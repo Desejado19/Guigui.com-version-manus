@@ -195,7 +195,7 @@ Expected: exit code 0 para frontend e bundle de produção do servidor.
 
 Encerrar o processo iniciado no Step 5 e remover apenas o diretório temporário exato criado para `GUIGUI_DATA_DIR`; não tocar em `data/`, `backups/`, `.env` ou outros artefactos preexistentes.
 
-- [ ] **Step 9: Commit do runtime, teste de regressão e documentação verificados**
+- [x] **Step 9: Commit do runtime, teste de regressão e documentação verificados**
 
 ```bash
 git add server.ts tests/home.spec.ts docs/OPERATIONS.md docs/superpowers/plans/2026-10-19-guigui-ddd-foundation.md
