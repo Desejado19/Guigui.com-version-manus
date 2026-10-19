@@ -3298,7 +3298,10 @@ async function startServer() {
       // fica inconsistente após mudanças de código (depsInfo[id] undefined).
       // Desligar a pré-otimização evita o crash; o transform on-demand continua.
       // Vite 6.4 não aceita `disabled`; usar `noDiscovery: true` em vez disso.
-      optimizeDeps: { include: ['pako'], noDiscovery: true },
+      optimizeDeps: {
+        include: ['pako', 'jsqr', 'qrcode', 'react-dom/client'],
+        noDiscovery: true,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);

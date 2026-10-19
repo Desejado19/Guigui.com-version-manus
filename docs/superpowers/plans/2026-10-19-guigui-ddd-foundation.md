@@ -43,7 +43,7 @@
 - Consumes: scripts `npm run check` e `npm run dev`; tipo `CategoryGroupId` de `src/types.ts`; testes Playwright.
 - Produces: `node --check check-front.js` sem erro sintático; `npm run check` sem erros TypeScript; configuração de middleware Vite válida para Vite 6 e compatível com o objetivo existente de não abrir WebSocket standalone.
 
-- [ ] **Step 1: Reproduzir as falhas antes de alterar código**
+- [x] **Step 1: Reproduzir as falhas antes de alterar código**
 
 Run: `node --check check-front.js`
 Expected: FAIL apontando a string multilinha inválida no callback `page.evaluate`.
@@ -54,11 +54,11 @@ Expected: FAIL, primeiro pela sintaxe de `check-front.js`; após isolar esse err
 Run: `npx tsc --noEmit --allowJs false`
 Expected: a verificação diagnóstica ignora somente a análise JavaScript e mostra os quatro erros TypeScript já observados; não usar essa opção como correção permanente nem alterar `tsconfig.json` para excluir fontes.
 
-- [ ] **Step 2: Corrigir somente as causas reproduzidas**
+- [x] **Step 2: Corrigir somente as causas reproduzidas**
 
 Reparar a string passada a `page.evaluate` em `check-front.js` sem remover a verificação do helper. Na configuração Vite em middleware mode, trocar o valor numérico inválido de `server.ws` pela opção Vite 6 suportada que desativa o servidor WS standalone, preservando o comportamento pretendido para HMR. Corrigir os dois IDs corrompidos para o membro tipado `ongs_artesãos`. Colocar a mensagem de diagnóstico do teste de unicidade no primeiro `expect`, deixando `.toBe` com apenas o argumento esperado.
 
-- [ ] **Step 3: Verificar a reparação**
+- [x] **Step 3: Verificar a reparação**
 
 Run: `node --check check-front.js`
 Expected: exit code 0.
@@ -66,7 +66,7 @@ Expected: exit code 0.
 Run: `npm run check`
 Expected: exit code 0, sem erros TypeScript.
 
-- [ ] **Step 4: Commit do baseline**
+- [x] **Step 4: Commit do baseline**
 
 ```bash
 git add check-front.js server.ts src/components/BusinessDashboard.tsx tests/system-health.spec.ts
@@ -92,7 +92,7 @@ git commit -m "fix: restore local type-check baseline"
   - `export function classifyHealth(database: DatabaseHealth): HealthStatus`
   - `GET /api/health` mantém os campos atuais, com `status: 'degraded'` somente quando o PostgreSQL está configurado mas desconectado.
 
-- [ ] **Step 1: Escrever testes unitários que falhem inicialmente**
+- [x] **Step 1: Escrever testes unitários que falhem inicialmente**
 
 Em `tests/unit/healthService.test.ts`, adicionar:
 
@@ -110,20 +110,20 @@ it('reports degraded when configured PostgreSQL is disconnected', () => {
 });
 ```
 
-- [ ] **Step 2: Verificar RED**
+- [x] **Step 2: Verificar RED**
 
 Run: `npx vitest run tests/unit/healthService.test.ts`
 Expected: FAIL porque `server/healthService.ts` e `classifyHealth` ainda não existem.
 
-- [ ] **Step 3: Implementar classificador e ligar a rota**
+- [x] **Step 3: Implementar classificador e ligar a rota**
 
 Implementar `classifyHealth` em `server/healthService.ts` com a regra exata definida na interface. Usar o resultado no handler existente. Se `checkDatabaseConnection()` lançar, conservar `{ configured: true, connected: false }`, registar uma mensagem operacional sem credenciais e devolver a rota com HTTP 200 e `status: 'degraded'`; preservar `app`, `timestamp`, `geminiActive`, `database` e `observability`.
 
-- [ ] **Step 4: Cobrir o contrato HTTP e os estados do consumidor E2E**
+- [x] **Step 4: Cobrir o contrato HTTP e os estados do consumidor E2E**
 
 Em `tests/unit/securityRoutes.test.ts`, no ambiente de teste sem `DATABASE_URL`, afirmar que `/api/health` responde HTTP 200, `status: 'ok'`, `database.configured: false` e `database.connected: false`, mantendo `geminiActive` booleano. Em `tests/system-health.spec.ts`, substituir a exigência fixa de PostgreSQL ligado por assertions coerentes: sem base configurada, `ok`; base configurada e ligada, `ok`; base configurada mas desligada, `degraded`; manter os testes dos campos e do HTTP status.
 
-- [ ] **Step 5: Verificar GREEN e regressões**
+- [x] **Step 5: Verificar GREEN e regressões**
 
 Run: `npx vitest run tests/unit/healthService.test.ts tests/unit/securityRoutes.test.ts`
 Expected: PASS; três classificações e teste HTTP local aprovados.
@@ -131,7 +131,7 @@ Expected: PASS; três classificações e teste HTTP local aprovados.
 Run: `npm run test:unit`
 Expected: PASS para todos os testes antes aprovados; nenhum novo teste ignorado.
 
-- [ ] **Step 6: Commit do contrato de saúde**
+- [x] **Step 6: Commit do contrato de saúde**
 
 ```bash
 git add server/healthService.ts tests/unit/healthService.test.ts server.ts tests/unit/securityRoutes.test.ts tests/system-health.spec.ts
@@ -144,21 +144,37 @@ git commit -m "feat: report degraded database health explicitly"
 
 **Files:**
 - Modify: `docs/OPERATIONS.md`
-- Verify: `server.ts`, `scripts/dev.mjs`, `index.html`, `src/main.tsx`, `tests/home.spec.ts`, `tests/system-health.spec.ts`
+- Modify: `server.ts` — include the browser dependencies in Vite's explicit optimizeDeps list
+- Modify: `tests/home.spec.ts` — fail on browser JavaScript exceptions during initial SPA mount
+- Verify: `scripts/dev.mjs`, `index.html`, `src/main.tsx`, `tests/system-health.spec.ts`
 
 **Interfaces:**
 - Consumes: classificação de saúde criada na Task 2 e comando de desenvolvimento já existente.
 - Produces: instruções locais para modo JSON e PostgreSQL degradado; evidência runtime de SPA, módulo Vite transformado e endpoint de saúde.
 
-- [ ] **Step 1: Atualizar runbook local**
+- [x] **Step 1: Escrever o teste de regressão da montagem da SPA**
 
-Acrescentar a `docs/OPERATIONS.md` secção “Verificação local” com `npm run dev`, URL local, `npm run check`, `npm run test:unit`, `npm run build`, e a interpretação dos estados de `/api/health`: JSON local sem DB (`ok`, ambos os campos false), PostgreSQL conectado (`ok`), configurado mas desconectado (`degraded`). Não documentar credenciais nem apresentar integrações simuladas como reais.
+Em `tests/home.spec.ts`, no teste `opens the Guigui home page`, recolher eventos `pageerror` antes de `page.goto('/')` e afirmar que a lista fica vazia antes de verificar o título e o heading. A assertion deve identificar que erros JavaScript impediram a SPA de montar.
 
-- [ ] **Step 2: Iniciar desenvolvimento sem reutilizar dados locais**
+- [x] **Step 2: Verificar RED no browser**
+
+Run: `npx playwright test tests/home.spec.ts -g "opens the Guigui home page" --reporter=list`
+Expected: FAIL na assertion `pageerror` com o erro que a dependência `qrcode` importada não oferece o export nomeado `toDataURL`, confirmando por que React não monta o heading.
+
+- [x] **Step 3: Corrigir o limite de otimização da dependência e documentar**
+
+Como `noDiscovery: true` impede a descoberta automática, preservar o include existente de `pako` e acrescentar apenas os imports que os testes de montagem provaram problemáticos: `qrcode`, `jsqr` e o subpath efetivamente usado `react-dom/client`. Evitar pré-empacotar os restantes pacotes frontend sem evidência de que necessitam de interop CommonJS. Preservar `noDiscovery: true`, que evita o crash de otimização já observado. O WebSocket HMR não ligado em middleware mode pode emitir `WebSocket closed without opened`; essa mensagem exclusiva do servidor de desenvolvimento é filtrada pela asserção do teste, conforme os testes de saúde existentes. Acrescentar a `docs/OPERATIONS.md` secção “Verificação local” com `npm run dev`, URL local, `npm run check`, `npm run test:unit`, `npm run build`, e a interpretação dos estados de `/api/health`: JSON local sem DB (`ok`, ambos os campos false), PostgreSQL conectado (`ok`), configurado mas desconectado (`degraded`). Não documentar credenciais nem apresentar integrações simuladas como reais.
+
+- [x] **Step 4: Verificar GREEN no browser**
+
+Run: `npx playwright test tests/home.spec.ts -g "opens the Guigui home page" --reporter=list`
+Expected: PASS com o heading da home visível e sem eventos `pageerror`.
+
+- [x] **Step 5: Iniciar desenvolvimento sem reutilizar dados locais**
 
 Na mesma sessão PowerShell, definir `GUIGUI_DATA_DIR` para uma pasta nova sob `$env:TEMP`, `DATABASE_URL` para a string vazia (para impedir que `dotenv` carregue a configuração do `.env`) e `PORT=3000` se estiver livre. Iniciar `npm run dev` e manter o processo em execução. Não ler ou imprimir `.env`; não executar migrações, seed, importadores, backups nem endpoints de escrita.
 
-- [ ] **Step 3: Verificar runtime por HTTP**
+- [x] **Step 6: Verificar runtime por HTTP**
 
 Fazer pedidos somente GET:
 
@@ -168,33 +184,32 @@ Fazer pedidos somente GET:
 
 Se a porta 3000 estiver ocupada, iniciar com uma porta livre via `PORT` e definir o mesmo valor em `PW_PORT` na sessão usada pelo Playwright. Esperado: servidor continua estável, sem erro de compilação Vite nem servidor WebSocket standalone em conflito.
 
-- [ ] **Step 4: Executar verificações de entrega**
+- [x] **Step 7: Executar verificações de entrega**
 
-Com o servidor isolado em execução e `GUIGUI_DATA_DIR`, `DATABASE_URL` e `PW_PORT` configurados para o mesmo ambiente isolado, Run: `npm run test:e2e`.
-Expected: os fluxos E2E existentes passam; se algum requer PostgreSQL ou conta externa, reportar a dependência específica sem alterar a base ou enfraquecer o teste.
+Com o servidor isolado em execução, executar `npm run check`, `npm run test:unit`, o teste Playwright da home, o teste Playwright de saúde focado e `npm run build`. Todos passaram; a suíte unitária registou 262 passados e 21 skips já existentes. A suíte E2E completa foi tentada, mas não pode ser considerada verde: fluxos dependentes de contas demo/seed/PostgreSQL falham no ambiente JSON vazio e a execução ficou sem progresso, tendo sido interrompida. Na suíte de saúde, 14 passaram e 3 que exigem dados seed/PostgreSQL falharam; não foram semeados dados nem alterados testes.
 
 Run: `npm run build`
 Expected: exit code 0 para frontend e bundle de produção do servidor.
 
-- [ ] **Step 5: Limpar somente o processo e a pasta temporária criados pela validação**
+- [x] **Step 8: Limpar somente o processo e a pasta temporária criados pela validação**
 
-Encerrar o processo iniciado no Step 2 e remover apenas o diretório temporário exato criado para `GUIGUI_DATA_DIR`; não tocar em `data/`, `backups/`, `.env` ou outros artefactos preexistentes.
+Encerrar o processo iniciado no Step 5 e remover apenas o diretório temporário exato criado para `GUIGUI_DATA_DIR`; não tocar em `data/`, `backups/`, `.env` ou outros artefactos preexistentes.
 
-- [ ] **Step 6: Commit da documentação e baseline verificado**
+- [ ] **Step 9: Commit do runtime, teste de regressão e documentação verificados**
 
 ```bash
-git add docs/OPERATIONS.md
-git commit -m "docs: describe local degraded health verification"
+git add server.ts tests/home.spec.ts docs/OPERATIONS.md docs/superpowers/plans/2026-10-19-guigui-ddd-foundation.md
+git commit -m "fix: restore local SPA browser mounting"
 ```
 
 ---
 
 ## Final Verification
 
-- [ ] `node --check check-front.js` passa.
-- [ ] `npm run check` passa sem exclusões de ficheiros relevantes.
-- [ ] `npm run test:unit` passa; reportar os skips existentes separadamente.
-- [ ] `npm run build` passa.
-- [ ] Smoke runtime confirma HTML SPA, módulo Vite transformado e estados de saúde esperados.
-- [ ] `npm run test:e2e` é executado; reportar claramente quaisquer dependências ambientais.
+- [x] `node --check check-front.js` passa.
+- [x] `npm run check` passa sem exclusões de ficheiros relevantes.
+- [x] `npm run test:unit` passa; reportar os skips existentes separadamente.
+- [x] `npm run build` passa.
+- [x] Smoke runtime confirma HTML SPA, módulo Vite transformado e estados de saúde esperados.
+- [x] `npm run test:e2e` é executado; reportar claramente quaisquer dependências ambientais.
 - [ ] Apenas commits da especificação, das três fatias aprovadas e da documentação aparecem no histórico criado para esta tarefa; arquivos preexistentes continuam fora do staging.
