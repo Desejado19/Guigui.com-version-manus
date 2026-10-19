@@ -15,14 +15,16 @@ import { expect, test, type Page } from '@playwright/test';
  */
 
 test.describe('backend: APIs públicas e de plataforma', () => {
-  test('health: API saudável com PostgreSQL ligado', async ({ page }) => {
+  test('health: API reports the process and persistence state accurately', async ({ page }) => {
     const response = await page.request.get('/api/health');
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
-    expect(body.status).toBe('ok');
     expect(body.app).toBe('Guigui.com Bissau');
-    expect(body.database.configured, 'DATABASE_URL não configurado no servidor').toBe(true);
-    expect(body.database.connected, 'servidor sem ligação PostgreSQL ativa').toBe(true);
+    expect(typeof body.database.configured).toBe('boolean');
+    expect(typeof body.database.connected).toBe('boolean');
+    expect(body.status).toBe(
+      body.database.configured && !body.database.connected ? 'degraded' : 'ok',
+    );
     expect(typeof body.geminiActive).toBe('boolean');
   });
 

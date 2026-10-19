@@ -26,6 +26,7 @@ import { addSubscriptionPeriod } from './src/utils/subscriptions';
 import { sendTeamInvitation } from './server/emailService';
 import { createSession, getSession, revokeAllUserSessions, revokeSession, SESSION_COOKIE_NAME } from './server/sessionService';
 import { checkDatabaseConnection, databaseConfigured, databasePool } from './server/db';
+import { classifyHealth } from './server/healthService';
 import { changePostgresUserPassword, createPostgresUser, deactivatePostgresUser, deletePostgresUser, findPostgresUserByEmail, findPostgresUserById } from './server/postgresAuthService';
 import { activatePostgresTicketReservations, findPostgresTicket, listPostgresTicketsForUser, markPostgresTicketUsed, persistPostgresTickets, releaseExpiredPostgresTicketReservations } from './server/postgresTicketService';
 import { listPostgresTicketsForCompany } from './server/postgresTicketLifecycleService';
@@ -503,12 +504,16 @@ app.get('/api/health', async (req, res) => {
   if (databaseConfigured) {
     try {
       database = await checkDatabaseConnection();
-    } catch {
+    } catch (error) {
+      console.error(
+        '[Guigui.com] health database check failed:',
+        error instanceof Error ? error.message : 'unknown_error',
+      );
       database = { configured: true, connected: false };
     }
   }
   res.json({
-    status: 'ok',
+    status: classifyHealth(database),
     app: 'Guigui.com Bissau',
     timestamp: new Date().toISOString(),
     geminiActive: !!getAIClient(),
