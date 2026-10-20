@@ -137,6 +137,22 @@ interface AdminDashboardProps {
   onSidebarCollapsedChange?: (collapsed: boolean) => void;
 }
 
+const getPaymentStatusLabel = (
+  transaction: Pick<PaymentTransaction, 'status' | 'providerMode' | 'provider' | 'manualProofReference'>,
+) => {
+  if (transaction.provider === 'manual_transfer' || transaction.manualProofReference) {
+    return 'Registo legado; somente leitura';
+  }
+  if (transaction.status === 'confirmed_api') {
+    return transaction.providerMode === 'simulated' ? 'Confirmado em modo simulado' : 'Confirmado API Sandbox';
+  }
+  if (transaction.status === 'pending_provider') {
+    return transaction.providerMode === 'simulated' ? 'Pendente em modo simulado' : 'Pendente do provider';
+  }
+  if (transaction.status === 'pending_manual_confirmation') return 'Pendente de confirmação manual';
+  return transaction.status;
+};
+
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   businesses: initialBusinesses,
   events,
@@ -3195,7 +3211,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <td className="px-4 py-2 text-right font-mono font-bold text-slate-900">{t.amountXOF.toLocaleString('pt-PT')} XOF</td>
                       <td className="px-4 py-2">
                         <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-lg border ${t.status === 'confirmed_api' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                          {t.status === 'confirmed_api' ? 'Confirmado' : t.status === 'pending_manual_confirmation' ? 'Pendente' : t.status}
+                          {getPaymentStatusLabel(t)}
                         </span>
                       </td>
                       <td className="px-4 py-2 text-slate-500 font-mono">{t.createdAt || '—'}</td>
@@ -3610,7 +3626,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           )}
                           {item.status === 'confirmed_api' && (
                             <span className="bg-blue-100 text-blue-900 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-blue-200">
-                              Confirmado API Sandbox
+                              {getPaymentStatusLabel(item)}
+                            </span>
+                          )}
+                          {item.status === 'pending_provider' && (
+                            <span className="bg-amber-100 text-amber-900 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-amber-300">
+                              {getPaymentStatusLabel(item)}
                             </span>
                           )}
                           {item.status === 'confirmed_manual' && (
