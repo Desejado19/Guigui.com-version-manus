@@ -23,7 +23,6 @@ import { createPaymentAdapters } from './server/paymentService';
 import { localizeApiPayload, resolveRequestLanguage } from './server/i18n';
 import { LANGUAGE_CYCLE } from './src/utils/i18n';
 import { addSubscriptionPeriod } from './src/utils/subscriptions';
-import { sendTeamInvitation } from './server/emailService';
 import { createSession, getSession, revokeAllUserSessions, revokeSession, SESSION_COOKIE_NAME } from './server/sessionService';
 import { checkDatabaseConnection, databaseConfigured, databasePool } from './server/db';
 import { classifyHealth } from './server/healthService';
@@ -49,7 +48,9 @@ import { getProductFunnel, persistProductEvent } from './server/productAnalytics
 import { canViewTransaction, resolveTransactionAccess } from './server/paymentAccessService';
 import { resolveAppStateValue, resolveAppStateWrite, resolveBusinessWrite, resolveEventWrite } from './server/platformWriteAccess';
 import { startBackupScheduler, triggerLocalBackup } from './server/backupService';
-import { describeSmsGateway, sendSms } from './server/smsGatewayService';
+import { describeSmsGateway } from './server/smsGatewayService';
+import { deliverConfirmedTicketPurchase } from './server/ticketPurchaseDeliveryService';
+import { createSimulatedEmailAdapter, createSimulatedSmsAdapter } from './server/integrations/simulatedAdapters';
 import { createScheduledItem, ensureDemoScheduledItems, listScheduledItems, processDueScheduledItems, updateScheduledItem, SCHEDULING_TIMEZONE } from './server/schedulingService';
 import type { ScheduledItem } from './src/types';
 import type { MonetizationCatalog, MonetizationLedgerEntry, MonetizationWallet } from './src/types';
@@ -59,6 +60,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+const emailDelivery = createSimulatedEmailAdapter();
+const smsDelivery = createSimulatedSmsAdapter();
 const communicationStreams = new Set<import('express').Response>();
 const broadcastCommunication = (event: string, payload: Record<string, unknown>) => {
   const data = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
@@ -1373,17 +1376,26 @@ app.post('/api/business/team/invitations', requireRole('business'), async (req, 
   }
   try {
     createTeamInvitation({ email: recipientEmail, name: recipientName, businessId, businessName, role, permissions }, token);
-    await sendTeamInvitation({
+    const delivery = await emailDelivery.sendTeamInvitation({
+      invitationId: randomUUID(),
       recipientEmail: recipientEmail.trim().toLowerCase(),
       recipientName: recipientName.trim(),
       businessName: businessName.trim(),
       roleLabel: roleLabel.trim(),
-      token: token.trim(),
+      invitationUrl: `${process.env.APP_URL?.trim() || 'http://localhost:3000'}/?team_invite=${encodeURIComponent(token.trim())}`,
     });
-    return res.status(201).json({ success: true, message: 'Convite enviado por e-mail.' });
+    return res.status(201).json({
+      success: true,
+      simulated: delivery.mode === 'simulated',
+      delivery: { state: delivery.state, mode: delivery.mode, reference: delivery.reference },
+      message: 'Convite registado. O envio por e-mail está simulado e não foi realizado.',
+    });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Não foi possível enviar o convite por e-mail.';
-    return res.status(503).json({ error: message, code: 'TEAM_INVITATION_EMAIL_FAILED' });
+    console.error('team-invitation-simulation-failed', {
+      businessId,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    return res.status(503).json({ error: 'Não foi possível registar o convite simulado.', code: 'TEAM_INVITATION_SIMULATION_FAILED' });
   }
 });
 
@@ -2267,39 +2279,47 @@ app.post('/api/tickets/purchase', async (req, res) => {
     newTxn.qrTokens = newTickets.map((ticket) => ticket.qrToken);
     persistTickets();
     persistPayments();
+    let accountEmail: string | undefined;
+    let accountName: string | undefined;
     if (purchaseSession?.role === 'user') {
-      await persistPostgresNotification({
-        id: `notif-ticket-${txnId}`,
-        userId: purchaseSession.userId,
-        category: 'order_redemption',
-        title: 'O seu bilhete está disponível',
-        message: `A compra para ${primaryTicket.eventTitle} foi confirmada. O código e o QR Code estão disponíveis em Área pessoal > Meus bilhetes.`,
-        metadata: {
-          orderId: txnId,
+      try {
+        const account = databaseConfigured
+          ? await findPostgresUserById(purchaseSession.userId)
+          : findUserById(purchaseSession.userId);
+        accountEmail = account?.email;
+        accountName = account?.name;
+      } catch (error) {
+        console.error('ticket-purchase-account-lookup-failed', {
           transactionId: txnId,
-          ticketId: primaryTicket.id,
-          ticketCode: primaryTicket.ticketCode,
-          eventId: primaryTicket.eventId,
-        },
-        createdAt: new Date().toISOString(),
-      });
-
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+        });
+      }
     }
 
-    // Entrega real do bilhete por SMS. O estado devolvido pelo gateway viaja
-    // na resposta, para o cliente saber se o SMS saiu ou ficou por entregar.
-    const message1 = `[Guigui.com] ${ticketQuantity > 1 ? `${ticketQuantity} bilhetes confirmados` : 'Bilhete confirmado'} para ${primaryTicket.eventTitle}! ${ticketQuantity > 1 ? `Códigos: ${newTickets.map((ticket) => ticket.ticketCode).join(', ')}` : `Seu código: ${primaryTicket.ticketCode}`}.`;
-    const message2 = `[Guigui.com] ${ticketQuantity > 1 ? `Foram gerados ${ticketQuantity} PINs individuais. O primeiro é ${primaryTicket.pinCode}; consulte os restantes na sua conta.` : `O seu código PIN de segurança para a porta do evento é: ${primaryTicket.pinCode}.`} Não partilhe com terceiros.`;
-    const smsDelivery1 = await sendSms({ to: primaryTicket.buyerPhone, text: message1, reference: `${txnId}-1` });
-    const smsDelivery2 = await sendSms({ to: primaryTicket.buyerPhone, text: message2, reference: `${txnId}-2` });
+    const delivery = await deliverConfirmedTicketPurchase({
+      transactionId: txnId,
+      accountUserId: purchaseSession?.role === 'user' ? purchaseSession.userId : undefined,
+      accountEmail,
+      accountName,
+      eventId: primaryTicket.eventId || eventId,
+      eventTitle: primaryTicket.eventTitle || 'Evento Cultural Guigui',
+      totalAmountXOF: chargedAmountXOF,
+      tickets: newTickets,
+    }, { email: emailDelivery, sms: smsDelivery });
     recordAudit({
       action: 'ticket_sms_dispatch',
       resource: 'ticket',
       resourceId: txnId,
       actorRole: 'system',
       requestId,
-      success: smsDelivery1.state !== 'failed',
-      metadata: { mode: smsDelivery1.mode, state1: smsDelivery1.state, state2: smsDelivery2.state, providerRef: smsDelivery1.providerRef },
+      success: delivery.sms.state !== 'failed',
+      metadata: {
+        mode: delivery.sms.mode,
+        state: delivery.sms.state,
+        referenceCount: delivery.sms.references.length,
+        emailState: delivery.email.state,
+        notificationState: delivery.notification.state,
+      },
     });
 
     const responsePayload = {
@@ -2309,14 +2329,14 @@ app.post('/api/tickets/purchase', async (req, res) => {
       feeBreakdown: ticketFeeBreakdown,
       transaction: newTxn,
       sms: {
-        mode: smsDelivery1.mode,
-        delivered: smsDelivery1.state === 'delivered' || smsDelivery1.state === 'accepted',
-        state1: smsDelivery1.state,
-        state2: smsDelivery2.state,
-        ...(smsDelivery1.error ? { error: smsDelivery1.error } : {}),
+        mode: delivery.sms.mode,
+        state: delivery.sms.state,
       },
-      // Mantido para o ecrã de simulação local, que mostra o conteúdo das mensagens.
-      smsSimulated: { message1, message2 },
+      delivery: {
+        email: delivery.email,
+        notification: delivery.notification,
+        sms: { state: delivery.sms.state, mode: delivery.sms.mode },
+      },
     };
     if (idempotencyKey) {
       purchaseIdempotency.set(idempotencyKey, { createdAt: Date.now(), response: responsePayload });
@@ -2366,7 +2386,7 @@ app.post('/api/tickets/lookup', async (req, res) => {
   return res.json({ success: true, ticket: { id: ticket.id, ticketCode: ticket.ticketCode, eventId: ticket.eventId, eventTitle: ticket.eventTitle, ticketTypeName: ticket.ticketTypeName, buyerName: ticket.buyerName, buyerPhone: ticket.buyerPhone, status: ticket.status, purchasedAt: ticket.purchasedAt, expiresAt: ticket.expiresAt, viewPath: `/bilhete/${encodeURIComponent(ticket.qrToken)}` }, requestId });
 });
 
-// Reenvio de SMS com cooldown e limite diário, entregue pelo gateway configurado.
+// Reenvio de SMS com cooldown e limite diário, atualmente sempre simulado.
 app.post('/api/tickets/resend-sms', async (req, res) => {
   const requestId = requestIdFrom(req);
   const phone = normalizeLookupPhone(req.body?.phone);
@@ -2386,30 +2406,24 @@ app.post('/api/tickets/resend-sms', async (req, res) => {
   const count = current?.dayKey === dayKey ? current.count : 0;
   if (count >= SMS_RESEND_DAILY_MAX) return res.status(429).json({ success: false, code: 'SMS_DAILY_LIMIT', message: 'O limite diário de reenvios foi atingido.', requestId });
   smsResendWindows.set(key, { lastSentAt: now, dayKey, count: count + 1 });
-  // Reenvio pelo gateway configurado, com o estado real de entrega na resposta.
   const resendMessage = `[Guigui.com] Reenvio do seu bilhete ${ticket.ticketCode} para ${ticket.eventTitle || 'o evento'}. Código: ${ticket.ticketCode}.`;
-  const resendDelivery = await sendSms({ to: phone, text: resendMessage, reference: `resend-${ticket.id}` });
+  const resendDelivery = await smsDelivery.send({ to: phone, text: resendMessage, reference: `resend-${ticket.id}` });
   recordAudit({
     action: 'ticket_sms_resend_requested',
     resource: 'ticket',
     resourceId: ticket.id,
     actorRole: 'citizen',
     requestId,
-    success: resendDelivery.state !== 'failed',
-    metadata: { mode: resendDelivery.mode, state: resendDelivery.state, attempt: count + 1, providerRef: resendDelivery.providerRef },
+    success: true,
+    metadata: { mode: resendDelivery.mode, state: resendDelivery.state, attempt: count + 1, reference: resendDelivery.reference },
   });
-  const delivered = resendDelivery.state === 'delivered' || resendDelivery.state === 'accepted';
   return res.json({
-    success: delivered,
-    simulated: resendDelivery.state === 'simulated',
+    success: true,
+    simulated: true,
     smsState: resendDelivery.state,
     mode: resendDelivery.mode,
-    message: resendDelivery.state === 'simulated'
-      ? 'Gateway de SMS não configurado: o pedido foi registado, mas o SMS não foi entregue.'
-      : delivered
-        ? 'SMS reenviado.'
-        : `Não foi possível entregar o SMS (${resendDelivery.error || resendDelivery.state}).`,
-    delivery: { ticketLink: `/bilhete/${encodeURIComponent(ticket.qrToken)}`, pinSent: delivered },
+    message: 'Pedido de reenvio registado em modo simulado; o SMS não foi enviado.',
+    delivery: { ticketLink: `/bilhete/${encodeURIComponent(ticket.qrToken)}`, pinSent: false },
     requestId,
   });
 });
