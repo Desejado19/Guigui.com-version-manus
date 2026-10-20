@@ -268,6 +268,18 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
   onSidebarCollapsedChange,
 }) => {
   const t = (key: string, variables?: Record<string, string | number>) => getTranslation(currentLang, key, variables);
+  const paymentStatusMessage = (transaction: { status?: string; providerMode?: string }) => {
+    if (transaction.status === 'confirmed_api') {
+      return transaction.providerMode === 'simulated' ? t('paymentSimulationConfirmed') : t('paymentConfirmed');
+    }
+    if (transaction.status === 'failed') {
+      return transaction.providerMode === 'simulated' ? t('paymentSimulationFailed') : t('paymentFailed');
+    }
+    if (transaction.status === 'confirmed_manual' || transaction.status === 'reconciled') {
+      return t('paymentManualConfirmationUnsupported');
+    }
+    return transaction.providerMode === 'simulated' ? t('paymentSimulationPending') : t('paymentConfirmationPending');
+  };
 
   const [activeTab, setActiveTab] = useState<BusinessDashboardTab>('overview');
   const [selectedBusinessPost, setSelectedBusinessPost] = useState<BusinessPost | null>(null);
@@ -723,8 +735,8 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
         throw new Error(data.error || 'O pagamento do upgrade n�o foi aceite.');
       }
 
-      if (data.transaction.status !== 'confirmed_api' && data.transaction.status !== 'confirmed_manual' && data.transaction.status !== 'reconciled') {
-        alert(`Pagamento registado (#${data.transaction.id}) e pendente de confirma��o. O plano s� ser� activado depois da confirma��o.`);
+      if (data.transaction.status !== 'confirmed_api') {
+        alert(paymentStatusMessage(data.transaction));
         return;
       }
 
@@ -755,7 +767,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
       onUpdateBusiness?.(updatedBiz);
       setPostsQuota(selectedPlan.postsPerMonth === 'unlimited' || selectedPlan.postsPerMonth === 'negotiated' ? Number.MAX_SAFE_INTEGER : Number(selectedPlan.postsPerMonth || 0));
       setShowUpgradeModal(false);
-      alert(`PLANO ${selectedPlan.name.toUpperCase()} ACTIVADO COM SUCESSO!\n\nPer�odo: ${isAnnualBilling ? 'anual' : 'mensal'}. Pr�xima renova��o: ${new Date(renewDate).toLocaleDateString('pt-PT')}. Limites configurados: ${limitLabel(selectedPlan.postsPerMonth)} posts e ${limitLabel(selectedPlan.promotionsPerMonth)} promo��es por m�s.`);
+      alert(`${paymentStatusMessage(data.transaction)}\n\nPLANO ${selectedPlan.name.toUpperCase()} ACTIVADO COM SUCESSO!\n\nPer�odo: ${isAnnualBilling ? 'anual' : 'mensal'}. Pr�xima renova��o: ${new Date(renewDate).toLocaleDateString('pt-PT')}. Limites configurados: ${limitLabel(selectedPlan.postsPerMonth)} posts e ${limitLabel(selectedPlan.promotionsPerMonth)} promo��es por m�s.`);
     } catch (err) {
       alert(err instanceof Error ? err.message : t('business.upgradeFailed'));
     } finally {
@@ -1183,7 +1195,9 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
       const response = await fetch('/api/payments/create', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': `ad-${business.id}-${advertisingProduct.code}-${Date.now()}` }, body: JSON.stringify({ useCase: 'advertising_purchase', useCaseLabel: advertisingProduct.name, productId: advertisingProduct.id, productCode: advertisingProduct.code, quantity: 1, businessId: business.id, businessName: business.name, payerName: business.ownerName || business.name, payerPhone: mobileMoneyPhone.startsWith('+245') ? mobileMoneyPhone : `+245 ${mobileMoneyPhone}`, amountXOF: amount, provider: selectedPaymentProvider === 'orange' ? 'orange_money' : 'telecel' }) });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'N�o foi poss�vel iniciar o pagamento da publicidade.');
-      setMonetizationNotice(result.transaction?.status === 'confirmed_api' ? `${advertisingProduct.name} pago e registado.` : `Pedido de pagamento registado para ${advertisingProduct.name}.`);
+      setMonetizationNotice(result.transaction
+        ? `${paymentStatusMessage(result.transaction)} ${advertisingProduct.name}.`
+        : `Pagamento registado para ${advertisingProduct.name}.`);
     } catch (error) { setMonetizationNotice(error instanceof Error ? error.message : 'N�o foi poss�vel iniciar o pagamento.'); }
   };
 
@@ -1218,18 +1232,14 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
       setIsProcessingPayment(false);
       setShowBuyPostModal(false);
 
-      if (data.transaction.status === 'pending_manual_confirmation') {
-        alert(
-          `Pedido de pagamento registado (#${data.transaction.id})!\n\nEnvie ${postExtraPrice.toLocaleString('pt-PT')} XOF via ${
-            selectedPaymentProvider === 'orange' ? 'Orange Money (+245 955 00 00)' : 'Telecel (+245 966 00 00)'
-          }.\nO cr�dito ser� adicionado depois da confirma��o da equipa financeira.`
-        );
-      } else {
-        const previousWallet: MonetizationWallet = business.monetizationWallet || { postsExtraPurchased: 0, promotionsExtraPurchased: 0, postsExtraUsed: 0, promotionsExtraUsed: 0, updatedAt: new Date().toISOString() };
-        onUpdateBusiness?.({ ...business, monetizationWallet: { ...previousWallet, postsExtraPurchased: previousWallet.postsExtraPurchased + extraPostQuantity, updatedAt: new Date().toISOString() } });
-        setPostsQuota((prev) => prev + extraPostQuantity);
-        alert(`Pagamento de ${postExtraPrice.toLocaleString('pt-PT')} XOF confirmado via SMS/API! +${extraPostQuantity} post(s) extra(s) adicionado(s) � carteira.`);
+      if (data.transaction.status !== 'confirmed_api') {
+        alert(paymentStatusMessage(data.transaction));
+        return;
       }
+      const previousWallet: MonetizationWallet = business.monetizationWallet || { postsExtraPurchased: 0, promotionsExtraPurchased: 0, postsExtraUsed: 0, promotionsExtraUsed: 0, updatedAt: new Date().toISOString() };
+      onUpdateBusiness?.({ ...business, monetizationWallet: { ...previousWallet, postsExtraPurchased: previousWallet.postsExtraPurchased + extraPostQuantity, updatedAt: new Date().toISOString() } });
+      setPostsQuota((prev) => prev + extraPostQuantity);
+      alert(`${paymentStatusMessage(data.transaction)} +${extraPostQuantity} post(s) extra(s) adicionado(s) � carteira.`);
     } catch (err) {
       console.error(err);
       setIsProcessingPayment(false);
@@ -1268,17 +1278,13 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
       setIsProcessingPayment(false);
       setShowBuyPromoModal(false);
 
-      if (data.transaction.status === 'pending_manual_confirmation') {
-        alert(
-          `Pedido de pagamento registado (#${data.transaction.id})!\n\nEnvie ${promotionExtraPrice.toLocaleString('pt-PT')} XOF via ${
-            selectedPaymentProvider === 'orange' ? 'Orange Money (+245 955 00 00)' : 'Telecel (+245 966 00 00)'
-          }.\nO destaque ser� ativado depois da confirma��o da equipa financeira.`
-        );
-      } else {
-        const previousWallet: MonetizationWallet = business.monetizationWallet || { postsExtraPurchased: 0, promotionsExtraPurchased: 0, postsExtraUsed: 0, promotionsExtraUsed: 0, updatedAt: new Date().toISOString() };
-        onUpdateBusiness?.({ ...business, monetizationWallet: { ...previousWallet, promotionsExtraPurchased: previousWallet.promotionsExtraPurchased + extraPromotionQuantity, updatedAt: new Date().toISOString() } });
-        alert(`Pagamento de ${promotionExtraPrice.toLocaleString('pt-PT')} XOF confirmado via SMS/API! +${extraPromotionQuantity} promo��o(�es) extra(s) adicionada(s) � carteira.`);
+      if (data.transaction.status !== 'confirmed_api') {
+        alert(paymentStatusMessage(data.transaction));
+        return;
       }
+      const previousWallet: MonetizationWallet = business.monetizationWallet || { postsExtraPurchased: 0, promotionsExtraPurchased: 0, postsExtraUsed: 0, promotionsExtraUsed: 0, updatedAt: new Date().toISOString() };
+      onUpdateBusiness?.({ ...business, monetizationWallet: { ...previousWallet, promotionsExtraPurchased: previousWallet.promotionsExtraPurchased + extraPromotionQuantity, updatedAt: new Date().toISOString() } });
+      alert(`${paymentStatusMessage(data.transaction)} +${extraPromotionQuantity} promo��o(�es) extra(s) adicionada(s) � carteira.`);
     } catch (err) {
       console.error(err);
       setIsProcessingPayment(false);
@@ -5244,7 +5250,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                 disabled={isProcessingPayment}
                 className="w-full py-3.5 bg-[var(--color-green-600)] hover:bg-[var(--color-green-700)] text-white font-extrabold rounded-xl transition shadow-sm flex items-center justify-center gap-2 min-h-[44px]"
               >
-                <span>{isProcessingPayment ? 'A Processar SMS...' : `Pagar ${postExtraPrice.toLocaleString('pt-PT')} XOF via Telem�vel`}</span>
+                <span>{isProcessingPayment ? 'A processar simulação...' : `Simular pagamento de ${postExtraPrice.toLocaleString('pt-PT')} XOF`}</span>
               </Button>
             </form>
           </div>
@@ -5257,7 +5263,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
             <div className="flex items-center justify-between border-b pb-3"><h3 className="font-extrabold text-[var(--color-text-strong)] text-base flex items-center gap-2"><Tag className="w-5 h-5 text-[var(--color-gold-600)]" /><span>{t('business.ComprarPromocaoExtra')}</span></h3><button type="button" onClick={() => setShowBuyPromoModal(false)} className="guigui-close-button" aria-label={t('business.FecharCompraPromocao')} title="Fechar"><X className="w-4 h-4" /></button></div>
             <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">{t('business.EscolhaPacotePromocoes')}</p>
             <div className="bg-[var(--color-gold-50)] p-4 rounded-2xl border-[var(--color-gold-200)] space-y-3 font-mono"><div className="flex items-center justify-between gap-3"><div><div className="text-[10px] text-[var(--color-gold-800)] uppercase font-bold">Destaques promocionais</div><div className="text-xs text-[var(--color-gold-700)]">{t('business.PrecoQuantidadeDefinidos')}</div></div><select value={extraPromotionQuantity} onChange={(e) => setExtraPromotionQuantity(Number(e.target.value) || 1)} className="rounded-xl border-[var(--color-gold-200)] bg-[var(--color-bg-surface)] px-2 py-2 text-xs font-black text-[var(--color-gold-900)]" aria-label={t('business.PacotePromocoesExtra')}>{(promotionExtraProduct?.priceRules || [{ id: 'promotion-extra-default', quantity: 1, label: '+1 promo��o', price: pricingConfig.extraPromotionPriceXOF }]).map((rule) => <option key={rule.id} value={rule.quantity}>{rule.label}</option>)}</select></div><div className="text-right text-base font-black text-[var(--color-gold-700)]">{promotionExtraPrice.toLocaleString('pt-PT')} XOF</div></div>
-            <form onSubmit={handleBuyExtraPromo} className="space-y-4 text-xs"><div><label className="block text-[var(--color-text-strong)] font-semibold mb-1">{t('business.SeleccioneCarteiraTelemovel')}</label><div className="grid grid-cols-2 gap-3"><button type="button" onClick={() => setSelectedPaymentProvider('orange')} className={`p-3 rounded-xl border text-center font-bold transition ${selectedPaymentProvider === 'orange' ? 'border-[var(--color-gold-500)] bg-[var(--color-gold-50)] text-[var(--color-gold-900)] ring-2 ring-[var(--color-gold-500)]' : 'border-[var(--color-border-subtle)] text-[var(--color-text-muted)]'}`}>Orange Money</button><button type="button" onClick={() => setSelectedPaymentProvider('telecel')} className={`p-3 rounded-xl border text-center font-bold transition ${selectedPaymentProvider === 'telecel' ? 'border-[var(--color-green-600)] bg-[var(--color-green-50)] text-[var(--color-green-900)] ring-2 ring-[var(--color-green-600)]' : 'border-[var(--color-border-subtle)] text-[var(--color-text-muted)]'}`}>Telecel Cash</button></div></div><div><label className="block text-[var(--color-text-strong)] font-semibold mb-1">{t('business.NumeroTelemovel2452')}</label><input type="text" required value={mobileMoneyPhone} onChange={(e) => setMobileMoneyPhone(e.target.value)} className="w-full bg-[var(--color-bg-subtle)] border-[var(--color-border-subtle)] rounded-xl p-3 font-mono text-[var(--color-text-strong)]" /></div><button type="submit" disabled={isProcessingPayment} className="w-full py-3.5 bg-[var(--color-gold-600)] hover:bg-[var(--color-gold-700)] text-white font-extrabold rounded-xl transition shadow-sm min-h-[44px]">{isProcessingPayment ? 'A Processar SMS...' : `Pagar ${promotionExtraPrice.toLocaleString('pt-PT')} XOF via Telem�vel`}</button></form>
+            <form onSubmit={handleBuyExtraPromo} className="space-y-4 text-xs"><div><label className="block text-[var(--color-text-strong)] font-semibold mb-1">{t('business.SeleccioneCarteiraTelemovel')}</label><div className="grid grid-cols-2 gap-3"><button type="button" onClick={() => setSelectedPaymentProvider('orange')} className={`p-3 rounded-xl border text-center font-bold transition ${selectedPaymentProvider === 'orange' ? 'border-[var(--color-gold-500)] bg-[var(--color-gold-50)] text-[var(--color-gold-900)] ring-2 ring-[var(--color-gold-500)]' : 'border-[var(--color-border-subtle)] text-[var(--color-text-muted)]'}`}>Orange Money</button><button type="button" onClick={() => setSelectedPaymentProvider('telecel')} className={`p-3 rounded-xl border text-center font-bold transition ${selectedPaymentProvider === 'telecel' ? 'border-[var(--color-green-600)] bg-[var(--color-green-50)] text-[var(--color-green-900)] ring-2 ring-[var(--color-green-600)]' : 'border-[var(--color-border-subtle)] text-[var(--color-text-muted)]'}`}>Telecel Cash</button></div></div><div><label className="block text-[var(--color-text-strong)] font-semibold mb-1">{t('business.NumeroTelemovel2452')}</label><input type="text" required value={mobileMoneyPhone} onChange={(e) => setMobileMoneyPhone(e.target.value)} className="w-full bg-[var(--color-bg-subtle)] border-[var(--color-border-subtle)] rounded-xl p-3 font-mono text-[var(--color-text-strong)]" /></div><button type="submit" disabled={isProcessingPayment} className="w-full py-3.5 bg-[var(--color-gold-600)] hover:bg-[var(--color-gold-700)] text-white font-extrabold rounded-xl transition shadow-sm min-h-[44px]">{isProcessingPayment ? 'A processar simulação...' : `Simular pagamento de ${promotionExtraPrice.toLocaleString('pt-PT')} XOF`}</button></form>
           </div>
         </div>
       )}
@@ -5389,12 +5395,6 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
     </div>
   );
 };
-
-
-
-
-
-
 
 
 

@@ -96,7 +96,8 @@ export const EventsView: React.FC<EventsViewProps> = ({
   // Purchase Result State
   const [purchasedTickets, setPurchasedTickets] = useState<TicketType[]>([]);
   const [purchaseDelivery, setPurchaseDelivery] = useState<{
-    email: 'sent' | 'failed' | 'not_configured' | 'unavailable';
+    paymentSimulated: boolean;
+    email: 'sent' | 'simulated' | 'failed' | 'unavailable';
     notification: 'created' | 'failed' | 'unavailable';
     sms: 'sent' | 'simulated' | 'failed';
   } | null>(null);
@@ -108,6 +109,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
     transactionId?: string;
     providerRef?: string;
     reservationExpiresAt?: string;
+    providerMode?: string;
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const purchaseIdempotencyKeyRef = useRef<string | null>(null);
@@ -275,6 +277,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
           transactionId: result.transaction?.id,
           providerRef: result.transaction?.providerRef,
           reservationExpiresAt: result.reservationExpiresAt,
+          providerMode: result.transaction?.providerMode,
         });
         setIsPurchaseModalOpen(false);
         return;
@@ -292,11 +295,16 @@ export const EventsView: React.FC<EventsViewProps> = ({
         : [result.ticket];
       const emailState = result.delivery?.email?.state;
       const notificationState = result.delivery?.notification?.state;
-      const smsDelivered = result.delivery?.sms?.delivered === true;
+      const smsState = result.delivery?.sms?.state;
       setPurchaseDelivery({
-        email: emailState === 'sent' || emailState === 'failed' || emailState === 'not_configured' ? emailState : 'unavailable',
+        paymentSimulated: result.transaction?.providerMode === 'simulated',
+        email: emailState === 'delivered' || emailState === 'accepted' ? 'sent'
+          : emailState === 'simulated' || emailState === 'failed' ? emailState
+          : 'unavailable',
         notification: notificationState === 'created' || notificationState === 'failed' ? notificationState : 'unavailable',
-        sms: smsDelivered ? 'sent' : result.delivery?.sms?.mode === 'simulated' ? 'simulated' : 'failed',
+        sms: smsState === 'delivered' || smsState === 'accepted' ? 'sent'
+          : smsState === 'simulated' ? 'simulated'
+          : 'failed',
       });
       if (currentUser?.role === 'user' && typeof result.transaction?.id === 'string') {
         onTicketPurchaseConfirmed?.({
@@ -758,6 +766,9 @@ export const EventsView: React.FC<EventsViewProps> = ({
               <div>
                 <h2 className="text-lg font-extrabold text-amber-700">Pagamento pendente</h2>
                 <p className="mt-2 text-sm text-slate-700">{paymentPending.message}</p>
+                {paymentPending.providerMode === 'simulated' && (
+                  <p className="mt-2 text-xs font-semibold text-amber-800">{t('ticketPaymentPendingSimulated')}</p>
+                )}
               </div>
               {(paymentPending.providerRef || paymentPending.transactionId) && (
                 <p className="text-xs text-slate-600">
@@ -818,9 +829,10 @@ export const EventsView: React.FC<EventsViewProps> = ({
               </div>
               {purchaseDelivery && (
                 <div className="ticket-delivery-status space-y-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100" role="status" aria-live="polite">
+                  {purchaseDelivery.paymentSimulated && <p>{t('ticketPaymentSimulated')}</p>}
                   <p>
                     {purchaseDelivery.email === 'sent' ? t('ticketEmailSent')
-                      : purchaseDelivery.email === 'not_configured' ? t('ticketEmailNotConfigured')
+                     : purchaseDelivery.email === 'simulated' ? t('ticketEmailSimulated')
                       : purchaseDelivery.email === 'failed' ? t('ticketEmailFailed')
                       : t('ticketEmailUnavailable')}
                   </p>

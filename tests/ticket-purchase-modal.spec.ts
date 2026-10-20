@@ -123,13 +123,13 @@ test('submits the selected ticket and handles pending and confirmed payments wit
         contentType: 'application/json',
         body: JSON.stringify({
           success: true,
-          transaction: { id: 'TXN-CONFIRMED-TEST' },
+          transaction: { id: 'TXN-CONFIRMED-TEST', providerMode: 'simulated', status: 'confirmed_api' },
           ticket: makeTicket(1),
           tickets: [makeTicket(1), makeTicket(2), makeTicket(3)],
           delivery: {
-            email: { state: 'sent' },
+            email: { state: 'simulated' },
             notification: { state: 'created' },
-            sms: { delivered: true, mode: 'live' },
+            sms: { state: 'simulated', mode: 'simulated' },
           },
         }),
       });
@@ -141,9 +141,9 @@ test('submits the selected ticket and handles pending and confirmed payments wit
       body: JSON.stringify({
         success: false,
         paymentPending: true,
-        transaction: { id: 'TXN-TEST', providerRef: 'MANUAL-TEST' },
+        transaction: { id: 'TXN-TEST', providerRef: 'TEL-SIM-TXN-TEST', providerMode: 'simulated', status: 'pending_provider' },
         reservationExpiresAt: '2026-12-03T12:00:00.000Z',
-        message: 'Transferência pendente para validação.',
+        message: 'Pagamento simulado pendente; os bilhetes não foram emitidos.',
       }),
     });
   });
@@ -210,8 +210,10 @@ test('submits the selected ticket and handles pending and confirmed payments wit
   await dialog.getByRole('button', { name: /Confirmar e Pagar/ }).click();
 
   const pendingDialog = page.getByRole('dialog', { name: 'Pagamento pendente' });
-  await expect(pendingDialog).toContainText('Transferência pendente para validação.');
-  await expect(pendingDialog).toContainText('MANUAL-TEST');
+  await expect(pendingDialog).toContainText('Pagamento simulado pendente; os bilhetes não foram emitidos.');
+  await expect(pendingDialog).toContainText('TEL-SIM-TXN-TEST');
+  await expect(pendingDialog).toContainText('Pagamento em modo simulado.');
+  await expect(page.getByRole('dialog', { name: 'Comprovativo da compra' })).toHaveCount(0);
   expect(purchaseRequests[0].body).toMatchObject({
     eventId: 'event-test',
     eventTitle: 'Festival de Teste',
@@ -244,8 +246,9 @@ test('submits the selected ticket and handles pending and confirmed payments wit
   ));
   expect(openingContentBounds.every(({ top, bottom }) => top >= 0 && bottom <= 640)).toBe(true);
   await expect(receipt).toContainText('Compra concluída com sucesso');
-  await expect(receipt).toContainText('Bilhetes enviados para o e-mail da sua conta.');
-  await expect(receipt).toContainText('SMS de confirmação enviado ao titular do bilhete.');
+  await expect(receipt).toContainText('Pagamento confirmado em modo simulado; não houve cobrança real.');
+  await expect(receipt).toContainText('E-mail simulado, mas não enviado.');
+  await expect(receipt).toContainText('SMS simulado, mas não enviado.');
   expect(JSON.parse((await page.locator('body').getAttribute('data-ticket-purchase-notification')) || 'null'))
     .toMatchObject({
       transactionId: 'TXN-CONFIRMED-TEST',

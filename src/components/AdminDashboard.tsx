@@ -850,6 +850,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // 1-Click Confirm Manual Payment
   const handleConfirmManualPayment = async (txnId: string) => {
     if (!isPlatformTransaction(txnId)) return;
+    const transaction = paymentTransactionsList.find((item) => item.id === txnId);
+    if (!transaction || transaction.provider === 'manual_transfer' || transaction.manualProofReference) {
+      alert('Pagamentos legados com comprovativo manual não podem ser confirmados neste modo simulado.');
+      return;
+    }
     try {
       const res = await fetch('/api/payments/confirm', {
         method: 'POST',
@@ -858,7 +863,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success || !data.transaction) throw new Error(data.error || 'O backend não confirmou o pagamento.');
-      const transaction = paymentTransactionsList.find((item) => item.id === txnId);
       onSystemEvent?.({
         eventType: 'PAYMENT_CONFIRMED',
         businessId: transaction?.businessId,
@@ -3599,6 +3603,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               Pendente Confirmação MVP
                             </span>
                           )}
+                          {item.status === 'pending_manual_confirmation' && (item.provider === 'manual_transfer' || item.manualProofReference) && (
+                            <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-slate-300">
+                              Registo legado; não confirmar
+                            </span>
+                          )}
                           {item.status === 'confirmed_api' && (
                             <span className="bg-blue-100 text-blue-900 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-blue-200">
                               Confirmado API Sandbox
@@ -3624,7 +3633,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         {/* Action Buttons */}
                         <td className="py-3.5 px-4 text-right space-y-1">
                           <div className="flex items-center justify-end gap-1.5">
-                            {item.status === 'pending_manual_confirmation' && (
+                            {item.status === 'pending_manual_confirmation' && item.provider !== 'manual_transfer' && !item.manualProofReference && (
                               <button type="button"
                                 onClick={() => handleConfirmManualPayment(item.id)}
                                 className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-2.5 py-1 rounded-lg text-[10px] transition shadow-sm"
