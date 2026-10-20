@@ -2161,7 +2161,7 @@ app.post('/api/tickets/purchase', async (req, res) => {
 
     const txnId = `TXN-${Date.now()}-${randomBytes(3).toString('hex').toUpperCase()}`;
     const paymentAdapter = paymentAdapters[paymentMethod];
-    const paymentIntent = paymentAdapter.createIntent({
+    const paymentIntent = await paymentAdapter.createIntent({
       transactionId: txnId,
           amountXOF: chargedAmountXOF,
           payerName: primaryTicket.buyerName,
@@ -2815,6 +2815,9 @@ app.post('/api/payments/webhook/:provider', async (req, res) => {
   const provider = req.params.provider as keyof typeof paymentAdapters;
   const adapter = paymentAdapters[provider];
   if (!adapter) return res.status(404).json({ error: 'Operadora não configurada.', code: 'PAYMENT_PROVIDER_NOT_CONFIGURED', requestId });
+  if (adapter.mode === 'simulated') {
+    return res.status(409).json({ error: 'Webhooks estão desactivados enquanto o pagamento estiver em modo de simulação.', code: 'PAYMENT_PROVIDER_NOT_ACTIVE', requestId });
+  }
   if (isProduction && !paymentWebhookSecret) return res.status(503).json({ error: 'Webhook de pagamentos não configurado no servidor.', code: 'PAYMENT_WEBHOOK_NOT_CONFIGURED', requestId });
   const signature = req.header('x-payment-signature') || req.header('x-webhook-signature');
   if (!adapter.verifyWebhook(req.body, signature)) {
@@ -2867,7 +2870,6 @@ app.post('/api/payments/create', async (req, res) => {
       payerPhone,
       amountXOF,
       provider,
-      manualProofReference,
     } = req.body;
 
     const commercialValidation = resolveCommercialPayment(req.body as Record<string, unknown>);
@@ -2903,27 +2905,17 @@ app.post('/api/payments/create', async (req, res) => {
     }
 
     const txnId = `TXN-${Date.now()}-${randomBytes(3).toString('hex').toUpperCase()}`;
-    const isManual = normalizedPayment.provider === 'manual_transfer' || !!manualProofReference;
     const paymentAdapter = paymentAdapters[normalizedPayment.provider];
-    const paymentIntent = isManual
-      ? paymentAdapters.manual_transfer.createIntent({
-          transactionId: txnId,
-          amountXOF: normalizedPayment.amountXOF,
-          payerName: normalizedPayment.payerName,
-          payerPhone: normalizedPayment.payerPhone,
-          description: useCaseLabel || 'Pagamento Guigui.com',
-          provider: 'manual_transfer',
-        })
-      : paymentAdapter.createIntent({
-          transactionId: txnId,
-          amountXOF: normalizedPayment.amountXOF,
-          payerName: normalizedPayment.payerName,
-          payerPhone: normalizedPayment.payerPhone,
-          description: useCaseLabel || 'Pagamento Guigui.com',
-          provider: normalizedPayment.provider,
-          metadata: { useCase: String(useCase || 'subscription_initial'), businessId: String(businessId || '') },
-        });
-    const paymentStatus = paymentIntent.state === 'confirmed' ? 'confirmed_api' : paymentIntent.state === 'failed' ? 'failed' : isManual ? 'pending_manual_confirmation' : 'pending_provider';
+    const paymentIntent = await paymentAdapter.createIntent({
+      transactionId: txnId,
+      amountXOF: normalizedPayment.amountXOF,
+      payerName: normalizedPayment.payerName,
+      payerPhone: normalizedPayment.payerPhone,
+      description: useCaseLabel || 'Pagamento Guigui.com',
+      provider: normalizedPayment.provider,
+      metadata: { useCase: String(useCase || 'subscription_initial'), businessId: String(businessId || '') },
+    });
+    const paymentStatus = paymentIntent.state === 'confirmed' ? 'confirmed_api' : paymentIntent.state === 'failed' ? 'failed' : 'pending_provider';
     const paymentTimestamp = new Date().toISOString().replace('T', ' ').substring(0, 16);
 
     const newTxn = {
@@ -2942,7 +2934,6 @@ app.post('/api/payments/create', async (req, res) => {
       providerMode: paymentAdapter.mode,
       checkoutUrl: paymentIntent.checkoutUrl,
       paymentInstructions: paymentIntent.instructions,
-      manualProofReference,
       ...(commercialValidation.code ? { productId: commercialValidation.productId, productCode: commercialValidation.code, quantity: commercialValidation.quantity } : {}),
       ...(useCase === 'subscription_initial' || useCase === 'subscription_renewal' || useCase === 'subscription_upgrade' ? {
         subscriptionInterval: req.body.subscriptionInterval === 'annual' ? 'annual' : 'monthly',
@@ -2975,7 +2966,7 @@ app.post('/api/payments/create', async (req, res) => {
       actorRole: 'citizen',
       requestId,
       success: true,
-      metadata: { provider: newTxn.provider, amountXOF: newTxn.amountXOF, useCase: newTxn.useCase, manual: isManual },
+      metadata: { provider: newTxn.provider, amountXOF: newTxn.amountXOF, useCase: newTxn.useCase },
     });
 
     if (useCase === 'event_tickets' && paymentIntent.state !== 'confirmed') {
@@ -3041,6 +3032,10 @@ app.post('/api/payments/confirm', requireRole('admin'), async (req, res) => {
 
   if (!txn) {
     return res.status(404).json({ error: 'Transação não encontrada.' });
+  }
+  if (txn.provider === 'manual_transfer' || txn.manualProofReference) {
+    recordAudit({ action: 'manual_payment_confirmation_rejected', resource: 'payment', resourceId: txn.id, actorRole: 'admin', requestId, success: false, metadata: { reason: 'manual_payments_disabled' } });
+    return res.status(409).json({ error: 'Pagamentos manuais históricos são apenas de leitura e não podem ser confirmados.', code: 'MANUAL_PAYMENT_DISABLED', requestId });
   }
   if (txn.useCase === 'event_tickets' || txn.useCase === 'event_refund') {
     return res.status(403).json({ error: 'Operação reservada à empresa organizadora.', code: 'TICKET_OPERATION_FORBIDDEN' });
