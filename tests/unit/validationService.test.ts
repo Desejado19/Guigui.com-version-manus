@@ -65,6 +65,8 @@ describe('validateUserIdentity', () => {
 describe('validatePurchaseInput', () => {
   const valid = {
     eventId: 'evt-1',
+    ticketTypeId: 'type-1',
+    quantity: 1,
     eventTitle: 'Concerto',
     ticketTypeName: 'Geral',
     priceXOF: 5000,
@@ -81,7 +83,16 @@ describe('validatePurchaseInput', () => {
     const result = validatePurchaseInput(valid);
     expect(result.ok).toBe(true);
     expect(result.value?.priceXOF).toBe(5000);
+    expect(result.value?.ticketTypeId).toBe('type-1');
+    expect(result.value?.quantity).toBe(1);
     expect(result.value?.paymentMethod).toBe('orange_money');
+  });
+
+  it('requires a selected ticket type and a whole quantity within the supported limit', () => {
+    expect(codes(validatePurchaseInput({ ...valid, ticketTypeId: '' }).issues)).toContain('required');
+    for (const quantity of [undefined, 0, -1, 1.5, 101]) {
+      expect(codes(validatePurchaseInput({ ...valid, quantity }).issues)).toContain('invalid_quantity');
+    }
   });
 
   it('requires holder name and phone to be provided together', () => {

@@ -31,6 +31,8 @@ export interface NormalizedIdentity {
 
 export interface PurchaseInput {
   eventId?: unknown;
+  ticketTypeId?: unknown;
+  quantity?: unknown;
   businessId?: unknown;
   eventTitle?: unknown;
   ticketTypeName?: unknown;
@@ -47,6 +49,8 @@ export interface PurchaseInput {
 
 export interface NormalizedPurchase {
   eventId: string;
+  ticketTypeId: string;
+  quantity: number;
   businessId?: string;
   eventTitle: string;
   ticketTypeName: string;
@@ -63,6 +67,8 @@ export interface NormalizedPurchase {
 
 export interface TicketForValidation {
   id: string;
+  ticketTypeId?: string;
+  buyerUserId?: string;
   businessId?: string;
   ticketCode: string;
   qrToken: string;
@@ -152,6 +158,7 @@ export function validateUserIdentity(input: UserIdentityInput): ValidationResult
 
 export function validatePurchaseInput(input: PurchaseInput): ValidationResult<NormalizedPurchase> {
   const eventId = text(input.eventId ?? 'evt-1', 'Identificador do evento', 120, true);
+  const ticketTypeId = text(input.ticketTypeId, 'Identificador do tipo de bilhete', 120, true);
   const businessId = input.businessId === undefined ? { ok: true as const, issues: [] as ValidationIssue[] } : text(input.businessId, 'Identificador da empresa', 120, true);
   const eventTitle = text(input.eventTitle ?? 'Evento Cultural Guigui', 'Evento', 200, true);
   const ticketTypeName = text(input.ticketTypeName ?? 'Entrada Geral', 'Categoria do bilhete', 120, true);
@@ -162,8 +169,13 @@ export function validatePurchaseInput(input: PurchaseInput): ValidationResult<No
   const hasHolderPhone = input.holderPhone !== undefined && input.holderPhone !== null && String(input.holderPhone).trim() !== '';
   const holderName = hasHolderName ? text(input.holderName, 'Nome do titular', 120, true) : { ok: true as const, issues: [] as ValidationIssue[] };
   const holderPhone = hasHolderPhone ? normalizePhone(input.holderPhone) : { ok: true as const, issues: [] as ValidationIssue[] };
-  const issues = [...eventId.issues, ...businessId.issues, ...eventTitle.issues, ...ticketTypeName.issues, ...buyerName.issues, ...buyerPhone.issues, ...holderName.issues, ...holderPhone.issues];
+  const issues = [...eventId.issues, ...ticketTypeId.issues, ...businessId.issues, ...eventTitle.issues, ...ticketTypeName.issues, ...buyerName.issues, ...buyerPhone.issues, ...holderName.issues, ...holderPhone.issues];
   if (hasHolderName !== hasHolderPhone) issues.push(issue('holder_pair_required', 'Nome e telemóvel do titular devem ser fornecidos em conjunto.', 'holder'));
+
+  const quantity = typeof input.quantity === 'number' || typeof input.quantity === 'string' ? Number(input.quantity) : NaN;
+  if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 100) {
+    issues.push(issue('invalid_quantity', 'A quantidade deve ser um número inteiro entre 1 e 100.', 'quantity'));
+  }
 
   const amount = typeof input.priceXOF === 'number' || typeof input.priceXOF === 'string' ? Number(input.priceXOF) : NaN;
   if (!Number.isSafeInteger(amount) || amount <= 0 || amount > MAX_TICKET_PRICE_XOF) {
@@ -188,13 +200,15 @@ export function validatePurchaseInput(input: PurchaseInput): ValidationResult<No
     issues.push(issue('policy_accepted_at_missing', 'A data/hora de aceitação da política é obrigatória.', 'policyAcceptedAt'));
   }
 
-  if (issues.length > 0 || !eventId.value || !eventTitle.value || !ticketTypeName.value || !buyerName.value || !buyerPhone.value || !Number.isSafeInteger(amount) || typeof paymentMethod !== 'string') {
+  if (issues.length > 0 || !eventId.value || !ticketTypeId.value || !eventTitle.value || !ticketTypeName.value || !buyerName.value || !buyerPhone.value || !Number.isSafeInteger(quantity) || !Number.isSafeInteger(amount) || typeof paymentMethod !== 'string') {
     return { ok: false, issues };
   }
   return {
     ok: true,
     value: {
       eventId: eventId.value,
+      ticketTypeId: ticketTypeId.value,
+      quantity,
       ...(businessId.value ? { businessId: businessId.value } : {}),
       eventTitle: eventTitle.value,
       ticketTypeName: ticketTypeName.value,

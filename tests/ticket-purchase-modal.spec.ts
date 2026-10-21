@@ -85,6 +85,30 @@ test('rejects manual transfer at both new-payment API boundaries', async ({ requ
   expect(await paymentResponse.json()).toMatchObject({ code: 'VALIDATION_ERROR' });
 });
 
+test('requires an authenticated buyer before resolving or paying for a valid ticket purchase', async ({ request }) => {
+  const response = await request.post('/api/tickets/purchase', {
+    headers: { 'Idempotency-Key': `unauthenticated-${Date.now()}` },
+    data: {
+      eventId: 'unknown-event',
+      ticketTypeId: 'unknown-ticket-type',
+      ticketTypeName: 'VIP',
+      priceXOF: 5000,
+      pricePerTicketXOF: 5000,
+      quantity: 1,
+      chargedAmountXOF: 5000,
+      buyerName: 'Untrusted Name',
+      buyerPhone: '+245955000000',
+      paymentMethod: 'orange_money',
+      policyAccepted: true,
+      policyVersion: '1.0',
+      policyAcceptedAt: '2026-10-20T00:00:00.000Z',
+    },
+  });
+
+  expect(response.status()).toBe(401);
+  expect(await response.json()).toMatchObject({ code: 'AUTHENTICATION_REQUIRED' });
+});
+
 test('rejects webhooks while payment providers are simulation-only', async ({ request }) => {
   const response = await request.post('/api/payments/webhook/orange_money', {
     data: { providerRef: 'OM-SIM-TX-1001', status: 'paid' },

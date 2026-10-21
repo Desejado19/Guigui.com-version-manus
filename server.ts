@@ -50,6 +50,9 @@ import { resolveAppStateValue, resolveAppStateWrite, resolveBusinessWrite, resol
 import { startBackupScheduler, triggerLocalBackup } from './server/backupService';
 import { describeSmsGateway } from './server/smsGatewayService';
 import { deliverConfirmedTicketPurchase } from './server/ticketPurchaseDeliveryService';
+import { getTicketOffer } from './server/ticketCatalogService';
+import { ticketInventory } from './server/ticketInventoryService';
+import { quoteTicketPurchase } from './server/ticketPurchaseDomain';
 import { createSimulatedEmailAdapter, createSimulatedSmsAdapter } from './server/integrations/simulatedAdapters';
 import { createScheduledItem, ensureDemoScheduledItems, listScheduledItems, processDueScheduledItems, updateScheduledItem, SCHEDULING_TIMEZONE } from './server/schedulingService';
 import type { ScheduledItem } from './src/types';
@@ -272,12 +275,15 @@ function getAIClient(): GoogleGenAI | null {
 
 // In-Memory Database for Tickets and Moderation logs in Dev
 const ticketsDb = new Map<string, any>(loadJson<Array<[string, any]>>('tickets.json', []));
+const eventSnapshots = new Map<string, any>(loadJson<any[]>('events.json', []).map((event) => [event.id, event]));
 const moderationLogs: any[] = loadJson<any[]>('moderation-logs.json', []);
 const securityAuditLogs: AuditEntry[] = loadJson<AuditEntry[]>('audit-logs.json', []);
 const persistTickets = () => saveJson('tickets.json', Array.from(ticketsDb.entries()));
+const persistEventSnapshots = () => saveJson('events.json', Array.from(eventSnapshots.values()));
 const persistModerationLogs = () => saveJson('moderation-logs.json', moderationLogs);
 const persistAuditLogs = () => saveJson('audit-logs.json', securityAuditLogs);
-const purchaseIdempotency = new Map<string, { createdAt: number; response: unknown }>();
+const purchaseIdempotency = new Map<string, { createdAt: number; response: unknown; status: number }>();
+const purchaseIdempotencyLocks = new Map<string, Promise<void>>();
 const paymentIdempotency = new Map<string, { createdAt: number; response: unknown }>();
 const ticketLookupWindows = new Map<string, { startedAt: number; count: number }>();
 const smsResendWindows = new Map<string, { lastSentAt: number; dayKey: string; count: number }>();
@@ -1142,7 +1148,9 @@ app.post('/api/businesses', requireSession, async (req, res) => {
 
 app.get('/api/events', async (_req, res) => {
   try {
-    const events = await listPostgresEvents();
+    const events = databaseConfigured
+      ? await listPostgresEvents()
+      : Array.from(eventSnapshots.values());
     res.json({ events });
   } catch (error) {
     res.status(500).json({ error: 'Erro ao listar eventos.' });
@@ -1184,8 +1192,16 @@ app.post('/api/events', requireSession, async (req, res) => {
   }
 
   try {
-    const storedEvent = { ...event, businessId: resolvedBusinessId };
+    const previousEvent = eventSnapshots.get(event.id);
+    const storedEvent = {
+      ...previousEvent,
+      ...event,
+      ...(Array.isArray(event.ticketTypes) ? { ticketTypes: event.ticketTypes } : previousEvent?.ticketTypes ? { ticketTypes: previousEvent.ticketTypes } : {}),
+      businessId: resolvedBusinessId,
+    };
     await persistPostgresEvent(storedEvent);
+    eventSnapshots.set(storedEvent.id, storedEvent);
+    persistEventSnapshots();
     res.json({ success: true, event: storedEvent });
   } catch (error) {
     res.status(500).json({ error: 'Erro ao persistir evento no banco.' });
@@ -1280,6 +1296,13 @@ const demoUsers: Array<PublicUser & { password: string }> = [
   { id: 'demo-business', name: 'Coqueiros Bissau', email: 'empresa.teste@guigui.com', role: 'business', phone: '+245 955 88 99', neighborhood: 'Praça dos Heróis', avatarUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=200&q=80', businessId: 'biz-1', businessName: 'Coqueiros Bissau', password: 'Guigui@2026!' },
   { id: 'demo-admin', name: 'Administração Guigui', email: 'admin.teste@guigui.com', role: 'admin', phone: '+245 955 00 00', neighborhood: 'Centro Administrativo', avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80', password: 'Guigui@2026!' },
 ];
+
+function findDemoUserById(userId: string): PublicUser | undefined {
+  const demo = demoUsers.find((user) => user.id === userId);
+  if (!demo) return undefined;
+  const { password: _password, ...publicUser } = demo;
+  return publicUser;
+}
 
 app.post('/api/auth/login', async (req, res) => {
   const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
@@ -2098,9 +2121,18 @@ setInterval(() => {
 
 // Ticket Purchase API (Generates Ticket + Simulates SMS Notification)
 app.post('/api/tickets/purchase', async (req, res) => {
+  let reservationId: string | undefined;
+  let paymentConfirmed = false;
+  let idempotencyKey: string | undefined;
+  let releaseIdempotencyLock: (() => void) | undefined;
+  const requestId = requestIdFrom(req);
   try {
-    const requestId = requestIdFrom(req);
-    const validation = validatePurchaseInput({ ...req.body, priceXOF: req.body?.priceXOF ?? 5000 });
+    const validation = validatePurchaseInput({
+      ...req.body,
+      buyerName: 'Utilizador autenticado',
+      buyerPhone: '+24500000000',
+      priceXOF: req.body?.priceXOF ?? 5000,
+    });
     if (!validation.ok) {
       recordAudit({
         action: 'purchase_validation_failed',
@@ -2118,6 +2150,31 @@ app.post('/api/tickets/purchase', async (req, res) => {
       });
     }
 
+    const purchaseSession = await sessionContext(req);
+    if (!purchaseSession || purchaseSession.role !== 'user') {
+      return res.status(401).json({ error: 'Inicie sessão para comprar bilhetes.', code: 'AUTHENTICATION_REQUIRED', requestId });
+    }
+    const account = databaseConfigured
+      ? await findPostgresUserById(purchaseSession.userId)
+      : findUserById(purchaseSession.userId) || findDemoUserById(purchaseSession.userId);
+    if (!account) {
+      return res.status(401).json({ error: 'A conta da sessão não está disponível.', code: 'AUTHENTICATION_REQUIRED', requestId });
+    }
+    const buyerValidation = validatePurchaseInput({
+      ...req.body,
+      buyerName: account.name,
+      buyerPhone: account.phone,
+      priceXOF: req.body?.priceXOF ?? 5000,
+    });
+    if (!buyerValidation.ok) {
+      return res.status(400).json({
+        error: firstIssueMessage(buyerValidation.issues, 'Os dados da conta não permitem concluir a compra.'),
+        code: 'VALIDATION_ERROR',
+        issues: buyerValidation.issues,
+        requestId,
+      });
+    }
+
     if (isProduction && !ticketSigningSecret) {
       return res.status(503).json({
         error: 'Emissão temporariamente indisponível: TICKET_SIGNING_SECRET não configurado.',
@@ -2127,72 +2184,136 @@ app.post('/api/tickets/purchase', async (req, res) => {
     }
 
     cleanupIdempotency();
-    const idempotencyKey = req.header('idempotency-key')?.trim();
-    if (idempotencyKey) {
-      if (idempotencyKey.length > 160) {
+    const requestIdempotencyKey = req.header('idempotency-key')?.trim();
+    if (requestIdempotencyKey) {
+      if (requestIdempotencyKey.length > 160) {
         return res.status(400).json({ error: 'Chave de idempotência inválida.', code: 'INVALID_IDEMPOTENCY_KEY', requestId });
       }
-      const previous = purchaseIdempotency.get(idempotencyKey);
-      if (previous) return res.status(200).json(previous.response);
+      idempotencyKey = `${purchaseSession.userId}:${requestIdempotencyKey}`;
+      let previous = purchaseIdempotency.get(idempotencyKey);
+      if (previous) return res.status(previous.status).json(previous.response);
+      const pendingRequest = purchaseIdempotencyLocks.get(idempotencyKey);
+      if (pendingRequest) {
+        await pendingRequest;
+        previous = purchaseIdempotency.get(idempotencyKey);
+        if (previous) return res.status(previous.status).json(previous.response);
+      }
+      let resolveLock!: () => void;
+      const lock = new Promise<void>((resolve) => { resolveLock = resolve; });
+      purchaseIdempotencyLocks.set(idempotencyKey, lock);
+      releaseIdempotencyLock = () => {
+        if (purchaseIdempotencyLocks.get(idempotencyKey!) === lock) {
+          purchaseIdempotencyLocks.delete(idempotencyKey!);
+        }
+        resolveLock();
+      };
     }
 
-    const { eventId, businessId, eventTitle, ticketTypeName, priceXOF, buyerName, buyerPhone, holderName, holderPhone, paymentMethod } = validation.value!;
-    const monetizationCatalog = normaliseMonetizationCatalog(monetizationCatalogStore);
-    const ticketQuantity = Number.isInteger(Number(req.body?.quantity)) ? Math.min(100, Math.max(1, Number(req.body.quantity))) : 1;
-    const ticketUnitPrice = Number(req.body?.pricePerTicketXOF || (Number(priceXOF || 5000) / ticketQuantity));
-    const ticketFeeBreakdown = calculateTicketFees(monetizationCatalog, ticketUnitPrice, ticketQuantity);
-    const chargedAmountXOF = Number(req.body?.chargedAmountXOF ?? ticketFeeBreakdown.buyerTotal);
-    if (chargedAmountXOF !== ticketFeeBreakdown.buyerTotal) {
-      return res.status(409).json({ error: 'O total do checkout não corresponde à política de taxas actual.', code: 'TICKET_TOTAL_MISMATCH', expectedAmountXOF: ticketFeeBreakdown.buyerTotal, requestId });
+    const {
+      eventId,
+      ticketTypeId,
+      quantity: ticketQuantity,
+      holderName,
+      holderPhone,
+      paymentMethod,
+    } = buyerValidation.value!;
+    const offer = await getTicketOffer(eventId, ticketTypeId);
+    if (!offer) {
+      return res.status(404).json({ error: 'O evento ou tipo de bilhete já não está disponível.', code: 'TICKET_OFFER_NOT_FOUND', requestId });
     }
+
+    const monetizationCatalog = normaliseMonetizationCatalog(monetizationCatalogStore);
+    const quoteResult = quoteTicketPurchase({ offer, quantity: ticketQuantity, catalog: monetizationCatalog });
+    if ('reason' in quoteResult) {
+      const unavailable = quoteResult.reason === 'sold_out' || quoteResult.reason === 'insufficient_inventory';
+      return res.status(unavailable ? 409 : 400).json({
+        error: quoteResult.reason === 'sales_closed'
+          ? 'As vendas deste tipo de bilhete estão encerradas.'
+          : quoteResult.reason === 'invalid_quantity'
+            ? 'A quantidade de bilhetes não é válida.'
+            : 'Não há bilhetes suficientes disponíveis.',
+        code: quoteResult.reason === 'invalid_quantity' ? 'INVALID_TICKET_QUANTITY' : 'TICKET_INVENTORY_UNAVAILABLE',
+        requestId,
+      });
+    }
+    if (req.body?.ticketTypeName !== undefined && req.body.ticketTypeName !== offer.ticketTypeName) {
+      return res.status(409).json({ error: 'A categoria selecionada foi alterada. Actualize o checkout.', code: 'TICKET_TYPE_MISMATCH', requestId });
+    }
+    const submittedPrice = req.body?.pricePerTicketXOF ?? req.body?.priceXOF;
+    if (submittedPrice !== undefined
+      && (!Number.isSafeInteger(Number(submittedPrice)) || Number(submittedPrice) !== offer.unitPriceXOF)) {
+      return res.status(409).json({ error: 'O preço do bilhete foi alterado. Actualize o checkout.', code: 'TICKET_PRICE_MISMATCH', requestId });
+    }
+    const ticketFeeBreakdown = quoteResult.quote.feeBreakdown;
+    const chargedAmountXOF = quoteResult.quote.buyerTotalXOF;
+    if (req.body?.chargedAmountXOF !== undefined && Number(req.body.chargedAmountXOF) !== chargedAmountXOF) {
+      return res.status(409).json({ error: 'O total do checkout não corresponde à política de taxas actual.', code: 'TICKET_TOTAL_MISMATCH', expectedAmountXOF: chargedAmountXOF, requestId });
+    }
+
+    const txnId = `TXN-${Date.now()}-${randomBytes(3).toString('hex').toUpperCase()}`;
+    const reservedUntil = new Date(Date.now() + TICKET_RESERVATION_TTL_MS).toISOString();
+    const reservationResult = await ticketInventory.reserve({
+      offer,
+      quantity: ticketQuantity,
+      reservationId: txnId,
+      expiresAt: reservedUntil,
+    });
+    if (reservationResult !== 'reserved') {
+      return res.status(409).json({ error: 'Não há bilhetes suficientes disponíveis.', code: 'TICKET_INVENTORY_UNAVAILABLE', requestId });
+    }
+    reservationId = txnId;
+
+    const paymentAdapter = paymentAdapters[paymentMethod];
+    const paymentIntent = await paymentAdapter.createIntent({
+      transactionId: txnId,
+      amountXOF: chargedAmountXOF,
+      payerName: account.name,
+      payerPhone: account.phone,
+      description: `${offer.ticketTypeName} - ${offer.eventTitle} (${ticketQuantity} unidade${ticketQuantity === 1 ? '' : 's'})`,
+      provider: paymentMethod,
+      metadata: { eventId: offer.eventId, businessId: offer.businessId || '', ticketQuantity: String(ticketQuantity) },
+    });
+    paymentConfirmed = paymentIntent.state === 'confirmed';
+
     const purchaseTimestamp = new Date().toISOString();
-    const newTickets: TicketForValidation[] = Array.from({ length: ticketQuantity }, (_, index) => {
+    const newTickets: TicketForValidation[] = paymentConfirmed ? Array.from({ length: ticketQuantity }, (_, index) => {
       const { ticketCode, qrToken, pinCode } = generateTicketIdentifiers();
       const ticket: TicketForValidation = {
         id: `TKT-${Date.now()}-${index + 1}-${randomBytes(2).toString('hex').toUpperCase()}`,
         ticketCode,
-        eventId,
-        ...(businessId ? { businessId } : {}),
-        eventTitle: eventTitle || 'Evento Cultural Guigui',
-        ticketTypeName: ticketTypeName || 'Entrada Geral',
-        priceXOF: ticketUnitPrice,
-        buyerName,
-        buyerPhone,
+        ticketTypeId: offer.ticketTypeId,
+        buyerUserId: purchaseSession.userId,
+        eventId: offer.eventId,
+        ...(offer.businessId ? { businessId: offer.businessId } : {}),
+        eventTitle: offer.eventTitle,
+        ticketTypeName: offer.ticketTypeName,
+        priceXOF: offer.unitPriceXOF,
+        buyerName: account.name,
+        buyerPhone: account.phone,
         ...(holderName && holderPhone ? { holderName, holderPhone } : {}),
         qrToken,
         pinCode,
         status: 'valid',
         purchasedAt: purchaseTimestamp,
-        expiresAt: calculateTicketExpiry(req.body?.eventDate, req.body?.eventTime),
+        expiresAt: calculateTicketExpiry(offer.eventDate, offer.eventTime),
         paymentMethod,
       };
       if (ticketSigningSecret) ticket.signature = signTicket(ticket, ticketSigningSecret);
       return ticket;
-    });
+    }) : [];
     const primaryTicket = newTickets[0];
 
-    const txnId = `TXN-${Date.now()}-${randomBytes(3).toString('hex').toUpperCase()}`;
-    const paymentAdapter = paymentAdapters[paymentMethod];
-    const paymentIntent = await paymentAdapter.createIntent({
-      transactionId: txnId,
-          amountXOF: chargedAmountXOF,
-          payerName: primaryTicket.buyerName,
-      payerPhone: primaryTicket.buyerPhone,
-      description: `${primaryTicket.ticketTypeName} - ${primaryTicket.eventTitle} (${ticketQuantity} unidade${ticketQuantity === 1 ? '' : 's'})`,
-      provider: paymentMethod,
-      metadata: { eventId: primaryTicket.eventId || 'evt-1', businessId: primaryTicket.businessId || '', ticketQuantity: String(ticketQuantity) },
-    });
     const paymentTimestamp = new Date().toISOString().replace('T', ' ').substring(0, 16);
     const newTxn = {
       id: txnId,
       useCase: 'event_tickets',
-      useCaseLabel: `Bilhete ${primaryTicket.ticketTypeName} - ${primaryTicket.eventTitle}`,
-      businessId: primaryTicket.businessId,
-      businessName: primaryTicket.eventTitle,
-      payerName: primaryTicket.buyerName,
-      payerPhone: primaryTicket.buyerPhone,
+      useCaseLabel: `Bilhete ${offer.ticketTypeName} - ${offer.eventTitle}`,
+      businessId: offer.businessId,
+      businessName: offer.eventTitle,
+      payerName: account.name,
+      payerPhone: account.phone,
       amountXOF: chargedAmountXOF,
-      ticketBaseAmountXOF: ticketUnitPrice * ticketQuantity,
+      ticketBaseAmountXOF: offer.unitPriceXOF * ticketQuantity,
       platformFeeXOF: ticketFeeBreakdown.platformRevenue,
       provider: paymentMethod,
       providerRef: paymentIntent.providerRef,
@@ -2211,7 +2332,7 @@ app.post('/api/tickets/purchase', async (req, res) => {
       qrToken: undefined as string | undefined,
       qrTokens: [] as string[],
       ticketDraft: undefined as
-        | { eventId?: string; eventTitle?: string; ticketTypeName?: string; eventDate?: string; eventTime?: string; quantity?: number }
+        | { eventId?: string; eventTitle?: string; ticketTypeId?: string; ticketTypeName?: string; unitPriceXOF?: number; buyerUserId?: string; eventDate?: string; eventTime?: string; quantity?: number }
         | undefined,
       createdAt: paymentTimestamp,
       ...(paymentIntent.state === 'confirmed' ? { confirmedAt: paymentTimestamp, confirmedBy: `${paymentAdapter.provider} (${paymentAdapter.mode})` } : {}),
@@ -2220,57 +2341,56 @@ app.post('/api/tickets/purchase', async (req, res) => {
     if (paymentIntent.state === 'confirmed') recordMonetizationFulfillment(newTxn);
     persistPayments();
 
-    if (paymentIntent.state !== 'confirmed') {
-      // Regra 4.7: reserva temporária com prazo definido. Os bilhetes ficam em
-      // 'pending' (Regra 11) até o pagamento confirmar; se o prazo expirar sem
-      // confirmação, a quantidade reservada é libertada pelo job de limpeza.
-      const reservedUntil = new Date(Date.now() + TICKET_RESERVATION_TTL_MS).toISOString();
-      for (const ticket of newTickets) {
-        ticket.status = 'pending';
-        ticket.reservedUntil = reservedUntil;
-      }
-      newTickets.forEach((ticket) => {
-        ticketsDb.set(ticket.qrToken, ticket);
-        ticketsDb.set(ticket.pinCode!, ticket);
-        ticketsDb.set(ticket.ticketCode, ticket);
-      });
-      const reservationSession = await sessionContext(req);
-      await persistPostgresTickets(newTickets, reservationSession?.role === 'user' ? reservationSession.userId : undefined);
-      newTxn.ticketId = primaryTicket.id;
-      newTxn.ticketIds = newTickets.map((ticket) => ticket.id);
-      newTxn.ticketCode = primaryTicket.ticketCode;
-      newTxn.ticketCodes = newTickets.map((ticket) => ticket.ticketCode);
-      newTxn.qrToken = primaryTicket.qrToken;
-      newTxn.qrTokens = newTickets.map((ticket) => ticket.qrToken);
-      // Rascunho de recuperação: se a reserva expirar antes da confirmação,
-      // o webhook consegue emitir bilhetes novos sem cobrar duas vezes (Regra 4.5).
+    if (paymentIntent.state === 'failed') {
+      await ticketInventory.release(txnId);
+      reservationId = undefined;
+      const failurePayload = {
+        success: false,
+        error: 'O pagamento simulado não foi aprovado. A reserva de bilhetes foi libertada.',
+        code: 'TICKET_PAYMENT_FAILED',
+        transaction: newTxn,
+        requestId,
+      };
+      if (idempotencyKey) purchaseIdempotency.set(idempotencyKey, { createdAt: Date.now(), response: failurePayload, status: 502 });
+      return res.status(502).json(failurePayload);
+    }
+
+    if (paymentIntent.state === 'pending') {
       newTxn.ticketDraft = {
-        eventId,
-        eventTitle: eventTitle || 'Evento Cultural Guigui',
-        ticketTypeName: ticketTypeName || 'Entrada Geral',
-        eventDate: req.body?.eventDate,
-        eventTime: req.body?.eventTime,
+        eventId: offer.eventId,
+        eventTitle: offer.eventTitle,
+        ticketTypeId: offer.ticketTypeId,
+        ticketTypeName: offer.ticketTypeName,
+        unitPriceXOF: offer.unitPriceXOF,
+        buyerUserId: purchaseSession.userId,
+        eventDate: offer.eventDate,
+        eventTime: offer.eventTime,
         quantity: ticketQuantity,
       };
-      persistTickets();
-      recordAudit({ action: 'ticket_payment_pending', resource: 'payment', resourceId: txnId, actorRole: 'citizen', requestId, success: true, metadata: { provider: paymentMethod, providerRef: paymentIntent.providerRef, reservedUntil, ticketIds: newTxn.ticketIds } });
-      return res.status(202).json({
+      persistPayments();
+      const pendingPayload = {
         success: false,
         paymentPending: true,
         transaction: newTxn,
         reservationExpiresAt: reservedUntil,
         message: paymentIntent.instructions || 'Pagamento pendente. Os bilhetes ficam reservados até à confirmação da operadora.',
         requestId,
-      });
+      };
+      if (idempotencyKey) purchaseIdempotency.set(idempotencyKey, { createdAt: Date.now(), response: pendingPayload, status: 202 });
+      recordAudit({ action: 'ticket_payment_pending', resource: 'payment', resourceId: txnId, actorRole: 'citizen', requestId, success: true, metadata: { provider: paymentMethod, providerRef: paymentIntent.providerRef, reservedUntil } });
+      return res.status(202).json(pendingPayload);
     }
+
+    if (!primaryTicket) throw new Error('A confirmação do pagamento não produziu bilhetes.');
 
     newTickets.forEach((ticket) => {
       ticketsDb.set(ticket.qrToken, ticket);
       ticketsDb.set(ticket.pinCode!, ticket); // allow QR token, código e PIN a localizar o bilhete
       ticketsDb.set(ticket.ticketCode, ticket);
     });
-    const purchaseSession = await sessionContext(req);
-    await persistPostgresTickets(newTickets, purchaseSession?.role === 'user' ? purchaseSession.userId : undefined);
+    await persistPostgresTickets(newTickets, purchaseSession.userId);
+    await ticketInventory.confirm(txnId);
+    reservationId = undefined;
     newTxn.ticketId = primaryTicket.id;
     newTxn.ticketIds = newTickets.map((ticket) => ticket.id);
     newTxn.ticketCode = primaryTicket.ticketCode;
@@ -2281,7 +2401,7 @@ app.post('/api/tickets/purchase', async (req, res) => {
     persistPayments();
     let accountEmail: string | undefined;
     let accountName: string | undefined;
-    if (purchaseSession?.role === 'user') {
+    if (purchaseSession.role === 'user') {
       try {
         const account = databaseConfigured
           ? await findPostgresUserById(purchaseSession.userId)
@@ -2298,11 +2418,11 @@ app.post('/api/tickets/purchase', async (req, res) => {
 
     const delivery = await deliverConfirmedTicketPurchase({
       transactionId: txnId,
-      accountUserId: purchaseSession?.role === 'user' ? purchaseSession.userId : undefined,
+      accountUserId: purchaseSession.userId,
       accountEmail,
       accountName,
-      eventId: primaryTicket.eventId || eventId,
-      eventTitle: primaryTicket.eventTitle || 'Evento Cultural Guigui',
+      eventId: primaryTicket.eventId || offer.eventId,
+      eventTitle: primaryTicket.eventTitle || offer.eventTitle,
       totalAmountXOF: chargedAmountXOF,
       tickets: newTickets,
     }, { email: emailDelivery, sms: smsDelivery });
@@ -2327,6 +2447,7 @@ app.post('/api/tickets/purchase', async (req, res) => {
       ticket: primaryTicket,
       tickets: newTickets,
       feeBreakdown: ticketFeeBreakdown,
+      quote: quoteResult.quote,
       transaction: newTxn,
       sms: {
         mode: delivery.sms.mode,
@@ -2339,7 +2460,7 @@ app.post('/api/tickets/purchase', async (req, res) => {
       },
     };
     if (idempotencyKey) {
-      purchaseIdempotency.set(idempotencyKey, { createdAt: Date.now(), response: responsePayload });
+      purchaseIdempotency.set(idempotencyKey, { createdAt: Date.now(), response: responsePayload, status: 200 });
     }
     recordAudit({
       action: 'ticket_issued',
@@ -2351,8 +2472,24 @@ app.post('/api/tickets/purchase', async (req, res) => {
       metadata: { eventId: primaryTicket.eventId, paymentMethod: primaryTicket.paymentMethod, amountXOF: chargedAmountXOF, ticketIds: newTickets.map((ticket) => ticket.id) },
     });
     res.json(responsePayload);
-  } catch (err: any) {
-    res.status(500).json({ error: 'Erro ao emitir bilhete', details: err.message });
+  } catch (error) {
+    if (reservationId && !paymentConfirmed) {
+      try {
+        await ticketInventory.release(reservationId);
+      } catch (releaseError) {
+        console.error('ticket-purchase-reservation-release-failed', {
+          reservationId,
+          errorName: releaseError instanceof Error ? releaseError.name : 'UnknownError',
+        });
+      }
+    }
+    console.error('ticket-purchase-failed', {
+      requestId,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    return res.status(500).json({ error: 'Não foi possível concluir a compra do bilhete.', code: 'TICKET_PURCHASE_FAILED', requestId });
+  } finally {
+    releaseIdempotencyLock?.();
   }
 });
 
