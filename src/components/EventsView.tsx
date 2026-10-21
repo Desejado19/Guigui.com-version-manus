@@ -53,6 +53,26 @@ interface EventsViewProps {
   onContactOrganizer?: (event: EventItem) => void;
 }
 
+type TicketPurchaseDeliveryStatus = {
+  paymentSimulated: boolean;
+  email: 'sent' | 'simulated' | 'failed' | 'unavailable';
+  notification: 'created' | 'failed' | 'unavailable';
+  sms: 'sent' | 'simulated' | 'failed';
+};
+
+interface TicketPurchaseReceipt {
+  transactionId: string;
+  providerMode?: string;
+  eventId: string;
+  eventTitle: string;
+  ticketTypeName: string;
+  quantity: number;
+  feeBreakdown: ReturnType<typeof calculateTicketFees> | null;
+  buyerTotalXOF: number | null;
+  tickets: TicketType[];
+  delivery: TicketPurchaseDeliveryStatus;
+}
+
 export const EventsView: React.FC<EventsViewProps> = ({
   events,
   currentLang,
@@ -93,14 +113,8 @@ export const EventsView: React.FC<EventsViewProps> = ({
   const resolvedMonetizationCatalog = normaliseMonetizationCatalog(monetizationCatalog, businessModelConfig);
   const ticketFeeBreakdown = calculateTicketFees(resolvedMonetizationCatalog, selectedTicketType?.priceXOF || 0, ticketQuantity);
 
-  // Purchase Result State
-  const [purchasedTickets, setPurchasedTickets] = useState<TicketType[]>([]);
-  const [purchaseDelivery, setPurchaseDelivery] = useState<{
-    paymentSimulated: boolean;
-    email: 'sent' | 'simulated' | 'failed' | 'unavailable';
-    notification: 'created' | 'failed' | 'unavailable';
-    sms: 'sent' | 'simulated' | 'failed';
-  } | null>(null);
+  const [purchaseReceipt, setPurchaseReceipt] = useState<TicketPurchaseReceipt | null>(null);
+  const purchasedTickets = purchaseReceipt?.tickets || [];
   const ticketPurchaseTriggerRef = useRef<HTMLElement | null>(null);
   const ticketReceiptRef = useRef<HTMLDivElement | null>(null);
   const ticketReceiptCloseRef = useRef<HTMLButtonElement | null>(null);
@@ -130,14 +144,14 @@ export const EventsView: React.FC<EventsViewProps> = ({
     setSelectedEvent(event);
     setSelectedTicketType(event.ticketTypes[0] || null);
     setTicketQuantity(1);
-    setPurchasedTickets([]);
+    setPurchaseReceipt(null);
   }, [events, focusEventId]);
 
   useEffect(() => {
     if (currentUser) return;
     setActiveTab('all');
     setSelectedEvent(null);
-    setPurchasedTickets([]);
+    setPurchaseReceipt(null);
   }, [currentUser]);
 
   useEffect(() => {
@@ -148,7 +162,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
     dialog.focus({ preventScroll: true });
     const handleDialogKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setPurchasedTickets([]);
+        setPurchaseReceipt(null);
         setSelectedEvent(null);
         return;
       }
@@ -188,10 +202,10 @@ export const EventsView: React.FC<EventsViewProps> = ({
     ticketPurchaseTriggerRef.current = trigger
       || (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     setSelectedEvent(event);
-    setPurchaseDelivery(null);
+    setPurchaseReceipt(null);
     setSelectedTicketType(event.ticketTypes[0] || null);
     setTicketQuantity(1);
-    setPurchasedTickets([]);
+    setPurchaseReceipt(null);
     setPaymentPending(null);
     purchaseIdempotencyKeyRef.current = null;
     setIsPurchaseModalOpen(true);
@@ -296,7 +310,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
       const emailState = result.delivery?.email?.state;
       const notificationState = result.delivery?.notification?.state;
       const smsState = result.delivery?.sms?.state;
-      setPurchaseDelivery({
+      const delivery: TicketPurchaseDeliveryStatus = {
         paymentSimulated: result.transaction?.providerMode === 'simulated',
         email: emailState === 'delivered' || emailState === 'accepted' ? 'sent'
           : emailState === 'simulated' || emailState === 'failed' ? emailState
@@ -305,7 +319,11 @@ export const EventsView: React.FC<EventsViewProps> = ({
         sms: smsState === 'delivered' || smsState === 'accepted' ? 'sent'
           : smsState === 'simulated' ? 'simulated'
           : 'failed',
-      });
+      };
+      const feeBreakdown = result.quote?.feeBreakdown || result.feeBreakdown || null;
+      const buyerTotalXOF = Number.isSafeInteger(result.quote?.buyerTotalXOF)
+        ? result.quote.buyerTotalXOF
+        : Number.isSafeInteger(feeBreakdown?.buyerTotal) ? feeBreakdown.buyerTotal : null;
       if (currentUser?.role === 'user' && typeof result.transaction?.id === 'string') {
         onTicketPurchaseConfirmed?.({
           transactionId: result.transaction.id,
@@ -317,7 +335,18 @@ export const EventsView: React.FC<EventsViewProps> = ({
           ticketCodes: issuedTickets.map((ticket: TicketType) => ticket.ticketCode),
         });
       }
-      setPurchasedTickets(issuedTickets);
+      setPurchaseReceipt({
+        transactionId: typeof result.transaction?.id === 'string' ? result.transaction.id : '',
+        providerMode: result.transaction?.providerMode,
+        eventId: issuedTickets[0].eventId || selectedEvent.id,
+        eventTitle: issuedTickets[0].eventTitle || selectedEvent.title,
+        ticketTypeName: issuedTickets[0].ticketTypeName || ticketType.name,
+        quantity: issuedTickets.length,
+        feeBreakdown,
+        buyerTotalXOF,
+        tickets: issuedTickets,
+        delivery,
+      });
       setIsPurchaseModalOpen(false);
     } catch (error) {
       setNotificationStatusNotice('Erro de conexão ao comprar bilhete.');
@@ -810,7 +839,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
           tabIndex={-1}
           onClick={(event) => {
             if (event.target === event.currentTarget) {
-              setPurchasedTickets([]);
+              setPurchaseReceipt(null);
               setSelectedEvent(null);
             }
           }}
@@ -827,33 +856,67 @@ export const EventsView: React.FC<EventsViewProps> = ({
                   <p className="mt-0.5 text-xs sm:text-sm">O seu bilhete digital está pronto. Apresente o QR Code ou o código à entrada.</p>
                 </div>
               </div>
-              {purchaseDelivery && (
+              {purchaseReceipt?.delivery && (
                 <div className="ticket-delivery-status space-y-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100" role="status" aria-live="polite">
-                  {purchaseDelivery.paymentSimulated && <p>{t('ticketPaymentSimulated')}</p>}
+                  {purchaseReceipt.delivery.paymentSimulated && <p>{t('ticketPaymentSimulated')}</p>}
                   <p>
-                    {purchaseDelivery.email === 'sent' ? t('ticketEmailSent')
-                     : purchaseDelivery.email === 'simulated' ? t('ticketEmailSimulated')
-                      : purchaseDelivery.email === 'failed' ? t('ticketEmailFailed')
+                    {purchaseReceipt.delivery.email === 'sent' ? t('ticketEmailSent')
+                     : purchaseReceipt.delivery.email === 'simulated' ? t('ticketEmailSimulated')
+                      : purchaseReceipt.delivery.email === 'failed' ? t('ticketEmailFailed')
                       : t('ticketEmailUnavailable')}
                   </p>
                   <p>
-                    {purchaseDelivery.sms === 'sent' ? t('ticketSmsSent')
-                      : purchaseDelivery.sms === 'simulated' ? t('ticketSmsSimulated')
+                    {purchaseReceipt.delivery.sms === 'sent' ? t('ticketSmsSent')
+                      : purchaseReceipt.delivery.sms === 'simulated' ? t('ticketSmsSimulated')
                       : t('ticketSmsFailed')}
                   </p>
-                  {purchaseDelivery.notification !== 'unavailable' && (
-                    <p>{purchaseDelivery.notification === 'created' ? t('ticketNotificationSaved') : t('ticketNotificationFailed')}</p>
+                  {purchaseReceipt.delivery.notification !== 'unavailable' && (
+                    <p>{purchaseReceipt.delivery.notification === 'created' ? t('ticketNotificationSaved') : t('ticketNotificationFailed')}</p>
                   )}
                 </div>
               )}
-              <div className="ticket-receipt-order-summary flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm dark:border-emerald-800 dark:bg-emerald-950/50">
-                <span className="font-semibold text-emerald-900 dark:text-emerald-100">
+              <section className="ticket-receipt-order-summary grid min-w-0 gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm dark:border-emerald-800 dark:bg-emerald-950/50" aria-label="Resumo da compra">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-semibold text-emerald-900 dark:text-emerald-100">
                   {purchasedTickets.length} bilhete{purchasedTickets.length === 1 ? '' : 's'} emitido{purchasedTickets.length === 1 ? '' : 's'}
-                </span>
-                <span className="font-mono font-bold text-emerald-800 dark:text-emerald-200">
-                  Total pago: {ticketFeeBreakdown.buyerTotal.toLocaleString('pt-PT')} XOF
-                </span>
-              </div>
+                  </span>
+                  <span className="min-w-0 break-all text-xs font-semibold text-emerald-900 dark:text-emerald-100">
+                    Referência da transação: <code>{purchaseReceipt?.transactionId || 'Não disponibilizada'}</code>
+                  </span>
+                </div>
+                <dl className="grid min-w-0 gap-x-4 gap-y-1 text-xs sm:grid-cols-2">
+                  <div className="flex min-w-0 justify-between gap-2">
+                    <dt className="text-emerald-800 dark:text-emerald-200">Evento</dt>
+                    <dd className="min-w-0 text-right font-semibold text-emerald-950 dark:text-emerald-50">{purchaseReceipt?.eventTitle}</dd>
+                  </div>
+                  <div className="flex min-w-0 justify-between gap-2">
+                    <dt className="text-emerald-800 dark:text-emerald-200">Categoria</dt>
+                    <dd className="min-w-0 text-right font-semibold text-emerald-950 dark:text-emerald-50">{purchaseReceipt?.ticketTypeName}</dd>
+                  </div>
+                </dl>
+                <dl className="ticket-receipt-financials grid min-w-0 gap-1 border-t border-emerald-200 pt-2 text-xs dark:border-emerald-800">
+                  <div className="flex justify-between gap-3">
+                    <dt>Subtotal dos bilhetes</dt>
+                    <dd className="font-semibold">{purchaseReceipt?.feeBreakdown?.grossTicketValue.toLocaleString('pt-PT') ?? 'Indisponível'} XOF</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt>Taxa total da plataforma</dt>
+                    <dd className="font-semibold">{purchaseReceipt?.feeBreakdown?.platformRevenue.toLocaleString('pt-PT') ?? 'Indisponível'} XOF</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt>Taxa paga pelo comprador</dt>
+                    <dd className="font-semibold">{purchaseReceipt?.feeBreakdown?.buyerShare.toLocaleString('pt-PT') ?? 'Indisponível'} XOF</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt>Taxa suportada pelo organizador</dt>
+                    <dd className="font-semibold">{purchaseReceipt?.feeBreakdown?.organizerShare.toLocaleString('pt-PT') ?? 'Indisponível'} XOF</dd>
+                  </div>
+                  <div className="flex justify-between gap-3 border-t border-emerald-200 pt-2 text-sm font-extrabold dark:border-emerald-800">
+                    <dt>Total pago</dt>
+                    <dd>{purchaseReceipt?.buyerTotalXOF?.toLocaleString('pt-PT') ?? 'Indisponível'} XOF</dd>
+                  </div>
+                </dl>
+              </section>
               <div className="space-y-3">
                 {purchasedTickets.map((ticket, index) => (
                   <div key={ticket.id} className="ticket-receipt-ticket rounded-2xl border border-emerald-200/80 p-2 dark:border-emerald-900 sm:p-3">
@@ -885,7 +948,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
                   type="button"
                   ref={ticketReceiptCloseRef}
                   onClick={() => {
-                    setPurchasedTickets([]);
+                    setPurchaseReceipt(null);
                     setSelectedEvent(null);
                   }}
                   className="ticket-receipt-close min-h-11 w-full rounded-xl bg-emerald-700 px-4 py-3 text-xs font-bold text-white transition hover:bg-emerald-600"

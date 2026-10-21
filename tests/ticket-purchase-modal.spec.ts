@@ -148,6 +148,35 @@ test('submits the selected ticket and handles pending and confirmed payments wit
         body: JSON.stringify({
           success: true,
           transaction: { id: 'TXN-CONFIRMED-TEST', providerMode: 'simulated', status: 'confirmed_api' },
+          quote: {
+            unitPriceXOF: 12000,
+            quantity: 3,
+            buyerTotalXOF: 37296,
+            feeBreakdown: {
+              grossTicketValue: 36000,
+              percentageFee: 1296,
+              fixedFee: 0,
+              platformRevenue: 1296,
+              buyerShare: 1296,
+              organizerShare: 0,
+              buyerTotal: 37296,
+              organizerNet: 36000,
+              feePayer: 'buyer',
+              currency: 'XOF',
+            },
+          },
+          feeBreakdown: {
+            grossTicketValue: 36000,
+            percentageFee: 1296,
+            fixedFee: 0,
+            platformRevenue: 1296,
+            buyerShare: 1296,
+            organizerShare: 0,
+            buyerTotal: 37296,
+            organizerNet: 36000,
+            feePayer: 'buyer',
+            currency: 'XOF',
+          },
           ticket: makeTicket(1),
           tickets: [makeTicket(1), makeTicket(2), makeTicket(3)],
           delivery: {
@@ -284,11 +313,16 @@ test('submits the selected ticket and handles pending and confirmed payments wit
   await expect(receipt.locator('.ticket-proof-status').first()).toContainText('Bilhete válido');
   await expect(receipt).not.toContainText('Aguardando validação');
   await expect(receipt.locator('.ticket-receipt-ticket')).toHaveCount(3);
+  await expect(receipt).toContainText('TXN-CONFIRMED-TEST');
+  await expect(receipt).toContainText('Festival de Teste');
+  await expect(receipt).toContainText('VIP');
   await expect(receipt).toContainText('GUI-TEST-1');
   await expect(receipt).toContainText('GUI-TEST-2');
   await expect(receipt).toContainText('GUI-TEST-3');
   const orderSummary = await receipt.locator('.ticket-receipt-order-summary').innerText();
-  expect(orderSummary.replace(/\s/g, '')).toContain('36000XOF');
+  expect(orderSummary.replace(/\s/g, '')).toContain('37296XOF');
+  await expect(receipt).toContainText('36 000 XOF');
+  await expect(receipt).toContainText('1296 XOF');
   await expect(receipt).toBeFocused();
   await expect(receipt.locator('.ticket-success-notice')).toBeInViewport();
   await page.keyboard.press('Tab');
@@ -307,6 +341,8 @@ test('submits the selected ticket and handles pending and confirmed payments wit
   ]) {
     await page.setViewportSize(viewport);
     await expect(receiptCard).toBeVisible();
+    const documentOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(documentOverflow, `page has horizontal overflow at ${viewport.width}px`).toBeLessThanOrEqual(1);
     const layout = await receiptCard.evaluate((element) => {
       const bounds = element.getBoundingClientRect();
       return {
