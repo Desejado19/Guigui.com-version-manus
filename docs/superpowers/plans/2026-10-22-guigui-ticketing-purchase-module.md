@@ -39,7 +39,7 @@
 ### Task 1: Isolate purchase domain, application, and fee policy
 
 **Files:**
-- Add tracked prerequisite: `src/data/monetizationCatalog.ts` (currently ignored by `.gitignore`; source is byte-identical to the preserved checkout and the validated `main` overlay)
+- Add tracked prerequisites: `src/data/monetizationCatalog.ts`, `src/data/initialData.ts`, `src/data/adminStaffData.ts`, `src/data/auditLogsData.ts`, `src/data/notificationsData.ts`, and `src/data/subscriptionCatalog.ts` (currently ignored by `.gitignore`; copied only after user approval and SHA256-verified against the preserved checkout and validated `main` overlay)
 - Create: `server/modules/ticketing/domain/ticketPurchaseDomain.ts`
 - Create: `server/modules/ticketing/application/ticketPurchasePorts.ts`
 - Create: `server/modules/ticketing/application/purchaseTicket.ts`
@@ -65,15 +65,15 @@
 
 - [ ] **Step 1: Record the approved fee-policy source in this branch**
 
-Stage the exact copied file despite the existing `data/` ignore rule:
+Stage only the six approved copied files despite the existing `data/` ignore rule:
 
 ```powershell
-git add -f -- src/data/monetizationCatalog.ts
+git add -f -- src/data/monetizationCatalog.ts src/data/initialData.ts src/data/adminStaffData.ts src/data/auditLogsData.ts src/data/notificationsData.ts src/data/subscriptionCatalog.ts
 git diff --cached --check
-git diff --cached -- src/data/monetizationCatalog.ts
+git diff --cached --name-only
 ```
 
-Confirm the staged file is the single approved prerequisite and its SHA256 is `64D01DF5E57B2B723A2A7EAC965EBDC95A2320379AF4519241E18CFF0AF29E47`. Do not stage any other ignored `data/` content.
+Confirm the six staged paths are exactly these prerequisites and their hashes match the values recorded in the execution ledger. Do not stage any other ignored `data/` content.
 
 - [ ] **Step 2: Establish the focused baseline**
 
@@ -101,7 +101,7 @@ Expected: PASS with all existing assertions intact. Then run `npm run check`; ex
 
 - [ ] **Step 7: Remove the old implementation files and commit**
 
-Remove the old `server/ticketPurchaseDomain.ts`, `server/ticketPurchasePorts.ts`, and `server/ticketPurchaseUseCase.ts` after all imports have moved. Stage only those paths, `server.ts`, the three service/test consumers listed above, the new module files, the prerequisite fee source, and the updated purchase tests. Commit as `refactor: move ticket purchase rules into ticketing module`, including the required `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>` trailer.
+Remove the old `server/ticketPurchaseDomain.ts`, `server/ticketPurchasePorts.ts`, and `server/ticketPurchaseUseCase.ts` after all imports have moved. Stage only those paths, `server.ts`, the three service/test consumers listed above, the new module files, the six approved prerequisites, and the updated purchase tests. Commit as `refactor: move ticket purchase rules into ticketing module`, including the required `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>` trailer.
 
 ---
 
