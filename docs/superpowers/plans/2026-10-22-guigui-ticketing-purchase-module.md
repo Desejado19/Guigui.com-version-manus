@@ -47,6 +47,11 @@
 - Modify: `server/ticketPurchaseDomain.ts` (remove after its consumers move)
 - Modify: `server/ticketPurchasePorts.ts` (remove after its consumers move)
 - Modify: `server/ticketPurchaseUseCase.ts` (remove after its consumers move)
+- Modify: `server/ticketCatalogService.ts` (consume the module's `TicketOffer` contract)
+- Modify: `server/ticketInventoryService.ts` (consume the module's `TicketOffer` and `TicketInventoryPort` contracts)
+- Modify: `server/postgresTicketService.ts` (consume the module's `TicketOffer` contract)
+- Modify: `tests/unit/ticketPurchaseCatalog.test.ts`
+- Modify: `tests/unit/ticketInventoryService.test.ts`
 - Modify: `tests/unit/ticketPurchaseDomain.test.ts`
 - Modify: `tests/unit/ticketPurchaseUseCase.test.ts`
 
@@ -96,7 +101,7 @@ Expected: PASS with all existing assertions intact. Then run `npm run check`; ex
 
 - [ ] **Step 7: Remove the old implementation files and commit**
 
-Remove the old `server/ticketPurchaseDomain.ts`, `server/ticketPurchasePorts.ts`, and `server/ticketPurchaseUseCase.ts` after all imports have moved. Stage only those paths, `server.ts`, the new module files, the prerequisite fee source, and the two updated test files. Commit as `refactor: move ticket purchase rules into ticketing module`, including the required `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>` trailer.
+Remove the old `server/ticketPurchaseDomain.ts`, `server/ticketPurchasePorts.ts`, and `server/ticketPurchaseUseCase.ts` after all imports have moved. Stage only those paths, `server.ts`, the three service/test consumers listed above, the new module files, the prerequisite fee source, and the updated purchase tests. Commit as `refactor: move ticket purchase rules into ticketing module`, including the required `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>` trailer.
 
 ---
 
