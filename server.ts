@@ -26,6 +26,8 @@ import { addSubscriptionPeriod } from './src/utils/subscriptions';
 import { createSession, getSession, revokeAllUserSessions, revokeSession, SESSION_COOKIE_NAME } from './server/sessionService';
 import { checkDatabaseConnection, databaseConfigured, databasePool } from './server/db';
 import { createHealthHandler } from './server/modules/platform-foundation/http/healthHandler';
+import { resolveSessionContext, type SessionRole } from './server/modules/identity-access/application/resolveSessionContext';
+import { createSessionAccessMiddleware } from './server/modules/identity-access/http/sessionAccessMiddleware';
 import { changePostgresUserPassword, createPostgresUser, deactivatePostgresUser, deletePostgresUser, findPostgresUserByEmail, findPostgresUserById } from './server/postgresAuthService';
 import { activatePostgresTicketReservations, findPostgresTicket, listPostgresTicketsForUser, markPostgresTicketUsed, persistPostgresTickets, releaseExpiredPostgresTicketReservations } from './server/postgresTicketService';
 import { listPostgresTicketsForCompany } from './server/postgresTicketLifecycleService';
@@ -378,32 +380,21 @@ function clearSessionCookie(res: express.Response) {
   res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
 }
 
-type SessionRole = 'user' | 'business' | 'admin';
-
-async function sessionContext(req: express.Request): Promise<{ userId: string; role: SessionRole } | null> {
-  const session = await getSession(sessionTokenFromRequest(req));
-  if (!session || !session.role) return null;
-  return { userId: session.userId, role: session.role };
-}
-
-async function requireSession(req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (!(await sessionContext(req))) {
-    return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
-  }
-  next();
-}
-
-function requireRole(...roles: SessionRole[]) {
-  return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const context = await sessionContext(req);
-    if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
-    if (!roles.includes(context.role)) {
-      recordAudit({ action: 'authorization_denied', resource: req.path, actorRole: context.role === 'user' ? 'citizen' : context.role, requestId: requestIdFrom(req), success: false, metadata: { requiredRoles: roles } });
-      return res.status(403).json({ error: 'Não possui permissão para esta operação.', code: 'PERMISSION_DENIED' });
-    }
-    next();
-  };
-}
+const sessionAccess = createSessionAccessMiddleware({
+  resolveContext: (req) => resolveSessionContext(sessionTokenFromRequest(req), { getSession }),
+  requestIdFrom,
+  onAuthorizationDenied: ({ resource, actorRole, requestId, requiredRoles }) => {
+    recordAudit({
+      action: 'authorization_denied',
+      resource,
+      actorRole,
+      requestId,
+      success: false,
+      metadata: { requiredRoles },
+    });
+  },
+});
+const { sessionContext, requireSession, requireRole } = sessionAccess;
 
 function recordAudit(entry: Omit<AuditEntry, 'id' | 'requestId' | 'createdAt'> & { requestId?: string }): AuditEntry {
   const auditEntry = createAuditEntry(entry);
