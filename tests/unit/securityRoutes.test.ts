@@ -122,6 +122,40 @@ describe('GET /api/payments/transactions tenant isolation', () => {
   });
 });
 
+describe('metrics route access', () => {
+  it('rejects anonymous access to JSON metrics', async () => {
+    const response = await getJson('/api/metrics', undefined);
+
+    expect(response.status).toBe(401);
+  });
+
+  it('allows an authenticated admin to read JSON metrics', async () => {
+    const cookie = await login('admin-teste@test.guigui', 'CorrectHorse42');
+    const response = await getJson('/api/metrics', cookie);
+    const metrics = await response.json() as {
+      totalRequests: number;
+      errors: number;
+      routes: unknown[];
+      database: unknown;
+    };
+
+    expect(response.status).toBe(200);
+    expect(typeof metrics.totalRequests).toBe('number');
+    expect(typeof metrics.errors).toBe('number');
+    expect(Array.isArray(metrics.routes)).toBe(true);
+    expect(metrics.database).toBeNull();
+  });
+
+  it('keeps Prometheus metrics publicly accessible', async () => {
+    const response = await getJson('/metrics', undefined);
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('text/plain');
+    expect(body).toContain('# TYPE guigui_http_requests_total counter');
+  });
+});
+
 describe('account lifecycle security', () => {
   it('requires an authenticated session for deactivation and deletion', async () => {
     const deactivation = await postJson('/api/account/deactivate', undefined, { email: 'cidadao-um@test.guigui', currentPassword: 'CorrectHorse42' });

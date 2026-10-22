@@ -26,6 +26,17 @@ test.describe('backend: APIs públicas e de plataforma', () => {
       body.database.configured && !body.database.connected ? 'degraded' : 'ok',
     );
     expect(typeof body.geminiActive).toBe('boolean');
+    expect(typeof body.timestamp).toBe('string');
+    expect(body.observability.inProcess).toBe(true);
+    expect(body.observability.persistent).toBe(body.database.connected);
+  });
+
+  test('metrics: Prometheus remains publicly accessible as plain text', async ({ page }) => {
+    const response = await page.request.get('/metrics');
+
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain('text/plain');
+    expect(await response.text()).toContain('# TYPE guigui_http_requests_total counter');
   });
 
   test('features: flags do produto devolvem booleanos coerentes', async ({ page }) => {

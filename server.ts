@@ -25,7 +25,7 @@ import { LANGUAGE_CYCLE } from './src/utils/i18n';
 import { addSubscriptionPeriod } from './src/utils/subscriptions';
 import { createSession, getSession, revokeAllUserSessions, revokeSession, SESSION_COOKIE_NAME } from './server/sessionService';
 import { checkDatabaseConnection, databaseConfigured, databasePool } from './server/db';
-import { classifyHealth } from './server/healthService';
+import { createHealthHandler } from './server/modules/platform-foundation/http/healthHandler';
 import { changePostgresUserPassword, createPostgresUser, deactivatePostgresUser, deletePostgresUser, findPostgresUserByEmail, findPostgresUserById } from './server/postgresAuthService';
 import { activatePostgresTicketReservations, findPostgresTicket, listPostgresTicketsForUser, markPostgresTicketUsed, persistPostgresTickets, releaseExpiredPostgresTicketReservations } from './server/postgresTicketService';
 import { listPostgresTicketsForCompany } from './server/postgresTicketLifecycleService';
@@ -42,8 +42,10 @@ import { assignPostgresBusinessOwner, decidePostgresBusiness, getAppState, listP
 
 import { beginMfaSetup, enableMfa, hasEnabledMfa, verifyUserMfa } from './server/mfaService';
 import { consumeDistributedRateLimit } from './server/rateLimitService';
-import { getDatabaseObservability, persistRequestMetric } from './server/observabilityService';
-import { renderPrometheusMetrics } from './server/prometheusService';
+import { createPostgresObservabilityRepository } from './server/modules/platform-foundation/observability/adapters/postgresObservabilityRepository';
+import { createObservabilityHandlers } from './server/modules/platform-foundation/observability/http/observabilityHandlers';
+import { createObservabilityMiddleware } from './server/modules/platform-foundation/observability/http/observabilityMiddleware';
+import { HttpMetricsRegistry } from './server/modules/platform-foundation/observability/domain/httpMetrics';
 import { getProductFunnel, persistProductEvent } from './server/productAnalyticsService';
 import { canViewTransaction, resolveTransactionAccess } from './server/paymentAccessService';
 import { resolveAppStateValue, resolveAppStateWrite, resolveBusinessWrite, resolveEventWrite } from './server/platformWriteAccess';
@@ -94,11 +96,16 @@ const paymentAdapters = createPaymentAdapters({
   autoConfirmSandbox: process.env.PAYMENT_SANDBOX_AUTOCONFIRM !== 'false',
 });
 
-const requestMetrics = {
-  total: 0,
-  errors: 0,
-  byRoute: new Map<string, { count: number; errors: number; totalMs: number }>(),
-};
+const httpMetricsRegistry = new HttpMetricsRegistry();
+const observabilityRepository = createPostgresObservabilityRepository(
+  databasePool
+    ? { query: (text: string, values: unknown[]) => databasePool.query(text, values) }
+    : null,
+);
+const observabilityHandlers = createObservabilityHandlers({
+  registry: httpMetricsRegistry,
+  repository: observabilityRepository,
+});
 
 app.disable('x-powered-by');
 // Middleware anti-cache para forçar o navegador a buscar tudo novo (resolve tela branca por cache/Service Worker)
@@ -109,31 +116,12 @@ app.use((req, res, next) => {
   res.setHeader('Surrogate-Control', 'no-store');
   next();
 });
-app.use((req, res, next) => {
-  const startedAt = performance.now();
-  const requestId = requestIdFrom(req);
-  res.setHeader('X-Request-Id', requestId);
-  res.on('finish', () => {
-    const durationMs = Math.round((performance.now() - startedAt) * 100) / 100;
-    const route = req.route?.path || req.path;
-    const current = requestMetrics.byRoute.get(route) || { count: 0, errors: 0, totalMs: 0 };
-    current.count += 1;
-    current.totalMs += durationMs;
-    if (res.statusCode >= 500) {
-      current.errors += 1;
-      requestMetrics.errors += 1;
-    }
-    requestMetrics.byRoute.set(route, current);
-    requestMetrics.total += 1;
-    void persistRequestMetric(route, res.statusCode, durationMs).catch((error: unknown) => {
-      console.error(JSON.stringify({ event: 'observability_persist_failed', requestId, message: error instanceof Error ? error.message : 'unknown_error' }));
-    });
-    if (res.statusCode >= 400 || durationMs >= 1000) {
-      console.log(JSON.stringify({ event: 'http_request', requestId, method: req.method, route, status: res.statusCode, durationMs }));
-    }
-  });
-  next();
-});
+app.use(createObservabilityMiddleware({
+  registry: httpMetricsRegistry,
+  persistRequestMetric: observabilityRepository.persistRequestMetric,
+  requestIdFrom,
+  logger: console,
+}));
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
@@ -508,28 +496,13 @@ for (const ticket of ticketsDb.values() as Iterable<TicketForValidation>) {
 persistTickets();
 
 // API Routes
-app.get('/api/health', async (req, res) => {
-  let database = { configured: databaseConfigured, connected: false };
-  if (databaseConfigured) {
-    try {
-      database = await checkDatabaseConnection();
-    } catch (error) {
-      console.error(
-        '[Guigui.com] health database check failed:',
-        error instanceof Error ? error.message : 'unknown_error',
-      );
-      database = { configured: true, connected: false };
-    }
-  }
-  res.json({
-    status: classifyHealth(database),
-    app: 'Guigui.com Bissau',
-    timestamp: new Date().toISOString(),
-    geminiActive: !!getAIClient(),
-    database,
-    observability: { inProcess: true, persistent: Boolean(database.connected) },
-  });
-});
+app.get('/api/health', createHealthHandler({
+  databaseConfigured,
+  checkDatabaseConnection,
+  geminiActive: () => Boolean(getAIClient()),
+  logger: console,
+  now: () => new Date(),
+}));
 
 app.get('/api/marketing/scheduled-items', requireRole('business', 'admin'), async (req, res) => {
     const context = await sessionContext(req);
@@ -1237,19 +1210,9 @@ app.get('/api/openapi.json', (_req, res) => {
   res.sendFile(path.resolve(process.cwd(), 'docs/openapi.json'));
 });
 
-app.get('/api/metrics', requireRole('admin'), async (_req, res) => {
-  const routes = Array.from(requestMetrics.byRoute.entries()).map(([route, metrics]) => ({
-    route,
-    count: metrics.count,
-    errors: metrics.errors,
-    averageMs: metrics.count ? Math.round((metrics.totalMs / metrics.count) * 100) / 100 : 0,
-  }));
-  res.json({ totalRequests: requestMetrics.total, errors: requestMetrics.errors, routes, database: await getDatabaseObservability() });
-});
+app.get('/api/metrics', requireRole('admin'), observabilityHandlers.adminMetrics);
 
-app.get('/metrics', async (_req, res) => {
-  res.type('text/plain').send(await renderPrometheusMetrics(requestMetrics.total, requestMetrics.errors, requestMetrics.byRoute));
-});
+app.get('/metrics', observabilityHandlers.prometheusMetrics);
 
 app.get('/api/monetization/catalog', (_req, res) => {
   res.json(normaliseMonetizationCatalog(monetizationCatalogStore));
