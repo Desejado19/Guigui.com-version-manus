@@ -113,10 +113,10 @@ Remove the old `server/ticketPurchaseDomain.ts`, `server/ticketPurchasePorts.ts`
 
 **Interfaces:**
 - Produces `createTicketPurchaseHandler(dependencies): RequestHandler`.
-- Dependencies inject `validatePurchaseInput(input): ValidationResult`, `resolveSession(request): Promise<SessionContext | null>`, `findAccount(userId): Promise<BuyerAccount | null>`, `isProduction`, `ticketSigningSecretConfigured`, `catalog: TicketCatalogPort`, `feePolicy: TicketFeePolicyPort`, `idempotency: { get(key): Promise<TicketPurchaseResult | null>; acquire(key): Promise<() => void> }`, `executePurchase(command): Promise<TicketPurchaseResult>`, `requestIdFrom(request): string`, and `recordAudit(event): void`. `ValidationResult`, `SessionContext`, `BuyerAccount`, and audit event types are imported from existing contracts; do not duplicate them.
-- `acquire(key)` waits for an in-flight same-key operation and returns a release function; after acquiring, the handler re-reads the cached result before executing the purchase.
+- Dependencies inject `validatePurchaseInput(input: PurchaseInput): ValidationResult<NormalizedPurchase>`, `resolveSession(request: Request): Promise<SessionContext | null>`, `findAccount(userId: string): Promise<PublicUser | null>`, `isProduction: boolean`, `ticketSigningSecretConfigured: boolean`, `catalog: TicketCatalogPort`, `feePolicy: TicketFeePolicyPort`, `idempotency: { cleanup(): void; get(key: string): Promise<TicketPurchaseResult | null>; acquire(key: string): Promise<() => void> }`, `executePurchase(command: TicketPurchaseCommand): Promise<TicketPurchaseResult>`, `requestIdFrom(request: Request): string`, and `recordAudit(event: Omit<AuditEntry, 'id' | 'requestId' | 'createdAt'> & { requestId?: string }): void`.
+- `PurchaseInput`, `ValidationResult`, `NormalizedPurchase`, `SessionContext`, `PublicUser`, `AuditEntry`, `TicketCatalogPort`, `TicketFeePolicyPort`, `TicketPurchaseCommand`, and `TicketPurchaseResult` are imported from existing module contracts; do not duplicate them.
+- `acquire(key)` waits for an in-flight same-key operation and returns a release function; after acquiring, the handler re-reads the cached result before executing the purchase. `cleanup()` preserves the current endpoint's idempotency cleanup call.
 - The handler keeps HTTP-specific parsing and response mapping in this adapter. It keeps `POST /api/tickets/purchase` path mounting in the composition root and preserves exact current response status/body contracts.
-- The handler keeps `POST /api/tickets/purchase` path mounting in the composition root and preserves exact current response status/body contracts.
 
 - [ ] **Step 1: Write failing HTTP contract tests**
 
