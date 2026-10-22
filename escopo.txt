@@ -1,0 +1,333 @@
+
+GRUPO GORILA
+
+GUIGUI.COM
+Documento de Escopo do Projecto
+Escopo Técnico e Funcional — Versão 1.0
+Preparado para apresentação à equipa de desenvolvimento
+Julho de 2026
+Documento confidencial — uso interno e para parceiros de desenvolvimento autorizados
+
+Índice
+TOC \h \o &quot;1-3&quot;
+
+
+1. Sumário Executivo
+O Guigui.com é uma plataforma digital de divulgação comercial e cultural dedicada à Guiné-Bissau, propriedade do Grupo Gorila. Funciona como um directório/agenda pública onde negócios, serviços e eventos culturais compram visibilidade através de fichas próprias, publicações periódicas e promoções pontuais.
+O site destina-se a três públicos: (1) residentes em Bissau que procuram informação sobre comércio, serviços e eventos; (2) a diáspora guineense e visitantes internacionais que planeiam viver ou visitar o país; (3) negócios e organizadores de eventos que pretendem divulgar a sua actividade.
+O modelo de negócio assenta em subscrições mensais/anuais por escalão e categoria, complementadas por publicidade avulsa, serviços de produção de conteúdo, e — em regime de venda directa — bilhética de eventos culturais com emissão de bilhete único por QR code e validação anti-fraude.
+Este documento define o âmbito funcional, técnico, operacional e de conformidade do projecto, servindo de referência única para a equipa de desenvolvimento durante todas as fases de construção do produto.
+2. Objectivo do Projecto
+Criar e lançar uma plataforma web (guigui.com) que funcione como cartão de visita digital colectivo da actividade comercial, de serviços e cultural da Guiné-Bissau, com os seguintes objectivos específicos:
+Permitir que qualquer negócio em Bissau crie uma ficha paga com informação de contacto, fotos, horários e publicações periódicas de marketing.
+Permitir promoções pontuais pagas, visíveis numa secção agregada &quot;Promoções Activas&quot;.
+Permitir a organizadores de eventos culturais vender bilhetes directamente através da plataforma, com emissão de bilhete único (QR code) enviado por SMS e validação anti-fraude na entrada.
+Fornecer a cada cliente pagante um dashboard de gestão do seu negócio com estatísticas de interacção do público.
+Garantir que toda a informação exposta é adequada, segura e legalmente conforme, através de um sistema de moderação híbrido (IA + revisão humana).
+Operar de forma financeiramente sustentável desde os primeiros meses, com custos de infra-estrutura compatíveis com a fase inicial de capital limitado do projecto (fase MVP).
+Fora de âmbito: o Guigui.com não processa vendas de produtos ou serviços dos negócios listados (excepto bilhética de eventos), não gere entregas, não intermedia pagamentos entre público e negócios, e não assume responsabilidade pela qualidade dos produtos/serviços anunciados.
+3. Visão Geral do Sistema
+O sistema é composto por cinco grandes módulos, detalhados nas secções seguintes:
+Módulo
+Descrição resumida
+Utilizadores
+Área Pública
+Directório, pesquisa, fichas de negócio, promoções, eventos, blog
+Público em geral
+Área do Cliente
+Dashboard de gestão do negócio, posts, promoções, estatísticas, facturação
+Negócios/clientes pagantes
+Bilhética de Eventos
+Compra de bilhetes, emissão de QR, envio por SMS
+Público comprador de bilhetes
+Scanner de Porta
+Validação de bilhetes em tempo real no local do evento
+Equipa de segurança do evento
+Administração
+Gestão de clientes, conteúdo, finanças, moderação
+Equipa Guigui / Grupo Gorila
+
+Todos os módulos partilham uma base de dados única e um sistema de autenticação comum, mas com níveis de permissão distintos (público anónimo, cliente autenticado, staff administrativo, staff de evento).
+4. Modelo de Negócio e Fontes de Receita
+4.1 Escalões de subscrição
+Cada negócio subscreve um de quatro escalões, com preço ajustado por categoria de actividade (ver 4.3).
+Regra transversal a todos os escalões: a subscrição inclui sempre 3 posts por mês, sem excepção de escalão. Qualquer post adicional além destes 3 é sempre pago à parte (compra avulsa), independentemente de o cliente estar no escalão Básico, Profissional, Premium ou Enterprise. Os posts extra são uma fonte de receita própria e não devem ser oferecidos como &quot;ilimitados&quot; em nenhum escalão.
+Escalão
+Posts/mês incluídos
+Promoções incluídas
+Funcionalidades principais
+Básico
+3
+0 (pagas à parte)
+Ficha padrão, 1 categoria, estatísticas simples
+Profissional
+3
+1/mês
+Ficha expandida, 2 categorias, badge &quot;Verificado&quot;, estatísticas detalhadas
+Premium
+3
+4/mês
+Rotação na homepage, prioridade na pesquisa, gestor de conta, relatórios mensais
+Enterprise
+3
+Negociado
+Banner exclusivo, branding próprio, contrato anual, condições à medida
+
+4.2 Preços por categoria (estrutura, sem valores)
+Os preços de subscrição não são fixos nem uniformes: variam consoante o grupo de categoria do negócio (reflectindo a capacidade de pagamento típica do sector) e o escalão contratado (Básico, Profissional, Premium, Enterprise). Os valores concretos serão definidos e aplicados pelo Grupo Gorila numa fase posterior, fora do âmbito deste documento, e não devem ser assumidos nem codificados de forma fixa pela equipa de desenvolvimento.
+Requisito técnico obrigatório: o sistema deve permitir à administração definir, editar e desactivar, a qualquer momento e sem intervenção dos programadores, uma matriz de preços cruzando grupo de categoria × escalão. Cada célula desta matriz deve ser um valor numérico configurável (moeda XOF), com possibilidade de: (a) preços diferentes por categoria; (b) alteração de preços sem afectar clientes já subscritos até à renovação; (c) histórico de alterações de preço para auditoria; (d) suporte a descontos por pagamento anual antecipado.
+A estrutura de grupos de categoria a suportar (sem valores associados neste documento) é, no mínimo: Restauração/cafés/pequeno comércio; Hotelaria/clínicas/escolas privadas/comércio médio; Bancos/seguradoras/telecoms/distribuidoras/construção; ONGs/associações/artesãos; Serviços profissionais. Esta lista de grupos deve também ser configurável pela administração, não fixa em código.
+4.3 Fontes de receita adicionais
+Bilhética de eventos culturais — comissão sobre valor do bilhete + taxa fixa por bilhete emitido (percentagens configuráveis pela administração).
+Publicidade em espaços premium — banner rotativo na homepage, destaque &quot;Promoção da Semana&quot;, notificações push segmentadas, vendidos avulsamente por período.
+Serviços de produção de conteúdo — pacotes de fotografia e redacção vendidos à parte (gestão manual/comercial, não necessariamente automatizada no MVP).
+Posts e promoções extra — compra avulsa acima dos 3 posts/mês incluídos, aplicável a todos os escalões sem excepção; é uma das principais fontes de receita variável da plataforma.
+Directório impresso anual e API de dados para terceiros — fases futuras, fora do âmbito do MVP mas a considerar na arquitectura de dados.
+5. Categorias de Negócio
+O sistema deve suportar uma estrutura de categorias em dois níveis (categoria principal e subcategoria), configurável pela administração. Lista inicial de categorias principais:
+#
+Categoria principal
+Exemplos de subcategorias
+1
+Restauração e Bebidas
+Restaurantes, churrascarias, cafés, bares, food trucks, catering
+2
+Hotelaria e Alojamento
+Hotéis, pousadas, alojamento local, resorts
+3
+Turismo e Lazer
+Agências de viagens, guias, aluguer de barcos, mergulho, museus
+4
+Saúde e Bem-estar
+Hospitais, clínicas, farmácias, cabeleireiros, ginásios
+5
+Educação e Formação
+Escolas, universidades, formação profissional, explicações
+6
+Serviços Profissionais
+Advogados, contabilistas, consultores, arquitectos, TI
+7
+Comércio e Retalho
+Supermercados, moda, electrónica, papelarias, ourivesarias
+8
+Automóvel e Transportes
+Stands, oficinas, aluguer de viaturas, táxis, logística
+9
+Construção e Imobiliário
+Empreiteiros, materiais, imobiliárias, jardinagem
+10
+Bancos e Serviços Financeiros
+Bancos, microfinanças, seguradoras, câmbios
+11
+Telecomunicações e Tecnologia
+Operadoras, lojas de telemóveis, provedores de internet
+12
+Indústria e Produção
+Agroindústria, pescas, artesanato, carpintaria
+13
+Agricultura e Pescas
+Produtores, cooperativas, pesca artesanal, avicultura
+14
+Eventos Culturais *
+Concertos, festivais, teatro, exposições, conferências
+15
+Associações, ONGs e Instituições
+ONGs, associações, cooperativas, embaixadas
+16
+Media e Entretenimento
+Rádios, TVs, produtoras, DJs, aluguer de som e luz
+
+* A categoria &quot;Eventos Culturais&quot; tem tratamento técnico diferenciado: cada evento é um registo temporário associado a datas e bilhética, distinto de uma ficha permanente de negócio (ver secção 7.3).
+Requisito técnico: um negócio pode estar associado a 1 categoria (Básico), 2 categorias (Profissional) ou 3 categorias (Premium/Enterprise). A estrutura de categorias deve ser gerível via administração (criar, editar, arquivar categorias e subcategorias).
+6. Requisitos Funcionais — Mapa de Páginas
+6.1 Área Pública
+Homepage: banner rotativo pago, pesquisa central, acesso às categorias, secções &quot;Promoções Activas&quot;, &quot;Eventos próximos&quot;, &quot;Novidades&quot;, &quot;Destaques da semana&quot;, selector de idioma (Português, Crioulo, Francês, Inglês).
+Página de categoria: listagem com filtros (subcategoria, zona, preço, avaliação, aberto agora, com promoção) e ordenação múltipla.
+Página de negócio individual: galeria de fotos, descrição, contactos (telefone, WhatsApp, email), mapa, horários, redes sociais, menu/catálogo, promoções activas, avaliações, posts recentes, botão de partilha.
+Página de promoções activas: todas as promoções em curso, filtros por categoria e zona, contagem decrescente até ao fim.
+Página de eventos: calendário, filtros por tipo e mês, fichas de evento com fluxo de compra de bilhete integrado.
+Pesquisa unificada: negócios, eventos e promoções num único resultado, com sugestões automáticas.
+Páginas institucionais: &quot;Sobre o Guigui&quot;, &quot;Anuncie o seu negócio&quot; (comercial, com formulário e CTA de registo), Blog/Guias de Bissau, Ajuda/FAQ, Termos e Condições, Política de Privacidade, Como funciona a compra de bilhetes.
+6.2 Área do Cliente (negócio pagante)
+Registo: escolha de escalão e categoria(s), dados do negócio e do responsável, aceitação de termos, pagamento inicial via Orange Money ou Telecel.
+Login e recuperação de password, com 2FA opcional por SMS.
+Dashboard principal: posts usados/disponíveis, visualizações, cliques em telefone/WhatsApp/direcções, dias até renovação, notificações.
+Gestão de ficha: fotos, descrição, contactos, horários, redes sociais, categorias (dentro do limite do escalão).
+Gestão de posts: criação, calendário, contador do plano, compra de posts extra avulsos.
+Gestão de promoções: criação (título, desconto, período, condições, foto), activas e histórico com estatísticas, compra de promoções extra.
+Estatísticas detalhadas: visualizações ao longo do tempo, origem do tráfego, horas de maior consulta, cliques por tipo de acção; nos escalões superiores, dados demográficos agregados.
+Facturação: histórico de pagamentos, próxima renovação, alteração de escalão, facturas descarregáveis, gestão do método de pagamento.
+Área específica para clientes de &quot;Eventos&quot;: criação de evento, gestão de tipos de bilhete e preços, vendas em tempo real, receita gerada, exportação de participantes, geração de acesso para a equipa de porta.
+Definições da conta: dados, password, notificações, encerramento de conta.
+6.3 Área do Comprador de Bilhetes
+Fluxo sem exigência de conta prévia, para minimizar fricção:
+Página do evento → selecção de bilhetes → dados do titular (nome, telemóvel) → pagamento (Orange Money/Telecel) → confirmação em ecrã + SMS.
+Página &quot;O meu bilhete&quot;: acesso via link único enviado por SMS, com opção de reenvio limitada por anti-abuso.
+Página &quot;Consultar bilhete&quot;: recuperação via número de telemóvel + código de 4 dígitos.
+6.4 Scanner de Porta (equipa de segurança do evento)
+Login por código único do evento, partilhado pelo organizador.
+Ecrã de leitura com câmara sempre activa; feedback visual/sonoro imediato (válido / já usado / inválido); opção de verificação manual por código de 4 dígitos.
+Modo offline: regista validações localmente e sincroniza quando a rede for recuperada, com aviso de risco de duplicação enquanto offline.
+Estatísticas ao vivo do evento: entrados/total, ritmo de entrada.
+6.5 Área de Administração (equipa Guigui)
+Dashboard geral: receita mensal, clientes activos por escalão/categoria, novos registos, churn, eventos activos, bilhetes vendidos, tráfego do site.
+Gestão de clientes: pesquisa, filtros, alteração manual de escalão, suspensão, prolongamento, notas internas.
+Gestão de conteúdo: fila de moderação (ver secção 8), gestão do blog, banners, destaques da homepage, páginas sazonais.
+Gestão de categorias e preços: edição sem necessidade de alteração de código.
+Gestão de eventos: aprovação de novos eventos, monitorização de vendas, gestão de reembolsos em caso de cancelamento.
+Gestão financeira: transacções, reconciliação com Orange/Telecel, comissões de bilhética, exportação para contabilidade.
+Gestão de utilizadores internos: permissões diferenciadas (administrador, comercial, moderador, financeiro).
+Ferramentas de marketing: SMS/push segmentados, campanhas, códigos promocionais.
+Auditoria e logs: registo de todas as acções sensíveis (alteração de preços, suspensões, reembolsos).
+7. Sistema de Bilhética (QR + SMS)
+Este é o único fluxo de venda directa da plataforma e exige atenção técnica reforçada por envolver pagamento, dados pessoais e controlo de acesso físico a eventos.
+7.1 Fluxo de compra
+O comprador escolhe tipo e quantidade de bilhetes na ficha do evento.
+Indica nome e número de telemóvel do titular de cada bilhete (pode ser diferente do comprador).
+Efectua o pagamento via Orange Money ou Telecel.
+O servidor gera, para cada bilhete, um token único assinado (JWT ou equivalente) e envia dois SMS separados ao número do titular: (a) imagem/link do QR code; (b) código numérico de 4 dígitos.
+7.2 Fluxo de validação na entrada
+O agente de segurança lê o QR code através da web-app de scanner (não requer instalação).
+O servidor confirma validade em tempo real e marca o token como &quot;usado&quot; nesse instante — qualquer segunda leitura do mesmo QR é automaticamente rejeitada, independentemente de existirem cópias da imagem.
+Em caso de dúvida ou reclamação, o agente pode pedir o código de 4 dígitos, que só foi enviado ao titular legítimo.
+Em modo offline (falha de rede no local), o scanner regista validações localmente e sincroniza ao recuperar ligação; o sistema deve assinalar o risco acrescido de duplicação nesse período e recomendar exigência do código de 4 dígitos como verificação adicional enquanto offline.
+7.3 Requisitos específicos para eventos
+Evento é uma entidade própria (não uma ficha permanente de negócio), com data, local, tipos de bilhete, preços e estado (rascunho, aprovado, activo, encerrado, cancelado).
+Aprovação prévia de eventos pela administração antes de ficarem visíveis ao público (ver secção 8).
+Política de reembolso em caso de cancelamento: o sistema deve suportar reembolso em massa via Orange Money/Telecel e notificação automática a todos os compradores.
+Retenção da receita ao organizador por um período configurável (referência: 7 dias úteis pós-evento) antes de transferência, para acomodar eventuais cancelamentos/reembolsos.
+8. Sistema de Avaliações
+As avaliações públicas usam uma escala qualitativa de 4 níveis, não numérica: &quot;Não gostei&quot;, &quot;Gostei&quot;, &quot;Gostei muito&quot;, &quot;Muito bom&quot;.
+Cada nível tem um peso interno (1 a 4) usado para calcular a classificação predominante do negócio, mas o público vê apenas o rótulo qualitativo (ex.: &quot;Muito Bom · 127 avaliações&quot;), nunca uma média numérica ou estrelas.
+Uma avaliação por número de telemóvel por negócio, confirmada por SMS (código de 4 dígitos), com possibilidade de reavaliação a cada 90 dias.
+Comentário escrito opcional, limitado a 200 caracteres, sujeito a moderação (ver secção 9).
+O negócio pode responder publicamente a cada comentário recebido.
+Deve existir função de denúncia de avaliações, com revisão pela equipa Guigui.
+9. Moderação de Conteúdo (IA + Revisão Humana)
+Todo o conteúdo gerado por clientes (posts, promoções, respostas) e por público (comentários de avaliação) passa por um pipeline de moderação automática antes ou no momento da publicação.
+9.1 Classificação de risco
+Classificação
+Acção do sistema
+Cobertura esperada
+Verde — aprovado
+Publicação imediata e automática
+~85–90%
+Amarelo — revisão humana
+Fica em fila de moderação; publicação suspensa até decisão humana
+~8–12%
+Vermelho — rejeitado
+Não publica; notifica o autor com o motivo; pode ser contestado (escala para humano)
+~2–3%
+
+9.2 Critérios de análise
+Texto: discurso de ódio, ameaças, difamação, incitação à violência, conteúdo sexual explícito, promoção de actividades ilegais, informação enganosa manifesta, spam, exposição indevida de dados pessoais de terceiros.
+Imagem: nudez, violência gráfica, símbolos de ódio, conteúdo perturbador, qualidade manifestamente inadequada.
+Contexto de mercado: termos publicitários abusivos (&quot;garantido&quot;, &quot;cura definitiva&quot;), possível imitação de marcas registadas.
+9.3 Requisitos técnicos
+Integração com API de moderação (ex.: Claude, OpenAI, Google) para análise de texto e imagem em tempo real (latência alvo: 2–5 segundos).
+Conteúdo em crioulo guineense deve, numa primeira fase, ser tratado com precaução adicional (classificação por defeito não inferior a &quot;Amarelo&quot;) até se validar a fiabilidade da IA neste idioma.
+Painel de administração deve permitir: ver fila de revisão humana, aprovar/rejeitar com um clique, ver histórico de decisões, ajustar sensibilidade dos critérios sem alteração de código.
+Deve manter-se auditoria de todas as decisões de moderação (automática e humana) para efeitos de conformidade e resolução de disputas.
+10. Integração de Pagamentos
+Meios de pagamento suportados no lançamento: Orange Money e Telecel (Teletaco/nova operadora).
+Casos de uso: pagamento de subscrição inicial e renovações, compra de posts/promoções extra, compra de bilhetes de eventos, reembolsos em caso de cancelamento de evento.
+Deve prever-se um período de 2 a 4 meses para negociação e integração técnica com cada operadora; a equipa de desenvolvimento deve confirmar disponibilidade de API/SDK de cada operadora antes de comprometer prazos.
+Enquanto a integração automática não estiver disponível, o MVP pode operar com confirmação manual de pagamento pela equipa Guigui (transferência para número dedicado, confirmação manual no painel administrativo) — ver secção 12.
+Todas as transacções devem ficar registadas com identificador único, permitindo reconciliação com os extractos das operadoras.
+11. Requisitos Técnicos e Arquitectura
+11.1 Stack recomendada
+Camada
+Recomendação
+Observações
+Frontend
+Next.js + Tailwind CSS
+Bom SEO nativo, essencial para pesquisas tipo &quot;restaurantes Bissau&quot;
+Backend
+Node.js ou Django
+API REST; escolha conforme experiência da equipa
+Base de dados
+PostgreSQL
+Estrutura relacional adequada a categorias, escalões, transacções
+Hospedagem
+DigitalOcean ou Hetzner
+Servidores na Europa (Frankfurt/Amesterdão) para boa latência com África Ocidental
+Formato de app
+PWA (Progressive Web App)
+Sem app nativa no lançamento — ver 11.3
+Scanner de porta
+Web-app dedicada ou app Android leve
+Deve funcionar em qualquer smartphone com câmara e dados móveis
+
+11.2 Hospedagem — nuvem, não infra-estrutura local
+Os servidores de produção devem estar alojados em serviços de nuvem (não fisicamente em Bissau), por três razões: instabilidade eléctrica local, fragilidade e custo de uplink de internet, e menor custo/maior fiabilidade de segurança e backups em fornecedores especializados. Um eventual servidor local no Grupo Gorila serve apenas como posto de trabalho da equipa ou cópia de segurança secundária, nunca como servidor de produção.
+11.3 PWA em vez de app nativa
+No lançamento, a plataforma deve ser apenas um site, construído como PWA (instalável no ecrã inicial, com suporte a notificações push e funcionamento parcial offline), pelas seguintes razões:
+A maioria dos utilizadores em Bissau chega via link partilhado em WhatsApp/Facebook, não via loja de aplicações — a descoberta orgânica depende de SEO, que só funciona em conteúdo web indexável, não em apps.
+Evita custos e atrito de duplo desenvolvimento (Android + iOS), contas de developer pagas, processos de aprovação em lojas, e fricção de instalação para o utilizador.
+Publicação de novas funcionalidades é imediata (sem espera por aprovação de loja).
+Excepção: a equipa de segurança de eventos pode beneficiar de uma pequena app Android dedicada ao scanner de bilhetes (leitura de câmara mais robusta, modo offline mais fiável) — projecto isolado, avaliar caso a caso.
+11.4 Segurança e privacidade
+Dados pessoais (nomes, telefones associados a bilhetes e avaliações) devem ser tratados em conformidade com boas práticas de protecção de dados, incluindo para utilizadores da diáspora sujeitos ao RGPD.
+Tokens de bilhete devem ser assinados criptograficamente e de uso único, validados no servidor (nunca apenas no cliente).
+Autenticação de clientes com password segura (hash + salt) e 2FA opcional por SMS.
+Registo de consentimento explícito aos termos no acto de registo (data/hora e IP), para efeitos de prova jurídica.
+Backups automáticos diários com replicação em segunda região.
+11.5 Requisitos não-funcionais
+Suporte multilingue: Português, Crioulo, Francês, Inglês (mínimo o Português no lançamento, arquitectura preparada para os restantes).
+Desempenho: tempos de carregamento optimizados para ligações móveis 3G/4G instáveis, típicas de Bissau.
+Disponibilidade: arquitectura deve tolerar quebras de conectividade do lado do cliente sem perda de dados (especialmente crítico no scanner de bilhetes).
+Escalabilidade: arquitectura deve permitir crescimento de MVP (dezenas de clientes) para escala nacional (milhares de clientes, múltiplos eventos simultâneos) sem reescrita estrutural.
+12. Fases de Desenvolvimento e Entregáveis
+Dado o capital inicial limitado, o desenvolvimento deve ser faseado, com cada fase a produzir um entregável funcional e validável antes de avançar para a seguinte.
+Fase 1 — MVP (lançamento inicial)
+Directório público completo: categorias, pesquisa, fichas de negócio, sistema de posts.
+Painel de administração básico: gestão manual de clientes e conteúdo, aprovação de registos.
+Registo de clientes com pagamento confirmado manualmente (sem integração automática Orange/Telecel nesta fase).
+Sistema de avaliações de 4 níveis com confirmação por SMS.
+Moderação por IA para posts e comentários (texto e imagem).
+Sem bilhética de eventos nesta fase — eventos podem ser apenas informativos (sem venda).
+Fase 2 — Automatização de pagamentos e promoções
+Integração automática com Orange Money e Telecel para subscrições, renovações e compras avulsas.
+Dashboard de cliente completo, com estatísticas detalhadas.
+Sistema de promoções activas com contador regressivo.
+Fase 3 — Bilhética de eventos
+Módulo completo de criação de eventos, venda de bilhetes, emissão de QR + SMS.
+Web-app de scanner de porta com modo offline.
+Gestão de reembolsos e cancelamentos.
+Fase 4 — Optimização e expansão
+PWA completa com notificações push.
+Suporte multilingue alargado (Crioulo, Francês, Inglês).
+API para terceiros, directório impresso, funcionalidades avançadas de marketing.
+Nota para os programadores: cada fase deve ser entregue com ambiente de testes acessível à equipa Guigui para validação antes de passar à fase seguinte, e com documentação técnica mínima (esquema de base de dados, endpoints de API, instruções de deployment).
+13. Aspectos Jurídicos e Contratuais
+Embora a redacção legal seja da responsabilidade de advogado contratado pelo Grupo Gorila, o sistema deve prever, do ponto de vista técnico, os seguintes requisitos de conformidade:
+Ecrã de aceitação obrigatória dos Termos e Condições e Política de Privacidade no registo de qualquer cliente, com registo de data/hora e IP como prova de aceitação.
+Contrato de prestação de serviços entre o Guigui.com e cada cliente pagante, cobrindo objecto do serviço, limites de responsabilidade, propriedade do conteúdo submetido, condições de renovação/cancelamento e foro competente — a gerar/associar digitalmente a cada conta no acto de subscrição.
+Contrato específico adicional para clientes da categoria Eventos, cobrindo comissão de bilhética, prazo de transferência de receita, política de reembolso e responsabilidade sobre a validação na porta.
+Mecanismo de remoção de conteúdo com notificação prévia ao cliente e prazo de resposta, antes de acção definitiva por parte da administração.
+Nota importante: o Guigui.com posiciona-se juridicamente como plataforma de divulgação e marketing, não como intermediário comercial nem parte nas transacções entre negócios e público — excepto no caso da bilhética de eventos, que é venda directa da própria plataforma.
+14. Glossário
+Termo
+Definição
+Ficha de negócio
+Página pública de um cliente pagante, com contactos, fotos e informação do negócio
+Post
+Publicação periódica de marketing feita pelo cliente na sua ficha
+Promoção activa
+Oferta pontual paga à parte, visível na secção agregada &quot;Promoções Activas&quot;
+Escalão
+Nível de subscrição (Básico, Profissional, Premium, Enterprise)
+PWA
+Progressive Web App — site que se comporta como aplicação, instalável sem loja de apps
+Token de bilhete
+Código único e assinado que identifica um bilhete, usado uma única vez
+Fila de moderação
+Lista de conteúdos classificados como &quot;Amarelo&quot; à espera de decisão humana
+15. Próximos Passos para a Equipa de Desenvolvimento
+Validar exequibilidade técnica e prazos de cada fase descrita na secção 12.
+Confirmar disponibilidade de API/SDK de Orange Money e Telecel e estimar esforço de integração.
+Propor esquema inicial de base de dados para categorias, escalões, clientes, posts, promoções, eventos e bilhetes.
+Seleccionar fornecedor de moderação por IA e validar custos reais por volume esperado de conteúdo.
+Apresentar orçamento e cronograma detalhado por fase, com marcos de pagamento associados a entregáveis validados.
+
+Documento elaborado para o Grupo Gorila — Guigui.com. Sujeito a revisão e actualização à medida que o projecto evolui.

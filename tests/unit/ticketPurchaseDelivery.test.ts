@@ -89,7 +89,13 @@ describe('confirmed ticket purchase delivery', () => {
       id: 'notif-ticket-txn-1',
       userId: 'user-1',
       category: 'order_redemption',
-      metadata: expect.objectContaining({ transactionId: 'txn-1', ticketIds: ['ticket-1', 'ticket-2', 'ticket-3'] }),
+      metadata: expect.objectContaining({
+        transactionId: 'txn-1',
+        ticketId: 'ticket-1',
+        ticketIds: ['ticket-1', 'ticket-2', 'ticket-3'],
+        eventId: 'event-1',
+        ticketDestination: 'my-tickets',
+      }),
     }));
     expect(deliveryMocks.smsSend).toHaveBeenCalledTimes(4);
     expect(deliveryMocks.smsSend).toHaveBeenNthCalledWith(1, expect.objectContaining({

@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+.cursor
+.git
+coverage
+backups
+*.log
+agent-transcripts
+pnpm-lock.yaml

@@ -19,3 +19,8 @@ export interface TicketInventoryPort {
 export interface TicketRepositoryPort {
   issue(reservationId: string, tickets: TicketForValidation[], buyerUserId: string): Promise<TicketForValidation[]>;
 }
+
+export interface TicketPurchaseIdempotencyPort<T> {
+  get(key: string): Promise<T | null>;
+  store(key: string, result: T): Promise<void>;
+}

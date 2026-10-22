@@ -1,0 +1,74 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Guigui.com API",
+    "version": "1.0.0",
+    "description": "Contrato público da API. As rotas /api continuam suportadas; clientes novos devem usar /api/v1."
+  },
+  "servers": [
+    { "url": "/api/v1" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": { "type": "apiKey", "in": "cookie", "name": "guigui_session" }
+    },
+    "schemas": {
+      "ApiError": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": { "type": "string" },
+          "code": { "type": "string" },
+          "requestId": { "type": "string" },
+          "issues": { "type": "array", "items": { "type": "object" } }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Verifica a saúde da aplicação",
+        "responses": { "200": { "description": "Estado da aplicação" } }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "Inicia uma sessão",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["email", "password"], "properties": { "email": { "type": "string", "format": "email" }, "password": { "type": "string", "minLength": 6 }, "mfaCode": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "Sessão iniciada" }, "401": { "description": "Credenciais inválidas", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } } }
+      }
+    },
+    "/auth/session": {
+      "get": {
+        "summary": "Obtém a sessão atual",
+        "responses": { "200": { "description": "Sessão atual" } }
+      }
+    },
+    "/tickets/purchase": {
+      "post": {
+        "summary": "Cria uma compra de bilhete",
+        "responses": { "201": { "description": "Bilhete criado" }, "400": { "description": "Dados inválidos", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } } }
+      }
+    },
+    "/tickets/lookup": {
+      "post": {
+        "summary": "Consulta bilhetes por código ou telefone",
+        "responses": { "200": { "description": "Bilhetes encontrados" } }
+      }
+    },
+    "/payments/create": {
+      "post": {
+        "summary": "Cria uma intenção de pagamento",
+        "responses": { "201": { "description": "Pagamento criado" }, "400": { "description": "Dados inválidos", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } } }
+      }
+    },
+    "/notifications": {
+      "get": {
+        "summary": "Lista notificações do utilizador autenticado",
+        "security": [{ "sessionCookie": [] }],
+        "responses": { "200": { "description": "Notificações" }, "401": { "description": "Autenticação necessária" } }
+      }
+    }
+  }
+}
