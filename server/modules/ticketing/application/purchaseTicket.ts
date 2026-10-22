@@ -72,7 +72,16 @@ export type TicketPurchaseResult =
     }
   | {
       status: 'rejected';
-      reason: 'invalid_offer' | 'invalid_policy' | 'inventory_unavailable' | 'payment_failed' | 'invalid_quantity' | 'sales_closed';
+      reason:
+        | 'invalid_offer'
+        | 'invalid_policy'
+        | 'inventory_unavailable'
+        | 'payment_failed'
+        | 'invalid_quantity'
+        | 'sales_closed'
+        | 'ticket_type_mismatch'
+        | 'ticket_price_mismatch'
+        | 'ticket_total_mismatch';
       message: string;
       transaction?: TicketPurchaseTransaction;
     };
@@ -89,6 +98,9 @@ export interface TicketPurchaseCommand {
   policyVersion: string;
   policyAcceptedAt: string;
   idempotencyKey?: string;
+  expectedCheckout?: Pick<TicketPurchaseQuote, 'unitPriceXOF' | 'buyerTotalXOF'> & {
+    ticketTypeName: string;
+  };
 }
 
 export interface TicketFactoryInput {
@@ -228,6 +240,17 @@ export async function executeTicketPurchase(
     if (quoteResult.reason === 'invalid_quantity') return rejection('invalid_quantity', 'A quantidade de bilhetes não é válida.');
     if (quoteResult.reason === 'sales_closed') return rejection('sales_closed', 'As vendas deste tipo de bilhete estão encerradas.');
     return rejection('inventory_unavailable', 'Não há bilhetes suficientes disponíveis.');
+  }
+  if (command.expectedCheckout) {
+    if (command.expectedCheckout.ticketTypeName !== offer.ticketTypeName) {
+      return rejection('ticket_type_mismatch', 'A categoria selecionada foi alterada. Actualize o checkout.');
+    }
+    if (command.expectedCheckout.unitPriceXOF !== quoteResult.quote.unitPriceXOF) {
+      return rejection('ticket_price_mismatch', 'O preço do bilhete foi alterado. Actualize o checkout.');
+    }
+    if (command.expectedCheckout.buyerTotalXOF !== quoteResult.quote.buyerTotalXOF) {
+      return rejection('ticket_total_mismatch', 'O total do checkout não corresponde à política de taxas actual.');
+    }
   }
 
   const transactionId = ports.createTransactionId();

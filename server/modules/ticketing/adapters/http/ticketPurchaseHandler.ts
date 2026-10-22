@@ -74,6 +74,9 @@ function mapTicketPurchaseHttpResponse(
     sales_closed: 400,
     inventory_unavailable: 409,
     payment_failed: 502,
+    ticket_type_mismatch: 409,
+    ticket_price_mismatch: 409,
+    ticket_total_mismatch: 409,
   };
   const rejectionCode: Record<typeof result.reason, string> = {
     invalid_offer: 'TICKET_OFFER_NOT_FOUND',
@@ -82,6 +85,9 @@ function mapTicketPurchaseHttpResponse(
     sales_closed: 'TICKET_INVENTORY_UNAVAILABLE',
     inventory_unavailable: 'TICKET_INVENTORY_UNAVAILABLE',
     payment_failed: 'TICKET_PAYMENT_FAILED',
+    ticket_type_mismatch: 'TICKET_TYPE_MISMATCH',
+    ticket_price_mismatch: 'TICKET_PRICE_MISMATCH',
+    ticket_total_mismatch: 'TICKET_TOTAL_MISMATCH',
   };
   return {
     status: rejectionStatus[result.reason],
@@ -234,6 +240,11 @@ export function createTicketPurchaseHandler(
         policyVersion: input.policyVersion,
         policyAcceptedAt: input.policyAcceptedAt,
         idempotencyKey,
+        expectedCheckout: {
+          ticketTypeName: offer.ticketTypeName,
+          unitPriceXOF: offer.unitPriceXOF,
+          buyerTotalXOF: chargedAmountXOF,
+        },
       });
 
       if (result.status === 'pending') {

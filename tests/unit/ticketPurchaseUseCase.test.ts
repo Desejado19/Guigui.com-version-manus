@@ -206,6 +206,51 @@ describe('ticket purchase application use case', () => {
     });
   });
 
+  it.each([
+    ['ticket category', { ...offer, ticketTypeName: 'Regular' }, 'ticket_type_mismatch'],
+    ['unit price', { ...offer, unitPriceXOF: 12000 }, 'ticket_price_mismatch'],
+  ])('rejects a changed %s before reserving or creating payment', async (_label, currentOffer, reason) => {
+    const ports = createPorts();
+    ports.catalog.getOffer = vi.fn(async () => currentOffer);
+    const expectedCheckout = {
+      ticketTypeName: offer.ticketTypeName,
+      unitPriceXOF: offer.unitPriceXOF,
+      buyerTotalXOF: calculateTicketFees(DEFAULT_MONETIZATION_CATALOG, offer.unitPriceXOF, command.quantity).buyerTotal,
+    };
+    const { executeTicketPurchase } = await import('../../server/modules/ticketing/application/purchaseTicket');
+
+    const result = await executeTicketPurchase({ ...command, expectedCheckout }, ports);
+
+    expect(result).toMatchObject({ status: 'rejected', reason });
+    expect(ports.inventory.reserve).not.toHaveBeenCalled();
+    expect(ports.payments.orange_money.createIntent).not.toHaveBeenCalled();
+    expect(ports.transactions.persist).not.toHaveBeenCalled();
+  });
+
+  it('rejects a changed checkout total when the fee policy changes before payment', async () => {
+    const ports = createPorts();
+    const calculate = ports.feePolicy.calculate;
+    let calculationCount = 0;
+    ports.feePolicy.calculate = (input) => {
+      const breakdown = calculate(input);
+      calculationCount += 1;
+      return calculationCount === 1 ? breakdown : { ...breakdown, buyerTotal: breakdown.buyerTotal + 1 };
+    };
+    const expectedCheckout = {
+      ticketTypeName: offer.ticketTypeName,
+      unitPriceXOF: offer.unitPriceXOF,
+      buyerTotalXOF: ports.feePolicy.calculate({ unitPriceXOF: offer.unitPriceXOF, quantity: command.quantity }).buyerTotal,
+    };
+    const { executeTicketPurchase } = await import('../../server/modules/ticketing/application/purchaseTicket');
+
+    const result = await executeTicketPurchase({ ...command, expectedCheckout }, ports);
+
+    expect(result).toMatchObject({ status: 'rejected', reason: 'ticket_total_mismatch' });
+    expect(ports.inventory.reserve).not.toHaveBeenCalled();
+    expect(ports.payments.orange_money.createIntent).not.toHaveBeenCalled();
+    expect(ports.transactions.persist).not.toHaveBeenCalled();
+  });
+
   it('returns the stored result for an idempotency key without repeating payment or issuance', async () => {
     const ports = createPorts();
     const { executeTicketPurchase } = await import('../../server/modules/ticketing/application/purchaseTicket');

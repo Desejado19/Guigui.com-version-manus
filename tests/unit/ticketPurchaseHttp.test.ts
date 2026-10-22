@@ -249,6 +249,22 @@ describe('ticket purchase HTTP adapter', () => {
     expect(harness.dependencies.executePurchase).not.toHaveBeenCalled();
   });
 
+  it('passes the validated server quote to the purchase use case', async () => {
+    const harness = createHarness();
+
+    await withServer(createApp(harness.dependencies), async (baseUrl) => {
+      const response = await postPurchase(baseUrl);
+      expect(response.status).toBe(200);
+    });
+    expect(harness.dependencies.executePurchase).toHaveBeenCalledWith(expect.objectContaining({
+      expectedCheckout: {
+        ticketTypeName: offer.ticketTypeName,
+        unitPriceXOF: offer.unitPriceXOF,
+        buyerTotalXOF: confirmedResult.quote.buyerTotalXOF,
+      },
+    }));
+  });
+
   it('returns the established bad request when ticket sales are closed', async () => {
     const harness = createHarness();
     vi.mocked(harness.dependencies.catalog.getOffer).mockResolvedValue({ ...offer, salesOpen: false });
@@ -333,6 +349,9 @@ describe('ticket purchase HTTP adapter', () => {
     ['invalid quantity', { status: 'rejected', reason: 'invalid_quantity', message: 'Quantidade inválida.' } as TicketPurchaseResult, 400, { code: 'INVALID_TICKET_QUANTITY' }],
     ['inventory unavailable', { status: 'rejected', reason: 'inventory_unavailable', message: 'Sem inventário.' } as TicketPurchaseResult, 409, { code: 'TICKET_INVENTORY_UNAVAILABLE' }],
     ['sales closed', { status: 'rejected', reason: 'sales_closed', message: 'Vendas fechadas.' } as TicketPurchaseResult, 400, { code: 'TICKET_INVENTORY_UNAVAILABLE' }],
+    ['ticket type changed', { status: 'rejected', reason: 'ticket_type_mismatch', message: 'A categoria selecionada foi alterada. Actualize o checkout.' } as TicketPurchaseResult, 409, { code: 'TICKET_TYPE_MISMATCH' }],
+    ['ticket price changed', { status: 'rejected', reason: 'ticket_price_mismatch', message: 'O preço do bilhete foi alterado. Actualize o checkout.' } as TicketPurchaseResult, 409, { code: 'TICKET_PRICE_MISMATCH' }],
+    ['checkout total changed', { status: 'rejected', reason: 'ticket_total_mismatch', message: 'O total do checkout não corresponde à política de taxas actual.' } as TicketPurchaseResult, 409, { code: 'TICKET_TOTAL_MISMATCH' }],
     ['payment failed', { status: 'rejected', reason: 'payment_failed', message: 'Pagamento falhou.' } as TicketPurchaseResult, 502, { code: 'TICKET_PAYMENT_FAILED' }],
   ])('maps %s to the current response contract', async (_label, result, status, expectedBody) => {
     const harness = createHarness(result);
