@@ -5,8 +5,8 @@ import {
   releasePostgresTicketReservation,
   reservePostgresTicketInventory,
 } from './postgresTicketService';
-import type { TicketInventoryPort } from './ticketPurchasePorts';
-import type { TicketOffer } from './ticketPurchaseDomain';
+import type { TicketInventoryPort } from './modules/ticketing/application/ticketPurchasePorts';
+import type { TicketOffer } from './modules/ticketing/domain/ticketPurchaseDomain';
 
 export interface LocalTicketReservation {
   reservationId: string;

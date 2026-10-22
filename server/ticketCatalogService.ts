@@ -1,6 +1,6 @@
 import { databaseConfigured, databasePool } from './db';
 import { loadJson } from './runtimeStore';
-import type { TicketOffer } from './ticketPurchaseDomain';
+import type { TicketOffer } from './modules/ticketing/domain/ticketPurchaseDomain';
 
 export interface TicketEventSnapshot {
   id: string;

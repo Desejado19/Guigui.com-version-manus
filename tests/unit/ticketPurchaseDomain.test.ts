@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { calculateTicketFees, DEFAULT_MONETIZATION_CATALOG } from '../../src/data/monetizationCatalog';
-import { quoteTicketPurchase, type TicketOffer } from '../../server/ticketPurchaseDomain';
+import { quoteTicketPurchase, type TicketOffer } from '../../server/modules/ticketing/domain/ticketPurchaseDomain';
 
 const offer: TicketOffer = {
   eventId: 'event-1',
@@ -22,9 +22,15 @@ const buyerFeeCatalog = {
   },
 };
 
+const feePolicy = {
+  calculate: ({ unitPriceXOF, quantity }: { unitPriceXOF: number; quantity: number }) => (
+    calculateTicketFees(buyerFeeCatalog, unitPriceXOF, quantity)
+  ),
+};
+
 describe('quoteTicketPurchase', () => {
   it('calculates the quote from the server-owned offer and fee policy', () => {
-    const result = quoteTicketPurchase({ offer, quantity: 2, catalog: buyerFeeCatalog });
+    const result = quoteTicketPurchase({ offer, quantity: 2, feePolicy });
 
     expect(result).toMatchObject({
       valid: true,
@@ -38,7 +44,7 @@ describe('quoteTicketPurchase', () => {
   });
 
   it.each([0, -1, 1.5, 101])('rejects invalid quantity %s', (quantity) => {
-    expect(quoteTicketPurchase({ offer, quantity, catalog: buyerFeeCatalog })).toMatchObject({
+    expect(quoteTicketPurchase({ offer, quantity, feePolicy })).toMatchObject({
       valid: false,
       reason: 'invalid_quantity',
     });
@@ -48,7 +54,7 @@ describe('quoteTicketPurchase', () => {
     expect(quoteTicketPurchase({
       offer: { ...offer, salesOpen: false },
       quantity: 1,
-      catalog: buyerFeeCatalog,
+      feePolicy,
     })).toMatchObject({ valid: false, reason: 'sales_closed' });
   });
 
@@ -56,7 +62,7 @@ describe('quoteTicketPurchase', () => {
     expect(quoteTicketPurchase({
       offer: { ...offer, availableQuantity: 2, soldQuantity: 2 },
       quantity: 1,
-      catalog: buyerFeeCatalog,
+      feePolicy,
     })).toMatchObject({ valid: false, reason: 'sold_out' });
   });
 
@@ -64,7 +70,7 @@ describe('quoteTicketPurchase', () => {
     expect(quoteTicketPurchase({
       offer: { ...offer, availableQuantity: 3, soldQuantity: 2 },
       quantity: 2,
-      catalog: buyerFeeCatalog,
+      feePolicy,
     })).toMatchObject({ valid: false, reason: 'insufficient_inventory' });
   });
 
@@ -72,7 +78,7 @@ describe('quoteTicketPurchase', () => {
     expect(quoteTicketPurchase({
       offer: { ...offer, availableQuantity: 3, soldQuantity: 1, reservedQuantity: 1 },
       quantity: 2,
-      catalog: buyerFeeCatalog,
+      feePolicy,
     })).toMatchObject({ valid: false, reason: 'insufficient_inventory' });
   });
 });

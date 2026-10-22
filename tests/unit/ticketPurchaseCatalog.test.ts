@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createTicketCatalogService, type TicketEventSnapshot } from '../../server/ticketCatalogService';
-import type { TicketOffer } from '../../server/ticketPurchaseDomain';
+import type { TicketOffer } from '../../server/modules/ticketing/domain/ticketPurchaseDomain';
 
 const event: TicketEventSnapshot = {
   id: 'event-1',

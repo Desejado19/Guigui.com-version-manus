@@ -1,14 +1,18 @@
-import type { MonetizationCatalog } from '../src/types';
-import type { PaymentProvider, PaymentProviderAdapter } from './integrations/ports';
-import type { TicketForValidation } from './validationService';
-import { quoteTicketPurchase, type TicketOffer, type TicketPurchaseQuote } from './ticketPurchaseDomain';
+import type { PaymentProvider, PaymentProviderAdapter } from '../../../integrations/ports';
+import type { TicketForValidation } from '../../../validationService';
+import {
+  quoteTicketPurchase,
+  type TicketFeePolicyPort,
+  type TicketOffer,
+  type TicketPurchaseQuote,
+} from '../domain/ticketPurchaseDomain';
 import type {
   TicketCatalogPort,
   TicketInventoryPort,
   TicketPurchaseIdempotencyPort,
   TicketRepositoryPort,
 } from './ticketPurchasePorts';
-import type { TicketPurchaseDeliveryResult } from './ticketPurchaseDeliveryService';
+import type { TicketPurchaseDeliveryResult } from '../../../ticketPurchaseDeliveryService';
 
 export interface TicketPurchaseTransaction {
   id: string;
@@ -118,7 +122,7 @@ export interface TicketPurchaseUseCasePorts {
     totalAmountXOF: number;
     tickets: TicketForValidation[];
   }): Promise<TicketPurchaseDeliveryResult>;
-  catalogSettings: MonetizationCatalog;
+  feePolicy: TicketFeePolicyPort;
   createTransactionId(): string;
   reservationTtlMs: number;
   now(): Date;
@@ -218,7 +222,7 @@ export async function executeTicketPurchase(
   const quoteResult = quoteTicketPurchase({
     offer,
     quantity: command.quantity,
-    catalog: ports.catalogSettings,
+    feePolicy: ports.feePolicy,
   });
   if (quoteResult.valid === false) {
     if (quoteResult.reason === 'invalid_quantity') return rejection('invalid_quantity', 'A quantidade de bilhetes não é válida.');

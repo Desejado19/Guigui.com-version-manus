@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_MONETIZATION_CATALOG } from '../../src/data/monetizationCatalog';
+import { calculateTicketFees, DEFAULT_MONETIZATION_CATALOG } from '../../src/data/monetizationCatalog';
 import type { PaymentIntentState } from '../../server/integrations/ports';
-import type { TicketPurchaseResult } from '../../server/ticketPurchaseUseCase';
+import type { TicketPurchaseResult } from '../../server/modules/ticketing/application/purchaseTicket';
 
 const testState = vi.hoisted(() => ({
   events: [] as string[],
@@ -97,7 +97,11 @@ function createPorts() {
         sms: { state: 'simulated' as const, mode: 'simulated' as const, references: ['sms-1'] },
       };
     }),
-    catalogSettings: DEFAULT_MONETIZATION_CATALOG,
+    feePolicy: {
+      calculate: ({ unitPriceXOF, quantity }: { unitPriceXOF: number; quantity: number }) => (
+        calculateTicketFees(DEFAULT_MONETIZATION_CATALOG, unitPriceXOF, quantity)
+      ),
+    },
     createTransactionId: () => 'txn-1',
     reservationTtlMs: 15 * 60_000,
     now: () => new Date('2026-10-21T10:00:00.000Z'),
@@ -125,7 +129,7 @@ describe('ticket purchase application use case', () => {
 
   it('quotes, reserves, confirms payment, issues tickets, and delivers in order', async () => {
     const ports = createPorts();
-    const { executeTicketPurchase } = await import('../../server/ticketPurchaseUseCase');
+    const { executeTicketPurchase } = await import('../../server/modules/ticketing/application/purchaseTicket');
 
     const result = await executeTicketPurchase(command, ports);
 
@@ -143,7 +147,7 @@ describe('ticket purchase application use case', () => {
   it('keeps pending payments reserved without issuing tickets or attempting delivery', async () => {
     const ports = createPorts();
     testState.paymentState = 'pending';
-    const { executeTicketPurchase } = await import('../../server/ticketPurchaseUseCase');
+    const { executeTicketPurchase } = await import('../../server/modules/ticketing/application/purchaseTicket');
 
     const result = await executeTicketPurchase(command, ports);
 
@@ -157,7 +161,7 @@ describe('ticket purchase application use case', () => {
   it('releases the reservation when payment fails and returns an explicit rejection', async () => {
     const ports = createPorts();
     testState.paymentState = 'failed';
-    const { executeTicketPurchase } = await import('../../server/ticketPurchaseUseCase');
+    const { executeTicketPurchase } = await import('../../server/modules/ticketing/application/purchaseTicket');
 
     const result = await executeTicketPurchase(command, ports);
 
@@ -170,7 +174,7 @@ describe('ticket purchase application use case', () => {
   it('does not create a payment intent when inventory is unavailable', async () => {
     const ports = createPorts();
     testState.available = 'unavailable';
-    const { executeTicketPurchase } = await import('../../server/ticketPurchaseUseCase');
+    const { executeTicketPurchase } = await import('../../server/modules/ticketing/application/purchaseTicket');
 
     const result = await executeTicketPurchase(command, ports);
 
@@ -182,7 +186,7 @@ describe('ticket purchase application use case', () => {
     const ports = createPorts();
     testState.deliveryFails = true;
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const { executeTicketPurchase } = await import('../../server/ticketPurchaseUseCase');
+    const { executeTicketPurchase } = await import('../../server/modules/ticketing/application/purchaseTicket');
 
     const result = await executeTicketPurchase(command, ports);
 
@@ -204,7 +208,7 @@ describe('ticket purchase application use case', () => {
 
   it('returns the stored result for an idempotency key without repeating payment or issuance', async () => {
     const ports = createPorts();
-    const { executeTicketPurchase } = await import('../../server/ticketPurchaseUseCase');
+    const { executeTicketPurchase } = await import('../../server/modules/ticketing/application/purchaseTicket');
 
     const firstResult = await executeTicketPurchase(command, ports);
     testState.events.length = 0;

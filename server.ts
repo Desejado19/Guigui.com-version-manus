@@ -57,8 +57,8 @@ import { deliverConfirmedTicketPurchase } from './server/ticketPurchaseDeliveryS
 import { listOwnedTickets } from './server/ticketAccessService';
 import { getTicketOffer } from './server/ticketCatalogService';
 import { ticketInventory } from './server/ticketInventoryService';
-import { quoteTicketPurchase } from './server/ticketPurchaseDomain';
-import { executeTicketPurchase, type TicketPurchaseResult } from './server/ticketPurchaseUseCase';
+import { quoteTicketPurchase } from './server/modules/ticketing/domain/ticketPurchaseDomain';
+import { executeTicketPurchase, type TicketPurchaseResult } from './server/modules/ticketing/application/purchaseTicket';
 import { createSimulatedEmailAdapter, createSimulatedSmsAdapter } from './server/integrations/simulatedAdapters';
 import { createScheduledItem, ensureDemoScheduledItems, listScheduledItems, processDueScheduledItems, updateScheduledItem, SCHEDULING_TIMEZONE } from './server/schedulingService';
 import type { ScheduledItem } from './src/types';
@@ -296,6 +296,11 @@ const allowTicketLookup = (phone: string) => {
   return true;
 };
 const monetizationCatalogStore = loadJson<MonetizationCatalog>('monetization-catalog.json', DEFAULT_MONETIZATION_CATALOG);
+const ticketPurchaseFeePolicy = {
+  calculate: ({ unitPriceXOF, quantity }: { unitPriceXOF: number; quantity: number }) => (
+    calculateTicketFees(normaliseMonetizationCatalog(monetizationCatalogStore), unitPriceXOF, quantity)
+  ),
+};
 void persistPostgresCatalog(monetizationCatalogStore).catch((error: unknown) => {
   console.error('postgres-catalog-bootstrap-failed', error);
 });
@@ -2244,7 +2249,7 @@ app.post('/api/tickets/purchase', async (req, res) => {
     const quoteResult = quoteTicketPurchase({
       offer,
       quantity: input.quantity,
-      catalog: normaliseMonetizationCatalog(monetizationCatalogStore),
+      feePolicy: ticketPurchaseFeePolicy,
     });
     if (quoteResult.valid === false) {
       const unavailable = quoteResult.reason === 'sold_out' || quoteResult.reason === 'insufficient_inventory';
@@ -2350,7 +2355,7 @@ app.post('/api/tickets/purchase', async (req, res) => {
         },
       },
       delivery: (deliveryInput) => deliverConfirmedTicketPurchase(deliveryInput, { email: emailDelivery, sms: smsDelivery }),
-      catalogSettings: normaliseMonetizationCatalog(monetizationCatalogStore),
+      feePolicy: ticketPurchaseFeePolicy,
       createTransactionId: () => `TXN-${Date.now()}-${randomBytes(3).toString('hex').toUpperCase()}`,
       reservationTtlMs: TICKET_RESERVATION_TTL_MS,
       now: () => new Date(),

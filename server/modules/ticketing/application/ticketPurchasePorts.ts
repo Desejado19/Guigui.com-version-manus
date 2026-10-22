@@ -1,5 +1,5 @@
-import type { TicketForValidation } from './validationService';
-import type { TicketOffer } from './ticketPurchaseDomain';
+import type { TicketForValidation } from '../../../validationService';
+import type { TicketOffer } from '../domain/ticketPurchaseDomain';
 
 export interface TicketCatalogPort {
   getOffer(eventId: string, ticketTypeId: string): Promise<TicketOffer | null>;

@@ -1,7 +1,7 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { databasePool } from './db';
 import type { TicketForValidation } from './validationService';
-import type { TicketOffer } from './ticketPurchaseDomain';
+import type { TicketOffer } from './modules/ticketing/domain/ticketPurchaseDomain';
 
 export async function reservePostgresTicketInventory(input: {
   offer: TicketOffer;

@@ -1,6 +1,3 @@
-import { calculateTicketFees } from '../src/data/monetizationCatalog';
-import type { MonetizationCatalog } from '../src/types';
-
 export interface TicketOffer {
   eventId: string;
   businessId?: string;
@@ -16,10 +13,27 @@ export interface TicketOffer {
   salesOpen: boolean;
 }
 
+export interface TicketFeeBreakdown {
+  grossTicketValue: number;
+  percentageFee: number;
+  fixedFee: number;
+  platformRevenue: number;
+  buyerShare: number;
+  organizerShare: number;
+  buyerTotal: number;
+  organizerNet: number;
+  feePayer: 'buyer' | 'organizer' | 'split';
+  currency: string;
+}
+
+export interface TicketFeePolicyPort {
+  calculate(input: { unitPriceXOF: number; quantity: number }): TicketFeeBreakdown;
+}
+
 export interface TicketPurchaseQuote {
   unitPriceXOF: number;
   quantity: number;
-  feeBreakdown: ReturnType<typeof calculateTicketFees>;
+  feeBreakdown: TicketFeeBreakdown;
   buyerTotalXOF: number;
 }
 
@@ -33,9 +47,9 @@ export type TicketPurchaseQuoteResult =
 export function quoteTicketPurchase(input: {
   offer: TicketOffer;
   quantity: number;
-  catalog: MonetizationCatalog;
+  feePolicy: TicketFeePolicyPort;
 }): TicketPurchaseQuoteResult {
-  const { offer, quantity, catalog } = input;
+  const { offer, quantity, feePolicy } = input;
   if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 100) {
     return { valid: false, reason: 'invalid_quantity' };
   }
@@ -51,7 +65,7 @@ export function quoteTicketPurchase(input: {
     return { valid: false, reason: 'insufficient_inventory' };
   }
 
-  const feeBreakdown = calculateTicketFees(catalog, offer.unitPriceXOF, quantity);
+  const feeBreakdown = feePolicy.calculate({ unitPriceXOF: offer.unitPriceXOF, quantity });
   return {
     valid: true,
     quote: {

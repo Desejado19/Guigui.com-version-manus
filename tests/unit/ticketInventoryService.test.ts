@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createLocalTicketInventory } from '../../server/ticketInventoryService';
-import type { TicketOffer } from '../../server/ticketPurchaseDomain';
+import type { TicketOffer } from '../../server/modules/ticketing/domain/ticketPurchaseDomain';
 
 const offer: TicketOffer = {
   eventId: 'event-1',
