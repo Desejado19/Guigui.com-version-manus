@@ -57,8 +57,12 @@ import { deliverConfirmedTicketPurchase } from './server/ticketPurchaseDeliveryS
 import { listOwnedTickets } from './server/ticketAccessService';
 import { getTicketOffer } from './server/ticketCatalogService';
 import { ticketInventory } from './server/ticketInventoryService';
-import { quoteTicketPurchase } from './server/modules/ticketing/domain/ticketPurchaseDomain';
-import { executeTicketPurchase, type TicketPurchaseResult } from './server/modules/ticketing/application/purchaseTicket';
+import { createTicketPurchaseHandler } from './server/modules/ticketing/adapters/http/ticketPurchaseHandler';
+import {
+  executeTicketPurchase,
+  type TicketPurchaseResult,
+  type TicketPurchaseUseCasePorts,
+} from './server/modules/ticketing/application/purchaseTicket';
 import { createSimulatedEmailAdapter, createSimulatedSmsAdapter } from './server/integrations/simulatedAdapters';
 import { createScheduledItem, ensureDemoScheduledItems, listScheduledItems, processDueScheduledItems, updateScheduledItem, SCHEDULING_TIMEZONE } from './server/schedulingService';
 import type { ScheduledItem } from './src/types';
@@ -2080,346 +2084,110 @@ setInterval(() => {
   }
 }, 60_000);
 
-// Ticket Purchase API (Generates Ticket + Simulates SMS Notification)
-function mapTicketPurchaseHttpResponse(result: TicketPurchaseResult, requestId: string): { status: number; body: Record<string, unknown> } {
-  if (result.status === 'confirmed') {
-    return {
-      status: 200,
-      body: {
-        success: true,
-        ticket: result.tickets[0],
-        tickets: result.tickets,
-        feeBreakdown: result.quote.feeBreakdown,
-        quote: result.quote,
-        transaction: result.transaction,
-        sms: { mode: result.delivery.sms.mode, state: result.delivery.sms.state },
-        delivery: {
-          email: result.delivery.email,
-          notification: result.delivery.notification,
-          sms: { state: result.delivery.sms.state, mode: result.delivery.sms.mode },
-        },
-      },
-    };
-  }
-  if (result.status === 'pending') {
-    return {
-      status: 202,
-      body: {
-        success: false,
-        paymentPending: true,
-        transaction: result.transaction,
-        reservationExpiresAt: result.reservationExpiresAt,
-        message: result.transaction.paymentInstructions || 'Pagamento pendente. Os bilhetes ficam reservados até à confirmação da operadora.',
-        requestId,
-      },
-    };
-  }
-
-  const rejectionStatus: Record<typeof result.reason, number> = {
-    invalid_offer: 404,
-    invalid_policy: 400,
-    invalid_quantity: 400,
-    sales_closed: 400,
-    inventory_unavailable: 409,
-    payment_failed: 502,
-  };
-  const rejectionCode: Record<typeof result.reason, string> = {
-    invalid_offer: 'TICKET_OFFER_NOT_FOUND',
-    invalid_policy: 'VALIDATION_ERROR',
-    invalid_quantity: 'INVALID_TICKET_QUANTITY',
-    sales_closed: 'TICKET_INVENTORY_UNAVAILABLE',
-    inventory_unavailable: 'TICKET_INVENTORY_UNAVAILABLE',
-    payment_failed: 'TICKET_PAYMENT_FAILED',
-  };
+function createTicketPurchaseUseCasePorts(): TicketPurchaseUseCasePorts {
   return {
-    status: rejectionStatus[result.reason],
-    body: {
-      success: false,
-      error: result.message,
-      code: rejectionCode[result.reason],
-      ...(result.transaction ? { transaction: result.transaction } : {}),
-      requestId,
+    catalog: { getOffer: getTicketOffer },
+    inventory: ticketInventory,
+    tickets: {
+      issue: async (_reservationId, tickets, buyerUserId) => {
+        for (const ticket of tickets) {
+          ticketsDb.set(ticket.qrToken, ticket);
+          if (ticket.pinCode) ticketsDb.set(ticket.pinCode, ticket);
+          ticketsDb.set(ticket.ticketCode, ticket);
+        }
+        await persistPostgresTickets(tickets, buyerUserId);
+        persistTickets();
+        return tickets;
+      },
     },
+    idempotency: {
+      get: async (key) => purchaseIdempotency.get(key)?.result || null,
+      store: async (key, storedResult) => {
+        purchaseIdempotency.set(key, { createdAt: Date.now(), result: storedResult });
+      },
+    },
+    payments: paymentAdapters,
+    ticketFactory: ({ offer, buyer, quantity, holderName, holderPhone, paymentMethod, purchasedAt }) => (
+      Array.from({ length: quantity }, (_, index) => {
+        const { ticketCode, qrToken, pinCode } = generateTicketIdentifiers();
+        const ticket: TicketForValidation = {
+          id: `TKT-${Date.now()}-${index + 1}-${randomBytes(2).toString('hex').toUpperCase()}`,
+          ticketCode,
+          ticketTypeId: offer.ticketTypeId,
+          buyerUserId: buyer.userId,
+          eventId: offer.eventId,
+          ...(offer.businessId ? { businessId: offer.businessId } : {}),
+          eventTitle: offer.eventTitle,
+          ticketTypeName: offer.ticketTypeName,
+          priceXOF: offer.unitPriceXOF,
+          buyerName: buyer.name,
+          buyerPhone: buyer.phone,
+          ...(holderName && holderPhone ? { holderName, holderPhone } : {}),
+          qrToken,
+          pinCode,
+          status: 'valid',
+          purchasedAt,
+          expiresAt: calculateTicketExpiry(offer.eventDate, offer.eventTime),
+          paymentMethod,
+        };
+        if (ticketSigningSecret) ticket.signature = signTicket(ticket, ticketSigningSecret);
+        return ticket;
+      })
+    ),
+    transactions: {
+      persist: async (transaction) => {
+        const existingIndex = paymentTransactions.findIndex((item) => item.id === transaction.id);
+        if (existingIndex === -1) paymentTransactions.push(transaction);
+        else paymentTransactions[existingIndex] = transaction;
+        persistPayments();
+      },
+      recordFulfillment: async (transaction) => {
+        recordMonetizationFulfillment(transaction);
+      },
+    },
+    delivery: (input) => deliverConfirmedTicketPurchase(input, { email: emailDelivery, sms: smsDelivery }),
+    feePolicy: ticketPurchaseFeePolicy,
+    createTransactionId: () => `TXN-${Date.now()}-${randomBytes(3).toString('hex').toUpperCase()}`,
+    reservationTtlMs: TICKET_RESERVATION_TTL_MS,
+    now: () => new Date(),
   };
 }
 
-app.post('/api/tickets/purchase', async (req, res) => {
-  let idempotencyKey: string | undefined;
-  let releaseIdempotencyLock: (() => void) | undefined;
-  let purchaseStage = 'request-validation';
-  const requestId = requestIdFrom(req);
-  try {
-    const validation = validatePurchaseInput({
-      ...req.body,
-      buyerName: 'Utilizador autenticado',
-      buyerPhone: '+24500000000',
-      priceXOF: req.body?.priceXOF ?? 5000,
-    });
-    if (!validation.ok) {
-      recordAudit({
-        action: 'purchase_validation_failed',
-        resource: 'purchase',
-        actorRole: 'citizen',
-        requestId,
-        success: false,
-        metadata: { issues: validation.issues },
-      });
-      return res.status(400).json({
-        error: firstIssueMessage(validation.issues, 'Dados de compra inválidos.'),
-        code: 'VALIDATION_ERROR',
-        issues: validation.issues,
-        requestId,
-      });
-    }
+const ticketPurchaseUseCasePorts = createTicketPurchaseUseCasePorts();
 
-    purchaseStage = 'session-lookup';
-    const purchaseSession = await sessionContext(req);
-    if (!purchaseSession || purchaseSession.role !== 'user') {
-      return res.status(401).json({ error: 'Inicie sessão para comprar bilhetes.', code: 'AUTHENTICATION_REQUIRED', requestId });
-    }
-    purchaseStage = 'account-lookup';
+// Ticket Purchase API (Generates Ticket + Simulates SMS Notification)
+app.post('/api/tickets/purchase', createTicketPurchaseHandler({
+  validatePurchaseInput,
+  resolveSession: sessionContext,
+  findAccount: async (userId) => {
     const account = databaseConfigured
-      ? await findPostgresUserById(purchaseSession.userId)
-      : findUserById(purchaseSession.userId) || findDemoUserById(purchaseSession.userId);
-    if (!account) {
-      return res.status(401).json({ error: 'A conta da sessão não está disponível.', code: 'AUTHENTICATION_REQUIRED', requestId });
-    }
-    purchaseStage = 'buyer-validation';
-    const buyerValidation = validatePurchaseInput({
-      ...req.body,
-      buyerName: account.name,
-      buyerPhone: account.phone,
-      priceXOF: req.body?.priceXOF ?? 5000,
-    });
-    if (!buyerValidation.ok) {
-      return res.status(400).json({
-        error: firstIssueMessage(buyerValidation.issues, 'Os dados da conta não permitem concluir a compra.'),
-        code: 'VALIDATION_ERROR',
-        issues: buyerValidation.issues,
-        requestId,
-      });
-    }
-
-    if (isProduction && !ticketSigningSecret) {
-      return res.status(503).json({
-        error: 'Emissão temporariamente indisponível: TICKET_SIGNING_SECRET não configurado.',
-        code: 'TICKET_SECURITY_NOT_CONFIGURED',
-        requestId,
-      });
-    }
-
-    purchaseStage = 'idempotency-lock';
-    cleanupIdempotency();
-    const requestIdempotencyKey = req.header('idempotency-key')?.trim();
-    if (requestIdempotencyKey) {
-      if (requestIdempotencyKey.length > 160) {
-        return res.status(400).json({ error: 'Chave de idempotência inválida.', code: 'INVALID_IDEMPOTENCY_KEY', requestId });
-      }
-      idempotencyKey = `${purchaseSession.userId}:${requestIdempotencyKey}`;
-      const pendingRequest = purchaseIdempotencyLocks.get(idempotencyKey);
-      if (pendingRequest) {
-        await pendingRequest;
-      }
+      ? await findPostgresUserById(userId)
+      : findUserById(userId) || findDemoUserById(userId);
+    return account || null;
+  },
+  isProduction,
+  ticketSigningSecretConfigured: Boolean(ticketSigningSecret),
+  catalog: { getOffer: getTicketOffer },
+  feePolicy: ticketPurchaseFeePolicy,
+  idempotency: {
+    cleanup: cleanupIdempotency,
+    get: async (key) => purchaseIdempotency.get(key)?.result || null,
+    acquire: async (key) => {
+      const pendingRequest = purchaseIdempotencyLocks.get(key);
+      if (pendingRequest) await pendingRequest;
       let resolveLock!: () => void;
       const lock = new Promise<void>((resolve) => { resolveLock = resolve; });
-      purchaseIdempotencyLocks.set(idempotencyKey, lock);
-      releaseIdempotencyLock = () => {
-        if (purchaseIdempotencyLocks.get(idempotencyKey!) === lock) {
-          purchaseIdempotencyLocks.delete(idempotencyKey!);
-        }
+      purchaseIdempotencyLocks.set(key, lock);
+      return () => {
+        if (purchaseIdempotencyLocks.get(key) === lock) purchaseIdempotencyLocks.delete(key);
         resolveLock();
       };
-    }
-
-    if (idempotencyKey) {
-      const cached = purchaseIdempotency.get(idempotencyKey)?.result;
-      if (cached) {
-        const replay = mapTicketPurchaseHttpResponse(cached, requestId);
-        return res.status(replay.status).json(replay.body);
-      }
-    }
-
-    const input = buyerValidation.value!;
-    purchaseStage = 'offer-query';
-    const offer = await getTicketOffer(input.eventId, input.ticketTypeId);
-    if (!offer) {
-      return res.status(404).json({ error: 'O evento ou tipo de bilhete já não está disponível.', code: 'TICKET_OFFER_NOT_FOUND', requestId });
-    }
-    purchaseStage = 'quote-validation';
-    const quoteResult = quoteTicketPurchase({
-      offer,
-      quantity: input.quantity,
-      feePolicy: ticketPurchaseFeePolicy,
-    });
-    if (quoteResult.valid === false) {
-      const unavailable = quoteResult.reason === 'sold_out' || quoteResult.reason === 'insufficient_inventory';
-      return res.status(unavailable ? 409 : 400).json({
-        error: quoteResult.reason === 'sales_closed'
-          ? 'As vendas deste tipo de bilhete estão encerradas.'
-          : quoteResult.reason === 'invalid_quantity'
-            ? 'A quantidade de bilhetes não é válida.'
-            : 'Não há bilhetes suficientes disponíveis.',
-        code: quoteResult.reason === 'invalid_quantity' ? 'INVALID_TICKET_QUANTITY' : 'TICKET_INVENTORY_UNAVAILABLE',
-        requestId,
-      });
-    }
-    if (req.body?.ticketTypeName !== undefined && req.body.ticketTypeName !== offer.ticketTypeName) {
-      return res.status(409).json({ error: 'A categoria selecionada foi alterada. Actualize o checkout.', code: 'TICKET_TYPE_MISMATCH', requestId });
-    }
-    const submittedPrice = req.body?.pricePerTicketXOF ?? req.body?.priceXOF;
-    if (submittedPrice !== undefined
-      && (!Number.isSafeInteger(Number(submittedPrice)) || Number(submittedPrice) !== offer.unitPriceXOF)) {
-      return res.status(409).json({ error: 'O preço do bilhete foi alterado. Actualize o checkout.', code: 'TICKET_PRICE_MISMATCH', requestId });
-    }
-    const chargedAmountXOF = quoteResult.quote.buyerTotalXOF;
-    if (req.body?.chargedAmountXOF !== undefined && Number(req.body.chargedAmountXOF) !== chargedAmountXOF) {
-      return res.status(409).json({ error: 'O total do checkout não corresponde à política de taxas actual.', code: 'TICKET_TOTAL_MISMATCH', expectedAmountXOF: chargedAmountXOF, requestId });
-    }
-
-    purchaseStage = 'application-use-case';
-    const result = await executeTicketPurchase({
-      buyer: {
-        userId: purchaseSession.userId,
-        name: account.name,
-        phone: account.phone,
-        email: account.email,
-      },
-      eventId: input.eventId,
-      ticketTypeId: input.ticketTypeId,
-      quantity: input.quantity,
-      holderName: input.holderName,
-      holderPhone: input.holderPhone,
-      paymentMethod: input.paymentMethod,
-      policyAccepted: input.policyAccepted,
-      policyVersion: input.policyVersion,
-      policyAcceptedAt: input.policyAcceptedAt,
-      idempotencyKey,
-    }, {
-      catalog: { getOffer: getTicketOffer },
-      inventory: ticketInventory,
-      tickets: {
-        issue: async (_reservationId, tickets, buyerUserId) => {
-          for (const ticket of tickets) {
-            ticketsDb.set(ticket.qrToken, ticket);
-            if (ticket.pinCode) ticketsDb.set(ticket.pinCode, ticket);
-            ticketsDb.set(ticket.ticketCode, ticket);
-          }
-          await persistPostgresTickets(tickets, buyerUserId);
-          persistTickets();
-          return tickets;
-        },
-      },
-      idempotency: {
-        get: async (key) => purchaseIdempotency.get(key)?.result || null,
-        store: async (key, storedResult) => {
-          purchaseIdempotency.set(key, { createdAt: Date.now(), result: storedResult });
-        },
-      },
-      payments: paymentAdapters,
-      ticketFactory: ({ offer: ticketOffer, buyer, quantity, holderName, holderPhone, paymentMethod: method, purchasedAt }) => (
-        Array.from({ length: quantity }, (_, index) => {
-          const { ticketCode, qrToken, pinCode } = generateTicketIdentifiers();
-          const ticket: TicketForValidation = {
-            id: `TKT-${Date.now()}-${index + 1}-${randomBytes(2).toString('hex').toUpperCase()}`,
-            ticketCode,
-            ticketTypeId: ticketOffer.ticketTypeId,
-            buyerUserId: buyer.userId,
-            eventId: ticketOffer.eventId,
-            ...(ticketOffer.businessId ? { businessId: ticketOffer.businessId } : {}),
-            eventTitle: ticketOffer.eventTitle,
-            ticketTypeName: ticketOffer.ticketTypeName,
-            priceXOF: ticketOffer.unitPriceXOF,
-            buyerName: buyer.name,
-            buyerPhone: buyer.phone,
-            ...(holderName && holderPhone ? { holderName, holderPhone } : {}),
-            qrToken,
-            pinCode,
-            status: 'valid',
-            purchasedAt,
-            expiresAt: calculateTicketExpiry(ticketOffer.eventDate, ticketOffer.eventTime),
-            paymentMethod: method,
-          };
-          if (ticketSigningSecret) ticket.signature = signTicket(ticket, ticketSigningSecret);
-          return ticket;
-        })
-      ),
-      transactions: {
-        persist: async (transaction) => {
-          const existingIndex = paymentTransactions.findIndex((item) => item.id === transaction.id);
-          if (existingIndex === -1) paymentTransactions.push(transaction);
-          else paymentTransactions[existingIndex] = transaction;
-          persistPayments();
-        },
-        recordFulfillment: async (transaction) => {
-          recordMonetizationFulfillment(transaction);
-        },
-      },
-      delivery: (deliveryInput) => deliverConfirmedTicketPurchase(deliveryInput, { email: emailDelivery, sms: smsDelivery }),
-      feePolicy: ticketPurchaseFeePolicy,
-      createTransactionId: () => `TXN-${Date.now()}-${randomBytes(3).toString('hex').toUpperCase()}`,
-      reservationTtlMs: TICKET_RESERVATION_TTL_MS,
-      now: () => new Date(),
-    });
-
-    if (result.status === 'pending') {
-      recordAudit({
-        action: 'ticket_payment_pending',
-        resource: 'payment',
-        resourceId: result.transaction.id,
-        actorRole: 'citizen',
-        requestId,
-        success: true,
-        metadata: {
-          provider: result.transaction.provider,
-          providerRef: result.transaction.providerRef,
-          reservedUntil: result.reservationExpiresAt,
-        },
-      });
-    } else if (result.status === 'confirmed') {
-      recordAudit({
-        action: 'ticket_sms_dispatch',
-        resource: 'ticket',
-        resourceId: result.transaction.id,
-        actorRole: 'system',
-        requestId,
-        success: result.delivery.sms.state !== 'failed',
-        metadata: {
-          mode: result.delivery.sms.mode,
-          state: result.delivery.sms.state,
-          referenceCount: result.delivery.sms.references.length,
-          emailState: result.delivery.email.state,
-          notificationState: result.delivery.notification.state,
-        },
-      });
-      recordAudit({
-        action: 'ticket_issued',
-        resource: 'ticket',
-        resourceId: result.transaction.id,
-        actorRole: 'citizen',
-        requestId,
-        success: true,
-        metadata: {
-          eventId: result.tickets[0]?.eventId,
-          paymentMethod: result.tickets[0]?.paymentMethod,
-          amountXOF: chargedAmountXOF,
-          ticketIds: result.tickets.map((ticket) => ticket.id),
-        },
-      });
-    }
-
-    const response = mapTicketPurchaseHttpResponse(result, requestId);
-    res.status(response.status).json(response.body);
-  } catch (error) {
-    console.error('ticket-purchase-failed', {
-      requestId,
-      stage: purchaseStage,
-      errorName: error instanceof Error ? error.name : 'UnknownError',
-    });
-    return res.status(500).json({ error: 'Não foi possível concluir a compra do bilhete.', code: 'TICKET_PURCHASE_FAILED', requestId });
-  } finally {
-    releaseIdempotencyLock?.();
-  }
-});
+    },
+  },
+  executePurchase: (command) => executeTicketPurchase(command, ticketPurchaseUseCasePorts),
+  requestIdFrom,
+  recordAudit,
+}));
 
 app.get('/api/tickets/mine', requireSession, async (req, res) => {
   const context = await sessionContext(req);
