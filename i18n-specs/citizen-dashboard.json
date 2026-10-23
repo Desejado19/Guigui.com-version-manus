@@ -1,0 +1,285 @@
+{
+  "sites": [
+    {
+      "line": 454,
+      "index": 1,
+      "key": "citizen.citizenLabel",
+      "en": "Guigui.com / Citizen",
+      "fr": "Guigui.com / Citoyen",
+      "es": "Guigui.com / Ciudadano"
+    },
+    {
+      "line": 471,
+      "index": 1,
+      "key": "personalArea"
+    },
+    {
+      "line": 495,
+      "index": 1,
+      "key": "citizen.systemSettingsModule",
+      "en": "System settings module",
+      "fr": "Module de paramètres du système",
+      "es": "Módulo de ajustes del sistema"
+    },
+    {
+      "line": 501,
+      "index": 1,
+      "key": "citizen.personalAreaModule",
+      "en": "Personal area module",
+      "fr": "Module de l'espace personnel",
+      "es": "Módulo del área personal"
+    },
+    {
+      "line": 502,
+      "index": 1,
+      "key": "citizen.systemSettings",
+      "en": "System settings",
+      "fr": "Paramètres du système",
+      "es": "Ajustes del sistema"
+    },
+    {
+      "line": 503,
+      "index": 1,
+      "key": "citizen.personalSettings",
+      "en": "Personal settings",
+      "fr": "Paramètres personnels",
+      "es": "Configuración personal"
+    },
+    {
+      "line": 504,
+      "index": 1,
+      "key": "citizen.personalSettingsHint",
+      "en": "Theme, language, notifications and your account options.",
+      "fr": "Thème, langue, notifications et options de votre compte.",
+      "es": "Tema, idioma, notificaciones y opciones de su cuenta."
+    },
+    {
+      "line": 516,
+      "index": 1,
+      "key": "citizen.upcomingReminders",
+      "en": "Upcoming reminders",
+      "fr": "Rappels à venir",
+      "es": "Próximos recordatorios"
+    },
+    {
+      "line": 517,
+      "index": 1,
+      "key": "citizen.noFollowedBusinesses",
+      "en": "You do not follow any business yet",
+      "fr": "Vous ne suivez encore aucune entreprise",
+      "es": "Aún no sigue ninguna empresa"
+    },
+    {
+      "line": 521,
+      "index": 1,
+      "key": "citizen.securityPrivacy",
+      "en": "Security and privacy",
+      "fr": "Sécurité et confidentialité",
+      "es": "Seguridad y privacidad"
+    },
+    {
+      "line": 521,
+      "index": 2,
+      "key": "citizen.recentNotifications",
+      "en": "Recent notifications",
+      "fr": "Notifications récentes",
+      "es": "Notificaciones recientes"
+    },
+    {
+      "line": 521,
+      "index": 3,
+      "key": "citizen.noRecentNotifications",
+      "en": "No recent notifications",
+      "fr": "Aucune notification récente",
+      "es": "Sin notificaciones recientes"
+    },
+    {
+      "line": 530,
+      "index": 1,
+      "key": "citizen.demoData",
+      "en": "Demo data",
+      "fr": "Données de démonstration",
+      "es": "Datos de demostración"
+    },
+    {
+      "line": 531,
+      "index": 1,
+      "key": "citizen.demoDataHint",
+      "en": "This account has no tickets registered on the server yet. The entries below are examples and cannot be cancelled or paid: real management only exists after the first purchase.",
+      "fr": "Ce compte n'a encore aucun billet enregistré sur le serveur. Les entrées ci-dessous sont des exemples et ne peuvent ni être annulées ni payées : la gestion réelle n'existe qu'après le premier achat.",
+      "es": "Esta cuenta aún no tiene entradas registradas en el servidor. Las entradas de abajo son ejemplos y no permiten cancelar ni pagar: la gestión real solo existe después de la primera compra."
+    },
+    {
+      "line": 542,
+      "index": 1,
+      "key": "citizen.systemSettings"
+    },
+    {
+      "line": 542,
+      "index": 2,
+      "key": "citizen.securityChangesSaved",
+      "en": "Security and privacy changes are stored on this account.",
+      "fr": "Les modifications de sécurité et de confidentialité sont enregistrées sur ce compte.",
+      "es": "Los cambios de seguridad y privacidad quedan guardados en esta cuenta."
+    },
+    {
+      "line": 543,
+      "index": 1,
+      "key": "account.security"
+    },
+    {
+      "line": 543,
+      "index": 2,
+      "key": "citizen.passwordUpdated",
+      "en": "This account's password has already been updated.",
+      "fr": "Le mot de passe de ce compte a déjà été mis à jour.",
+      "es": "La contraseña de esta cuenta ya se ha actualizado."
+    },
+    {
+      "line": 544,
+      "index": 1,
+      "key": "citizen.communicationPreferences",
+      "en": "Communication preferences",
+      "fr": "Préférences de communication",
+      "es": "Preferencias de comunicación"
+    },
+    {
+      "line": 548,
+      "index": 1,
+      "key": "citizen.accountModule",
+      "en": "Account module",
+      "fr": "Module du compte",
+      "es": "Módulo de la cuenta"
+    },
+    {
+      "line": 548,
+      "index": 2,
+      "key": "citizen.accountModuleHint",
+      "en": "Control your profile visibility, alerts and how your data is used.",
+      "fr": "Contrôlez la visibilité de votre profil, les alertes et l'utilisation de vos données.",
+      "es": "Controle la visibilidad de su perfil, las alertas y el uso de sus datos."
+    },
+    {
+      "line": 550,
+      "index": 1,
+      "key": "citizen.changesAppliedNote",
+      "en": "Changes apply to your account immediately and are stored permanently.",
+      "fr": "Les modifications s'appliquent immédiatement à votre compte et sont enregistrées durablement.",
+      "es": "Los cambios se aplican inmediatamente a su cuenta y quedan guardados de forma persistente."
+    },
+    {
+      "line": 558,
+      "index": 1,
+      "key": "citizen.accountManagement",
+      "en": "Account management",
+      "fr": "Gestion du compte",
+      "es": "Gestión de la cuenta"
+    },
+    {
+      "line": 567,
+      "index": 1,
+      "key": "citizen.deactivateHint",
+      "en": "Temporarily hides your profile and stops notifications. Your data is kept for reactivation.",
+      "fr": "Masque temporairement votre profil et interrompt les notifications. Vos données sont conservées pour réactivation.",
+      "es": "Oculta temporalmente su perfil e interrumpe las notificaciones. Sus datos se guardan para reactivar."
+    },
+    {
+      "line": 572,
+      "index": 1,
+      "key": "citizen.deleteAccountHint",
+      "en": "Removes account access after confirmation and cannot be undone. Legal retention requests remain subject to the law.",
+      "fr": "Supprime l'accès au compte après confirmation et ne peut être annulé. Les demandes légales de conservation restent soumises à la loi.",
+      "es": "Elimina el acceso a la cuenta tras la confirmación y no se puede deshacer. Las solicitudes legales de retención siguen sujetas a la ley."
+    },
+    {
+      "line": 576,
+      "index": 1,
+      "key": "citizen.ownerActionsNote",
+      "en": "These actions are carried out by the account holder after confirmation. Permanent deletion cannot be reversed.",
+      "fr": "Ces actions sont exécutées par le titulaire lui-même après confirmation. La suppression permanente est irréversible.",
+      "es": "Estas acciones las ejecuta el propio titular tras la confirmación. La eliminación permanente no puede revertirse."
+    },
+    {
+      "line": 580,
+      "index": 1,
+      "key": "citizen.citizenData",
+      "en": "Citizen details",
+      "fr": "Données du citoyen",
+      "es": "Datos del ciudadano"
+    },
+    {
+      "line": 580,
+      "index": 2,
+      "key": "citizen.personalSettings"
+    },
+    {
+      "line": 580,
+      "index": 3,
+      "key": "citizen.citizenDataHint",
+      "en": "Update your contact details and account preferences.",
+      "fr": "Mettez à jour vos coordonnées et vos préférences de compte.",
+      "es": "Actualice sus datos de contacto y preferencias de la cuenta."
+    },
+    {
+      "line": 580,
+      "index": 4,
+      "key": "citizen.photoFormats",
+      "en": "PNG, JPG or WebP · up to 5 MB",
+      "fr": "PNG, JPG ou WebP · 5 Mo maximum",
+      "es": "PNG, JPG o WebP · máximo 5 MB"
+    },
+    {
+      "line": 580,
+      "index": 5,
+      "key": "citizen.photoPreview",
+      "en": "Photo preview",
+      "fr": "Aperçu de la photo",
+      "es": "Vista previa de la fotografía"
+    },
+    {
+      "line": 580,
+      "index": 6,
+      "key": "citizen.neighborhood",
+      "en": "Neighbourhood / location",
+      "fr": "Quartier / emplacement",
+      "es": "Barrio / ubicación"
+    },
+    {
+      "line": 581,
+      "index": 1,
+      "key": "citizen.ticketPreferences",
+      "en": "Ticket and purchase preferences",
+      "fr": "Préférences de billets et d'achats",
+      "es": "Preferencias de entradas y compras"
+    },
+    {
+      "line": 584,
+      "index": 1,
+      "key": "citizen.accountHistory",
+      "en": "Account history",
+      "fr": "Historique du compte",
+      "es": "Historial de la cuenta"
+    },
+    {
+      "line": 586,
+      "index": 1,
+      "key": "businessNavNotifications"
+    },
+    {
+      "line": 586,
+      "index": 2,
+      "key": "citizen.noNotifications",
+      "en": "No notifications",
+      "fr": "Aucune notification",
+      "es": "Sin notificaciones"
+    },
+    {
+      "line": 591,
+      "index": 1,
+      "key": "citizen.codeCopied",
+      "en": "Code copied to the clipboard.",
+      "fr": "Code copié dans le presse-papiers.",
+      "es": "Código copiado al portapapeles."
+    }
+  ]
+}

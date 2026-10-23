@@ -72,6 +72,7 @@ import { AdminPermissionsMatrix } from './admin/AdminPermissionsMatrix';
 import { AdminReportsHub } from './admin/AdminReportsHub';
 import { AdminSupportHub } from './admin/AdminSupportHub';
 import { SubscriptionPlansAdmin } from './admin/SubscriptionPlansAdmin';
+import { FeaturedBusinessesAdmin } from './admin/FeaturedBusinessesAdmin';
 import { MonetizationAdmin } from './admin/MonetizationAdmin';
 import { INITIAL_ADMIN_STAFF } from '../data/adminStaffData';
 import { INITIAL_AUDIT_LOGS } from '../data/auditLogsData';
@@ -1823,6 +1824,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             ))}
           </div>
+
+          <FeaturedBusinessesAdmin businesses={businessesList} onUpdateBusinesses={handleUpdateBusinesses} />
         </Card>
       )}
 

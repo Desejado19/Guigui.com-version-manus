@@ -506,6 +506,15 @@ export interface MarketingLibraryAsset {
   createdAt: string;
 }
 
+export type BusinessProfileNotApplicableField =
+  | 'address'
+  | 'openingHours'
+  | 'publicEmail'
+  | 'whatsapp'
+  | 'website'
+  | 'socialLinks'
+  | 'serviceLanguages';
+
 export interface Business {
   id: string;
   name: string;
@@ -530,8 +539,11 @@ export interface Business {
   phone: string;
   whatsapp: string;
   email?: string;
+  publicEmail?: string;
   website?: string;
   openingHours: string;
+  notApplicableFields?: BusinessProfileNotApplicableField[];
+  homepageFeaturedOrder?: number | null;
   isOpenNow: boolean;
   priceRange: '$' | '$$' | '$$$' | '$$$$';
   status: 'active' | 'pending' | 'suspended' | 'rejected';

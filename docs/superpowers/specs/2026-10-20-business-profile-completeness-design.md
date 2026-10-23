@@ -1,7 +1,7 @@
 # Business Profile Completeness and Presentation
 
-**Status:** Revised design; awaiting user review
-**Date:** 2026-10-20
+**Status:** Approved; JSON business persistence adapter added by user decision
+**Date:** 2026-10-23
 
 ## Goal
 
@@ -33,6 +33,7 @@ to every type of business.
 - Keep account email private unless the business explicitly provides a
   separate public contact email.
 - Do not fabricate data or add a database migration in this scope.
+- In JSON-only runtime, persist business records through an explicit JSON adapter rather than reporting success for a no-op PostgreSQL write.
 
 ## Profile data requirements
 
@@ -58,11 +59,20 @@ business may mark a field as not applicable where the dashboard offers that
 choice; the profile must still distinguish missing information from
 information that does not apply.
 
+Represent not-applicable optional fields explicitly in the business profile
+data, separately from absent values. Required fields cannot be marked
+not-applicable. Do not invent values to fill either state.
+
 ## Registration and management
 
 The business registration flow collects the essential profile fields before
 creating a business account. Existing plan selection and payment steps remain
 unchanged.
+
+Registration must collect a business contact phone, category, subcategory,
+description, and neighborhood as business-profile values. These are distinct
+from the account email and from any payment phone; no prefilled location or
+contact value may be submitted as if the business supplied it.
 
 The business dashboard includes a profile-completion section with:
 
@@ -80,9 +90,25 @@ addresses, contacts, schedules, or descriptions.
 
 ## Persistence and authorization
 
-The existing business persistence contract remains in use. The public
-business-list response already returns stored business data; the client must
-hydrate those values and apply defaults only for fields actually absent.
+Business persistence uses exactly one adapter per runtime:
+
+- When PostgreSQL is configured, use the PostgreSQL business adapter. A
+  database error is surfaced; it must not trigger a JSON fallback or a
+  dual-write.
+- When PostgreSQL is not configured, use a JSON business adapter backed by
+  `data/businesses.json` through the configured runtime data directory. A
+  missing file represents an empty collection; unreadable or malformed
+  persisted data must produce an explicit failure rather than being treated
+  as an empty collection.
+- The JSON adapter supports the business record reads/writes required by
+  registration, profile editing, public listing, and manual homepage
+  featuring. It does not change the current PostgreSQL requirement for the
+  separate administrative approval workflow.
+
+No database schema migration or bulk data migration is part of this scope.
+The public business-list response must return stored public profile data; the
+client must hydrate those values and apply defaults only for fields actually
+absent.
 
 Business profile writes must:
 
@@ -92,14 +118,20 @@ Business profile writes must:
 3. Reject attempts by a business user to target another business.
 4. Validate profile field types and required fields at the write boundary.
 5. Preserve server-owned fields such as owner, approval status, verification,
-   moderation status, and creation metadata when updating the profile.
-6. Persist the update through the existing PostgreSQL business adapter and
-   return an explicit error when persistence fails.
+   moderation status, featured ordering, and creation metadata when updating
+   the profile.
+6. Persist through the adapter selected for the current runtime and return an
+   explicit error when persistence is unavailable or fails.
+7. Keep the account email in the account record only. A separate
+   `publicEmail` may be published only when the business explicitly enters it;
+   legacy account-email fields must not be returned by public business APIs.
 
-This scope does not redesign JSON-mode business persistence or add schema
-migrations. If inspection shows that the current store cannot persist a
-required edit safely in the supported runtime, stop and document the needed
-decision rather than claiming a successful save.
+Registration must not report success unless both the account and its initial
+business profile have been persisted. On failure, return an explicit error
+and compensate any earlier successful write where possible. A compensation
+failure must be surfaced and audited; it must not be represented as a complete
+registration. The implementation plan must define and test this behavior for
+each adapter.
 
 ## Directory card
 
@@ -167,6 +199,8 @@ the required behavior safely.
   mutate persisted data.
 - Persistence failures are shown to the user as save failures; they must not
   be reported as success.
+- PostgreSQL failures never silently fall back to JSON; JSON read/parse/write
+  failures never become empty successful results.
 - Existing private account email remains private unless a separate public
   business email is explicitly supplied.
 - Do not include private account information in public directory responses or

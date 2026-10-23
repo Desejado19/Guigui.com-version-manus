@@ -1,4 +1,5 @@
 import { databasePool } from './db';
+import { listJsonBusinesses, saveJsonBusinesses } from './jsonBusinessStore';
 
 export type BusinessRecord = {
   id: string;
@@ -7,8 +8,18 @@ export type BusinessRecord = {
   status?: string;
   ownerUserId?: string;
   createdAt?: string;
+  homepageFeaturedOrder?: number | null;
   data?: Record<string, any>;
 };
+
+export class InvalidFeaturedBusinessOrderError extends Error {
+  constructor(readonly code: 'INVALID_FEATURED_BUSINESS_ORDER' | 'INELIGIBLE_FEATURED_BUSINESS') {
+    super(code === 'INVALID_FEATURED_BUSINESS_ORDER'
+      ? 'A lista de empresas em destaque contém identificadores repetidos.'
+      : 'A lista contém empresas inexistentes ou que não estão ativas.');
+    this.name = 'InvalidFeaturedBusinessOrderError';
+  }
+}
 
 export type EventRecord = {
   id: string;
@@ -37,9 +48,30 @@ function requireDatabase() {
 }
 
 export async function persistPostgresBusiness(business: BusinessRecord): Promise<void> {
-  if (!databasePool) return;
   const status = companyStatus[business.status || 'active'] || 'active';
   const data = business.data || business;
+  if (!databasePool) {
+    const businesses = listJsonBusinesses<BusinessRecord>();
+    const existingIndex = businesses.findIndex((record) => record.id === business.id);
+    const existing = existingIndex >= 0 ? businesses[existingIndex] : undefined;
+    const persistedBusiness: BusinessRecord = {
+      ...existing,
+      ...business,
+      status,
+      ownerUserId: business.ownerUserId || existing?.ownerUserId,
+      createdAt: business.createdAt || existing?.createdAt || new Date().toISOString(),
+      data: { ...(existing?.data || {}), ...data },
+    };
+
+    if (existingIndex >= 0) {
+      businesses[existingIndex] = persistedBusiness;
+    } else {
+      businesses.push(persistedBusiness);
+    }
+    saveJsonBusinesses(businesses);
+    return;
+  }
+
   await databasePool.query(
     `INSERT INTO companies (id, owner_user_id, name, status, category_id, data, created_at, updated_at)
      VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, NOW())
@@ -48,13 +80,198 @@ export async function persistPostgresBusiness(business: BusinessRecord): Promise
        name = EXCLUDED.name,
        status = EXCLUDED.status,
        category_id = EXCLUDED.category_id,
-       data = EXCLUDED.data,
+       data = COALESCE(companies.data, '{}'::jsonb) || EXCLUDED.data,
        updated_at = NOW()`,
     [business.id, business.ownerUserId || null, business.name, status, business.categoryId || null, JSON.stringify(data), business.createdAt || new Date().toISOString()],
   );
 }
 
+export async function updatePostgresBusinessProfile(
+  businessId: string,
+  profile: Record<string, unknown>,
+): Promise<Record<string, unknown> | null> {
+  if (!databasePool) {
+    const businesses = listJsonBusinesses<BusinessRecord>();
+    const index = businesses.findIndex((business) => business.id === businessId);
+    if (index === -1) return null;
+
+    const existing = businesses[index];
+    const data = { ...(existing.data || {}), ...profile };
+    const updated: BusinessRecord = {
+      ...existing,
+      name: typeof profile.name === 'string' ? profile.name : existing.name,
+      categoryId: typeof profile.categoryId === 'string' ? profile.categoryId : existing.categoryId,
+      data,
+    };
+    businesses[index] = updated;
+    saveJsonBusinesses(businesses);
+
+    return {
+      ...data,
+      id: updated.id,
+      ownerUserId: updated.ownerUserId,
+      name: updated.name,
+      status: updated.status,
+      categoryId: updated.categoryId,
+      createdAt: updated.createdAt,
+    };
+  }
+
+  const result = await databasePool.query(
+    `UPDATE companies
+        SET name=COALESCE($2, name),
+            category_id=COALESCE($3, category_id),
+            data=COALESCE(data, '{}'::jsonb) || $4::jsonb,
+            updated_at=NOW()
+      WHERE id=$1
+      RETURNING id, owner_user_id, name, status, category_id, created_at, data`,
+    [
+      businessId,
+      typeof profile.name === 'string' ? profile.name : null,
+      typeof profile.categoryId === 'string' ? profile.categoryId : null,
+      JSON.stringify(profile),
+    ],
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+
+  return {
+    ...(row.data && Object.keys(row.data).length > 0 ? row.data : {}),
+    id: row.id,
+    ownerUserId: row.owner_user_id,
+    name: row.name,
+    status: row.status,
+    categoryId: row.category_id,
+    createdAt: row.created_at,
+  };
+}
+
+export async function setPostgresBusinessFeaturedOrder(businessIds: string[]): Promise<Record<string, unknown>[]> {
+  if (new Set(businessIds).size !== businessIds.length) {
+    throw new InvalidFeaturedBusinessOrderError('INVALID_FEATURED_BUSINESS_ORDER');
+  }
+
+  if (!databasePool) {
+    const businesses = listJsonBusinesses<BusinessRecord>();
+    const selectedBusinesses = businesses.filter((business) => businessIds.includes(business.id));
+    if (selectedBusinesses.length !== businessIds.length || selectedBusinesses.some((business) => business.status !== 'active')) {
+      throw new InvalidFeaturedBusinessOrderError('INELIGIBLE_FEATURED_BUSINESS');
+    }
+
+    const orderById = new Map(businessIds.map((businessId, index) => [businessId, index]));
+    const updatedBusinesses = businesses.map((business) => {
+      const homepageFeaturedOrder = orderById.get(business.id) ?? null;
+      return {
+        ...business,
+        homepageFeaturedOrder,
+        data: { ...(business.data || {}), homepageFeaturedOrder },
+      };
+    });
+    saveJsonBusinesses(updatedBusinesses);
+
+    const businessesById = new Map(updatedBusinesses.map((business) => [business.id, business]));
+    return businessIds.map((businessId) => {
+      const business = businessesById.get(businessId)!;
+      return { ...(business.data || {}), ...business };
+    });
+  }
+
+  const client = await requireDatabase().connect();
+  let transactionStarted = false;
+  try {
+    await client.query('BEGIN');
+    transactionStarted = true;
+    const selected = await client.query<{ id: string; status: string }>(
+      'SELECT id, status FROM companies WHERE id = ANY($1::text[]) FOR UPDATE',
+      [businessIds],
+    );
+    if (selected.rows.length !== businessIds.length || selected.rows.some((business) => business.status !== 'active')) {
+      throw new InvalidFeaturedBusinessOrderError('INELIGIBLE_FEATURED_BUSINESS');
+    }
+
+    await client.query(
+      `UPDATE companies
+          SET data = COALESCE(data, '{}'::jsonb) || '{"homepageFeaturedOrder": null}'::jsonb,
+              updated_at = NOW()
+        WHERE data ? 'homepageFeaturedOrder'
+          AND data->'homepageFeaturedOrder' <> 'null'::jsonb`,
+    );
+    await client.query(
+      `UPDATE companies AS company
+          SET data = COALESCE(company.data, '{}'::jsonb) ||
+                jsonb_build_object('homepageFeaturedOrder', selected.position - 1),
+              updated_at = NOW()
+         FROM unnest($1::text[]) WITH ORDINALITY AS selected(id, position)
+        WHERE company.id = selected.id`,
+      [businessIds],
+    );
+    const ordered = await client.query<{
+      id: string;
+      owner_user_id: string | null;
+      name: string;
+      status: string;
+      category_id: string | null;
+      created_at: string;
+      data: Record<string, unknown> | null;
+    }>(
+      `SELECT id, owner_user_id, name, status, category_id, created_at, data
+         FROM companies
+        WHERE id = ANY($1::text[])
+        ORDER BY (data->>'homepageFeaturedOrder')::integer ASC`,
+      [businessIds],
+    );
+    await client.query('COMMIT');
+    transactionStarted = false;
+
+    return ordered.rows.map((business) => ({
+      ...(business.data || {}),
+      id: business.id,
+      ownerUserId: business.owner_user_id,
+      name: business.name,
+      status: business.status,
+      categoryId: business.category_id,
+      createdAt: business.created_at,
+    }));
+  } catch (error) {
+    if (transactionStarted) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        console.error('[Guigui.com] featured business order rollback failed:', rollbackError);
+      }
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deletePostgresBusiness(businessId: string): Promise<boolean> {
+  if (!databasePool) {
+    const businesses = listJsonBusinesses<BusinessRecord>();
+    const index = businesses.findIndex((business) => business.id === businessId);
+    if (index === -1) return false;
+
+    businesses.splice(index, 1);
+    saveJsonBusinesses(businesses);
+    return true;
+  }
+
+  const result = await databasePool.query('DELETE FROM companies WHERE id=$1 RETURNING id', [businessId]);
+  return result.rowCount === 1;
+}
+
 export async function assignPostgresBusinessOwner(businessId: string, ownerUserId: string): Promise<boolean> {
+  if (!databasePool) {
+    const businesses = listJsonBusinesses<BusinessRecord>();
+    const index = businesses.findIndex((business) => business.id === businessId);
+    if (index === -1) return false;
+
+    businesses[index] = { ...businesses[index], ownerUserId };
+    saveJsonBusinesses(businesses);
+    return true;
+  }
+
   const pool = requireDatabase();
   const result = await pool.query('UPDATE companies SET owner_user_id=$2, updated_at=NOW() WHERE id=$1 RETURNING id', [businessId, ownerUserId]);
   return result.rowCount === 1;
@@ -172,7 +389,18 @@ export async function setAppState<T>(key: string, value: T): Promise<void> {
 }
 
 export async function listPostgresBusinesses(): Promise<any[]> {
-  if (!databasePool) return [];
+  if (!databasePool) {
+    return listJsonBusinesses<BusinessRecord>().map((business) => ({
+      ...(business.data && Object.keys(business.data).length > 0 ? business.data : {}),
+      id: business.id,
+      ownerUserId: business.ownerUserId,
+      name: business.name,
+      status: business.status,
+      categoryId: business.categoryId,
+      createdAt: business.createdAt,
+    }));
+  }
+
   const result = await databasePool.query(`SELECT id, owner_user_id, name, status, category_id, data FROM companies ORDER BY created_at ASC`);
   return result.rows.map(row => ({ ...(row.data && Object.keys(row.data).length > 0 ? row.data : {}), id: row.id, ownerUserId: row.owner_user_id, name: row.name, status: row.status, categoryId: row.category_id }));
 }

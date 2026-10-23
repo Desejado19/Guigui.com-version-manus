@@ -48,7 +48,10 @@ const currentUser: UserProfile = {
   businessId: business.id,
 };
 
-function renderDashboard(onUpdateBusiness = vi.fn()) {
+function renderDashboard(
+  onUpdateBusiness = vi.fn(),
+  onSaveBusinessProfile = vi.fn().mockResolvedValue(undefined),
+) {
   render(
     <BusinessDashboard
       business={business}
@@ -59,6 +62,7 @@ function renderDashboard(onUpdateBusiness = vi.fn()) {
       onAddPost={vi.fn()}
       onAddPromotion={vi.fn()}
       onUpdateBusiness={onUpdateBusiness}
+      onSaveBusinessProfile={onSaveBusinessProfile}
       conversations={[]}
       conversationMessages={[]}
       supportRequests={[]}
@@ -130,5 +134,19 @@ describe('BusinessDashboard simulated quota purchases', () => {
 
     expect(onUpdateBusiness).not.toHaveBeenCalled();
     expect(alert).toHaveBeenCalledWith(expect.stringContaining('registo manual legado'));
+  });
+
+  it('waits for profile persistence before showing the saved state', async () => {
+    const onSaveBusinessProfile = vi.fn().mockResolvedValue(undefined);
+    renderDashboard(vi.fn(), onSaveBusinessProfile);
+    fireEvent.click(screen.getByRole('button', { name: /actualizar dados da empresa/i }));
+
+    await waitFor(() => expect(onSaveBusinessProfile).toHaveBeenCalledWith(expect.objectContaining({
+      id: business.id,
+      status: business.status,
+      tier: business.tier,
+      verified: business.verified,
+    })));
+    await screen.findByText(/dados guardados/i);
   });
 });

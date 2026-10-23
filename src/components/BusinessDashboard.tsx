@@ -199,6 +199,7 @@ interface BusinessDashboardProps {
   events?: EventItem[];
   onValidatePurchaseOrder?: (orderId: string, redeemedBy: string) => void;
   onUpdateBusiness?: (updatedBiz: Business) => void;
+  onSaveBusinessProfile?: (updatedBiz: Business) => Promise<void>;
   onEventSubmitted?: (event: EventItem) => void;
   onEventCancelled?: (event: EventItem) => void;
   notifications?: AppNotification[];
@@ -243,6 +244,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
   events = [],
   onValidatePurchaseOrder,
   onUpdateBusiness,
+  onSaveBusinessProfile,
   onEventSubmitted,
   onEventCancelled,
   notifications = [],
@@ -1493,11 +1495,12 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
           token: invitationToken,
         }),
       });
-      const payload = await response.json() as { error?: string };
       if (!response.ok) {
-        setTeamNotice(payload.error || 'N�o foi poss�vel enviar o convite por e-mail.');
+        const payload = await response.json().catch(() => ({ error: "" } as { error?: string }));
+        setTeamNotice(payload.error || 'Não foi possível enviar o convite por e-mail.');
         return;
       }
+      const payload = await response.json().catch(() => ({}));
     } catch {
       setTeamNotice('N�o foi poss�vel contactar o servi�o de e-mail. Tente novamente.');
       return;
@@ -1986,8 +1989,11 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
         <ClientBusinessProfile
           business={business}
           currentLang={currentLang}
-          onUpdateBusiness={(updatedBusiness) => {
-            if (denyPermission('profile') && guardSubscriptionAction()) onUpdateBusiness?.(updatedBusiness);
+          onUpdateBusiness={async (updatedBusiness) => {
+            if (!denyPermission('profile')) throw new Error('Não tem permissão para editar o perfil.');
+            if (!guardSubscriptionAction()) throw new Error('A empresa deve renovar o plano antes de editar o perfil.');
+            if (!onSaveBusinessProfile) throw new Error('A gravação do perfil não está disponível.');
+            await onSaveBusinessProfile(updatedBusiness);
           }}
         />
       )}
@@ -5395,7 +5401,6 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
     </div>
   );
 };
-
 
 
 

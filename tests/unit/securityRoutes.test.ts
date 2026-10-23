@@ -21,6 +21,7 @@ process.env.SCANNER_DOOR_CODE = 'TEST-DOOR';
 let server: Server;
 let baseUrl: string;
 let auth: typeof import('../../server/authService');
+let businessService: typeof import('../../server/postgresBusinessService');
 
 async function login(email: string, password: string): Promise<string> {
   const response = await fetch(`${baseUrl}/api/auth/login`, {
@@ -55,6 +56,7 @@ async function getJson(pathname: string, cookie: string | undefined) {
 beforeAll(async () => {
   const { default: app } = await import('../../server');
   auth = await import('../../server/authService');
+  businessService = await import('../../server/postgresBusinessService');
   const expressApp = app as Express;
   const password = 'CorrectHorse42';
 
@@ -68,6 +70,20 @@ beforeAll(async () => {
   // e eliminadas pelo bloco de ciclo de vida de conta e não podem ser reutilizadas.
   auth.createUser({ name: 'Cidadão Três', email: 'cidadao-tres@test.guigui', password, role: 'user', phone: '+245955000007', neighborhood: 'Bissau' });
   auth.createUser({ name: 'Cidadão Quatro', email: 'cidadao-quatro@test.guigui', password, role: 'user', phone: '+245955000008', neighborhood: 'Bissau' });
+  await businessService.persistPostgresBusiness({
+    id: 'biz-1',
+    name: 'Empresa Um',
+    status: 'active',
+    ownerUserId: auth.findUserByEmail('empresa-um@test.guigui')?.id,
+    data: { categoryId: 'services', description: 'Descrição de teste suficientemente longa para o perfil.' },
+  });
+  await businessService.persistPostgresBusiness({
+    id: 'biz-2',
+    name: 'Empresa Dois',
+    status: 'active',
+    ownerUserId: auth.findUserByEmail('empresa-dois@test.guigui')?.id,
+    data: { categoryId: 'services', description: 'Descrição de teste suficientemente longa para o perfil.' },
+  });
 
   server = await new Promise<Server>((resolve) => {
     const listener = expressApp.listen(0, '127.0.0.1', () => resolve(listener));
@@ -119,6 +135,61 @@ describe('GET /api/payments/transactions tenant isolation', () => {
     const transactions = await response.json() as Array<{ businessId: string; useCase: string }>;
     expect(transactions.map((transaction) => transaction.businessId)).toEqual(expect.arrayContaining(['biz-1', 'biz-2']));
     expect(transactions.some((transaction) => transaction.useCase === 'event_tickets')).toBe(false);
+  });
+});
+
+describe('ticket account visibility in local simulation', () => {
+  it('returns a confirmed purchase only to its buyer', async () => {
+    const adminCookie = await login('admin-teste@test.guigui', 'CorrectHorse42');
+    const buyerCookie = await login('cidadao-um@test.guigui', 'CorrectHorse42');
+    const otherBuyerCookie = await login('cidadao-dois@test.guigui', 'CorrectHorse42');
+    const eventId = `ticket-account-${Date.now()}`;
+    const eventResponse = await postJson('/api/events', adminCookie, {
+      id: eventId,
+      title: 'Evento de teste de bilhetes',
+      status: 'published',
+      businessId: 'biz-1',
+      date: '2027-12-01',
+      time: '19:00',
+      salesOpen: true,
+      ticketTypes: [{
+        id: `${eventId}-vip`,
+        name: 'VIP',
+        priceXOF: 5000,
+        availableQuantity: 2,
+        soldQuantity: 0,
+        salesOpen: true,
+      }],
+    });
+    expect(eventResponse.status).toBe(200);
+
+    const purchaseResponse = await postJson('/api/tickets/purchase', buyerCookie, {
+      eventId,
+      ticketTypeId: `${eventId}-vip`,
+      ticketTypeName: 'VIP',
+      priceXOF: 5000,
+      pricePerTicketXOF: 5000,
+      quantity: 1,
+      buyerName: 'Nome não confiável',
+      buyerPhone: '+245955000000',
+      paymentMethod: 'orange_money',
+      policyAccepted: true,
+      policyVersion: '1.0',
+      policyAcceptedAt: new Date().toISOString(),
+    });
+    expect(purchaseResponse.status).toBe(200);
+    const purchase = await purchaseResponse.json() as { tickets: Array<{ id: string; buyerUserId: string }> };
+    expect(purchase.tickets).toHaveLength(1);
+    expect(purchase.tickets[0].buyerUserId).toBeTruthy();
+
+    const buyerTicketsResponse = await getJson('/api/tickets/mine', buyerCookie);
+    expect(buyerTicketsResponse.status).toBe(200);
+    const buyerTickets = await buyerTicketsResponse.json() as { tickets: Array<{ id: string }> };
+    expect(buyerTickets.tickets.map((ticket) => ticket.id)).toContain(purchase.tickets[0].id);
+
+    const otherBuyerResponse = await getJson('/api/tickets/mine', otherBuyerCookie);
+    expect(otherBuyerResponse.status).toBe(200);
+    await expect(otherBuyerResponse.json()).resolves.toMatchObject({ tickets: [] });
   });
 });
 
@@ -290,6 +361,14 @@ describe('escrita do estado da plataforma por perfil', () => {
 
 describe('registo público de contas e empresas', () => {
   const uniqueEmail = () => `registo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@test.guigui`;
+  const validBusinessProfile = (businessName: string) => ({
+    businessName,
+    categoryId: 'services',
+    subcategoryId: 'tailoring',
+    description: 'Costura e reparação de roupas.',
+    businessPhone: '+245 955 123 456',
+    businessNeighborhood: 'Bissau Velho',
+  });
 
   it('cria uma conta empresarial nova sem aceitar um businessId externo', async () => {
     const email = uniqueEmail();
@@ -298,6 +377,7 @@ describe('registo público de contas e empresas', () => {
       email,
       password: 'CorrectHorse42',
       role: 'business',
+      ...validBusinessProfile('Nova Empresa'),
       businessId: 'biz-1',
     });
     expect(response.status).toBe(201);
@@ -315,6 +395,7 @@ describe('registo público de contas e empresas', () => {
       email: uniqueEmail(),
       password: 'CorrectHorse42',
       role: 'business',
+      ...validBusinessProfile('Empresa Independente'),
     });
     expect(response.status).toBe(201);
     await expect(response.json()).resolves.toMatchObject({ user: { role: 'business' }, business: { status: 'pending' } });
@@ -322,7 +403,14 @@ describe('registo público de contas e empresas', () => {
 
   it('mantém a associação da nova conta empresarial no armazenamento', async () => {
     const email = uniqueEmail();
-    const response = await postJson('/api/auth/register', undefined, { name: 'Empresa Guardada', email, password: 'CorrectHorse42', role: 'business', businessId: 'biz-1' });
+    const response = await postJson('/api/auth/register', undefined, {
+      name: 'Empresa Guardada',
+      email,
+      password: 'CorrectHorse42',
+      role: 'business',
+      ...validBusinessProfile('Empresa Guardada'),
+      businessId: 'biz-1',
+    });
 
     expect(response.status).toBe(201);
     const user = auth.findUserByEmail(email);
@@ -350,6 +438,7 @@ describe('registo público de contas e empresas', () => {
       email: uniqueEmail(),
       password: 'CorrectHorse42',
       role: 'business',
+      ...validBusinessProfile('Ataque'),
       businessId: 'empresa-que-nao-existe',
     });
     expect(response.status).toBe(201);

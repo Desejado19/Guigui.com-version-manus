@@ -284,7 +284,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
         return;
       }
 
-      const result = await response.json();
+      const result = await response.json().catch(() => ({}));
       if (result.paymentPending) {
         setPaymentPending({
           message: result.message || 'O pagamento está pendente de confirmação.',

@@ -1,5 +1,4 @@
 import 'dotenv/config';
-import './server/bootstrapVercel.js';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -22,10 +21,12 @@ import { loadJson, saveJson } from './server/runtimeStore';
 import { createPaymentAdapters } from './server/paymentService';
 import { localizeApiPayload, resolveRequestLanguage } from './server/i18n';
 import { LANGUAGE_CYCLE } from './src/utils/i18n';
+import { getBusinessProfileCompletion } from './src/utils/businessProfile';
 import { addSubscriptionPeriod } from './src/utils/subscriptions';
 import { createSession, getSession, revokeAllUserSessions, revokeSession, SESSION_COOKIE_NAME } from './server/sessionService';
 import { checkDatabaseConnection, databaseConfigured, databasePool } from './server/db';
 import { createHealthHandler } from './server/modules/platform-foundation/http/healthHandler';
+import { loadPlatformRuntimeConfig } from './server/modules/platform-foundation/config/platformRuntimeConfig';
 import { createSessionAccessMiddleware } from './server/modules/identity-access/http/sessionAccessMiddleware';
 import { resolveSessionContext } from './server/modules/identity-access/application/resolveSessionContext';
 import { changePostgresUserPassword, createPostgresUser, deactivatePostgresUser, deletePostgresUser, findPostgresUserByEmail, findPostgresUserById } from './server/postgresAuthService';
@@ -40,7 +41,7 @@ import { markPostgresMonetizationRefunded, persistPostgresMonetization } from '.
 import { persistPostgresCatalog } from './server/postgresCatalogService';
 import { createPostgresReview, flagPostgresReview, isReviewAllowed, listPostgresReviews, moderatePostgresReview, replyPostgresReview } from './server/postgresReviewService';
 import { normaliseReviewComment, validateReviewInput } from './src/utils/reviews';
-import { assignPostgresBusinessOwner, decidePostgresBusiness, getAppState, listPendingPostgresBusinesses, listPostgresBusinesses, listPostgresEvents, persistPostgresBusiness, persistPostgresEvent, setAppState } from './server/postgresBusinessService';
+import { assignPostgresBusinessOwner, decidePostgresBusiness, deletePostgresBusiness, getAppState, InvalidFeaturedBusinessOrderError, listPendingPostgresBusinesses, listPostgresBusinesses, listPostgresEvents, persistPostgresBusiness, persistPostgresEvent, setAppState, setPostgresBusinessFeaturedOrder, updatePostgresBusinessProfile } from './server/postgresBusinessService';
 
 import { beginMfaSetup, enableMfa, hasEnabledMfa, verifyUserMfa } from './server/mfaService';
 import { consumeDistributedRateLimit } from './server/rateLimitService';
@@ -50,6 +51,7 @@ import { createObservabilityMiddleware } from './server/modules/platform-foundat
 import { HttpMetricsRegistry } from './server/modules/platform-foundation/observability/domain/httpMetrics';
 import { getProductFunnel, persistProductEvent } from './server/productAnalyticsService';
 import { canViewTransaction, resolveTransactionAccess } from './server/paymentAccessService';
+import { listOwnedTickets } from './server/ticketAccessService';
 import { resolveAppStateValue, resolveAppStateWrite, resolveBusinessWrite, resolveEventWrite } from './server/platformWriteAccess';
 import { startBackupScheduler, triggerLocalBackup } from './server/backupService';
 import { describeSmsGateway } from './server/smsGatewayService';
@@ -57,6 +59,7 @@ import { deliverConfirmedTicketPurchase } from './server/ticketPurchaseDeliveryS
 import { getTicketOffer } from './server/ticketCatalogService';
 import { ticketInventory } from './server/ticketInventoryService';
 import { quoteTicketPurchase } from './server/ticketPurchaseDomain';
+import { executeTicketPurchase, type TicketPurchaseResult } from './server/ticketPurchaseUseCase';
 import { createSimulatedEmailAdapter, createSimulatedSmsAdapter } from './server/integrations/simulatedAdapters';
 import { createScheduledItem, ensureDemoScheduledItems, listScheduledItems, processDueScheduledItems, updateScheduledItem, SCHEDULING_TIMEZONE } from './server/schedulingService';
 import type { ScheduledItem } from './src/types';
@@ -76,8 +79,9 @@ const broadcastCommunication = (event: string, payload: Record<string, unknown>)
     try { stream.write(data); } catch { communicationStreams.delete(stream); }
   });
 };
-const PORT = Number(process.env.PORT) || 3000;
-const isProduction = process.env.NODE_ENV === 'production';
+const runtimeConfig = loadPlatformRuntimeConfig(process.env);
+const PORT = runtimeConfig.port;
+const isProduction = runtimeConfig.isProduction;
 const configuredScannerDoorCode = process.env.SCANNER_DOOR_CODE?.trim() || 'PORTA2026';
 const ticketSigningSecret = process.env.TICKET_SIGNING_SECRET?.trim() || (!isProduction ? 'guigui-ticket-development-secret' : undefined);
 const paymentWebhookSecret = process.env.PAYMENT_WEBHOOK_SECRET?.trim() || (!isProduction ? 'guigui-payment-webhook-development-secret' : undefined);
@@ -151,10 +155,7 @@ app.use((req, res, next) => {
 });
 
 const allowedOrigins = new Set(
-  (process.env.CORS_ALLOWED_ORIGINS || process.env.APP_URL || '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean),
+  runtimeConfig.allowedOrigins,
 );
 // Keep the existing API stable while exposing an explicit versioned entry point.
 app.use((req, _res, next) => {
@@ -272,7 +273,7 @@ const persistTickets = () => saveJson('tickets.json', Array.from(ticketsDb.entri
 const persistEventSnapshots = () => saveJson('events.json', Array.from(eventSnapshots.values()));
 const persistModerationLogs = () => saveJson('moderation-logs.json', moderationLogs);
 const persistAuditLogs = () => saveJson('audit-logs.json', securityAuditLogs);
-const purchaseIdempotency = new Map<string, { createdAt: number; response: unknown; status: number }>();
+const purchaseIdempotency = new Map<string, { createdAt: number; response: Record<string, unknown>; status: number; result?: TicketPurchaseResult }>();
 const purchaseIdempotencyLocks = new Map<string, Promise<void>>();
 const paymentIdempotency = new Map<string, { createdAt: number; response: unknown }>();
 const ticketLookupWindows = new Map<string, { startedAt: number; count: number }>();
@@ -705,10 +706,37 @@ app.get('/api/features', (_req, res) => {
     });
 });
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function toPublicBusinessDto(business: Record<string, unknown>): Record<string, unknown> {
+  const dto = { ...business };
+  for (const field of ['email', 'ownerEmail', 'owner_email', 'accountEmail', 'account_email', 'ownerUserId', 'data']) {
+    delete dto[field];
+  }
+  if (typeof dto.publicEmail !== 'string' || !dto.publicEmail.trim()) {
+    delete dto.publicEmail;
+  } else {
+    dto.publicEmail = dto.publicEmail.trim();
+  }
+  return dto;
+}
+
+function toPublicBusinessCollection(value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+  return value.map((business) => {
+    return isRecord(business) ? toPublicBusinessDto(business) : business;
+  });
+}
+
 app.get('/api/app-state/:key', async (req, res) => {
   try {
     const value = await getAppState(req.params.key);
-    res.json({ key: req.params.key, value });
+    res.json({
+      key: req.params.key,
+      value: req.params.key === 'guigui_businesses' ? toPublicBusinessCollection(value) : value,
+    });
   } catch (error) {
     res.status(500).json({ error: 'Erro ao obter estado do banco de dados.' });
   }
@@ -784,7 +812,7 @@ app.get('/api/sync/bootstrap', async (_req, res) => {
       success: true,
       database: { connected: Boolean(databasePool) },
       data: {
-        businesses: businesses.length > 0 ? businesses : null,
+        businesses: businesses.length > 0 ? businesses.map(toPublicBusinessDto) : null,
         events: events.length > 0 ? events : null,
         userPosts,
         promotions,
@@ -799,9 +827,43 @@ app.get('/api/sync/bootstrap', async (_req, res) => {
 app.get('/api/businesses', async (_req, res) => {
   try {
     const businesses = await listPostgresBusinesses();
-    res.json({ businesses });
+    res.json({ businesses: businesses.map(toPublicBusinessDto) });
   } catch (error) {
     res.status(500).json({ error: 'Erro ao listar empresas.' });
+  }
+});
+
+app.get('/api/businesses/featured', async (_req, res) => {
+  try {
+    const businesses = await listPostgresBusinesses();
+    const featured = businesses
+      .filter((business) => business.status === 'active'
+        && typeof business.homepageFeaturedOrder === 'number'
+        && Number.isInteger(business.homepageFeaturedOrder)
+        && business.homepageFeaturedOrder >= 0)
+      .sort((left, right) => left.homepageFeaturedOrder - right.homepageFeaturedOrder);
+    return res.json({ businesses: featured.map(toPublicBusinessDto) });
+  } catch (error) {
+    console.error('[Guigui.com] featured business list failed:', error);
+    return res.status(500).json({ error: 'Não foi possível carregar as empresas em destaque.', code: 'FEATURED_BUSINESSES_LOAD_FAILED' });
+  }
+});
+
+app.put('/api/admin/businesses/featured', requireRole('admin'), async (req, res) => {
+  const businessIds: unknown = req.body?.businessIds;
+  if (!Array.isArray(businessIds) || businessIds.some((id) => typeof id !== 'string' || !id.trim())) {
+    return res.status(400).json({ error: 'A lista de empresas em destaque não é válida.', code: 'INVALID_FEATURED_BUSINESS_ORDER' });
+  }
+
+  try {
+    const businesses = await setPostgresBusinessFeaturedOrder(businessIds);
+    return res.json({ success: true, businesses: businesses.map(toPublicBusinessDto) });
+  } catch (error) {
+    if (error instanceof InvalidFeaturedBusinessOrderError) {
+      return res.status(400).json({ error: error.message, code: error.code });
+    }
+    console.error('[Guigui.com] featured business order save failed:', error);
+    return res.status(500).json({ error: 'Não foi possível guardar a ordem das empresas em destaque.', code: 'FEATURED_BUSINESS_ORDER_SAVE_FAILED' });
   }
 });
 
@@ -1072,6 +1134,237 @@ app.post('/api/admin/businesses/:id/decision', requireRole('admin'), async (req,
   }
 });
 
+const editableBusinessProfileFields = new Set([
+  'name',
+  'categoryId',
+  'subcategoryId',
+  'groupGroupId',
+  'description',
+  'phone',
+  'neighborhood',
+  'address',
+  'whatsapp',
+  'publicEmail',
+  'website',
+  'openingHours',
+  'socialLinks',
+  'serviceLanguages',
+  'notApplicableFields',
+  'logo',
+  'coverImage',
+  'gallery',
+]);
+const protectedBusinessProfileFields = new Set([
+  'id',
+  'ownerUserId',
+  'ownerName',
+  'status',
+  'approvalStatus',
+  'verified',
+  'featured',
+  'homepageFeaturedOrder',
+  'tier',
+  'planId',
+  'planName',
+  'subscriptionPlanVersion',
+  'subscriptionPlanSnapshot',
+  'subscriptionUsage',
+  'subscriptionRenewDate',
+  'subscriptionPeriod',
+  'subscriptionStartedAt',
+  'subscriptionStatus',
+  'subscriptionPaymentId',
+  'subscriptionAlertKeys',
+  'subscriptionSuspendedAt',
+  'subscriptionSuspensionReason',
+  'subscriptionAutoSuspended',
+  'postsQuotaRemaining',
+  'monetizationWallet',
+  'rating',
+  'ratingLabel',
+  'reviewsCount',
+  'reviews',
+  'posts',
+  'promotions',
+  'metrics',
+  'reviewedBy',
+  'reviewedAt',
+  'reviewDecision',
+  'reviewReason',
+  'moderation',
+  'moderationStatus',
+]);
+const requiredBusinessProfileFields = new Set([
+  'name',
+  'categoryId',
+  'subcategoryId',
+  'description',
+  'phone',
+  'neighborhood',
+]);
+const optionalNotApplicableFields = new Set([
+  'address',
+  'openingHours',
+  'publicEmail',
+  'whatsapp',
+  'website',
+  'socialLinks',
+  'serviceLanguages',
+]);
+const businessProfileStringFields = new Set([
+  'name',
+  'categoryId',
+  'subcategoryId',
+  'description',
+  'phone',
+  'neighborhood',
+  'address',
+  'whatsapp',
+  'publicEmail',
+  'website',
+  'openingHours',
+  'logo',
+  'coverImage',
+]);
+
+function validateBusinessProfileUpdate(input: unknown):
+  | { ok: true; profile: Record<string, unknown> }
+  | { ok: false; error: { code: string; message: string } } {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return { ok: false, error: { code: 'INVALID_BUSINESS_PROFILE', message: 'O perfil da empresa deve ser um objeto.' } };
+  }
+
+  const profile: Record<string, unknown> = {};
+  const entries = Object.entries(input);
+  if (entries.length === 0) {
+    return { ok: false, error: { code: 'INVALID_BUSINESS_PROFILE', message: 'Indique pelo menos um campo do perfil.' } };
+  }
+
+  for (const [field, value] of entries) {
+    if (protectedBusinessProfileFields.has(field)) {
+      return { ok: false, error: { code: 'PROTECTED_BUSINESS_FIELD', message: `O campo ${field} não pode ser alterado nesta operação.` } };
+    }
+    if (!editableBusinessProfileFields.has(field)) {
+      return { ok: false, error: { code: 'INVALID_BUSINESS_PROFILE', message: `O campo ${field} não pertence ao perfil editável.` } };
+    }
+
+    if (businessProfileStringFields.has(field)) {
+      if (typeof value !== 'string') {
+        return { ok: false, error: { code: 'INVALID_BUSINESS_PROFILE', message: `O campo ${field} deve ser texto.` } };
+      }
+      const normalized = value.trim();
+      if (requiredBusinessProfileFields.has(field) && !normalized) {
+        return { ok: false, error: { code: 'INVALID_BUSINESS_PROFILE', message: `O campo ${field} é obrigatório.` } };
+      }
+      if (field === 'description' && normalized.length < 30) {
+        return { ok: false, error: { code: 'INVALID_BUSINESS_PROFILE', message: 'A descrição deve conter pelo menos 30 caracteres.' } };
+      }
+      if (field === 'publicEmail' && normalized && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+        return { ok: false, error: { code: 'INVALID_BUSINESS_PROFILE', message: 'O email público não é válido.' } };
+      }
+      profile[field] = normalized;
+      continue;
+    }
+
+    if (field === 'gallery') {
+      if (!Array.isArray(value) || value.some((image) => typeof image !== 'string')) {
+        return { ok: false, error: { code: 'INVALID_BUSINESS_PROFILE', message: 'A galeria deve ser uma lista de imagens.' } };
+      }
+      profile[field] = value.filter((image): image is string => typeof image === 'string').map((image) => image.trim());
+      continue;
+    }
+
+    if (field === 'socialLinks') {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return { ok: false, error: { code: 'INVALID_BUSINESS_PROFILE', message: 'As redes sociais devem ser um objeto válido.' } };
+      }
+      const socialLinks = value as Record<string, unknown>;
+      if (Object.keys(socialLinks).some((network) => !['facebook', 'instagram'].includes(network))
+        || Object.values(socialLinks).some((url) => typeof url !== 'string')) {
+        return { ok: false, error: { code: 'INVALID_BUSINESS_PROFILE', message: 'As redes sociais contêm valores inválidos.' } };
+      }
+      profile[field] = Object.fromEntries(Object.entries(socialLinks).map(([network, url]) => [network, (url as string).trim()]));
+      continue;
+    }
+
+    if (field === 'groupGroupId') {
+      if (typeof value !== 'string' || ![
+        'restauracao',
+        'hotelaria_saude_educacao',
+        'corporativo_financeiro',
+        'ongs_artesãos',
+        'servicos_profissionais',
+      ].includes(value)) {
+        return { ok: false, error: { code: 'INVALID_BUSINESS_PROFILE', message: 'O grupo da categoria não é válido.' } };
+      }
+      profile[field] = value;
+      continue;
+    }
+
+    if (field === 'serviceLanguages') {
+      if (!Array.isArray(value) || value.some((language) => !['pt', 'fr', 'en', 'es'].includes(String(language)))) {
+        return { ok: false, error: { code: 'INVALID_BUSINESS_PROFILE', message: 'A lista de idiomas de atendimento não é válida.' } };
+      }
+      profile[field] = [...new Set(value)];
+      continue;
+    }
+
+    if (field === 'notApplicableFields') {
+      if (!Array.isArray(value) || value.some((item) => typeof item !== 'string' || !optionalNotApplicableFields.has(item))) {
+        return { ok: false, error: { code: 'INVALID_BUSINESS_PROFILE', message: 'A lista de campos não aplicáveis não é válida.' } };
+      }
+      profile[field] = [...new Set(value)];
+    }
+  }
+
+  return { ok: true, profile };
+}
+
+app.patch('/api/businesses/:id/profile', requireRole('business', 'admin'), async (req, res) => {
+  const requestId = requestIdFrom(req);
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+
+  const validation = validateBusinessProfileUpdate(req.body);
+  if (validation.ok === false) {
+    return res.status(400).json(validation.error);
+  }
+
+  try {
+    const storedBusinessUser = context.role === 'business'
+      ? (databaseConfigured ? await findPostgresUserById(context.userId) : findUserById(context.userId) || undefined)
+      : null;
+    const decision = resolveBusinessWrite(context.role, storedBusinessUser?.businessId, req.params.id);
+    if (decision.allowed === false) {
+      recordAudit({
+        action: 'business_profile_update_denied',
+        resource: 'company',
+        resourceId: req.params.id,
+        actorRole: context.role === 'user' ? 'citizen' : context.role,
+        requestId,
+        success: false,
+        metadata: { code: decision.code },
+      });
+      return res.status(decision.status).json({
+        error: 'Não possui permissão para editar esta empresa.',
+        code: decision.code,
+      });
+    }
+
+    const business = await updatePostgresBusinessProfile(req.params.id, validation.profile);
+    if (!business) {
+      return res.status(404).json({ error: 'Empresa não encontrada.', code: 'BUSINESS_NOT_FOUND' });
+    }
+    return res.json({ success: true, business: toPublicBusinessDto(business) });
+  } catch (error) {
+    console.error('[Guigui.com] business profile update failed:', error);
+    return res.status(500).json({
+      error: 'Não foi possível guardar o perfil da empresa.',
+      code: 'BUSINESS_PROFILE_UPDATE_FAILED',
+    });
+  }
+});
+
 app.post('/api/businesses', requireSession, async (req, res) => {
   const requestId = requestIdFrom(req);
   const context = await sessionContext(req);
@@ -1100,6 +1393,30 @@ app.post('/api/businesses', requireSession, async (req, res) => {
       metadata: { code: decision.code },
     });
     return res.status(decision.status).json({ error: 'Não possui permissão para gravar esta empresa.', code: decision.code });
+  }
+
+  if (context.role === 'business') {
+    const profileInput = Object.fromEntries(
+      Object.entries(business).filter(([field]) => editableBusinessProfileFields.has(field)),
+    );
+    const validation = validateBusinessProfileUpdate(profileInput);
+    if (validation.ok === false) {
+      return res.status(400).json(validation.error);
+    }
+
+    try {
+      const updatedBusiness = await updatePostgresBusinessProfile(targetBusinessId, validation.profile);
+      if (!updatedBusiness) {
+        return res.status(404).json({ error: 'Empresa não encontrada.', code: 'BUSINESS_NOT_FOUND' });
+      }
+      return res.json({ success: true, business: toPublicBusinessDto(updatedBusiness) });
+    } catch (error) {
+      console.error('[Guigui.com] legacy business profile update failed:', error);
+      return res.status(500).json({
+        error: 'Não foi possível guardar o perfil da empresa.',
+        code: 'BUSINESS_PROFILE_UPDATE_FAILED',
+      });
+    }
   }
 
   try {
@@ -1359,7 +1676,7 @@ app.post('/api/business/team/invitations', requireRole('business'), async (req, 
       recipientName: recipientName.trim(),
       businessName: businessName.trim(),
       roleLabel: roleLabel.trim(),
-      invitationUrl: `${process.env.APP_URL?.trim() || 'http://localhost:3000'}/?team_invite=${encodeURIComponent(token.trim())}`,
+      invitationUrl: `${runtimeConfig.appUrl?.trim() || 'http://localhost:3000'}/?team_invite=${encodeURIComponent(token.trim())}`,
     });
     return res.status(201).json({
       success: true,
@@ -1611,38 +1928,139 @@ app.post('/api/notifications/:id/read', requireSession, async (req, res) => {
 });
 
 app.post('/api/auth/register', async (req, res) => {
-  const { name, email, password, phone = '+245 955 00 00', neighborhood = 'Bissau', role = 'user', businessName, businessId } = req.body || {};
+  const {
+    name,
+    email,
+    password,
+    phone = '+245 955 00 00',
+    neighborhood = 'Bissau',
+    role = 'user',
+    businessName,
+    businessId,
+    categoryId,
+    groupGroupId,
+    subcategoryId,
+    description,
+    businessPhone,
+    businessNeighborhood,
+    publicEmail,
+  } = req.body || {};
   if (typeof name !== 'string' || name.trim().length < 2 || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || typeof password !== 'string' || password.length < 6) {
     return res.status(400).json({ error: 'Indique um nome, e-mail válido e palavra-passe com pelo menos 6 carateres.' });
   }
   if (role !== 'user' && role !== 'business') return res.status(400).json({ error: 'Tipo de conta inválido.' });
 
+  const normalizedBusinessName = typeof businessName === 'string' ? businessName.trim() : '';
+  const normalizedBusinessPhone = typeof businessPhone === 'string' ? businessPhone.trim() : '';
+  const normalizedBusinessNeighborhood = typeof businessNeighborhood === 'string' ? businessNeighborhood.trim() : '';
+  const normalizedCategoryId = typeof categoryId === 'string' ? categoryId.trim() : '';
+  const normalizedGroupGroupId = typeof groupGroupId === 'string' ? groupGroupId.trim() : normalizedCategoryId;
+  const normalizedSubcategoryId = typeof subcategoryId === 'string' ? subcategoryId.trim() : '';
+  const normalizedDescription = typeof description === 'string' ? description.trim() : '';
+  if (role === 'business') {
+    const completion = getBusinessProfileCompletion({
+      name: normalizedBusinessName,
+      categoryId: normalizedCategoryId,
+      subcategoryId: normalizedSubcategoryId,
+      description: normalizedDescription,
+      phone: normalizedBusinessPhone,
+      neighborhood: normalizedBusinessNeighborhood,
+    });
+    if (completion.missingFields.length > 0) {
+      return res.status(400).json({
+        error: 'Preencha os campos obrigatórios do perfil empresarial.',
+        code: 'BUSINESS_PROFILE_INCOMPLETE',
+        missingFields: completion.missingFields,
+      });
+    }
+    if (publicEmail !== undefined && typeof publicEmail !== 'string') {
+      return res.status(400).json({ error: 'O e-mail público é inválido.', code: 'BUSINESS_PUBLIC_EMAIL_INVALID' });
+    }
+    if (typeof publicEmail === 'string' && publicEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(publicEmail.trim())) {
+      return res.status(400).json({ error: 'O e-mail público é inválido.', code: 'BUSINESS_PUBLIC_EMAIL_INVALID' });
+    }
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const newBusinessId = role === 'business' ? `biz-${Date.now()}-${randomBytes(3).toString('hex')}` : undefined;
+  let businessPersisted = false;
+  let accountPersisted = false;
+
   try {
-    const normalizedEmail = email.trim().toLowerCase();
-    const newBusinessId = role === 'business' ? `biz-${Date.now()}-${randomBytes(3).toString('hex')}` : undefined;
-    const normalizedBusinessName = role === 'business' ? String(businessName || name).trim() : undefined;
     const existingUser = databaseConfigured ? await findPostgresUserByEmail(normalizedEmail) : findUserByEmail(normalizedEmail);
     if (existingUser) return res.status(409).json({ error: 'Já existe uma conta com este e-mail.' });
-    if (newBusinessId && normalizedBusinessName) {
+    if (newBusinessId) {
       await persistPostgresBusiness({
         id: newBusinessId,
         name: normalizedBusinessName,
         status: 'pending',
         createdAt: new Date().toISOString(),
-        data: { email: normalizedEmail, phone: String(phone), neighborhood: String(neighborhood), ownerEmail: normalizedEmail },
+        categoryId: normalizedCategoryId,
+        data: {
+          categoryId: normalizedCategoryId,
+          groupGroupId: normalizedGroupGroupId,
+          subcategoryId: normalizedSubcategoryId,
+          description: normalizedDescription,
+          phone: normalizedBusinessPhone,
+          neighborhood: normalizedBusinessNeighborhood,
+          ...(typeof publicEmail === 'string' && publicEmail.trim() ? { publicEmail: publicEmail.trim() } : {}),
+        },
       });
+      businessPersisted = true;
     }
     const user = databaseConfigured
       ? await createPostgresUser({ name, email, password, phone: String(phone), neighborhood: String(neighborhood), role, ...(newBusinessId ? { businessId: newBusinessId, businessName: normalizedBusinessName } : {}) })
       : createUser({ name, email, password, phone: String(phone), neighborhood: String(neighborhood), role, ...(newBusinessId ? { businessId: newBusinessId, businessName: normalizedBusinessName } : {}) });
-    if (!user) return res.status(409).json({ error: 'Já existe uma conta com este e-mail.' });
-    if (databaseConfigured && newBusinessId) await assignPostgresBusinessOwner(newBusinessId, user.id);
+    if (!user) {
+      if (businessPersisted && !(await deletePostgresBusiness(newBusinessId!))) {
+        throw new Error('Business registration could not remove an unclaimed business profile.');
+      }
+      businessPersisted = false;
+      return res.status(409).json({ error: 'Já existe uma conta com este e-mail.' });
+    }
+    accountPersisted = true;
+    if (newBusinessId && !(await assignPostgresBusinessOwner(newBusinessId, user.id))) {
+      throw new Error('Business registration could not associate the account with its business profile.');
+    }
     const publicUser = { ...toPublicUser(user), ...(newBusinessId ? { businessId: newBusinessId, businessName: normalizedBusinessName } : {}) };
     setSessionCookie(res, await createSession({ userId: publicUser.id, role: publicUser.role, ipAddress: req.ip, userAgent: req.get('user-agent') }));
     recordAudit({ action: 'account_registered', resource: 'user', resourceId: publicUser.id, actorRole: role === 'user' ? 'citizen' : 'business', requestId: requestIdFrom(req), success: true, metadata: newBusinessId ? { businessId: newBusinessId } : undefined });
-    res.status(201).json({ success: true, user: publicUser, ...(newBusinessId ? { business: { id: newBusinessId, name: normalizedBusinessName, status: 'pending' } } : {}) });
+    res.status(201).json({
+      success: true,
+      user: publicUser,
+      ...(newBusinessId ? {
+        business: {
+          id: newBusinessId,
+          name: normalizedBusinessName,
+          status: 'pending',
+          categoryId: normalizedCategoryId,
+          groupGroupId: normalizedGroupGroupId,
+          subcategoryId: normalizedSubcategoryId,
+          description: normalizedDescription,
+          phone: normalizedBusinessPhone,
+          neighborhood: normalizedBusinessNeighborhood,
+          ...(typeof publicEmail === 'string' && publicEmail.trim() ? { publicEmail: publicEmail.trim() } : {}),
+        },
+      } : {}),
+    });
   } catch (error) {
-    // Uma falha de base de dados nunca pode derrubar o servidor: o registo é público.
+    const compensationFailures: string[] = [];
+    if (accountPersisted) {
+      try {
+        const deleted = databaseConfigured ? await deletePostgresUser(normalizedEmail) : deleteUserAccount(normalizedEmail);
+        if (!deleted) compensationFailures.push('account');
+      } catch {
+        compensationFailures.push('account');
+      }
+    }
+    if (businessPersisted && newBusinessId) {
+      try {
+        const deleted = await deletePostgresBusiness(newBusinessId);
+        if (!deleted) compensationFailures.push('business');
+      } catch {
+        compensationFailures.push('business');
+      }
+    }
     recordAudit({
       action: 'public_registration_failed',
       resource: 'user',
@@ -1650,9 +2068,15 @@ app.post('/api/auth/register', async (req, res) => {
       actorRole: 'system',
       requestId: requestIdFrom(req),
       success: false,
-      metadata: { reason: error instanceof Error ? error.message : 'unknown' },
+      metadata: {
+        reason: error instanceof Error ? error.message : 'unknown',
+        compensationFailures,
+      },
     });
-    res.status(400).json({ error: 'Não foi possível concluir o registo. Verifique os dados e tente novamente.', code: 'REGISTRATION_FAILED' });
+    res.status(500).json({
+      error: 'Não foi possível concluir o registo. Tente novamente.',
+      code: compensationFailures.length > 0 ? 'REGISTRATION_COMPENSATION_FAILED' : 'REGISTRATION_FAILED',
+    });
   }
 });
 
@@ -2073,10 +2497,80 @@ setInterval(() => {
   }
 }, 60_000);
 
+function ticketPurchaseHttpResponse(
+  result: TicketPurchaseResult,
+  requestId: string,
+): { status: number; body: Record<string, unknown> } {
+  if (result.status === 'confirmed') {
+    const ticket = result.tickets[0];
+    if (!ticket) throw new Error('A confirmação do pagamento não produziu bilhetes.');
+    return {
+      status: 200,
+      body: {
+        success: true,
+        ticket,
+        tickets: result.tickets,
+        feeBreakdown: result.quote.feeBreakdown,
+        quote: result.quote,
+        transaction: result.transaction,
+        sms: {
+          mode: result.delivery.sms.mode,
+          state: result.delivery.sms.state,
+        },
+        delivery: {
+          email: result.delivery.email,
+          notification: result.delivery.notification,
+          sms: { state: result.delivery.sms.state, mode: result.delivery.sms.mode },
+        },
+      },
+    };
+  }
+
+  if (result.status === 'pending') {
+    return {
+      status: 202,
+      body: {
+        success: false,
+        paymentPending: true,
+        transaction: result.transaction,
+        reservationExpiresAt: result.reservationExpiresAt,
+        message: result.transaction.paymentInstructions || 'Pagamento pendente. Os bilhetes ficam reservados até à confirmação da operadora.',
+        requestId,
+      },
+    };
+  }
+
+  const status = result.reason === 'invalid_offer'
+    ? 404
+    : result.reason === 'inventory_unavailable'
+      ? 409
+      : result.reason === 'payment_failed'
+        ? 502
+        : 400;
+  const code = result.reason === 'invalid_offer'
+    ? 'TICKET_OFFER_NOT_FOUND'
+    : result.reason === 'invalid_policy'
+      ? 'TICKET_POLICY_REQUIRED'
+      : result.reason === 'invalid_quantity'
+        ? 'INVALID_TICKET_QUANTITY'
+        : result.reason === 'payment_failed'
+          ? 'TICKET_PAYMENT_FAILED'
+          : 'TICKET_INVENTORY_UNAVAILABLE';
+
+  return {
+    status,
+    body: {
+      success: false,
+      error: result.message,
+      code,
+      ...(result.transaction ? { transaction: result.transaction } : {}),
+      requestId,
+    },
+  };
+}
+
 // Ticket Purchase API (Generates Ticket + Simulates SMS Notification)
 app.post('/api/tickets/purchase', async (req, res) => {
-  let reservationId: string | undefined;
-  let paymentConfirmed = false;
   let idempotencyKey: string | undefined;
   let releaseIdempotencyLock: (() => void) | undefined;
   const requestId = requestIdFrom(req);
@@ -2204,239 +2698,167 @@ app.post('/api/tickets/purchase', async (req, res) => {
       return res.status(409).json({ error: 'O total do checkout não corresponde à política de taxas actual.', code: 'TICKET_TOTAL_MISMATCH', expectedAmountXOF: chargedAmountXOF, requestId });
     }
 
-    const txnId = `TXN-${Date.now()}-${randomBytes(3).toString('hex').toUpperCase()}`;
-    const reservedUntil = new Date(Date.now() + TICKET_RESERVATION_TTL_MS).toISOString();
-    const reservationResult = await ticketInventory.reserve({
-      offer,
+    const catalogSettings = normaliseMonetizationCatalog(monetizationCatalogStore);
+    const result = await executeTicketPurchase({
+      buyer: {
+        userId: purchaseSession.userId,
+        name: account.name,
+        phone: account.phone,
+        email: account.email,
+      },
+      eventId,
+      ticketTypeId,
       quantity: ticketQuantity,
-      reservationId: txnId,
-      expiresAt: reservedUntil,
-    });
-    if (reservationResult !== 'reserved') {
-      return res.status(409).json({ error: 'Não há bilhetes suficientes disponíveis.', code: 'TICKET_INVENTORY_UNAVAILABLE', requestId });
-    }
-    reservationId = txnId;
-
-    const paymentAdapter = paymentAdapters[paymentMethod];
-    const paymentIntent = await paymentAdapter.createIntent({
-      transactionId: txnId,
-      amountXOF: chargedAmountXOF,
-      payerName: account.name,
-      payerPhone: account.phone,
-      description: `${offer.ticketTypeName} - ${offer.eventTitle} (${ticketQuantity} unidade${ticketQuantity === 1 ? '' : 's'})`,
-      provider: paymentMethod,
-      metadata: { eventId: offer.eventId, businessId: offer.businessId || '', ticketQuantity: String(ticketQuantity) },
-    });
-    paymentConfirmed = paymentIntent.state === 'confirmed';
-
-    const purchaseTimestamp = new Date().toISOString();
-    const newTickets: TicketForValidation[] = paymentConfirmed ? Array.from({ length: ticketQuantity }, (_, index) => {
-      const { ticketCode, qrToken, pinCode } = generateTicketIdentifiers();
-      const ticket: TicketForValidation = {
-        id: `TKT-${Date.now()}-${index + 1}-${randomBytes(2).toString('hex').toUpperCase()}`,
-        ticketCode,
-        ticketTypeId: offer.ticketTypeId,
-        buyerUserId: purchaseSession.userId,
-        eventId: offer.eventId,
-        ...(offer.businessId ? { businessId: offer.businessId } : {}),
-        eventTitle: offer.eventTitle,
-        ticketTypeName: offer.ticketTypeName,
-        priceXOF: offer.unitPriceXOF,
-        buyerName: account.name,
-        buyerPhone: account.phone,
-        ...(holderName && holderPhone ? { holderName, holderPhone } : {}),
-        qrToken,
-        pinCode,
-        status: 'valid',
-        purchasedAt: purchaseTimestamp,
-        expiresAt: calculateTicketExpiry(offer.eventDate, offer.eventTime),
-        paymentMethod,
-      };
-      if (ticketSigningSecret) ticket.signature = signTicket(ticket, ticketSigningSecret);
-      return ticket;
-    }) : [];
-    const primaryTicket = newTickets[0];
-
-    const paymentTimestamp = new Date().toISOString().replace('T', ' ').substring(0, 16);
-    const newTxn = {
-      id: txnId,
-      useCase: 'event_tickets',
-      useCaseLabel: `Bilhete ${offer.ticketTypeName} - ${offer.eventTitle}`,
-      businessId: offer.businessId,
-      businessName: offer.eventTitle,
-      payerName: account.name,
-      payerPhone: account.phone,
-      amountXOF: chargedAmountXOF,
-      ticketBaseAmountXOF: offer.unitPriceXOF * ticketQuantity,
-      platformFeeXOF: ticketFeeBreakdown.platformRevenue,
-      provider: paymentMethod,
-      providerRef: paymentIntent.providerRef,
-      productId: 'product-ticket-fee',
-      productCode: 'TICKET_FEE',
-      quantity: ticketQuantity,
-      status: paymentIntent.state === 'confirmed' ? 'confirmed_api' : paymentIntent.state === 'failed' ? 'failed' : 'pending_provider',
-      isApiIntegrationReady: paymentAdapter.mode === 'live',
-      providerMode: paymentAdapter.mode,
-      checkoutUrl: paymentIntent.checkoutUrl,
-      paymentInstructions: paymentIntent.instructions,
-      ticketId: undefined as string | undefined,
-      ticketIds: [] as string[],
-      ticketCode: undefined as string | undefined,
-      ticketCodes: [] as string[],
-      qrToken: undefined as string | undefined,
-      qrTokens: [] as string[],
-      ticketDraft: undefined as
-        | { eventId?: string; eventTitle?: string; ticketTypeId?: string; ticketTypeName?: string; unitPriceXOF?: number; buyerUserId?: string; eventDate?: string; eventTime?: string; quantity?: number }
-        | undefined,
-      createdAt: paymentTimestamp,
-      ...(paymentIntent.state === 'confirmed' ? { confirmedAt: paymentTimestamp, confirmedBy: `${paymentAdapter.provider} (${paymentAdapter.mode})` } : {}),
-    };
-    paymentTransactions.push(newTxn);
-    if (paymentIntent.state === 'confirmed') recordMonetizationFulfillment(newTxn);
-    persistPayments();
-
-    if (paymentIntent.state === 'failed') {
-      await ticketInventory.release(txnId);
-      reservationId = undefined;
-      const failurePayload = {
-        success: false,
-        error: 'O pagamento simulado não foi aprovado. A reserva de bilhetes foi libertada.',
-        code: 'TICKET_PAYMENT_FAILED',
-        transaction: newTxn,
-        requestId,
-      };
-      if (idempotencyKey) purchaseIdempotency.set(idempotencyKey, { createdAt: Date.now(), response: failurePayload, status: 502 });
-      return res.status(502).json(failurePayload);
-    }
-
-    if (paymentIntent.state === 'pending') {
-      newTxn.ticketDraft = {
-        eventId: offer.eventId,
-        eventTitle: offer.eventTitle,
-        ticketTypeId: offer.ticketTypeId,
-        ticketTypeName: offer.ticketTypeName,
-        unitPriceXOF: offer.unitPriceXOF,
-        buyerUserId: purchaseSession.userId,
-        eventDate: offer.eventDate,
-        eventTime: offer.eventTime,
-        quantity: ticketQuantity,
-      };
-      persistPayments();
-      const pendingPayload = {
-        success: false,
-        paymentPending: true,
-        transaction: newTxn,
-        reservationExpiresAt: reservedUntil,
-        message: paymentIntent.instructions || 'Pagamento pendente. Os bilhetes ficam reservados até à confirmação da operadora.',
-        requestId,
-      };
-      if (idempotencyKey) purchaseIdempotency.set(idempotencyKey, { createdAt: Date.now(), response: pendingPayload, status: 202 });
-      recordAudit({ action: 'ticket_payment_pending', resource: 'payment', resourceId: txnId, actorRole: 'citizen', requestId, success: true, metadata: { provider: paymentMethod, providerRef: paymentIntent.providerRef, reservedUntil } });
-      return res.status(202).json(pendingPayload);
-    }
-
-    if (!primaryTicket) throw new Error('A confirmação do pagamento não produziu bilhetes.');
-
-    newTickets.forEach((ticket) => {
-      ticketsDb.set(ticket.qrToken, ticket);
-      ticketsDb.set(ticket.pinCode!, ticket); // allow QR token, código e PIN a localizar o bilhete
-      ticketsDb.set(ticket.ticketCode, ticket);
-    });
-    await persistPostgresTickets(newTickets, purchaseSession.userId);
-    await ticketInventory.confirm(txnId);
-    reservationId = undefined;
-    newTxn.ticketId = primaryTicket.id;
-    newTxn.ticketIds = newTickets.map((ticket) => ticket.id);
-    newTxn.ticketCode = primaryTicket.ticketCode;
-    newTxn.ticketCodes = newTickets.map((ticket) => ticket.ticketCode);
-    newTxn.qrToken = primaryTicket.qrToken;
-    newTxn.qrTokens = newTickets.map((ticket) => ticket.qrToken);
-    persistTickets();
-    persistPayments();
-    let accountEmail: string | undefined;
-    let accountName: string | undefined;
-    if (purchaseSession.role === 'user') {
-      try {
-        const account = databaseConfigured
-          ? await findPostgresUserById(purchaseSession.userId)
-          : findUserById(purchaseSession.userId);
-        accountEmail = account?.email;
-        accountName = account?.name;
-      } catch (error) {
-        console.error('ticket-purchase-account-lookup-failed', {
-          transactionId: txnId,
-          errorName: error instanceof Error ? error.name : 'UnknownError',
+      holderName,
+      holderPhone,
+      paymentMethod,
+      policyAccepted: buyerValidation.value!.policyAccepted,
+      policyVersion: buyerValidation.value!.policyVersion,
+      policyAcceptedAt: buyerValidation.value!.policyAcceptedAt,
+      idempotencyKey,
+    }, {
+      catalog: { getOffer: async () => offer },
+      inventory: ticketInventory,
+      tickets: {
+        async issue(reservationId, tickets, buyerUserId) {
+          for (const ticket of tickets) {
+            ticketsDb.set(ticket.qrToken, ticket);
+            if (ticket.pinCode) ticketsDb.set(ticket.pinCode, ticket);
+            ticketsDb.set(ticket.ticketCode, ticket);
+          }
+          await persistPostgresTickets(tickets, buyerUserId);
+          persistTickets();
+          return tickets;
+        },
+      },
+      idempotency: {
+        async get(key) {
+          return purchaseIdempotency.get(key)?.result || null;
+        },
+        async store(key, storedResult) {
+          const response = ticketPurchaseHttpResponse(storedResult, requestId);
+          purchaseIdempotency.set(key, {
+            createdAt: Date.now(),
+            result: storedResult,
+            response: response.body,
+            status: response.status,
+          });
+        },
+      },
+      payments: paymentAdapters,
+      ticketFactory({ offer: purchaseOffer, buyer, quantity, holderName: purchaseHolderName, holderPhone: purchaseHolderPhone, paymentMethod: purchasePaymentMethod, purchasedAt }) {
+        return Array.from({ length: quantity }, (_, index) => {
+          const { ticketCode, qrToken, pinCode } = generateTicketIdentifiers();
+          const ticket: TicketForValidation = {
+            id: `TKT-${Date.now()}-${index + 1}-${randomBytes(2).toString('hex').toUpperCase()}`,
+            ticketCode,
+            ticketTypeId: purchaseOffer.ticketTypeId,
+            buyerUserId: buyer.userId,
+            eventId: purchaseOffer.eventId,
+            ...(purchaseOffer.businessId ? { businessId: purchaseOffer.businessId } : {}),
+            eventTitle: purchaseOffer.eventTitle,
+            ticketTypeName: purchaseOffer.ticketTypeName,
+            priceXOF: purchaseOffer.unitPriceXOF,
+            buyerName: buyer.name,
+            buyerPhone: buyer.phone,
+            ...(purchaseHolderName && purchaseHolderPhone
+              ? { holderName: purchaseHolderName, holderPhone: purchaseHolderPhone }
+              : {}),
+            qrToken,
+            pinCode,
+            status: 'valid',
+            purchasedAt,
+            expiresAt: calculateTicketExpiry(purchaseOffer.eventDate, purchaseOffer.eventTime),
+            paymentMethod: purchasePaymentMethod,
+          };
+          if (ticketSigningSecret) ticket.signature = signTicket(ticket, ticketSigningSecret);
+          return ticket;
         });
-      }
-    }
-
-    const delivery = await deliverConfirmedTicketPurchase({
-      transactionId: txnId,
-      accountUserId: purchaseSession.userId,
-      accountEmail,
-      accountName,
-      eventId: primaryTicket.eventId || offer.eventId,
-      eventTitle: primaryTicket.eventTitle || offer.eventTitle,
-      totalAmountXOF: chargedAmountXOF,
-      tickets: newTickets,
-    }, { email: emailDelivery, sms: smsDelivery });
-    recordAudit({
-      action: 'ticket_sms_dispatch',
-      resource: 'ticket',
-      resourceId: txnId,
-      actorRole: 'system',
-      requestId,
-      success: delivery.sms.state !== 'failed',
-      metadata: {
-        mode: delivery.sms.mode,
-        state: delivery.sms.state,
-        referenceCount: delivery.sms.references.length,
-        emailState: delivery.email.state,
-        notificationState: delivery.notification.state,
       },
+      transactions: {
+        async persist(transaction) {
+          const existing = paymentTransactions.find((item) => item.id === transaction.id);
+          if (existing) Object.assign(existing, transaction);
+          else paymentTransactions.push(transaction);
+          persistPayments();
+        },
+        async recordFulfillment(transaction) {
+          recordMonetizationFulfillment(transaction);
+        },
+      },
+      async delivery(input) {
+        return deliverConfirmedTicketPurchase({
+          transactionId: input.transactionId,
+          accountUserId: input.accountUserId,
+          accountEmail: input.accountEmail,
+          accountName: input.accountName,
+          eventId: input.eventId,
+          eventTitle: input.eventTitle,
+          totalAmountXOF: input.totalAmountXOF,
+          tickets: input.tickets,
+        }, { email: emailDelivery, sms: smsDelivery });
+      },
+      catalogSettings,
+      createTransactionId: () => `TXN-${Date.now()}-${randomBytes(3).toString('hex').toUpperCase()}`,
+      reservationTtlMs: TICKET_RESERVATION_TTL_MS,
+      now: () => new Date(),
     });
 
-    const responsePayload = {
-      success: true,
-      ticket: primaryTicket,
-      tickets: newTickets,
-      feeBreakdown: ticketFeeBreakdown,
-      quote: quoteResult.quote,
-      transaction: newTxn,
-      sms: {
-        mode: delivery.sms.mode,
-        state: delivery.sms.state,
-      },
-      delivery: {
-        email: delivery.email,
-        notification: delivery.notification,
-        sms: { state: delivery.sms.state, mode: delivery.sms.mode },
-      },
-    };
-    if (idempotencyKey) {
-      purchaseIdempotency.set(idempotencyKey, { createdAt: Date.now(), response: responsePayload, status: 200 });
+    const cachedResponse = idempotencyKey ? purchaseIdempotency.get(idempotencyKey) : undefined;
+    const httpResponse = cachedResponse
+      ? { status: cachedResponse.status, body: cachedResponse.response }
+      : ticketPurchaseHttpResponse(result, requestId);
+
+    if (result.status === 'pending') {
+      recordAudit({
+        action: 'ticket_payment_pending',
+        resource: 'payment',
+        resourceId: result.transaction.id,
+        actorRole: 'citizen',
+        requestId,
+        success: true,
+        metadata: {
+          provider: result.transaction.provider,
+          providerRef: result.transaction.providerRef,
+          reservedUntil: result.reservationExpiresAt,
+        },
+      });
+    } else if (result.status === 'confirmed') {
+      const ticket = result.tickets[0];
+      if (!ticket) throw new Error('A confirmação do pagamento não produziu bilhetes.');
+      recordAudit({
+        action: 'ticket_sms_dispatch',
+        resource: 'ticket',
+        resourceId: result.transaction.id,
+        actorRole: 'system',
+        requestId,
+        success: result.delivery.sms.state !== 'failed',
+        metadata: {
+          mode: result.delivery.sms.mode,
+          state: result.delivery.sms.state,
+          referenceCount: result.delivery.sms.references.length,
+          emailState: result.delivery.email.state,
+          notificationState: result.delivery.notification.state,
+        },
+      });
+      recordAudit({
+        action: 'ticket_issued',
+        resource: 'ticket',
+        resourceId: result.transaction.id,
+        actorRole: 'citizen',
+        requestId,
+        success: true,
+        metadata: {
+          eventId: ticket.eventId,
+          paymentMethod: ticket.paymentMethod,
+          amountXOF: result.transaction.amountXOF,
+          ticketIds: result.tickets.map((issuedTicket) => issuedTicket.id),
+        },
+      });
     }
-    recordAudit({
-      action: 'ticket_issued',
-      resource: 'ticket',
-      resourceId: txnId,
-      actorRole: 'citizen',
-      requestId,
-      success: true,
-      metadata: { eventId: primaryTicket.eventId, paymentMethod: primaryTicket.paymentMethod, amountXOF: chargedAmountXOF, ticketIds: newTickets.map((ticket) => ticket.id) },
-    });
-    res.json(responsePayload);
+
+    return res.status(httpResponse.status).json(httpResponse.body);
   } catch (error) {
-    if (reservationId && !paymentConfirmed) {
-      try {
-        await ticketInventory.release(reservationId);
-      } catch (releaseError) {
-        console.error('ticket-purchase-reservation-release-failed', {
-          reservationId,
-          errorName: releaseError instanceof Error ? releaseError.name : 'UnknownError',
-        });
-      }
-    }
     console.error('ticket-purchase-failed', {
       requestId,
       errorName: error instanceof Error ? error.name : 'UnknownError',
@@ -2450,7 +2872,9 @@ app.post('/api/tickets/purchase', async (req, res) => {
 app.get('/api/tickets/mine', requireSession, async (req, res) => {
   const context = await sessionContext(req);
   if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
-  const tickets = databaseConfigured ? await listPostgresTicketsForUser(context.userId) : [];
+  const tickets = databaseConfigured
+    ? await listPostgresTicketsForUser(context.userId)
+    : listOwnedTickets(ticketsDb.values() as Iterable<TicketForValidation>, context.userId);
   res.json({ tickets });
 });
 
@@ -3359,7 +3783,7 @@ app.post('/api/system/security/verify-token', requireRole('admin', 'business'), 
 });
 
 app.get('/robots.txt', (_req, res) => {
-  const baseUrl = (process.env.APP_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
+  const baseUrl = (runtimeConfig.appUrl || 'http://127.0.0.1:3000').replace(/\/$/, '');
   res.type('text/plain').send(`User-agent: *
 Allow: /
 Disallow: /api/
@@ -3369,7 +3793,7 @@ Sitemap: ${baseUrl}/sitemap.xml
 });
 
 app.get('/sitemap.xml', (_req, res) => {
-  const baseUrl = (process.env.APP_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
+  const baseUrl = (runtimeConfig.appUrl || 'http://127.0.0.1:3000').replace(/\/$/, '');
   res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>${baseUrl}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
@@ -3386,7 +3810,7 @@ app.get('/sw.js', (_req, res) => {
 
 async function startServer() {
   // Vite middleware in dev mode
-  if (process.env.NODE_ENV !== 'production') {
+  if (!runtimeConfig.isProduction) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       // O Express não expõe o servidor HTTP interno do Vite, logo o HMR está
@@ -3399,7 +3823,7 @@ async function startServer() {
       // Desligar a pré-otimização evita o crash; o transform on-demand continua.
       // Vite 6.4 não aceita `disabled`; usar `noDiscovery: true` em vez disso.
       optimizeDeps: {
-        include: ['pako', 'jsqr', 'qrcode', 'react-dom/client'],
+        include: ['pako', 'jsqr', 'qrcode', 'react-dom/client', 'recharts'],
         noDiscovery: true,
       },
       appType: 'spa',
@@ -3410,7 +3834,7 @@ async function startServer() {
     app.get('*', (_req, res) => {
       res.sendFile(path.join(process.cwd(), 'index.html'));
     });
-  } else if (!process.env.VERCEL) {
+  } else if (!runtimeConfig.isVercel) {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
@@ -3418,7 +3842,7 @@ async function startServer() {
     });
   }
 
-  if (process.env.VERCEL) {
+  if (runtimeConfig.isVercel) {
     return;
   }
 

@@ -96,6 +96,7 @@ export async function deliverConfirmedTicketPurchase(
           ticketIds: input.tickets.map((ticket) => ticket.id),
           ticketCodes: input.tickets.map((ticket) => ticket.ticketCode),
           eventId: input.eventId,
+          ticketDestination: 'my-tickets',
         },
         createdAt: new Date().toISOString(),
       });

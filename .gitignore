@@ -1,0 +1,22 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+.vercel
+.vercel-deploy.env
+
+.vercel
+
+# Estado de runtime e artefactos de validação (não versionar)
+data/
+backups/
+playwright-report/
+test-results/
+*.tmp
+*.out
+*.err
+
