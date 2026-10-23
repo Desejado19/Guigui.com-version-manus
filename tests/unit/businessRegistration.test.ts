@@ -20,7 +20,7 @@ process.env.SCANNER_DOOR_CODE = 'TEST-DOOR';
 
 let server: Server;
 let baseUrl: string;
-let auth: typeof import('../../server/authService');
+let auth: typeof import('../../server/modules/identity-access/infrastructure/jsonIdentityRepository');
 let businessService: typeof import('../../server/postgresBusinessService');
 
 async function register(body: Record<string, unknown>) {
@@ -48,7 +48,7 @@ function validBusinessRegistration(email: string): Record<string, unknown> {
 
 beforeAll(async () => {
   const { default: app } = await import('../../server');
-  auth = await import('../../server/authService');
+  auth = await import('../../server/modules/identity-access/infrastructure/jsonIdentityRepository');
   businessService = await import('../../server/postgresBusinessService');
 
   server = await new Promise<Server>((resolve) => {
@@ -92,8 +92,16 @@ describe('business registration', () => {
     expect(response.status).toBe(201);
     const payload = await response.json() as {
       business?: Record<string, unknown>;
-      user?: { businessId?: string };
+      user?: { id?: string; email?: string; role?: string; businessId?: string; businessName?: string; passwordHash?: string };
     };
+    expect(response.headers.get('set-cookie')).toContain('guigui_session=');
+    expect(payload.user).toMatchObject({
+      email,
+      role: 'business',
+      businessId: payload.business?.id,
+      businessName: 'Atelier Nô Pintcha',
+    });
+    expect(payload.user).not.toHaveProperty('passwordHash');
     expect(payload.business).toMatchObject({
       id: payload.user?.businessId,
       name: 'Atelier Nô Pintcha',

@@ -21,7 +21,7 @@ process.env.SCANNER_DOOR_CODE = 'TEST-DOOR';
 const password = 'CorrectHorse42';
 let server: Server;
 let baseUrl: string;
-let auth: typeof import('../../server/authService');
+let auth: typeof import('../../server/modules/identity-access/infrastructure/jsonIdentityRepository');
 let businessService: typeof import('../../server/postgresBusinessService');
 
 async function login(email: string): Promise<string> {
@@ -53,7 +53,7 @@ async function patchProfile(
 
 beforeAll(async () => {
   const { default: app } = await import('../../server');
-  auth = await import('../../server/authService');
+  auth = await import('../../server/modules/identity-access/infrastructure/jsonIdentityRepository');
   businessService = await import('../../server/postgresBusinessService');
 
   auth.createUser({

@@ -61,6 +61,18 @@ describe('createSessionAccessMiddleware', () => {
     expect(json).not.toHaveBeenCalled();
   });
 
+  it('forwards session-reader failures from requireSession to next', async () => {
+    const failure = new Error('session store unavailable');
+    const deps = { ...baseDeps, resolveContext: vi.fn().mockRejectedValue(failure) };
+    const { requireSession } = createSessionAccessMiddleware(deps);
+    const { res } = makeResponse();
+    const next = vi.fn();
+
+    await requireSession(makeRequest(), res, next);
+
+    expect(next).toHaveBeenCalledWith(failure);
+  });
+
   it('requireRole returns 401 when there is no session', async () => {
     const { requireRole } = createSessionAccessMiddleware(baseDeps);
     const { res, status, json } = makeResponse();
@@ -105,5 +117,17 @@ describe('createSessionAccessMiddleware', () => {
     expect(next).toHaveBeenCalled();
     expect(status).not.toHaveBeenCalled();
     expect(json).not.toHaveBeenCalled();
+  });
+
+  it('forwards session-reader failures from requireRole to next', async () => {
+    const failure = new Error('session store unavailable');
+    const deps = { ...baseDeps, resolveContext: vi.fn().mockRejectedValue(failure) };
+    const { requireRole } = createSessionAccessMiddleware(deps);
+    const { res } = makeResponse();
+    const next = vi.fn();
+
+    await requireRole('admin')(makeRequest(), res, next);
+
+    expect(next).toHaveBeenCalledWith(failure);
   });
 });

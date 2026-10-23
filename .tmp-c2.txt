@@ -1,0 +1,18 @@
+﻿7bc9d36 fix: validate ticket offers and inventory server-side
+ db/migrations/007_ticket_purchase_reservations.sql |  14 +
+ db/migrations/008_event_snapshot_data.sql          |   2 +
+ scripts/audit-ticket-flow.ts                       |  93 ++++++
+ server.ts                                          | 311 +++++++++++++++------
+ server/postgresBusinessService.ts                  | 187 +++++++++++++
+ server/postgresTicketService.ts                    | 258 +++++++++++++++++
+ server/ticketCatalogService.ts                     | 201 +++++++++++++
+ server/ticketInventoryService.ts                   |  97 +++++++
+ server/ticketPurchaseDomain.ts                     |  64 +++++
+ server/ticketPurchasePorts.ts                      |  21 ++
+ server/validationService.ts                        |  18 +-
+ tests/ticket-purchase-modal.spec.ts                |  24 ++
+ tests/unit/ticketInventoryService.test.ts          |  60 ++++
+ tests/unit/ticketPurchaseCatalog.test.ts           | 103 +++++++
+ tests/unit/ticketPurchaseDomain.test.ts            |  78 ++++++
+ tests/unit/validationService.test.ts               |  11 +
+ 16 files changed, 1453 insertions(+), 89 deletions(-)

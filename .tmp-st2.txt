@@ -1,0 +1,7 @@
+﻿ server.ts                                 | 498 ++++++++++++++----------------
+ server/healthService.ts                   |  15 +-
+ server/ticketPurchaseDeliveryService.ts   |   1 +
+ server/ticketPurchasePorts.ts             |   5 +
+ tests/system-health.spec.ts               |   3 +
+ tests/unit/ticketPurchaseDelivery.test.ts |   8 +-
+ 6 files changed, 248 insertions(+), 282 deletions(-)

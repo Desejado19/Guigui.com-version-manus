@@ -1,0 +1,130 @@
+﻿-    if (reservationResult !== 'reserved') {
+-      return res.status(409).json({ error: 'N├úo h├í bilhetes suficientes dispon├¡veis.', code: 'TICKET_INVENTORY_UNAVAILABLE', requestId });
+-    }
+-    reservationId = txnId;
+-
+-    const paymentAdapter = paymentAdapters[paymentMethod];
+-    const paymentIntent = await paymentAdapter.createIntent({
+-      transactionId: txnId,
+-      amountXOF: chargedAmountXOF,
+-      payerName: account.name,
+-      payerPhone: account.phone,
+-      description: `${offer.ticketTypeName} - ${offer.eventTitle} (${ticketQuantity} unidade${ticketQuantity === 1 ? '' : 's'})`,
+-      provider: paymentMethod,
+-      metadata: { eventId: offer.eventId, businessId: offer.businessId || '', ticketQuantity: String(ticketQuantity) },
++    purchaseStage = 'application-use-case';
++    const result = await executeTicketPurchase({
++      buyer: {
++        userId: purchaseSession.userId,
++        name: account.name,
++        phone: account.phone,
++        email: account.email,
++      },
++      eventId: input.eventId,
++      ticketTypeId: input.ticketTypeId,
++      quantity: input.quantity,
++      holderName: input.holderName,
++      holderPhone: input.holderPhone,
++      paymentMethod: input.paymentMethod,
++      policyAccepted: input.policyAccepted,
++      policyVersion: input.policyVersion,
++      policyAcceptedAt: input.policyAcceptedAt,
++      idempotencyKey,
++    }, {
++      catalog: { getOffer: getTicketOffer },
++      inventory: ticketInventory,
++      tickets: {
++        issue: async (_reservationId, tickets, buyerUserId) => {
++          for (const ticket of tickets) {
++            ticketsDb.set(ticket.qrToken, ticket);
++            if (ticket.pinCode) ticketsDb.set(ticket.pinCode, ticket);
++            ticketsDb.set(ticket.ticketCode, ticket);
++          }
++          await persistPostgresTickets(tickets, buyerUserId);
++          persistTickets();
++          return tickets;
++        },
++      },
++      idempotency: {
++        get: async (key) => purchaseIdempotency.get(key)?.result || null,
++        store: async (key, storedResult) => {
++          purchaseIdempotency.set(key, { createdAt: Date.now(), result: storedResult });
++        },
++      },
++      payments: paymentAdapters,
++      ticketFactory: ({ offer: ticketOffer, buyer, quantity, holderName, holderPhone, paymentMethod: method, purchasedAt }) => (
++        Array.from({ length: quantity }, (_, index) => {
++          const { ticketCode, qrToken, pinCode } = generateTicketIdentifiers();
++          const ticket: TicketForValidation = {
++            id: `TKT-${Date.now()}-${index + 1}-${randomBytes(2).toString('hex').toUpperCase()}`,
++            ticketCode,
++            ticketTypeId: ticketOffer.ticketTypeId,
++            buyerUserId: buyer.userId,
++            eventId: ticketOffer.eventId,
++            ...(ticketOffer.businessId ? { businessId: ticketOffer.businessId } : {}),
++            eventTitle: ticketOffer.eventTitle,
++            ticketTypeName: ticketOffer.ticketTypeName,
++            priceXOF: ticketOffer.unitPriceXOF,
++            buyerName: buyer.name,
++            buyerPhone: buyer.phone,
++            ...(holderName && holderPhone ? { holderName, holderPhone } : {}),
++            qrToken,
++            pinCode,
++            status: 'valid',
++            purchasedAt,
++            expiresAt: calculateTicketExpiry(ticketOffer.eventDate, ticketOffer.eventTime),
++            paymentMethod: method,
++          };
++          if (ticketSigningSecret) ticket.signature = signTicket(ticket, ticketSigningSecret);
++          return ticket;
++        })
++      ),
++      transactions: {
++        persist: async (transaction) => {
++          const existingIndex = paymentTransactions.findIndex((item) => item.id === transaction.id);
++          if (existingIndex === -1) paymentTransactions.push(transaction);
++          else paymentTransactions[existingIndex] = transaction;
++          persistPayments();
++        },
++        recordFulfillment: async (transaction) => {
++          recordMonetizationFulfillment(transaction);
++        },
++      },
++      delivery: (deliveryInput) => deliverConfirmedTicketPurchase(deliveryInput, { email: emailDelivery, sms: smsDelivery }),
++      catalogSettings: normaliseMonetizationCatalog(monetizationCatalogStore),
++      createTransactionId: () => `TXN-${Date.now()}-${randomBytes(3).toString('hex').toUpperCase()}`,
++      reservationTtlMs: TICKET_RESERVATION_TTL_MS,
++      now: () => new Date(),
+     });
+-    paymentConfirmed = paymentIntent.state === 'confirmed';
+-
+-    const purchaseTimestamp = new Date().toISOString();
+-    const newTickets: TicketForValidation[] = paymentConfirmed ? Array.from({ length: ticketQuantity }, (_, index) => {
+-      const { ticketCode, qrToken, pinCode } = generateTicketIdentifiers();
+-      const ticket: TicketForValidation = {
+-        id: `TKT-${Date.now()}-${index + 1}-${randomBytes(2).toString('hex').toUpperCase()}`,
+-        ticketCode,
+-        ticketTypeId: offer.ticketTypeId,
+-        buyerUserId: purchaseSession.userId,
+-        eventId: offer.eventId,
+-        ...(offer.businessId ? { businessId: offer.businessId } : {}),
+-        eventTitle: offer.eventTitle,
+-        ticketTypeName: offer.ticketTypeName,
+-        priceXOF: offer.unitPriceXOF,
+-        buyerName: account.name,
+-        buyerPhone: account.phone,
+-        ...(holderName && holderPhone ? { holderName, holderPhone } : {}),
+-        qrToken,
+-        pinCode,
+-        status: 'valid',
+-        purchasedAt: purchaseTimestamp,
+-        expiresAt: calculateTicketExpiry(offer.eventDate, offer.eventTime),
+-        paymentMethod,
+-      };
+-      if (ticketSigningSecret) ticket.signature = signTicket(ticket, ticketSigningSecret);
+-      return ticket;
+-    }) : [];
+-    const primaryTicket = newTickets[0];
+-
+-    const paymentTimestamp = new Date().toISOString().replace('T', ' ').substring(0, 16);
+-    const newTxn = {

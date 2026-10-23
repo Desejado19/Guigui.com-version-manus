@@ -1,0 +1,96 @@
+﻿- [ ] **Step 1: Add failing receipt tests**
+
+Update the browser purchase test to assert that a confirmed receipt displays the server transaction reference, event/category, all tickets, authoritative itemized total, and simulated-payment status. Add assertions that the displayed total does not come from stale modal state after selecting a different category or quantity. Keep the pending test asserting that it shows no success receipt.
+
+- [ ] **Step 2: Run the focused browser test and confirm expected failures**
+
+Run: `npx playwright test tests/ticket-purchase-modal.spec.ts`
+
+Expected: FAIL only on missing/stale receipt data; existing pending and modal-layer tests continue to pass.
+
+- [ ] **Step 3: Implement receipt state from the API response**
+
+Store the authoritative response data separately from checkout form state. Render transaction reference, ticket subtotal, platform-fee allocation, buyer total, tickets, and truthful simulation statuses from that state; do not recalculate the receipt total from the currently selected event type or quantity.
+
+- [ ] **Step 4: Verify responsive and accessible receipt behavior**
+
+Run: `npx playwright test tests/ticket-purchase-modal.spec.ts`
+
+Expected: PASS at 320, 768, 1024, and 1440 pixel widths, with visible first content, keyboard focus containment, clear pending/confirmed distinction, and no horizontal overflow.
+
+- [ ] **Step 5: Commit**
+
+```powershell
+git add src/components/TicketPurchaseModal.tsx src/components/EventsView.tsx src/index.css tests/ticket-purchase-modal.spec.ts
+git commit -m "fix: show authoritative ticket purchase receipt" -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+```
+
+## Task 3: Persist Tickets in the Account and Show Purchase Notifications
+
+**Files:**
+- Modify: `server.ts`
+- Modify: `server/postgresTicketService.ts`
+- Modify: `server/ticketPurchaseDeliveryService.ts` only if a verified gap remains.
+- Modify: `src/components/MyTicketsPanel.tsx` only if needed to refresh or present the account ticket state.
+- Modify: `src/App.tsx` and `src/services/notificationService.ts` only if the existing transaction-keyed notification does not appear for the buyer.
+- Test: `tests/unit/ticketPurchaseDelivery.test.ts`
+- Test: `tests/unit/ticketPurchaseNotification.test.ts`
+- Test: `tests/ticket-purchase-modal.spec.ts`
+
+**Interfaces:**
+- Consumes the confirmed purchase response and authenticated session identity.
+- Produces `GET /api/tickets/mine` results for the authenticated buyer from PostgreSQL or the local simulation ticket store.
+- Preserves the stable internal notification identifier `notif-ticket-${transactionId}` so local and server copies merge rather than duplicate.
+- Keeps email/SMS return states `simulated`, `failed`, or `unavailable`; none may claim sent/delivered.
+
+- [x] **Step 1: Add failing ticket-account and notification regressions**
+
+Add a test for a confirmed simulated purchase without PostgreSQL: tickets are associated with the account, returned by `/api/tickets/mine`, and do not leak to another account. Extend the notification test to assert the ticket destination metadata and stable transaction-derived ID. Extend the browser flow to show the buyer's account notification and tickets after purchase.
+
+- [x] **Step 2: Run focused tests and confirm expected failures**
+
+Run: `npx vitest run tests/unit/ticketPurchaseDelivery.test.ts tests/unit/ticketPurchaseNotification.test.ts`
+
+Expected: FAIL for missing local ticket-account visibility or notification destination behavior; existing transport-isolation assertions remain unchanged.
+
+- [x] **Step 3: Persist the account relationship and return owned tickets**
+
+Attach the authenticated buyer ID to each confirmed ticket record. Keep PostgreSQL as the durable source when configured; in local simulation, store the owner association with the server-managed ticket JSON and make `/api/tickets/mine` filter by the session user. Deduplicate ticket-map aliases by ticket ID before returning results.
+
+- [x] **Step 4: Verify independent notification and delivery outcomes**
+
+Ensure the purchase notification is persisted with transaction, event, ticket ID(s), and a route to â€œMeus bilhetesâ€. Keep notification, email, and SMS attempts independent; failures return their own state and do not change issued tickets or suppress remaining delivery attempts. Logs and response objects must not include PINs, message bodies, or recipient PII.
+
+- [x] **Step 5: Run focused regressions**
+
+The authenticated API integration was run against a fresh, isolated simulation-only server. After explicit authorization, `npm run db:migrate` applied all 10 SQL files to the configured local PostgreSQL database. The new `ticket_reservations` table (8 columns) and its active-inventory index were verified, and `/api/health` reports the database connected. No PostgreSQL-backed purchase was submitted during migration verification; payment, email, and SMS integrations remain simulated.
+
+Migration caveat: `003_reviews_schema.sql` backfills legacy reviews with generated IDs, so rerunning the all-files migration script can duplicate those rows if legacy review arrays exist. The pre-migration database had zero such arrays; do not rerun the script against legacy review data until that backfill is made idempotent.
+
+Commit deferred for the same worktree-safety reason noted in Task 4: several required source files are pre-existing untracked content and cannot be staged as a precise task diff.
+
+Run: `npx vitest run tests/unit/ticketPurchaseDelivery.test.ts tests/unit/ticketPurchaseNotification.test.ts`
+
+Run: `npx playwright test tests/ticket-purchase-modal.spec.ts`
+
+Expected: PASS; every confirmed ticket is visible only to its buyer, the account notification is stable and actionable, and simulated email/SMS explicitly say not sent.
+
+```powershell
+git add server.ts server/postgresTicketService.ts server/ticketPurchaseDeliveryService.ts src/components/MyTicketsPanel.tsx src/App.tsx src/services/notificationService.ts tests/unit/ticketPurchaseDelivery.test.ts tests/unit/ticketPurchaseNotification.test.ts tests/ticket-purchase-modal.spec.ts
+git commit -m "fix: deliver confirmed tickets to buyer accounts" -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+```
+
+## Task 4: Isolate the Purchase Use Case Behind DDD Ports
+
+**Files:**
+- Create: `server/ticketPurchaseUseCase.ts`
+- Modify: `server.ts`
+- Modify: `server/ticketPurchaseDomain.ts`
+- Modify: `server/ticketCatalogService.ts`
+- Modify: `tests/unit/ticketPurchaseUseCase.test.ts`
+- Verify: `tests/unit/simulatedAdapters.test.ts`, `tests/unit/ticketPurchaseDelivery.test.ts`
+
+**Interfaces:**
+- Produces `executeTicketPurchase(command, ports): Promise<TicketPurchaseResult>` as the application use case called by the Express route.
+- `command` contains authenticated buyer identity, event ID, ticket type ID, quantity, validated holder/contact data, accepted policy version/time, payment method, and optional idempotency key; it does not accept client-authoritative price, event title, category name, or fees.
+- `ports` contain `TicketCatalogPort`, `TicketInventoryPort`, `TicketRepositoryPort`, `TicketPurchaseIdempotencyPort`, the payment adapter, and post-confirmation delivery dependencies. `TicketPurchaseIdempotencyPort` exposes `get(key: string): Promise<TicketPurchaseResult | null>` and `store(key: string, result: TicketPurchaseResult): Promise<void>`. `TicketRepositoryPort` exposes `issue(reservationId: string, tickets: TicketForValidation[], buyerUserId: string): Promise<TicketForValidation[]>`. Reuse `PaymentProviderAdapter`, `EmailDeliveryPort`, and `SmsDeliveryPort`; do not create parallel provider abstractions.

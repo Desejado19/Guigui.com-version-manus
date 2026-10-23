@@ -22,19 +22,7 @@ O público desta fatia é a equipa que desenvolve, testa e opera a aplicação l
 
 ## Mapa de capacidades
 
-Os identificadores abaixo são estáveis para a iniciativa. As dependências descrevem contratos publicados, não autorização para importar modelos ou persistência interna de outro contexto.
-
-| Módulo | Responsabilidade | Depende de |
-|---|---|---|
-| `platform-foundation` | Inicialização, configuração, saúde, persistência e contratos comuns | — |
-| `identity-access` | Contas, sessões e autorização | `platform-foundation` |
-| `business-discovery` | Empresas, diretório, feed, ofertas e avaliações | `platform-foundation`, `identity-access` |
-| `payments-monetization` | Pagamentos, subscrições, taxas, reconciliação e reembolsos | `platform-foundation`, `identity-access` |
-| `events-ticketing` | Eventos, inventário, reservas, bilhetes e scanner | `platform-foundation`, `identity-access`, `business-discovery`, `payments-monetization` |
-| `communication-support` | Mensagens, suporte e notificações | `platform-foundation`, `identity-access`, `business-discovery`, `events-ticketing` |
-| `governance-operations` | Moderação, auditoria, operação e relatórios administrativos | Contratos publicados pelos módulos anteriores |
-
-Ordem de evolução: `platform-foundation` → `identity-access` → `business-discovery` → `payments-monetization` → `events-ticketing` → `communication-support` → `governance-operations`.
+O mapa de módulos e dependências vigente para a iniciativa está em [`CAPABILITY-MAP.md`](../../../CAPABILITY-MAP.md). Esse mapa atualiza esta proposta inicial e é a fonte canónica para a ordem e as dependências aprovadas.
 
 O trabalho imediato cobre apenas `platform-foundation`. A ordem posterior orienta especificações próprias e não constitui autorização para uma reescrita dos restantes módulos.
 

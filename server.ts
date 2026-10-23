@@ -16,20 +16,26 @@ import {
   validateUserIdentity,
   validateTicketForEntry,
 } from './server/validationService';
-import { acceptTeamInvitation, changeDemoPassword, changeUserPassword, createPasswordReset, createTeamInvitation, createUser, deactivateUserAccount, deleteUserAccount, findUserByEmail, findUserById, inspectTeamInvitation, resetPassword, toPublicUser, verifyDemoPassword, verifyPassword, PublicUser } from './server/authService';
+import {
+  createIdentityAccess,
+  createSessionAccessMiddleware,
+  resolveSessionContext,
+  SESSION_COOKIE_NAME,
+  type BusinessTeamPermissions,
+  type BusinessTeamRole,
+  type IdentityAccess,
+  type PublicIdentity,
+} from './server/modules/identity-access';
 import { loadJson, saveJson } from './server/runtimeStore';
 import { createPaymentAdapters } from './server/paymentService';
 import { localizeApiPayload, resolveRequestLanguage } from './server/i18n';
 import { LANGUAGE_CYCLE } from './src/utils/i18n';
 import { getBusinessProfileCompletion } from './src/utils/businessProfile';
 import { addSubscriptionPeriod } from './src/utils/subscriptions';
-import { createSession, getSession, revokeAllUserSessions, revokeSession, SESSION_COOKIE_NAME } from './server/sessionService';
 import { checkDatabaseConnection, databaseConfigured, databasePool } from './server/db';
 import { createHealthHandler } from './server/modules/platform-foundation/http/healthHandler';
 import { loadPlatformRuntimeConfig } from './server/modules/platform-foundation/config/platformRuntimeConfig';
-import { createSessionAccessMiddleware } from './server/modules/identity-access/http/sessionAccessMiddleware';
-import { resolveSessionContext } from './server/modules/identity-access/application/resolveSessionContext';
-import { changePostgresUserPassword, createPostgresUser, deactivatePostgresUser, deletePostgresUser, findPostgresUserByEmail, findPostgresUserById } from './server/postgresAuthService';
+import { BUSINESS_ROLE_PERMISSIONS } from './src/utils/businessPermissions';
 import { activatePostgresTicketReservations, findPostgresTicket, listPostgresTicketsForUser, markPostgresTicketUsed, persistPostgresTickets, releaseExpiredPostgresTicketReservations } from './server/postgresTicketService';
 import { listPostgresTicketsForCompany } from './server/postgresTicketLifecycleService';
 import { buildOfflineManifest, syncOfflineValidations, type OfflineValidationRecord } from './server/offlineScannerService';
@@ -43,7 +49,6 @@ import { createPostgresReview, flagPostgresReview, isReviewAllowed, listPostgres
 import { normaliseReviewComment, validateReviewInput } from './src/utils/reviews';
 import { assignPostgresBusinessOwner, decidePostgresBusiness, deletePostgresBusiness, getAppState, InvalidFeaturedBusinessOrderError, listPendingPostgresBusinesses, listPostgresBusinesses, listPostgresEvents, persistPostgresBusiness, persistPostgresEvent, setAppState, setPostgresBusinessFeaturedOrder, updatePostgresBusinessProfile } from './server/postgresBusinessService';
 
-import { beginMfaSetup, enableMfa, hasEnabledMfa, verifyUserMfa } from './server/mfaService';
 import { consumeDistributedRateLimit } from './server/rateLimitService';
 import { createPostgresObservabilityRepository } from './server/modules/platform-foundation/observability/adapters/postgresObservabilityRepository';
 import { createObservabilityHandlers } from './server/modules/platform-foundation/observability/http/observabilityHandlers';
@@ -381,9 +386,33 @@ function clearSessionCookie(res: express.Response) {
   res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
 }
 
+function sameBusinessTeamPermissions(
+  permissions: BusinessTeamPermissions | undefined,
+  expected: BusinessTeamPermissions,
+): boolean {
+  return Boolean(
+    permissions
+    && permissions.profile === expected.profile
+    && permissions.content === expected.content
+    && permissions.events === expected.events
+    && permissions.tickets === expected.tickets
+    && permissions.billing === expected.billing,
+  );
+}
+
+function isBusinessTeamPermissions(value: unknown): value is BusinessTeamPermissions {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const permissions = value as Record<string, unknown>;
+  const keys = ['profile', 'content', 'events', 'tickets', 'billing'];
+  return Object.keys(permissions).length === keys.length
+    && keys.every((key) => typeof permissions[key] === 'boolean');
+}
+
+let identityAccess!: IdentityAccess;
+
 const { sessionContext, requireSession, requireRole } = createSessionAccessMiddleware({
   resolveContext: (req) =>
-    resolveSessionContext(sessionTokenFromRequest(req), { getSession }),
+    resolveSessionContext(sessionTokenFromRequest(req), identityAccess),
   requestIdFrom: (req) => requestIdFrom(req),
   onAuthorizationDenied: (audit) => {
     recordAudit({
@@ -509,7 +538,7 @@ app.post('/api/marketing/campaigns', requireRole('business'), async (req, res) =
   if (!context || !campaign?.id || !campaign?.businessId || !campaign?.name) {
     return res.status(400).json({ error: 'id, businessId e name são obrigatórios.' });
   }
-  const storedUser = databaseConfigured ? await findPostgresUserById(context.userId) : findUserById(context.userId) || undefined;
+  const storedUser = await identityAccess.findById(context.userId) || undefined;
   if (!storedUser?.businessId || storedUser.businessId !== String(campaign.businessId)) {
     return res.status(403).json({ error: 'A campanha não pertence à empresa autenticada.' });
   }
@@ -562,7 +591,7 @@ app.post('/api/marketing/promotions', requireRole('business'), async (req, res) 
   if (!context || !promotion?.id || !promotion?.businessId || !promotion?.title) {
     return res.status(400).json({ error: 'id, businessId e title são obrigatórios.' });
   }
-  const storedUser = databaseConfigured ? await findPostgresUserById(context.userId) : findUserById(context.userId) || undefined;
+  const storedUser = await identityAccess.findById(context.userId) || undefined;
   if (!storedUser?.businessId || storedUser.businessId !== String(promotion.businessId)) {
     return res.status(403).json({ error: 'A promoção não pertence à empresa autenticada.' });
   }
@@ -622,7 +651,7 @@ app.post('/api/marketing/promotions', requireRole('business'), async (req, res) 
     const row = result.rows[0] as { business_id: string; payload: Record<string, unknown> } | undefined;
     if (!row) return res.status(404).json({ error: 'Campanha não encontrada.' });
 
-    const storedUser = databaseConfigured ? await findPostgresUserById(context.userId) : findUserById(context.userId) || undefined;
+    const storedUser = await identityAccess.findById(context.userId) || undefined;
     if (!storedUser?.businessId || storedUser.businessId !== String(row.business_id)) {
       return res.status(403).json({ error: 'A campanha não pertence à empresa autenticada.' });
     }
@@ -772,9 +801,7 @@ app.post('/api/app-state/:key', requireSession, async (req, res) => {
     // não lhe pertencem, para que não possa apagar concorrentes nem reescrever
     // o catálogo de preços da plataforma.
     if (context.role === 'business') {
-      const storedBusinessUser = databaseConfigured
-        ? await findPostgresUserById(context.userId)
-        : findUserById(context.userId) || undefined;
+      const storedBusinessUser = await identityAccess.findById(context.userId) || undefined;
       const stored = await getAppState(key);
       const valueDecision = resolveAppStateValue(context.role, key, storedBusinessUser?.businessId, incoming, stored);
       if (valueDecision.allowed === false) {
@@ -1332,7 +1359,7 @@ app.patch('/api/businesses/:id/profile', requireRole('business', 'admin'), async
 
   try {
     const storedBusinessUser = context.role === 'business'
-      ? (databaseConfigured ? await findPostgresUserById(context.userId) : findUserById(context.userId) || undefined)
+      ? (await identityAccess.findById(context.userId) || undefined)
       : null;
     const decision = resolveBusinessWrite(context.role, storedBusinessUser?.businessId, req.params.id);
     if (decision.allowed === false) {
@@ -1379,7 +1406,7 @@ app.post('/api/businesses', requireSession, async (req, res) => {
   // gravar a ficha a que está associada, impedindo criação ou sequestro de fichas.
   const targetBusinessId = String(context.role === 'admin' ? business.id : (business.businessId || business.id));
   const storedBusinessUser = context.role === 'business'
-    ? (databaseConfigured ? await findPostgresUserById(context.userId) : findUserById(context.userId) || undefined)
+    ? (await identityAccess.findById(context.userId) || undefined)
     : null;
   const decision = resolveBusinessWrite(context.role, storedBusinessUser?.businessId, targetBusinessId);
   if (decision.allowed === false) {
@@ -1451,7 +1478,7 @@ app.post('/api/events', requireSession, async (req, res) => {
   // Um evento é sempre propriedade da empresa organizadora: o businessId vem da
   // sessão, nunca do corpo do pedido, para impedir eventos em nome de terceiros.
   const storedBusinessUser = context.role === 'business'
-    ? (databaseConfigured ? await findPostgresUserById(context.userId) : findUserById(context.userId) || undefined)
+    ? (await identityAccess.findById(context.userId) || undefined)
     : null;
   // Uma empresa fica sempre ligada à sua própria conta; a administração pode
   // indicar a empresa organizadora, porque gere o conjunto da plataforma.
@@ -1562,63 +1589,103 @@ app.post('/api/monetization/requests', requireRole('business'), (req, res) => {
 });
 app.get('/api/monetization/wallet/:businessId', requireRole('admin', 'business'), (req, res) => res.json(monetizationWallets[req.params.businessId] || { postsExtraPurchased: 0, promotionsExtraPurchased: 0, postsExtraUsed: 0, promotionsExtraUsed: 0 }));
 
-const demoUsers: Array<PublicUser & { password: string }> = [
+const demoUsers: Array<PublicIdentity & { password: string }> = [
   { id: 'demo-citizen', name: 'Malam Bacar', email: 'cidadao.teste@guigui.com', role: 'user', phone: '+245 955 12 34', neighborhood: 'Bissau Velho', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80', password: 'Guigui@2026!' },
   { id: 'demo-business', name: 'Coqueiros Bissau', email: 'empresa.teste@guigui.com', role: 'business', phone: '+245 955 88 99', neighborhood: 'Praça dos Heróis', avatarUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=200&q=80', businessId: 'biz-1', businessName: 'Coqueiros Bissau', password: 'Guigui@2026!' },
   { id: 'demo-admin', name: 'Administração Guigui', email: 'admin.teste@guigui.com', role: 'admin', phone: '+245 955 00 00', neighborhood: 'Centro Administrativo', avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80', password: 'Guigui@2026!' },
 ];
 
-function findDemoUserById(userId: string): PublicUser | undefined {
+function findDemoUserById(userId: string): PublicIdentity | undefined {
   const demo = demoUsers.find((user) => user.id === userId);
   if (!demo) return undefined;
   const { password: _password, ...publicUser } = demo;
   return publicUser;
 }
 
+identityAccess = createIdentityAccess({
+  databaseConfigured,
+  demoAccountsEnabled,
+  demoUsers,
+  businessProvisioning: {
+    validateProfile: (profile) => ({
+      missingFields: getBusinessProfileCompletion(profile).missingFields,
+    }),
+    createProfile: async (profile) => {
+      await persistPostgresBusiness({
+        id: profile.id,
+        name: profile.name,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        categoryId: profile.categoryId,
+        data: {
+          categoryId: profile.categoryId,
+          groupGroupId: profile.groupGroupId,
+          subcategoryId: profile.subcategoryId,
+          description: profile.description,
+          phone: profile.phone,
+          neighborhood: profile.neighborhood,
+          ...(profile.publicEmail ? { publicEmail: profile.publicEmail } : {}),
+        },
+      });
+      return { id: profile.id };
+    },
+    assignOwner: assignPostgresBusinessOwner,
+    deleteProfile: deletePostgresBusiness,
+  },
+  createBusinessInvitationAccess: ({ findInviterById, findInvitedMemberById }) => ({
+    validate: async (input) => {
+      const inviter = await findInviterById(input.inviterUserId);
+      if (!inviter || inviter.role !== 'business' || inviter.businessId !== input.businessId) return null;
+      if (inviter.teamRole) {
+        const canonicalInviterPermissions = BUSINESS_ROLE_PERMISSIONS[inviter.teamRole];
+        if (!sameBusinessTeamPermissions(inviter.teamPermissions, canonicalInviterPermissions) || !canonicalInviterPermissions.profile) return null;
+      } else if (inviter.teamPermissions) {
+        return null;
+      }
+      return { role: input.role, permissions: { ...BUSINESS_ROLE_PERMISSIONS[input.role] } };
+    },
+    addMember: async (input) => {
+      const member = await findInvitedMemberById(input.userId);
+      const canonicalPermissions = BUSINESS_ROLE_PERMISSIONS[input.role];
+      return Boolean(
+        member
+        && member.role === 'business'
+        && member.businessId === input.businessId
+        && member.teamRole === input.role
+        && sameBusinessTeamPermissions(member.teamPermissions, canonicalPermissions)
+        && sameBusinessTeamPermissions(input.permissions, canonicalPermissions),
+      );
+    },
+  }),
+});
+
 app.post('/api/auth/login', async (req, res) => {
   const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   if (!email || password.length < 6) return res.status(400).json({ error: 'Indique um e-mail e uma palavra-passe válida.' });
 
-  const stored = databaseConfigured ? await findPostgresUserByEmail(email) : findUserByEmail(email);
-  if (stored?.accountStatus === 'deactivated') return res.status(403).json({ error: 'Esta conta está desativada. Contacte o suporte para reativá-la.' });
-  if (stored && verifyPassword(password, stored.passwordHash)) {
-    if (stored.role === 'admin' && await hasEnabledMfa(stored.id)) {
-      const mfaCode = typeof req.body?.mfaCode === 'string' ? req.body.mfaCode : '';
-      if (!mfaCode) return res.status(401).json({ error: 'Código MFA obrigatório.', code: 'MFA_REQUIRED' });
-      if (!await verifyUserMfa(stored.id, mfaCode)) return res.status(401).json({ error: 'Código MFA inválido ou já utilizado.', code: 'MFA_INVALID' });
-    }
-    setSessionCookie(res, await createSession({ userId: stored.id, role: stored.role, ipAddress: req.ip, userAgent: req.get('user-agent') }));
-    return res.json({ success: true, user: toPublicUser(stored) });
+  const result = await identityAccess.authenticate({
+    email,
+    password,
+    mfaCode: typeof req.body?.mfaCode === 'string' ? req.body.mfaCode : undefined,
+    ipAddress: req.ip,
+    userAgent: req.get('user-agent'),
+  });
+  if (result.kind === 'rejected') {
+    if (result.reason === 'deactivated') return res.status(403).json({ error: 'Esta conta está desativada. Contacte o suporte para reativá-la.' });
+    if (result.reason === 'mfa_required') return res.status(401).json({ error: 'Código MFA obrigatório.', code: 'MFA_REQUIRED' });
+    if (result.reason === 'mfa_invalid') return res.status(401).json({ error: 'Código MFA inválido ou já utilizado.', code: 'MFA_INVALID' });
+    return res.status(401).json({ error: 'E-mail ou palavra-passe incorretos.' });
   }
-  const demo = demoAccountsEnabled ? demoUsers.find((user) => user.email === email && verifyDemoPassword(user.email, password, user.password)) : undefined;
-  if (demo) {
-    const { password: _password, ...user } = demo;
-    const databaseUser = databaseConfigured
-      ? await createPostgresUser({
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-          neighborhood: user.neighborhood,
-          role: user.role,
-          avatarUrl: user.avatarUrl,
-          password,
-          ...(user.businessId ? { businessId: user.businessId } : {}),
-          ...(user.businessName ? { businessName: user.businessName } : {}),
-        }) || await findPostgresUserByEmail(user.email)
-      : null;
-    const sessionUser = databaseUser ? { ...user, ...toPublicUser(databaseUser) } : user;
-    setSessionCookie(res, await createSession({ userId: sessionUser.id, role: sessionUser.role, ipAddress: req.ip, userAgent: req.get('user-agent') }));
-    return res.json({ success: true, user: sessionUser });
-  }
-  res.status(401).json({ error: 'E-mail ou palavra-passe incorretos.' });
+  setSessionCookie(res, result.sessionToken);
+  res.json({ success: true, user: result.user });
 });
 
 app.post('/api/auth/mfa/setup', requireRole('admin'), async (req, res) => {
   const context = await sessionContext(req);
   if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
   const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : 'admin.teste@guigui.com';
-  const setup = await beginMfaSetup(context.userId, email);
+  const setup = await identityAccess.beginMfaSetup(context.userId, email);
   res.json({ success: true, ...setup, warning: 'Guarde o segredo apenas para concluir a configuração. Nunca o publique.' });
 });
 
@@ -1626,14 +1693,14 @@ app.post('/api/auth/mfa/enable', requireRole('admin'), async (req, res) => {
   const context = await sessionContext(req);
   if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
   const code = typeof req.body?.code === 'string' ? req.body.code : '';
-  if (!await enableMfa(context.userId, code)) return res.status(400).json({ error: 'Código MFA inválido.', code: 'MFA_INVALID' });
+  if (!await identityAccess.enableMfa(context.userId, code)) return res.status(400).json({ error: 'Código MFA inválido.', code: 'MFA_INVALID' });
   recordAudit({ action: 'mfa_enabled', resource: 'user', resourceId: context.userId, actorRole: 'admin', requestId: requestIdFrom(req), success: true });
   res.json({ success: true });
 });
 
 app.post('/api/auth/logout', async (req, res) => {
   const token = sessionTokenFromRequest(req);
-  const revoked = await revokeSession(token);
+  const revoked = await identityAccess.logout(token);
   clearSessionCookie(res);
   res.json({ success: true, revoked });
 });
@@ -1641,19 +1708,21 @@ app.post('/api/auth/logout', async (req, res) => {
 app.post('/api/auth/sessions/revoke-all', requireSession, async (req, res) => {
   const context = await sessionContext(req);
   if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
-  const revoked = await revokeAllUserSessions(context.userId);
+  const revoked = await identityAccess.revokeAllSessions(context.userId);
   clearSessionCookie(res);
   recordAudit({ action: 'sessions_revoked_all', resource: 'session', actorRole: context.role === 'user' ? 'citizen' : context.role, requestId: requestIdFrom(req), success: true, metadata: { revoked } });
   res.json({ success: true, revoked });
 });
 
 app.get('/api/auth/session', async (req, res) => {
-  const session = await getSession(sessionTokenFromRequest(req));
+  const session = await identityAccess.getSession(sessionTokenFromRequest(req));
   res.json({ authenticated: Boolean(session && session.role), ...(session && session.role ? { userId: session.userId, role: session.role, expiresAt: session.expiresAt } : {}) });
 });
 
 app.post('/api/business/team/invitations', requireRole('business'), async (req, res) => {
   const { recipientEmail, recipientName, businessId, businessName, role, permissions, roleLabel, token } = req.body || {};
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
   if (
     typeof recipientEmail !== 'string'
     || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())
@@ -1661,7 +1730,7 @@ app.post('/api/business/team/invitations', requireRole('business'), async (req, 
     || typeof businessName !== 'string'
     || typeof businessId !== 'string'
     || !['manager', 'editor', 'finance', 'support'].includes(role)
-    || !permissions || typeof permissions !== 'object'
+    || !isBusinessTeamPermissions(permissions)
     || typeof roleLabel !== 'string'
     || typeof token !== 'string'
     || token.trim().length < 32
@@ -1669,7 +1738,22 @@ app.post('/api/business/team/invitations', requireRole('business'), async (req, 
     return res.status(400).json({ error: 'Dados do convite inválidos.', code: 'INVALID_TEAM_INVITATION' });
   }
   try {
-    createTeamInvitation({ email: recipientEmail, name: recipientName, businessId, businessName, role, permissions }, token);
+    const invitationResult = await identityAccess.createTeamInvitation({
+      inviterUserId: context.userId,
+      email: recipientEmail,
+      name: recipientName,
+      businessId,
+      businessName,
+      role: role as BusinessTeamRole,
+      permissions,
+      token: token.trim(),
+    });
+    if (invitationResult.kind === 'forbidden') {
+      return res.status(403).json({
+        error: 'Não tem permissão para convidar membros para esta empresa.',
+        code: 'BUSINESS_INVITATION_FORBIDDEN',
+      });
+    }
     const delivery = await emailDelivery.sendTeamInvitation({
       invitationId: randomUUID(),
       recipientEmail: recipientEmail.trim().toLowerCase(),
@@ -1693,20 +1777,30 @@ app.post('/api/business/team/invitations', requireRole('business'), async (req, 
   }
 });
 
-app.get('/api/business/team/invitations/:token', (req, res) => {
-  const invitation = inspectTeamInvitation(req.params.token);
+app.get('/api/business/team/invitations/:token', async (req, res) => {
+  const invitation = await identityAccess.inspectTeamInvitation(req.params.token);
   if (!invitation) return res.status(404).json({ error: 'Convite inválido, expirado ou já utilizado.', code: 'INVALID_TEAM_INVITATION' });
   res.json({ invitation });
 });
 
-app.post('/api/business/team/invitations/accept', (req, res) => {
+app.post('/api/business/team/invitations/accept', async (req, res) => {
   const { token, password, phone, neighborhood } = req.body || {};
   if (typeof token !== 'string' || typeof password !== 'string' || password.length < 6) {
     return res.status(400).json({ error: 'O convite e uma palavra-passe com pelo menos 6 caracteres são obrigatórios.', code: 'INVALID_TEAM_ACCEPTANCE' });
   }
-  const user = acceptTeamInvitation(token, password, typeof phone === 'string' ? phone : '', typeof neighborhood === 'string' ? neighborhood : 'Bissau');
-  if (!user) return res.status(409).json({ error: 'Convite inválido, expirado, já utilizado ou e-mail já registado.', code: 'TEAM_INVITATION_UNAVAILABLE' });
-  res.status(201).json({ success: true, user: toPublicUser(user) });
+  const result = await identityAccess.acceptTeamInvitation({
+    token,
+    password,
+    phone: typeof phone === 'string' ? phone : '',
+    neighborhood: typeof neighborhood === 'string' ? neighborhood : 'Bissau',
+  });
+  if (result.kind === 'unavailable') {
+    return res.status(409).json({ error: 'Convite inválido, expirado, já utilizado ou e-mail já registado.', code: 'TEAM_INVITATION_UNAVAILABLE' });
+  }
+  if (result.kind === 'association_failed') {
+    return res.status(409).json({ error: 'Não foi possível associar a conta à equipa empresarial.', code: 'TEAM_INVITATION_ASSOCIATION_FAILED' });
+  }
+  res.status(201).json({ success: true, user: result.user });
 });
 
 app.post('/api/auth/change-password', async (req, res) => {
@@ -1716,9 +1810,7 @@ app.post('/api/auth/change-password', async (req, res) => {
   if (!email || currentPassword.length < 6 || newPassword.length < 6) {
     return res.status(400).json({ error: 'Indique a conta e passwords com pelo menos 6 carateres.' });
   }
-  const updated = databaseConfigured
-    ? await changePostgresUserPassword(email, currentPassword, newPassword)
-    : changeUserPassword(email, currentPassword, newPassword) || changeDemoPassword(email, currentPassword, newPassword);
+  const updated = await identityAccess.changePassword({ email, currentPassword, newPassword });
   if (!updated) return res.status(401).json({ error: 'A palavra-passe actual não corresponde à conta.' });
   res.json({ success: true, message: 'Palavra-passe actualizada com sucesso.' });
 });
@@ -1729,18 +1821,18 @@ app.post('/api/account/deactivate', requireSession, async (req, res) => {
   if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
   const currentPassword = typeof req.body?.currentPassword === 'string' ? req.body.currentPassword : '';
   if (!currentPassword) return res.status(400).json({ error: 'Confirme a palavra-passe atual.' });
-  const stored = databaseConfigured ? await findPostgresUserById(context.userId) : findUserById(context.userId) || undefined;
-  if (!stored) return res.status(404).json({ error: 'Conta não encontrada no backend.' });
-  const requestedEmail = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-  if (requestedEmail && requestedEmail !== stored.email.toLowerCase()) {
-    recordAudit({ action: 'account_deactivation_denied', resource: 'user', resourceId: context.userId, actorRole: context.role === 'user' ? 'citizen' : context.role, requestId, success: false, metadata: { reason: 'session_account_mismatch' } });
-    return res.status(403).json({ error: 'A operação deve ser executada na conta autenticada.', code: 'ACCOUNT_IDENTITY_MISMATCH' });
-  }
-  if (!verifyPassword(currentPassword, stored.passwordHash)) return res.status(401).json({ error: 'A palavra-passe atual não corresponde à conta.' });
-  if (!(databaseConfigured ? await deactivatePostgresUser(stored.email) : deactivateUserAccount(stored.email))) return res.status(404).json({ error: 'Não foi possível desativar a conta.' });
-  const revoked = await revokeAllUserSessions(context.userId);
+  const result = await identityAccess.deactivateAccount({
+    userId: context.userId,
+    currentPassword,
+    email: typeof req.body?.email === 'string' ? req.body.email : undefined,
+    actorRole: context.role,
+    requestId,
+  }, (event) => { recordAudit({ ...event, requestId }); });
+  if (result.kind === 'account_not_found') return res.status(404).json({ error: 'Conta não encontrada no backend.' });
+  if (result.kind === 'identity_mismatch') return res.status(403).json({ error: 'A operação deve ser executada na conta autenticada.', code: 'ACCOUNT_IDENTITY_MISMATCH' });
+  if (result.kind === 'invalid_password') return res.status(401).json({ error: 'A palavra-passe atual não corresponde à conta.' });
+  if (result.kind === 'operation_failed') return res.status(404).json({ error: 'Não foi possível desativar a conta.' });
   clearSessionCookie(res);
-  recordAudit({ action: 'account_deactivated', resource: 'user', resourceId: context.userId, actorRole: context.role === 'user' ? 'citizen' : context.role, actorName: `user:${context.userId}`, requestId, success: true, metadata: { revoked } });
   res.json({ success: true, message: 'Conta desativada temporariamente.' });
 });
 
@@ -1750,25 +1842,25 @@ app.post('/api/account/delete', requireSession, async (req, res) => {
   if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
   const currentPassword = typeof req.body?.currentPassword === 'string' ? req.body.currentPassword : '';
   if (!currentPassword) return res.status(400).json({ error: 'Confirme a palavra-passe atual.' });
-  const stored = databaseConfigured ? await findPostgresUserById(context.userId) : findUserById(context.userId) || undefined;
-  if (!stored) return res.status(404).json({ error: 'Conta não encontrada no backend.' });
-  const requestedEmail = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-  if (requestedEmail && requestedEmail !== stored.email.toLowerCase()) {
-    recordAudit({ action: 'account_deletion_denied', resource: 'user', resourceId: context.userId, actorRole: context.role === 'user' ? 'citizen' : context.role, requestId, success: false, metadata: { reason: 'session_account_mismatch' } });
-    return res.status(403).json({ error: 'A operação deve ser executada na conta autenticada.', code: 'ACCOUNT_IDENTITY_MISMATCH' });
-  }
-  if (!verifyPassword(currentPassword, stored.passwordHash)) return res.status(401).json({ error: 'A palavra-passe atual não corresponde à conta.' });
-  if (!(databaseConfigured ? await deletePostgresUser(stored.email) : deleteUserAccount(stored.email))) return res.status(404).json({ error: 'Não foi possível eliminar a conta.' });
-  const revoked = await revokeAllUserSessions(context.userId);
+  const result = await identityAccess.deleteAccount({
+    userId: context.userId,
+    currentPassword,
+    email: typeof req.body?.email === 'string' ? req.body.email : undefined,
+    actorRole: context.role,
+    requestId,
+  }, (event) => { recordAudit({ ...event, requestId }); });
+  if (result.kind === 'account_not_found') return res.status(404).json({ error: 'Conta não encontrada no backend.' });
+  if (result.kind === 'identity_mismatch') return res.status(403).json({ error: 'A operação deve ser executada na conta autenticada.', code: 'ACCOUNT_IDENTITY_MISMATCH' });
+  if (result.kind === 'invalid_password') return res.status(401).json({ error: 'A palavra-passe atual não corresponde à conta.' });
+  if (result.kind === 'operation_failed') return res.status(404).json({ error: 'Não foi possível eliminar a conta.' });
   clearSessionCookie(res);
-  recordAudit({ action: 'account_deleted', resource: 'user', resourceId: context.userId, actorRole: context.role === 'user' ? 'citizen' : context.role, actorName: `user:${context.userId}`, requestId, success: true, metadata: { revoked } });
   res.json({ success: true, message: 'Conta eliminada permanentemente.' });
 });
 
-app.post('/api/auth/request-password-reset', (req, res) => {
+app.post('/api/auth/request-password-reset', async (req, res) => {
   const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Indique um e-mail válido.' });
-  const token = createPasswordReset(email);
+  const token = await identityAccess.requestPasswordReset(email);
   const response: { success: boolean; message: string; resetToken?: string } = {
     success: true,
     message: 'Se existir uma conta com este e-mail, receberá instruções para recuperar a palavra-passe.',
@@ -1777,11 +1869,11 @@ app.post('/api/auth/request-password-reset', (req, res) => {
   res.json(response);
 });
 
-app.post('/api/auth/reset-password', (req, res) => {
+app.post('/api/auth/reset-password', async (req, res) => {
   const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
   const newPassword = typeof req.body?.newPassword === 'string' ? req.body.newPassword : '';
   if (!token || newPassword.length < 8) return res.status(400).json({ error: 'O código e a nova palavra-passe são obrigatórios. Use pelo menos 8 carateres.' });
-  if (!resetPassword(token, newPassword)) return res.status(400).json({ error: 'O código expirou ou já foi utilizado.' });
+  if (!await identityAccess.resetPassword(token, newPassword)) return res.status(400).json({ error: 'O código expirou ou já foi utilizado.' });
   res.json({ success: true, message: 'Palavra-passe redefinida com sucesso.' });
 });
 
@@ -1794,7 +1886,7 @@ app.post('/api/support/tickets', requireSession, async (req, res) => {
   if (!subject || !description) return res.status(400).json({ error: 'Assunto e descrição são obrigatórios.', code: 'SUPPORT_FIELDS_REQUIRED' });
   const now = new Date().toISOString();
   const stored = context.role === 'business'
-    ? (databaseConfigured ? await findPostgresUserById(context.userId) : findUserById(context.userId) || undefined)
+    ? (await identityAccess.findById(context.userId) || undefined)
     : null;
   const ticket = { id: `SUP-${Date.now()}-${randomUUID().slice(0, 8)}`, requesterUserId: context.userId, businessId: stored?.businessId, category, subject, description, status: 'open', createdAt: now, updatedAt: now };
   await persistPostgresSupportTicket(ticket);
@@ -1820,7 +1912,7 @@ app.get('/api/conversations', requireSession, async (req, res) => {
   if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.' });
   if (context.role !== 'user' && context.role !== 'business') return res.status(403).json({ error: 'As mensagens comerciais estão disponíveis apenas para cidadãos e empresas.' });
   const stored = context.role === 'business'
-    ? (databaseConfigured ? await findPostgresUserById(context.userId) : findUserById(context.userId) || undefined)
+    ? (await identityAccess.findById(context.userId) || undefined)
     : null;
   const result = await listPostgresConversations(context.userId, context.role, stored?.businessId);
   res.json(result);
@@ -1843,7 +1935,7 @@ app.post('/api/conversations/:id/read', requireSession, async (req, res) => {
   const context = await sessionContext(req);
   if (!context || (context.role !== 'user' && context.role !== 'business')) return res.status(401).json({ error: 'Sessão autenticada necessária.' });
   const stored = context.role === 'business'
-    ? (databaseConfigured ? await findPostgresUserById(context.userId) : findUserById(context.userId) || undefined)
+    ? (await identityAccess.findById(context.userId) || undefined)
     : null;
   const marked = await markPostgresConversationRead({ conversationId: req.params.id, userId: context.userId, role: context.role, businessId: stored?.businessId });
   if (!marked) return res.status(403).json({ error: 'Não participa nesta conversa.' });
@@ -1860,7 +1952,7 @@ app.post('/api/conversations/:id/messages', requireSession, async (req, res) => 
   if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.' });
   if ((context.role !== 'user' && context.role !== 'business') || !text) return res.status(400).json({ error: 'Mensagem inválida.' });
   const stored = context.role === 'business'
-    ? (databaseConfigured ? await findPostgresUserById(context.userId) : findUserById(context.userId) || undefined)
+    ? (await identityAccess.findById(context.userId) || undefined)
     : null;
   try {
     await createPostgresConversationMessage({ id: `MSG-${randomUUID()}`, conversationId: req.params.id, senderId: context.userId, senderRole: context.role, businessId: stored?.businessId, text, clientMessageId, replyToId, messageType });
@@ -1876,7 +1968,7 @@ app.get('/api/support/tickets/mine', requireSession, async (req, res) => {
   const context = await sessionContext(req);
   if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.' });
   const stored = context.role === 'business'
-    ? (databaseConfigured ? await findPostgresUserById(context.userId) : findUserById(context.userId) || undefined)
+    ? (await identityAccess.findById(context.userId) || undefined)
     : null;
   res.json({ tickets: await listPostgresSupportTickets(context.userId, context.role, stored?.businessId) });
 });
@@ -1887,7 +1979,7 @@ app.post('/api/support/tickets/:id/replies', requireSession, async (req, res) =>
   if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.' });
   if (!text || !['user', 'business', 'admin'].includes(context.role)) return res.status(400).json({ error: 'Resposta inválida.' });
   const stored = context.role === 'business'
-    ? (databaseConfigured ? await findPostgresUserById(context.userId) : findUserById(context.userId) || undefined)
+    ? (await identityAccess.findById(context.userId) || undefined)
     : null;
   try {
     await createPostgresSupportReply({ id: `REP-${randomUUID()}`, ticketId: req.params.id, senderId: context.userId, senderRole: context.role, businessId: stored?.businessId, text, status: context.role === 'admin' ? 'in_progress' : undefined });
@@ -1957,6 +2049,7 @@ app.post('/api/auth/register', async (req, res) => {
   const normalizedGroupGroupId = typeof groupGroupId === 'string' ? groupGroupId.trim() : normalizedCategoryId;
   const normalizedSubcategoryId = typeof subcategoryId === 'string' ? subcategoryId.trim() : '';
   const normalizedDescription = typeof description === 'string' ? description.trim() : '';
+  const normalizedPublicEmail = typeof publicEmail === 'string' ? publicEmail.trim() : '';
   if (role === 'business') {
     const completion = getBusinessProfileCompletion({
       name: normalizedBusinessName,
@@ -1976,91 +2069,45 @@ app.post('/api/auth/register', async (req, res) => {
     if (publicEmail !== undefined && typeof publicEmail !== 'string') {
       return res.status(400).json({ error: 'O e-mail público é inválido.', code: 'BUSINESS_PUBLIC_EMAIL_INVALID' });
     }
-    if (typeof publicEmail === 'string' && publicEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(publicEmail.trim())) {
+    if (normalizedPublicEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedPublicEmail)) {
       return res.status(400).json({ error: 'O e-mail público é inválido.', code: 'BUSINESS_PUBLIC_EMAIL_INVALID' });
     }
   }
 
   const normalizedEmail = email.trim().toLowerCase();
-  const newBusinessId = role === 'business' ? `biz-${Date.now()}-${randomBytes(3).toString('hex')}` : undefined;
-  let businessPersisted = false;
-  let accountPersisted = false;
+  const businessProfile = role === 'business' ? {
+    name: normalizedBusinessName,
+    categoryId: normalizedCategoryId,
+    groupGroupId: normalizedGroupGroupId,
+    subcategoryId: normalizedSubcategoryId,
+    description: normalizedDescription,
+    phone: normalizedBusinessPhone,
+    neighborhood: normalizedBusinessNeighborhood,
+    ...(normalizedPublicEmail ? { publicEmail: normalizedPublicEmail } : {}),
+  } : undefined;
+  const result = await identityAccess.register({
+    name: name.trim(),
+    email: normalizedEmail,
+    password,
+    phone: String(phone),
+    neighborhood: String(neighborhood),
+    role,
+    ...(businessProfile ? { businessProfile } : {}),
+    ipAddress: req.ip,
+    userAgent: req.get('user-agent'),
+  });
 
-  try {
-    const existingUser = databaseConfigured ? await findPostgresUserByEmail(normalizedEmail) : findUserByEmail(normalizedEmail);
-    if (existingUser) return res.status(409).json({ error: 'Já existe uma conta com este e-mail.' });
-    if (newBusinessId) {
-      await persistPostgresBusiness({
-        id: newBusinessId,
-        name: normalizedBusinessName,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        categoryId: normalizedCategoryId,
-        data: {
-          categoryId: normalizedCategoryId,
-          groupGroupId: normalizedGroupGroupId,
-          subcategoryId: normalizedSubcategoryId,
-          description: normalizedDescription,
-          phone: normalizedBusinessPhone,
-          neighborhood: normalizedBusinessNeighborhood,
-          ...(typeof publicEmail === 'string' && publicEmail.trim() ? { publicEmail: publicEmail.trim() } : {}),
-        },
-      });
-      businessPersisted = true;
-    }
-    const user = databaseConfigured
-      ? await createPostgresUser({ name, email, password, phone: String(phone), neighborhood: String(neighborhood), role, ...(newBusinessId ? { businessId: newBusinessId, businessName: normalizedBusinessName } : {}) })
-      : createUser({ name, email, password, phone: String(phone), neighborhood: String(neighborhood), role, ...(newBusinessId ? { businessId: newBusinessId, businessName: normalizedBusinessName } : {}) });
-    if (!user) {
-      if (businessPersisted && !(await deletePostgresBusiness(newBusinessId!))) {
-        throw new Error('Business registration could not remove an unclaimed business profile.');
-      }
-      businessPersisted = false;
-      return res.status(409).json({ error: 'Já existe uma conta com este e-mail.' });
-    }
-    accountPersisted = true;
-    if (newBusinessId && !(await assignPostgresBusinessOwner(newBusinessId, user.id))) {
-      throw new Error('Business registration could not associate the account with its business profile.');
-    }
-    const publicUser = { ...toPublicUser(user), ...(newBusinessId ? { businessId: newBusinessId, businessName: normalizedBusinessName } : {}) };
-    setSessionCookie(res, await createSession({ userId: publicUser.id, role: publicUser.role, ipAddress: req.ip, userAgent: req.get('user-agent') }));
-    recordAudit({ action: 'account_registered', resource: 'user', resourceId: publicUser.id, actorRole: role === 'user' ? 'citizen' : 'business', requestId: requestIdFrom(req), success: true, metadata: newBusinessId ? { businessId: newBusinessId } : undefined });
-    res.status(201).json({
-      success: true,
-      user: publicUser,
-      ...(newBusinessId ? {
-        business: {
-          id: newBusinessId,
-          name: normalizedBusinessName,
-          status: 'pending',
-          categoryId: normalizedCategoryId,
-          groupGroupId: normalizedGroupGroupId,
-          subcategoryId: normalizedSubcategoryId,
-          description: normalizedDescription,
-          phone: normalizedBusinessPhone,
-          neighborhood: normalizedBusinessNeighborhood,
-          ...(typeof publicEmail === 'string' && publicEmail.trim() ? { publicEmail: publicEmail.trim() } : {}),
-        },
-      } : {}),
+  if (result.kind === 'invalid_profile') {
+    return res.status(400).json({
+      error: 'Preencha os campos obrigatórios do perfil empresarial.',
+      code: 'BUSINESS_PROFILE_INCOMPLETE',
+      missingFields: result.missingFields,
     });
-  } catch (error) {
-    const compensationFailures: string[] = [];
-    if (accountPersisted) {
-      try {
-        const deleted = databaseConfigured ? await deletePostgresUser(normalizedEmail) : deleteUserAccount(normalizedEmail);
-        if (!deleted) compensationFailures.push('account');
-      } catch {
-        compensationFailures.push('account');
-      }
-    }
-    if (businessPersisted && newBusinessId) {
-      try {
-        const deleted = await deletePostgresBusiness(newBusinessId);
-        if (!deleted) compensationFailures.push('business');
-      } catch {
-        compensationFailures.push('business');
-      }
-    }
+  }
+  if (result.kind === 'duplicate_account') {
+    return res.status(409).json({ error: 'Já existe uma conta com este e-mail.' });
+  }
+  if (result.kind === 'registration_failed') {
     recordAudit({
       action: 'public_registration_failed',
       resource: 'user',
@@ -2069,15 +2116,31 @@ app.post('/api/auth/register', async (req, res) => {
       requestId: requestIdFrom(req),
       success: false,
       metadata: {
-        reason: error instanceof Error ? error.message : 'unknown',
-        compensationFailures,
+        reason: result.error instanceof Error ? result.error.message : 'unknown',
+        compensationFailures: result.compensationFailures,
       },
     });
-    res.status(500).json({
+    return res.status(500).json({
       error: 'Não foi possível concluir o registo. Tente novamente.',
-      code: compensationFailures.length > 0 ? 'REGISTRATION_COMPENSATION_FAILED' : 'REGISTRATION_FAILED',
+      code: result.compensationFailures.length > 0 ? 'REGISTRATION_COMPENSATION_FAILED' : 'REGISTRATION_FAILED',
     });
   }
+
+  setSessionCookie(res, result.sessionToken);
+  recordAudit({
+    action: 'account_registered',
+    resource: 'user',
+    resourceId: result.user.id,
+    actorRole: role === 'user' ? 'citizen' : 'business',
+    requestId: requestIdFrom(req),
+    success: true,
+    metadata: result.business ? { businessId: result.business.id } : undefined,
+  });
+  return res.status(201).json({
+    success: true,
+    user: result.user,
+    ...(result.business ? { business: result.business } : {}),
+  });
 });
 
 // Gemini AI Content Moderation Endpoint (Texto e Imagens em Português e Crioulo Guineense)
@@ -2341,7 +2404,7 @@ app.post('/api/reviews/:reviewId/reply', requireSession, async (req, res) => {
     return res.status(400).json({ error: 'Escreva a resposta pública.', code: 'REVIEW_REPLY_REQUIRED' });
   }
   if (context.role === 'business') {
-    const storedBusinessUser = databaseConfigured ? await findPostgresUserById(context.userId) : findUserById(context.userId) || undefined;
+    const storedBusinessUser = await identityAccess.findById(context.userId) || undefined;
     if (!storedBusinessUser?.businessId) {
       return res.status(403).json({ error: 'A sua conta não está associada a um negócio.', code: 'REVIEW_REPLY_FORBIDDEN' });
     }
@@ -2602,9 +2665,7 @@ app.post('/api/tickets/purchase', async (req, res) => {
     if (!purchaseSession || purchaseSession.role !== 'user') {
       return res.status(401).json({ error: 'Inicie sessão para comprar bilhetes.', code: 'AUTHENTICATION_REQUIRED', requestId });
     }
-    const account = databaseConfigured
-      ? await findPostgresUserById(purchaseSession.userId)
-      : findUserById(purchaseSession.userId) || findDemoUserById(purchaseSession.userId);
+    const account = await identityAccess.findById(purchaseSession.userId) || findDemoUserById(purchaseSession.userId);
     if (!account) {
       return res.status(401).json({ error: 'A conta da sessão não está disponível.', code: 'AUTHENTICATION_REQUIRED', requestId });
     }
@@ -2948,7 +3009,7 @@ app.get('/api/tickets/sold', requireRole('business', 'admin'), async (req, res) 
   const context = await sessionContext(req);
   if (!context) return res.status(401).json({ error: 'Sess�o autenticada necess�ria.', code: 'AUTHENTICATION_REQUIRED' });
   const stored = context.role === 'business'
-    ? (databaseConfigured ? await findPostgresUserById(context.userId) : findUserById(context.userId) || undefined)
+    ? (await identityAccess.findById(context.userId) || undefined)
     : null;
   const companyId = context.role === 'admin'
     ? (typeof req.query.companyId === 'string' ? req.query.companyId : undefined)
@@ -3004,9 +3065,7 @@ app.post('/api/tickets/offline-manifest', requireRole('business'), async (req, r
   }
 
   // A empresa organizadora vem da sess�o, nunca do corpo do pedido.
-  const stored = databaseConfigured
-    ? await findPostgresUserById((await sessionContext(req))?.userId || '')
-    : findUserById((await sessionContext(req))?.userId || '') || undefined;
+  const stored = await identityAccess.findById((await sessionContext(req))?.userId || '') || undefined;
   const manifest = await buildOfflineManifest(eventId, stored?.businessId || '', ticketSigningSecret);
   recordAudit({ action: 'scanner_manifest_downloaded', resource: 'scanner', actorRole: 'scanner', requestId, success: true, metadata: { eventId, tickets: manifest.tickets.length } });
   res.json({ manifest, requestId });
@@ -3293,7 +3352,7 @@ app.get('/api/payments/transactions', requireRole('admin', 'business'), async (r
   const context = await sessionContext(req);
   if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.' });
   const storedBusinessUser = context.role === 'business'
-    ? (databaseConfigured ? await findPostgresUserById(context.userId) : findUserById(context.userId) || undefined)
+    ? (await identityAccess.findById(context.userId) || undefined)
     : null;
   const access = resolveTransactionAccess(context.role, req.query.businessId, storedBusinessUser?.businessId);
   if (!access.allowed) {

@@ -1,7 +1,8 @@
 import { randomBytes } from 'node:crypto';
-import { databasePool } from './db';
-import { hashPassword, verifyPassword } from './authService';
-import type { PublicUser } from './authService';
+import { databasePool } from '../../../db';
+import { hashPassword, verifyPassword } from './jsonIdentityRepository';
+import type { IdentityAccountRepository } from '../application/identityAccessPorts';
+import type { PublicUser } from './jsonIdentityRepository';
 
 interface StoredPostgresUser extends PublicUser {
   passwordHash: string;
@@ -92,4 +93,15 @@ export async function deactivatePostgresUser(email: string): Promise<boolean> {
 export async function deletePostgresUser(email: string): Promise<boolean> {
   const result = await requirePool().query('DELETE FROM users WHERE LOWER(email)=LOWER($1) RETURNING id', [email.trim()]);
   return result.rowCount === 1;
+}
+
+export function createPostgresIdentityRepository(): IdentityAccountRepository {
+  return {
+    findByEmail: async (email) => findPostgresUserByEmail(email),
+    findById: async (id) => findPostgresUserById(id),
+    create: async (input) => createPostgresUser(input),
+    changePassword: async (email, currentPassword, newPassword) => changePostgresUserPassword(email, currentPassword, newPassword),
+    deactivate: async (email) => deactivatePostgresUser(email),
+    delete: async (email) => deletePostgresUser(email),
+  };
 }

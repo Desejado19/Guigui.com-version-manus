@@ -1,0 +1,84 @@
+﻿ 200: git commit -m "fix: deliver confirmed tickets to buyer accounts" -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+ 201: ```
+ 202: 
+ 203: ## Task 4: Isolate the Purchase Use Case Behind DDD Ports
+ 204: 
+ 205: **Files:**
+ 206: - Create: `server/ticketPurchaseUseCase.ts`
+ 207: - Modify: `server.ts`
+ 208: - Modify: `server/ticketPurchaseDomain.ts`
+ 209: - Modify: `server/ticketCatalogService.ts`
+ 210: - Modify: `tests/unit/ticketPurchaseUseCase.test.ts`
+ 211: - Verify: `tests/unit/simulatedAdapters.test.ts`, `tests/unit/ticketPurchaseDelivery.test.ts`
+ 212: 
+ 213: **Interfaces:**
+ 214: - Produces `executeTicketPurchase(command, ports): Promise<TicketPurchaseResult>` as the application use case called by the Express route.
+ 215: - `command` contains authenticated buyer identity, event ID, ticket type ID, quantity, validated holder/contact data, accepted policy version/time, payment method, and optional idempotency key; it does not accept client-authoritative price, event title, category name, or fees.
+ 216: - `ports` contain `TicketCatalogPort`, `TicketInventoryPort`, `TicketRepositoryPort`, `TicketPurchaseIdempotencyPort`, the payment adapter, and post-confirmation delivery dependencies. `TicketPurchaseIdempotencyPort` exposes `get(key: string): Promise<TicketPurchaseResult | null>` and `store(key: string, result: TicketPurchaseResult): Promise<void>`. `TicketRepositoryPort` exposes `issue(reservationId: string, tickets: TicketForValidation[], buyerUserId: string): Promise<TicketForValidation[]>`. Reuse `PaymentProviderAdapter`, `EmailDeliveryPort`, and `SmsDeliveryPort`; do not create parallel provider abstractions.
+ 217: - Produces `TicketPurchaseTransaction` with `id`, `providerRef`, `providerMode: PaymentProviderMode`, `amountXOF`, and `status: 'confirmed_api' | 'pending_provider' | 'failed'`; the HTTP adapter maps it to the existing transaction response shape.
+ 218: - `TicketPurchaseResult` is `{ status: 'confirmed'; transaction: TicketPurchaseTransaction; quote: TicketPurchaseQuote; tickets: TicketForValidation[]; delivery: TicketPurchaseDeliveryResult } | { status: 'pending'; transaction: TicketPurchaseTransaction; reservationExpiresAt: string } | { status: 'rejected'; reason: 'invalid_offer' | 'invalid_policy' | 'inventory_unavailable' | 'payment_failed'; message: string }`. The route maps these states to the existing HTTP response/status contract (`200`, `202`, `400`, `404`, `409`, or `502` as appropriate).
+ 219: 
+ 220: - [x] **Step 1: Add failing use-case tests with fake ports**
+ 221: 
+ 222: Test confirmed simulation calls catalog, quote, reservation, payment, ticket issuance, and delivery in order. Test pending payment returns no valid tickets and skips delivery. Test payment failure releases inventory and returns an explicit failure. Test invalid offer/stock returns before payment. Test delivery/notification failures remain isolated after ticket issuance. Test identical idempotency keys return the stored result without invoking payment or ticket persistence twice.
+ 223: 
+ 224: - [x] **Step 2: Run the focused use-case tests and confirm expected failures**
+ 225: 
+ 226: Run: `npx vitest run tests/unit/ticketPurchaseUseCase.test.ts`
+ 227: 
+ 228: Expected: FAIL because the application use case is not extracted.
+ 229: 
+ 230: - [x] **Step 3: Implement the use case and thin HTTP adapter**
+ 231: 
+ 232: Move purchase orchestration, including idempotency result lookup/storage, from `server.ts` into `executeTicketPurchase`. Leave request parsing, authentication/session lookup, idempotency-key syntax validation, audit transport, and HTTP status mapping in the route. Compose the existing simulated payment/email/SMS adapters at server startup; do not activate transports from environment variables.
+ 233: 
+ 234: - [x] **Step 4: Run end-to-end verification**
+ 235: 
+ 236: Run: `npx vitest run tests/unit/ticketPurchaseDomain.test.ts tests/unit/ticketPurchaseCatalog.test.ts tests/unit/ticketPurchaseUseCase.test.ts tests/unit/ticketPurchaseDelivery.test.ts tests/unit/ticketPurchaseNotification.test.ts`
+ 237: 
+ 238: Run: `npx playwright test tests/ticket-purchase-modal.spec.ts`
+ 239: 
+ 240: Run: `npm run check`
+ 241: 
+ 242: Run: `npm run build`
+ 243: 
+ 244: Expected: PASS; checkout, pending behavior, receipt, account tickets, notifications, and simulated adapter composition remain consistent.
+ 245: 
+ 246: - [ ] **Step 5: Commit**
+ 247: 
+ 248: Commit deferred: the checkout contains pre-existing untracked source files, including application surfaces needed by Task 3. Staging whole files would capture unrelated local content, so only a clean, scoped commit can be made after the baseline is clarified.
+ 249: 
+ 250: ```powershell
+ 251: git add server/ticketPurchaseUseCase.ts server.ts server/ticketPurchaseDomain.ts server/ticketCatalogService.ts tests/unit/ticketPurchaseUseCase.test.ts
+ 252: git commit -m "refactor: isolate ticket purchase use case" -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+ 253: ```
+ 254: 
+ 255: ## Dependencies
+ 256: 
+ 257: - Task 1 is prerequisite to Tasks 2, 3, and 4.
+ 258: - Task 2 depends on Task 1's authoritative response contract.
+ 259: - Task 3 depends on Task 1's confirmed ticket identity and Task 2's post-purchase flow.
+ 260: - Task 4 depends on Tasks 1â€“3 so orchestration is extracted only after the working behavior and response contract are verified.
+=== .gitignore ===
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+.vercel
+.vercel-deploy.env
+
+.vercel
+
+# Estado de runtime e artefactos de validaÃ§Ã£o (nÃ£o versionar)
+data/
+backups/
+playwright-report/
+test-results/
+*.tmp
+*.out
+*.err
+

@@ -1,0 +1,115 @@
+﻿===== da85d50
+commit da85d502e8d9b7228aca96c464b56f115fa6a9e7
+Author: Desejado19 <desejadombarbosa@gmail.com>
+Date:   Wed Oct 21 01:59:50 2026 +0000
+
+    fix: show authoritative ticket purchase receipt
+    
+    Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+M	src/components/EventsView.tsx
+M	tests/ticket-purchase-modal.spec.ts
+
+===== 7bc9d36
+commit 7bc9d368174a8b40fcca05a09d454395c0a855ab
+Author: Desejado19 <desejadombarbosa@gmail.com>
+Date:   Wed Oct 21 01:52:46 2026 +0000
+
+    fix: validate ticket offers and inventory server-side
+    
+    Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+A	db/migrations/007_ticket_purchase_reservations.sql
+A	db/migrations/008_event_snapshot_data.sql
+A	scripts/audit-ticket-flow.ts
+M	server.ts
+A	server/postgresBusinessService.ts
+A	server/postgresTicketService.ts
+A	server/ticketCatalogService.ts
+A	server/ticketInventoryService.ts
+A	server/ticketPurchaseDomain.ts
+A	server/ticketPurchasePorts.ts
+M	server/validationService.ts
+M	tests/ticket-purchase-modal.spec.ts
+A	tests/unit/ticketInventoryService.test.ts
+A	tests/unit/ticketPurchaseCatalog.test.ts
+A	tests/unit/ticketPurchaseDomain.test.ts
+M	tests/unit/validationService.test.ts
+
+===== d98f7ce
+commit d98f7ce4beff3f205da358a748340085adc96f1a
+Author: Desejado19 <desejadombarbosa@gmail.com>
+Date:   Wed Oct 21 00:45:21 2026 +0000
+
+    docs: specify ticket purchase experience
+    
+    Define approved checkout, receipt, notification, and DDD boundaries while keeping integrations simulated.
+    
+    Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+A	docs/superpowers/specs/2026-10-21-ticket-purchase-experience-design.md
+
+===== 27f179c
+commit 27f179cb6cb491c1385f2526d8cc90570f607838
+Author: Desejado19 <desejadombarbosa@gmail.com>
+Date:   Tue Oct 20 09:10:25 2026 +0000
+
+    docs: specify business profile completeness and highlights
+    
+    Document the approved business profile completion flow and the manually curated homepage feature rotation, while retaining active ad campaigns.
+    
+    Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+A	docs/superpowers/specs/2026-10-20-business-profile-completeness-design.md
+
+===== tracked files count
+48
+===== tracked list
+.env.example
+check-front.js
+db/migrations/007_ticket_purchase_reservations.sql
+db/migrations/008_event_snapshot_data.sql
+docs/OPERATIONS.md
+docs/superpowers/plans/2026-10-19-guigui-ddd-foundation.md
+docs/superpowers/specs/2026-10-19-guigui-ddd-foundation-design.md
+docs/superpowers/specs/2026-10-20-business-profile-completeness-design.md
+docs/superpowers/specs/2026-10-20-simulated-integrations-design.md
+docs/superpowers/specs/2026-10-21-ticket-purchase-experience-design.md
+scripts/audit-payment-flow.ts
+scripts/audit-ticket-flow.ts
+server.ts
+server/emailService.ts
+server/healthService.ts
+server/integrations/ports.ts
+server/integrations/simulatedAdapters.ts
+server/paymentService.ts
+server/postgresBusinessService.ts
+server/postgresPaymentService.ts
+server/postgresTicketService.ts
+server/smsGatewayService.ts
+server/ticketCatalogService.ts
+server/ticketInventoryService.ts
+server/ticketPurchaseDeliveryService.ts
+server/ticketPurchaseDomain.ts
+server/ticketPurchasePorts.ts
+server/validationService.ts
+src/components/AdminDashboard.tsx
+src/components/BusinessDashboard.tsx
+src/components/EventsView.tsx
+src/components/TicketPurchaseModal.tsx
+src/types.ts
+src/utils/i18n.ts
+tests/home.spec.ts
+tests/system-health.spec.ts
+tests/ticket-purchase-modal.spec.ts
+tests/unit/components/AdminDashboard.test.tsx
+tests/unit/components/BusinessDashboard.test.tsx
+tests/unit/healthService.test.ts
+tests/unit/paymentService.test.ts
+tests/unit/securityRoutes.test.ts
+tests/unit/simulatedAdapters.test.ts
+tests/unit/ticketInventoryService.test.ts
+tests/unit/ticketPurchaseCatalog.test.ts
+tests/unit/ticketPurchaseDelivery.test.ts
+tests/unit/ticketPurchaseDomain.test.ts
+tests/unit/validationService.test.ts

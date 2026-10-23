@@ -1,0 +1,13 @@
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Startup Error [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯⎯[39m
+Error: Root path does not exist or is not a directory: G:/G:
+    at resolveTestConfig (file:///G:/node_modules/vitest/dist/chunks/index.DzobfTyw.js:14295:80)
+    at resolveConfig$1 (file:///G:/node_modules/vitest/dist/chunks/index.DzobfTyw.js:14778:21)
+    at async createVitest (file:///G:/node_modules/vitest/dist/chunks/cli-api.DcLieX4F.js:26:17)
+    at async prepareVitest (file:///G:/node_modules/vitest/dist/chunks/cli-api.DcLieX4F.js:421:14)
+    at async startVitest (file:///G:/node_modules/vitest/dist/chunks/cli-api.DcLieX4F.js:340:14)
+    at async start (file:///G:/node_modules/vitest/dist/chunks/cac.fSuRXrAx.js:2370:15)
+    at async CAC.run (file:///G:/node_modules/vitest/dist/chunks/cac.fSuRXrAx.js:2346:2)
+
+
+

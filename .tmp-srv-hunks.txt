@@ -1,0 +1,23 @@
+﻿@@ -52,0 +53 @@ import { deliverConfirmedTicketPurchase } from './server/ticketPurchaseDeliveryS
+@@ -55,0 +57 @@ import { quoteTicketPurchase } from './server/ticketPurchaseDomain';
+@@ -285 +287 @@ const persistAuditLogs = () => saveJson('audit-logs.json', securityAuditLogs);
+@@ -2122,0 +2125,62 @@ setInterval(() => {
+@@ -2124,2 +2187,0 @@ app.post('/api/tickets/purchase', async (req, res) => {
+@@ -2127,0 +2190 @@ app.post('/api/tickets/purchase', async (req, res) => {
+@@ -2152,0 +2216 @@ app.post('/api/tickets/purchase', async (req, res) => {
+@@ -2156,0 +2221 @@ app.post('/api/tickets/purchase', async (req, res) => {
+@@ -2162,0 +2228 @@ app.post('/api/tickets/purchase', async (req, res) => {
+@@ -2185,0 +2252 @@ app.post('/api/tickets/purchase', async (req, res) => {
+@@ -2193,2 +2259,0 @@ app.post('/api/tickets/purchase', async (req, res) => {
+@@ -2198,2 +2262,0 @@ app.post('/api/tickets/purchase', async (req, res) => {
+@@ -2212,9 +2275,11 @@ app.post('/api/tickets/purchase', async (req, res) => {
+@@ -2224,4 +2289,7 @@ app.post('/api/tickets/purchase', async (req, res) => {
+@@ -2247 +2314,0 @@ app.post('/api/tickets/purchase', async (req, res) => {
+@@ -2253,22 +2320,83 @@ app.post('/api/tickets/purchase', async (req, res) => {
+@@ -2276,81 +2403,0 @@ app.post('/api/tickets/purchase', async (req, res) => {
+@@ -2358,19 +2405,6 @@ app.post('/api/tickets/purchase', async (req, res) => {
+@@ -2378,39 +2412,37 @@ app.post('/api/tickets/purchase', async (req, res) => {
+@@ -2419,56 +2451,2 @@ app.post('/api/tickets/purchase', async (req, res) => {
+@@ -2476,10 +2453,0 @@ app.post('/api/tickets/purchase', async (req, res) => {
+@@ -2487,0 +2456 @@ app.post('/api/tickets/purchase', async (req, res) => {
+@@ -2499 +2468,3 @@ app.get('/api/tickets/mine', requireSession, async (req, res) => {

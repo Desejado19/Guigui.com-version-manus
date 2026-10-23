@@ -13,7 +13,7 @@ const describeIfDb = testDatabaseUrl ? describe : describe.skip;
 
 type DbModule = typeof import('../../server/db');
 type PaymentModule = typeof import('../../server/postgresPaymentService');
-type AuthModule = typeof import('../../server/postgresAuthService');
+type AuthModule = typeof import('../../server/modules/identity-access/infrastructure/postgresIdentityRepository');
 type ModerationModule = typeof import('../../server/postgresModerationService');
 type CommunicationModule = typeof import('../../server/postgresCommunicationService');
 type BusinessModule = typeof import('../../server/postgresBusinessService');
@@ -112,7 +112,7 @@ describeIfDb('Postgres services integration (real test database)', () => {
     expect(pool, 'TEST_DATABASE_URL must produce a pool').toBeTruthy();
     await pool.query(schemaSql);
     payment = await import('../../server/postgresPaymentService');
-    auth = await import('../../server/postgresAuthService');
+    auth = await import('../../server/modules/identity-access/infrastructure/postgresIdentityRepository');
     moderation = await import('../../server/postgresModerationService');
     communication = await import('../../server/postgresCommunicationService');
     businessService = await import('../../server/postgresBusinessService');
@@ -189,7 +189,7 @@ describeIfDb('Postgres services integration (real test database)', () => {
       expect(await auth.changePostgresUserPassword('fatou@guigui.com', 'secret123', 'new-pass')).toBe(true);
 
       const stored = await auth.findPostgresUserByEmail('fatou@guigui.com');
-      const { verifyPassword } = await import('../../server/authService');
+      const { verifyPassword } = await import('../../server/modules/identity-access/infrastructure/jsonIdentityRepository');
       expect(verifyPassword('new-pass', stored!.passwordHash)).toBe(true);
     });
 

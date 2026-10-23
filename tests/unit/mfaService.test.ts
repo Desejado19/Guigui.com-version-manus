@@ -15,14 +15,14 @@ vi.mock('../../server/db', () => ({
   databaseConfigured: true,
 }));
 
-type MfaModule = typeof import('../../server/mfaService');
+type MfaModule = typeof import('../../server/modules/identity-access/infrastructure/mfaRepository');
 let mfa: MfaModule;
 
 beforeEach(async () => {
   queryMock.mockReset();
   pool = null;
   vi.resetModules();
-  mfa = await import('../../server/mfaService');
+  mfa = await import('../../server/modules/identity-access/infrastructure/mfaRepository');
 });
 
 afterEach(() => {

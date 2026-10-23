@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { Pool } from 'pg';
-import { hashPassword } from '../server/authService';
+import { hashPassword } from '../server/modules/identity-access';
 
 // Repoe a password do admin demo para 'Guigui2026!' (mesmo algoritmo scrypt da app)
 async function main() {

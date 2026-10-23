@@ -20,7 +20,7 @@ process.env.SCANNER_DOOR_CODE = 'TEST-DOOR';
 
 let server: Server;
 let baseUrl: string;
-let auth: typeof import('../../server/authService');
+let auth: typeof import('../../server/modules/identity-access/infrastructure/jsonIdentityRepository');
 let businessService: typeof import('../../server/postgresBusinessService');
 
 async function login(email: string, password: string): Promise<string> {
@@ -55,7 +55,7 @@ async function getJson(pathname: string, cookie: string | undefined) {
 
 beforeAll(async () => {
   const { default: app } = await import('../../server');
-  auth = await import('../../server/authService');
+  auth = await import('../../server/modules/identity-access/infrastructure/jsonIdentityRepository');
   businessService = await import('../../server/postgresBusinessService');
   const expressApp = app as Express;
   const password = 'CorrectHorse42';
@@ -95,6 +95,148 @@ beforeAll(async () => {
 afterAll(async () => {
   if (server) await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   fs.rmSync(tempDir, { recursive: true, force: true });
+});
+
+describe('identity session routes', () => {
+  it('returns a public identity DTO, session cookie, and lookup result after login', async () => {
+    const response = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'cidadao-um@test.guigui', password: 'CorrectHorse42' }),
+    });
+    expect(response.status).toBe(200);
+    const payload = await response.json() as { success: boolean; user: Record<string, unknown> };
+    expect(payload).toMatchObject({
+      success: true,
+      user: {
+        id: auth.findUserByEmail('cidadao-um@test.guigui')?.id,
+        email: 'cidadao-um@test.guigui',
+        role: 'user',
+      },
+    });
+    expect(payload.user).not.toHaveProperty('passwordHash');
+    const cookie = response.headers.get('set-cookie');
+    expect(cookie).toContain('guigui_session=');
+    const session = await getJson('/api/auth/session', cookie!.split(';')[0]);
+    expect(await session.json()).toMatchObject({
+      authenticated: true,
+      userId: payload.user.id,
+      role: 'user',
+    });
+  });
+
+  it('returns the session revocation result and clears the cookie on logout', async () => {
+    const cookie = await login('cidadao-um@test.guigui', 'CorrectHorse42');
+    const session = await getJson('/api/auth/session', cookie);
+    expect(await session.json()).toMatchObject({ authenticated: true, role: 'user' });
+
+    const response = await postJson('/api/auth/logout', cookie, {});
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ success: true, revoked: true });
+    expect(response.headers.get('set-cookie')).toContain('Max-Age=0');
+    await expect((await getJson('/api/auth/session', cookie)).json()).resolves.toMatchObject({ authenticated: false });
+  });
+
+  it('reports the number of revoked sessions and clears the current cookie', async () => {
+    auth.createUser({
+      name: 'Revocation Test',
+      email: 'revocation-test@test.guigui',
+      password: 'CorrectHorse42',
+      role: 'user',
+      phone: '+245955000009',
+      neighborhood: 'Bissau',
+    });
+    const currentCookie = await login('revocation-test@test.guigui', 'CorrectHorse42');
+    const anotherCookie = await login('revocation-test@test.guigui', 'CorrectHorse42');
+
+    const response = await postJson('/api/auth/sessions/revoke-all', currentCookie, {});
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ success: true, revoked: 2 });
+    expect(response.headers.get('set-cookie')).toContain('Max-Age=0');
+    await expect((await getJson('/api/auth/session', anotherCookie)).json()).resolves.toMatchObject({ authenticated: false });
+  });
+});
+
+describe('identity credential routes', () => {
+  it('changes the password through the account credential port', async () => {
+    const email = 'credential-change@test.guigui';
+    auth.createUser({
+      name: 'Credential Change',
+      email,
+      password: 'CorrectHorse42',
+      role: 'user',
+      phone: '+245955000010',
+      neighborhood: 'Bissau',
+    });
+
+    const response = await postJson('/api/auth/change-password', undefined, {
+      email: email.toUpperCase(),
+      currentPassword: 'CorrectHorse42',
+      newPassword: 'UpdatedHorse42',
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      success: true,
+      message: 'Palavra-passe actualizada com sucesso.',
+    });
+    expect((await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: 'UpdatedHorse42' }),
+    })).status).toBe(200);
+  });
+
+  it('keeps reset responses generic in production and consumes valid tokens once', async () => {
+    const email = 'credential-reset@test.guigui';
+    auth.createUser({
+      name: 'Credential Reset',
+      email,
+      password: 'CorrectHorse42',
+      role: 'user',
+      phone: '+245955000011',
+      neighborhood: 'Bissau',
+    });
+    const token = auth.createPasswordReset(email);
+    expect(token).toBeTruthy();
+
+    const request = await postJson('/api/auth/request-password-reset', undefined, { email });
+    expect(request.status).toBe(200);
+    const requestPayload = await request.json() as Record<string, unknown>;
+    expect(requestPayload).toMatchObject({
+      success: true,
+      message: 'Se existir uma conta com este e-mail, receberá instruções para recuperar a palavra-passe.',
+    });
+    expect(requestPayload).not.toHaveProperty('resetToken');
+
+    const reset = await postJson('/api/auth/reset-password', undefined, {
+      token,
+      newPassword: 'ResetHorse42',
+    });
+    expect(reset.status).toBe(200);
+    await expect(reset.json()).resolves.toEqual({
+      success: true,
+      message: 'Palavra-passe redefinida com sucesso.',
+    });
+    expect((await postJson('/api/auth/reset-password', undefined, {
+      token,
+      newPassword: 'SecondReset42',
+    })).status).toBe(400);
+  });
+
+  it('returns the current invalid-MFA response when no database is configured', async () => {
+    const cookie = await login('admin-teste@test.guigui', 'CorrectHorse42');
+
+    const response = await postJson('/api/auth/mfa/enable', cookie, { code: '000000' });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Código MFA inválido.',
+      code: 'MFA_INVALID',
+    });
+  });
 });
 
 describe('GET /api/payments/transactions tenant isolation', () => {

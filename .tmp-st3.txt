@@ -1,0 +1,34 @@
+﻿diff --git a/server/healthService.ts b/server/healthService.ts
+index fcd57f5..5db3c93 100644
+--- a/server/healthService.ts
++++ b/server/healthService.ts
+@@ -1,10 +1,5 @@
+-export type DatabaseHealth = {
+-  configured: boolean;
+-  connected: boolean;
+-};
+-
+-export type HealthStatus = 'ok' | 'degraded';
+-
+-export function classifyHealth(database: DatabaseHealth): HealthStatus {
+-  return database.configured && !database.connected ? 'degraded' : 'ok';
+-}
++export {
++  classifyHealth,
++  type DatabaseHealth,
++  type HealthStatus,
++} from './modules/platform-foundation/application/getPlatformHealth';
+diff --git a/tests/system-health.spec.ts b/tests/system-health.spec.ts
+index 64f94d6..a20f640 100644
+--- a/tests/system-health.spec.ts
++++ b/tests/system-health.spec.ts
+@@ -26,6 +26,9 @@ test.describe('backend: APIs p├║blicas e de plataforma', () => {
+       body.database.configured && !body.database.connected ? 'degraded' : 'ok',
+     );
+     expect(typeof body.geminiActive).toBe('boolean');
++    expect(typeof body.timestamp).toBe('string');
++    expect(body.observability.inProcess).toBe(true);
++    expect(body.observability.persistent).toBe(body.database.connected);
+   });
+ 
+   test('features: flags do produto devolvem booleanos coerentes', async ({ page }) => {

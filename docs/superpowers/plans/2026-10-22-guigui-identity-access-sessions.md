@@ -1,5 +1,7 @@
 # Guigui Identity Access Sessions Implementation Plan
 
+**Status:** Approved by the user on 2026-10-23 for session-context resolution and access middleware only; excluded authentication and account-lifecycle flows remain out of scope.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Extract session-context resolution and Express authentication/role middleware into `identity-access` without changing existing routes, access policies, or persistence.

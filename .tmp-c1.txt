@@ -1,0 +1,4 @@
+﻿da85d50 fix: show authoritative ticket purchase receipt
+ src/components/EventsView.tsx       | 131 ++++++++++++++++++++++++++----------
+ tests/ticket-purchase-modal.spec.ts |  38 ++++++++++-
+ 2 files changed, 134 insertions(+), 35 deletions(-)

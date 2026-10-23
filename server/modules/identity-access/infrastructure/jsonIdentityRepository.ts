@@ -1,44 +1,26 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import type { BusinessTeamMember } from '../src/types';
+import type {
+  IdentityAccountRepository,
+  IdentityCredentialRepository,
+  IdentityTeamInvitationRepository,
+} from '../application/identityAccessPorts';
+import type {
+  CreateIdentityAccount,
+  IdentityAccount,
+  IdentityRole,
+  PublicIdentity,
+  TeamInvitation as IdentityTeamInvitation,
+} from '../domain/identityTypes';
 
-export type AuthRole = 'user' | 'business' | 'admin';
-
-export interface PublicUser {
-  id: string;
-  name: string;
-  email: string;
-  role: AuthRole;
-  phone: string;
-  neighborhood: string;
-  avatarUrl: string;
-  businessId?: string;
-  businessName?: string;
-  accountStatus?: 'active' | 'deactivated';
-  teamRole?: BusinessTeamMember['role'];
-  teamPermissions?: BusinessTeamMember['permissions'];
-}
-
-interface StoredUser extends PublicUser {
-  passwordHash: string;
-  createdAt: string;
-}
+export type AuthRole = IdentityRole;
+export type PublicUser = PublicIdentity;
+export type StoredUser = IdentityAccount;
+export type TeamInvitation = IdentityTeamInvitation;
 
 interface AuthStore {
   users: StoredUser[];
-}
-
-export interface TeamInvitation {
-  email: string;
-  name: string;
-  businessId: string;
-  businessName: string;
-  role: BusinessTeamMember['role'];
-  permissions: BusinessTeamMember['permissions'];
-  tokenHash: string;
-  expiresAt: number;
-  usedAt?: string;
 }
 
 const dataDirectory = process.env.GUIGUI_DATA_DIR || path.resolve(process.cwd(), 'data');
@@ -50,11 +32,19 @@ const resetTokens: Record<string, { email: string; tokenHash: string; expiresAt:
 const teamInvitations: Record<string, TeamInvitation> = loadTeamInvitations();
 
 function loadTeamInvitations(): Record<string, TeamInvitation> {
+  let contents: string;
   try {
-    const parsed = JSON.parse(fs.readFileSync(teamInvitationStorePath, 'utf8'));
-    if (parsed && typeof parsed === 'object') return parsed;
-  } catch { /* Store is created on first invitation. */ }
-  return {};
+    contents = fs.readFileSync(teamInvitationStorePath, 'utf8');
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return {};
+    throw error;
+  }
+
+  const parsed: unknown = JSON.parse(contents);
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    return parsed as Record<string, TeamInvitation>;
+  }
+  throw new Error(`Invalid team invitation store format: ${teamInvitationStorePath}`);
 }
 function persistTeamInvitations() {
   fs.mkdirSync(dataDirectory, { recursive: true });
@@ -81,6 +71,15 @@ export function inspectTeamInvitation(token: string) {
   if (!entry) return null;
   return { email: entry.email, name: entry.name, businessId: entry.businessId, businessName: entry.businessName, role: entry.role, permissions: entry.permissions, expiresAt: entry.expiresAt };
 }
+
+export function consumeTeamInvitation(token: string): boolean {
+  const key = Object.keys(teamInvitations).find((candidate) => validInvitation(teamInvitations[candidate], token));
+  if (!key) return false;
+  teamInvitations[key].usedAt = new Date().toISOString();
+  persistTeamInvitations();
+  return true;
+}
+
 export function acceptTeamInvitation(token: string, password: string, phone = '', neighborhood = 'Bissau') {
   const key = Object.keys(teamInvitations).find((candidate) => validInvitation(teamInvitations[candidate], token));
   if (!key) return null;
@@ -93,13 +92,55 @@ export function acceptTeamInvitation(token: string, password: string, phone = ''
 }
 
 function loadResetTokens(): Record<string, { email: string; tokenHash: string; expiresAt: number }> {
+  let contents: string;
   try {
-    const parsed = JSON.parse(fs.readFileSync(resetTokenStorePath, 'utf8'));
-    if (parsed && typeof parsed === 'object') return parsed;
-  } catch {
-    // Reset tokens are recreated when no store exists.
+    contents = fs.readFileSync(resetTokenStorePath, 'utf8');
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return {};
+    throw new Error(`Não foi possível ler ${path.basename(resetTokenStorePath)}: ${error instanceof Error ? error.message : String(error)}`);
   }
-  return {};
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(contents);
+  } catch (error) {
+    throw new Error(`Ficheiro ${path.basename(resetTokenStorePath)} inválido: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`Ficheiro ${path.basename(resetTokenStorePath)} inválido: esperado um objeto de tokens.`);
+  }
+
+  const normalized: Record<string, { email: string; tokenHash: string; expiresAt: number }> = {};
+  let migrated = false;
+  for (const [storedKey, value] of Object.entries(parsed as Record<string, unknown>)) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error(`Ficheiro ${path.basename(resetTokenStorePath)} inválido: registo de token malformado.`);
+    }
+    const record = value as { email?: unknown; tokenHash?: unknown; expiresAt?: unknown };
+    if (
+      typeof record.email !== 'string'
+      || typeof record.tokenHash !== 'string'
+      || !/^[0-9a-f]{64}$/i.test(record.tokenHash)
+      || typeof record.expiresAt !== 'number'
+      || !Number.isFinite(record.expiresAt)
+    ) {
+      throw new Error(`Ficheiro ${path.basename(resetTokenStorePath)} inválido: registo de token malformado.`);
+    }
+    if (storedKey !== record.tokenHash && tokenHash(storedKey) !== record.tokenHash) {
+      throw new Error(`Ficheiro ${path.basename(resetTokenStorePath)} inválido: chave de token incompatível.`);
+    }
+    if (storedKey !== record.tokenHash) migrated = true;
+    normalized[record.tokenHash] = {
+      email: record.email,
+      tokenHash: record.tokenHash,
+      expiresAt: record.expiresAt,
+    };
+  }
+
+  if (migrated) {
+    fs.writeFileSync(resetTokenStorePath, JSON.stringify(normalized, null, 2), 'utf8');
+  }
+  return normalized;
 }
 
 function persistResetTokens() {
@@ -214,13 +255,15 @@ export function createPasswordReset(email: string) {
   const known = Boolean(findUserByEmail(normalizedEmail) || ['cidadao@guigui.com', 'empresa@guigui.com', 'admin@guigui.com'].includes(normalizedEmail));
   if (!known) return null;
   const token = randomBytes(32).toString('hex');
-  resetTokens[token] = { email: normalizedEmail, tokenHash: tokenHash(token), expiresAt: Date.now() + 15 * 60 * 1000 };
+  const hash = tokenHash(token);
+  resetTokens[hash] = { email: normalizedEmail, tokenHash: hash, expiresAt: Date.now() + 15 * 60 * 1000 };
   persistResetTokens();
   return token;
 }
 
 export function resetPassword(token: string, newPassword: string) {
-  const entry = resetTokens[token];
+  const hash = tokenHash(token);
+  const entry = resetTokens[hash];
   if (!entry || entry.expiresAt <= Date.now() || !timingSafeEqual(Buffer.from(entry.tokenHash, 'hex'), Buffer.from(tokenHash(token), 'hex'))) return false;
   const user = findUserByEmail(entry.email);
   if (user) {
@@ -229,7 +272,7 @@ export function resetPassword(token: string, newPassword: string) {
   } else if (!changeDemoPasswordWithReset(entry.email, newPassword)) {
     return false;
   }
-  delete resetTokens[token];
+  delete resetTokens[hash];
   persistResetTokens();
   return true;
 }
@@ -241,7 +284,7 @@ function changeDemoPasswordWithReset(email: string, newPassword: string) {
   return true;
 }
 
-export function createUser(input: Omit<PublicUser, 'id' | 'avatarUrl'> & { avatarUrl?: string; password: string }) {
+export function createUser(input: CreateIdentityAccount) {
   const email = input.email.trim().toLowerCase();
   if (findUserByEmail(email)) return null;
   const user: StoredUser = {
@@ -267,4 +310,31 @@ export function createUser(input: Omit<PublicUser, 'id' | 'avatarUrl'> & { avata
     throw error;
   }
   return user;
+}
+
+export function createJsonIdentityRepository(): IdentityAccountRepository {
+  return {
+    findByEmail: async (email) => findUserByEmail(email) ?? null,
+    findById: async (id) => findUserById(id) ?? null,
+    create: async (input) => createUser(input),
+    changePassword: async (email, currentPassword, newPassword) => changeUserPassword(email, currentPassword, newPassword),
+    deactivate: async (email) => deactivateUserAccount(email),
+    delete: async (email) => deleteUserAccount(email),
+  };
+}
+
+export function createJsonCredentialRepository(): IdentityCredentialRepository {
+  return {
+    changeDemoPassword: async (email, currentPassword, newPassword) => changeDemoPassword(email, currentPassword, newPassword),
+    createPasswordReset: async (email) => createPasswordReset(email),
+    resetPassword: async (token, newPassword) => resetPassword(token, newPassword),
+  };
+}
+
+export function createJsonTeamInvitationRepository(): IdentityTeamInvitationRepository {
+  return {
+    create: async (input, token) => { createTeamInvitation(input, token); },
+    inspect: async (token) => inspectTeamInvitation(token),
+    consume: async (token) => consumeTeamInvitation(token),
+  };
 }

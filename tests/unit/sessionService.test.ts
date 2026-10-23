@@ -12,7 +12,7 @@ process.env.SESSION_COOKIE_SECRET = 'unit-test-session-secret';
 // null so tests exercise the JSON-file backed implementation deterministically.
 vi.mock('../../server/db', () => ({ databasePool: null, databaseConfigured: false }));
 
-type SessionModule = typeof import('../../server/sessionService');
+type SessionModule = typeof import('../../server/modules/identity-access/infrastructure/sessionRepository');
 let sessionService: SessionModule;
 
 // The service keeps an in-memory `sessions` array loaded once at import time, so
@@ -21,7 +21,7 @@ async function freshModule(): Promise<SessionModule> {
   const storePath = path.join(tempDir, 'sessions.json');
   if (fs.existsSync(storePath)) fs.rmSync(storePath, { force: true });
   vi.resetModules();
-  sessionService = await import('../../server/sessionService');
+  sessionService = await import('../../server/modules/identity-access/infrastructure/sessionRepository');
   return sessionService;
 }
 
@@ -68,6 +68,15 @@ describe('createSession / getSession', () => {
     const session = await sessionService.getSession(token);
     expect(session?.tokenHash).toBeTruthy();
     expect(JSON.stringify(session)).not.toContain(token);
+  });
+
+  it('fails to load malformed session storage instead of treating it as empty', async () => {
+    fs.writeFileSync(path.join(tempDir, 'sessions.json'), '{invalid json', 'utf8');
+    vi.resetModules();
+
+    await expect(
+      import('../../server/modules/identity-access/infrastructure/sessionRepository'),
+    ).rejects.toThrow(SyntaxError);
   });
 });
 

@@ -10,7 +10,7 @@
  */
 import 'dotenv/config';
 import { Pool } from 'pg';
-import { hashPassword } from '../server/authService';
+import { hashPassword } from '../server/modules/identity-access';
 
 const SEED_PASSWORD = 'Guigui2026!';
 const SEED_DOMAIN = 'guigui.test';
@@ -176,4 +176,3 @@ main().catch((error) => {
   console.error('seed-demo FALHOU:', error instanceof Error ? error.message : error);
   process.exit(1);
 });
-

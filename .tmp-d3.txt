@@ -1,0 +1,141 @@
+﻿+        store: async (key, storedResult) => {
++          purchaseIdempotency.set(key, { createdAt: Date.now(), result: storedResult });
++        },
++      },
++      payments: paymentAdapters,
++      ticketFactory: ({ offer: ticketOffer, buyer, quantity, holderName, holderPhone, paymentMethod: method, purchasedAt }) => (
++        Array.from({ length: quantity }, (_, index) => {
++          const { ticketCode, qrToken, pinCode } = generateTicketIdentifiers();
++          const ticket: TicketForValidation = {
++            id: `TKT-${Date.now()}-${index + 1}-${randomBytes(2).toString('hex').toUpperCase()}`,
++            ticketCode,
++            ticketTypeId: ticketOffer.ticketTypeId,
++            buyerUserId: buyer.userId,
++            eventId: ticketOffer.eventId,
++            ...(ticketOffer.businessId ? { businessId: ticketOffer.businessId } : {}),
++            eventTitle: ticketOffer.eventTitle,
++            ticketTypeName: ticketOffer.ticketTypeName,
++            priceXOF: ticketOffer.unitPriceXOF,
++            buyerName: buyer.name,
++            buyerPhone: buyer.phone,
++            ...(holderName && holderPhone ? { holderName, holderPhone } : {}),
++            qrToken,
++            pinCode,
++            status: 'valid',
++            purchasedAt,
++            expiresAt: calculateTicketExpiry(ticketOffer.eventDate, ticketOffer.eventTime),
++            paymentMethod: method,
++          };
++          if (ticketSigningSecret) ticket.signature = signTicket(ticket, ticketSigningSecret);
++          return ticket;
++        })
++      ),
++      transactions: {
++        persist: async (transaction) => {
++          const existingIndex = paymentTransactions.findIndex((item) => item.id === transaction.id);
++          if (existingIndex === -1) paymentTransactions.push(transaction);
++          else paymentTransactions[existingIndex] = transaction;
++          persistPayments();
++        },
++        recordFulfillment: async (transaction) => {
++          recordMonetizationFulfillment(transaction);
++        },
++      },
++      delivery: (deliveryInput) => deliverConfirmedTicketPurchase(deliveryInput, { email: emailDelivery, sms: smsDelivery }),
++      catalogSettings: normaliseMonetizationCatalog(monetizationCatalogStore),
++      createTransactionId: () => `TXN-${Date.now()}-${randomBytes(3).toString('hex').toUpperCase()}`,
++      reservationTtlMs: TICKET_RESERVATION_TTL_MS,
++      now: () => new Date(),
+     });
+-    paymentConfirmed = paymentIntent.state === 'confirmed';
+-
+-    const purchaseTimestamp = new Date().toISOString();
+-    const newTickets: TicketForValidation[] = paymentConfirmed ? Array.from({ length: ticketQuantity }, (_, index) => {
+-      const { ticketCode, qrToken, pinCode } = generateTicketIdentifiers();
+-      const ticket: TicketForValidation = {
+-        id: `TKT-${Date.now()}-${index + 1}-${randomBytes(2).toString('hex').toUpperCase()}`,
+-        ticketCode,
+-        ticketTypeId: offer.ticketTypeId,
+-        buyerUserId: purchaseSession.userId,
+-        eventId: offer.eventId,
+-        ...(offer.businessId ? { businessId: offer.businessId } : {}),
+-        eventTitle: offer.eventTitle,
+-        ticketTypeName: offer.ticketTypeName,
+-        priceXOF: offer.unitPriceXOF,
+-        buyerName: account.name,
+-        buyerPhone: account.phone,
+-        ...(holderName && holderPhone ? { holderName, holderPhone } : {}),
+-        qrToken,
+-        pinCode,
+-        status: 'valid',
+-        purchasedAt: purchaseTimestamp,
+-        expiresAt: calculateTicketExpiry(offer.eventDate, offer.eventTime),
+-        paymentMethod,
+-      };
+-      if (ticketSigningSecret) ticket.signature = signTicket(ticket, ticketSigningSecret);
+-      return ticket;
+-    }) : [];
+-    const primaryTicket = newTickets[0];
+-
+-    const paymentTimestamp = new Date().toISOString().replace('T', ' ').substring(0, 16);
+-    const newTxn = {
+-      id: txnId,
+-      useCase: 'event_tickets',
+-      useCaseLabel: `Bilhete ${offer.ticketTypeName} - ${offer.eventTitle}`,
+-      businessId: offer.businessId,
+-      businessName: offer.eventTitle,
+-      payerName: account.name,
+-      payerPhone: account.phone,
+-      amountXOF: chargedAmountXOF,
+-      ticketBaseAmountXOF: offer.unitPriceXOF * ticketQuantity,
+-      platformFeeXOF: ticketFeeBreakdown.platformRevenue,
+-      provider: paymentMethod,
+-      providerRef: paymentIntent.providerRef,
+-      productId: 'product-ticket-fee',
+-      productCode: 'TICKET_FEE',
+-      quantity: ticketQuantity,
+-      status: paymentIntent.state === 'confirmed' ? 'confirmed_api' : paymentIntent.state === 'failed' ? 'failed' : 'pending_provider',
+-      isApiIntegrationReady: paymentAdapter.mode === 'live',
+-      providerMode: paymentAdapter.mode,
+-      checkoutUrl: paymentIntent.checkoutUrl,
+-      paymentInstructions: paymentIntent.instructions,
+-      ticketId: undefined as string | undefined,
+-      ticketIds: [] as string[],
+-      ticketCode: undefined as string | undefined,
+-      ticketCodes: [] as string[],
+-      qrToken: undefined as string | undefined,
+-      qrTokens: [] as string[],
+-      ticketDraft: undefined as
+-        | { eventId?: string; eventTitle?: string; ticketTypeId?: string; ticketTypeName?: string; unitPriceXOF?: number; buyerUserId?: string; eventDate?: string; eventTime?: string; quantity?: number }
+-        | undefined,
+-      createdAt: paymentTimestamp,
+-      ...(paymentIntent.state === 'confirmed' ? { confirmedAt: paymentTimestamp, confirmedBy: `${paymentAdapter.provider} (${paymentAdapter.mode})` } : {}),
+-    };
+-    paymentTransactions.push(newTxn);
+-    if (paymentIntent.state === 'confirmed') recordMonetizationFulfillment(newTxn);
+-    persistPayments();
+ 
+-    if (paymentIntent.state === 'failed') {
+-      await ticketInventory.release(txnId);
+-      reservationId = undefined;
+-      const failurePayload = {
+-        success: false,
+-        error: 'O pagamento simulado n├úo foi aprovado. A reserva de bilhetes foi libertada.',
+-        code: 'TICKET_PAYMENT_FAILED',
+-        transaction: newTxn,
++    if (result.status === 'pending') {
++      recordAudit({
++        action: 'ticket_payment_pending',
++        resource: 'payment',
++        resourceId: result.transaction.id,
++        actorRole: 'citizen',
+         requestId,
+-      };
+-      if (idempotencyKey) purchaseIdempotency.set(idempotencyKey, { createdAt: Date.now(), response: failurePayload, status: 502 });
+-      return res.status(502).json(failurePayload);
+-    }
+-
+-    if (paymentIntent.state === 'pending') {
+-      newTxn.ticketDraft = {
+-        eventId: offer.eventId,
+-        eventTitle: offer.eventTitle,

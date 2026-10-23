@@ -1,6 +1,6 @@
 # Especificação: `identity-access` — sessões e autorização
 
-**Estado:** proposta para revisão do utilizador
+**Estado:** aprovado pelo utilizador em 2026-10-23 para resolução de contexto de sessão e middleware de acesso
 **Data:** 2026-10-22
 **Escopo:** primeira fatia do módulo `identity-access`
 **Compatibilidade:** preservar os contratos HTTP e as políticas de acesso existentes

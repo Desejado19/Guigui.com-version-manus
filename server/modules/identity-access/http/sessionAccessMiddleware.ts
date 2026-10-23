@@ -28,7 +28,13 @@ export function createSessionAccessMiddleware(
   }
 
   const requireSession: RequestHandler = async (req, res, next) => {
-    if (!(await sessionContext(req))) {
+    let context: SessionContext | null;
+    try {
+      context = await sessionContext(req);
+    } catch (error) {
+      return next(error);
+    }
+    if (!context) {
       return res.status(401).json({
         error: 'Sessão autenticada necessária.',
         code: 'AUTHENTICATION_REQUIRED',
@@ -39,7 +45,12 @@ export function createSessionAccessMiddleware(
 
   function requireRole(...roles: SessionRole[]): RequestHandler {
     return async (req, res, next) => {
-      const context = await sessionContext(req);
+      let context: SessionContext | null;
+      try {
+        context = await sessionContext(req);
+      } catch (error) {
+        return next(error);
+      }
       if (!context) {
         return res.status(401).json({
           error: 'Sessão autenticada necessária.',

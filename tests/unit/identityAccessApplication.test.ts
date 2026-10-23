@@ -3,6 +3,12 @@ import {
   resolveSessionContext,
   type SessionReader,
 } from '../../server/modules/identity-access/application/resolveSessionContext';
+import {
+  createIdentityAccess,
+  hashPassword,
+  SESSION_COOKIE_NAME,
+  verifyPassword,
+} from '../../server/modules/identity-access';
 
 function createReader(
   overrides: Partial<SessionReader['getSession']> = {},
@@ -57,5 +63,35 @@ describe('resolução do contexto de sessão', () => {
     } as Partial<SessionReader['getSession']>);
 
     await expect(resolveSessionContext('token-1', reader)).rejects.toBe(failure);
+  });
+});
+
+describe('API pública de identity-access', () => {
+  it('composes identity operations and exposes password helpers without stored credentials', async () => {
+    const identityAccess = createIdentityAccess({
+      databaseConfigured: false,
+      demoAccountsEnabled: false,
+      demoUsers: [],
+      businessProvisioning: {
+        validateProfile: () => ({ missingFields: [] }),
+        createProfile: async ({ id }) => ({ id }),
+        assignOwner: async () => true,
+        deleteProfile: async () => true,
+      },
+      createBusinessInvitationAccess: () => ({
+        validate: async () => null,
+        addMember: async () => false,
+      }),
+    });
+
+    await expect(identityAccess.authenticate({
+      email: 'identity-access-public-api-missing@example.test',
+      password: 'test-password',
+    })).resolves.toEqual({ kind: 'rejected', reason: 'invalid_credentials' });
+
+    const encodedPassword = hashPassword('test-password');
+    expect(verifyPassword('test-password', encodedPassword)).toBe(true);
+    expect(verifyPassword('incorrect-password', encodedPassword)).toBe(false);
+    expect(SESSION_COOKIE_NAME).toBe('guigui_session');
   });
 });

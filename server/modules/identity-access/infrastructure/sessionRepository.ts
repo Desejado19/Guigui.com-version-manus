@@ -1,7 +1,9 @@
 import { createHmac, randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { databasePool } from './db';
+import { databasePool } from '../../../db';
+import type { IdentitySessionRepository } from '../application/identityAccessPorts';
+import type { StoredSession as IdentityStoredSession } from '../domain/identityTypes';
 
 const dataDirectory = process.env.GUIGUI_DATA_DIR || path.resolve(process.cwd(), 'data');
 const sessionStorePath = path.join(dataDirectory, 'sessions.json');
@@ -11,31 +13,26 @@ const sessionSecret = process.env.SESSION_COOKIE_SECRET
 
 export const SESSION_COOKIE_NAME = 'guigui_session';
 
-export interface StoredSession {
-  id?: string;
-  userId: string;
-  role?: 'user' | 'business' | 'admin';
-  tokenHash: string;
-  createdAt: string;
-  expiresAt: string;
-  revokedAt?: string;
-  ipAddress?: string;
-  userAgent?: string;
-}
+export type StoredSession = IdentityStoredSession;
 
 function loadSessions(): StoredSession[] {
+  let contents: string;
   try {
-    const parsed = JSON.parse(fs.readFileSync(sessionStorePath, 'utf8')) as unknown;
-    return Array.isArray(parsed) ? parsed.filter((session): session is StoredSession => (
-      Boolean(session)
-      && typeof session === 'object'
-      && typeof (session as StoredSession).userId === 'string'
-      && typeof (session as StoredSession).tokenHash === 'string'
-      && typeof (session as StoredSession).expiresAt === 'string'
-    )) : [];
-  } catch {
-    return [];
+    contents = fs.readFileSync(sessionStorePath, 'utf8');
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return [];
+    throw error;
   }
+
+  const parsed: unknown = JSON.parse(contents);
+  if (!Array.isArray(parsed)) throw new Error(`Invalid session store format: ${sessionStorePath}`);
+  return parsed.filter((session): session is StoredSession => (
+    Boolean(session)
+    && typeof session === 'object'
+    && typeof (session as StoredSession).userId === 'string'
+    && typeof (session as StoredSession).tokenHash === 'string'
+    && typeof (session as StoredSession).expiresAt === 'string'
+  ));
 }
 
 const sessions = loadSessions();
@@ -127,4 +124,8 @@ export async function revokeAllUserSessions(userId: string): Promise<number> {
   });
   if (count > 0) persistSessions();
   return count;
+}
+
+export function createSessionRepository(): IdentitySessionRepository {
+  return { createSession, getSession, revokeSession, revokeAllUserSessions };
 }

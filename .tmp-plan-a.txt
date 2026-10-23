@@ -1,0 +1,78 @@
+﻿- Modify `server/validationService.ts` to validate purchase identity, policy, selected event/ticket identifiers, and payment method without treating client prices as authoritative.
+- Modify `server/runtimeStore.ts` only if a narrowly scoped helper is needed for the server-owned local event/ticket simulation store.
+- Modify `src/components/TicketPurchaseModal.tsx` and `src/components/EventsView.tsx` for checkout errors and receipt data returned by the server.
+- Modify `src/components/MyTicketsPanel.tsx` and the existing account notification flow only where needed to expose persisted tickets and the purchase notification.
+- Modify `tests/ticket-purchase-modal.spec.ts`, `tests/unit/ticketPurchaseDelivery.test.ts`, and `tests/unit/ticketPurchaseNotification.test.ts`; create focused purchase-domain/use-case tests.
+- Add a non-destructive migration only if the existing `ticket_types` and `tickets` schema cannot represent the required inventory reservation; prefer existing quantity, status, and expiry columns.
+
+## Task 1: Validate Checkout Offers, Quotes, and Inventory
+
+**Files:**
+- Create: `server/ticketPurchaseDomain.ts`
+- Create: `server/ticketPurchasePorts.ts`
+- Create: `server/ticketCatalogService.ts`
+- Modify: `server.ts`
+- Modify: `server/postgresBusinessService.ts`
+- Modify: `server/postgresTicketService.ts`
+- Modify: `server/validationService.ts`
+- Test: `tests/unit/ticketPurchaseDomain.test.ts`
+- Test: `tests/unit/ticketPurchaseCatalog.test.ts`
+- Test: `tests/ticket-purchase-modal.spec.ts`
+
+**Interfaces:**
+- Produces `TicketOffer` with `eventId`, optional `businessId`, `eventTitle`, `ticketTypeId`, `ticketTypeName`, `unitPriceXOF`, `availableQuantity`, `soldQuantity`, and `salesOpen`.
+- Produces `TicketCatalogPort.getOffer(eventId: string, ticketTypeId: string): Promise<TicketOffer | null>` and `TicketInventoryPort.reserve(input: { offer: TicketOffer; quantity: number; reservationId: string; expiresAt: string }): Promise<'reserved' | 'unavailable'>`, plus `confirm(reservationId: string): Promise<void>` and `release(reservationId: string): Promise<void>`.
+- Produces `getTicketOffer(eventId: string, ticketTypeId: string): Promise<TicketOffer | null>` in `server/ticketCatalogService.ts`. Read persisted PostgreSQL event data when configured; otherwise read server-owned event snapshots from the local runtime store. Only published, sale-open events and ticket types are returned.
+- Produces `quoteTicketPurchase(input: { offer: TicketOffer; quantity: number; catalog: MonetizationCatalog }): TicketPurchaseQuoteResult` in `server/ticketPurchaseDomain.ts`. Return a discriminated result for invalid quantity, closed sales, sold out/insufficient inventory, or a valid quote; a valid quote contains unit price, quantity, fee breakdown, and buyer total.
+- Implements `TicketInventoryPort` so it atomically reserves the requested quantity for both confirmed and pending simulated payments. PostgreSQL uses the existing `ticket_types.quantity` and ticket status/expiry data under a row lock; local simulation updates the server-owned event/ticket store before awaiting payment.
+- Consumes existing `PaymentProviderAdapter`, `calculateTicketFees`, and explicit `policyAccepted`/`policyVersion`/`policyAcceptedAt` validation.
+
+- [ ] **Step 1: Write failing domain and catalog tests**
+
+Add `quoteTicketPurchase` tests for a valid quote, zero/fractional/over-limit quantity, closed sales, sold out inventory, and quantity above remaining stock. Assert totals use the server offer price and `calculateTicketFees`, never a submitted client amount. Add catalog tests for unknown event/type, unpublished event, and successful lookup from PostgreSQL and local simulation data.
+
+- [ ] **Step 2: Run focused tests and confirm expected failures**
+
+Run: `npx vitest run tests/unit/ticketPurchaseDomain.test.ts tests/unit/ticketPurchaseCatalog.test.ts`
+
+Expected: FAIL because the domain quote and catalog resolver do not yet exist.
+
+- [ ] **Step 3: Implement offer resolution and quote calculation**
+
+Implement the exact `TicketOffer`, `TicketPurchaseQuoteResult`, `quoteTicketPurchase`, and `getTicketOffer` interfaces above. Synchronize ticket type IDs, prices, and capacities when an authorized event is saved. In local simulation mode, retain the authorized server event snapshot with the existing JSON runtime store instead of trusting each purchase body as a new offer.
+
+- [ ] **Step 4: Add inventory reservation and server-authoritative request handling**
+
+Update `POST /api/tickets/purchase` to require an authenticated session for valid purchase requests, derive the buyer account ID from that session, resolve `eventId`/`ticketTypeId`, calculate price and fees from the offer, reject submitted price/total mismatches before creating a payment intent, and reserve capacity before calling the payment adapter. Keep reservations `pending` until confirmed, preserve expiry behavior, and release expired/failed reservations. Use canonical event and category names in the transaction and issued tickets.
+
+- [ ] **Step 5: Add regression assertions for tampering, stock, and idempotency**
+
+Extend the focused purchase tests to prove that an unauthenticated valid request, invalid policy acceptance, tampered price/category, unknown offer, unavailable stock, and closed sales create no payment intent or valid ticket; two concurrent reservations for the last available ticket allow only one success; same-key retries return the original result without duplicate tickets; a pending simulation reserves capacity but creates no valid ticket.
+
+- [ ] **Step 6: Run focused tests and commit**
+
+Run: `npx vitest run tests/unit/ticketPurchaseDomain.test.ts tests/unit/ticketPurchaseCatalog.test.ts tests/unit/ticketPurchaseDelivery.test.ts`
+
+Run: `npm run check`
+
+Expected: PASS; catalog/stock violations stop before simulated payment and the existing typed integration ports remain compatible.
+
+```powershell
+git add server/ticketPurchaseDomain.ts server/ticketCatalogService.ts server.ts server/postgresBusinessService.ts server/postgresTicketService.ts server/validationService.ts tests/unit/ticketPurchaseDomain.test.ts tests/unit/ticketPurchaseCatalog.test.ts tests/ticket-purchase-modal.spec.ts
+git commit -m "fix: validate ticket offers and inventory server-side" -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+```
+
+## Task 2: Make the Confirmed Receipt Complete and Responsive
+
+**Files:**
+- Modify: `src/components/TicketPurchaseModal.tsx`
+- Modify: `src/components/EventsView.tsx`
+- Modify: `src/index.css` only for receipt layout adjustments that cannot be expressed by existing component classes.
+- Test: `tests/ticket-purchase-modal.spec.ts`
+
+**Interfaces:**
+- Consumes the purchase result's `transaction.id`, `transaction.providerMode`, authoritative `feeBreakdown`, `tickets`, and `delivery` states.
+- Produces a receipt state in `EventsView` that retains the server transaction reference, server fee breakdown, issued ticket list, and explicit payment/email/SMS/notification statuses until the receipt closes.
+- Preserves existing modal callbacks and the API response shape.
+
+- [ ] **Step 1: Add failing receipt tests**

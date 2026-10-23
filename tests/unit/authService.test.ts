@@ -7,7 +7,7 @@ import path from 'node:path';
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'guigui-auth-'));
 process.env.GUIGUI_DATA_DIR = tempDir;
 
-type AuthModule = typeof import('../../server/authService');
+type AuthModule = typeof import('../../server/modules/identity-access/infrastructure/jsonIdentityRepository');
 let auth: AuthModule;
 
 // authService loads `store`, `demoPasswordStore`, `resetTokens` and
@@ -19,7 +19,7 @@ async function freshModule(): Promise<AuthModule> {
     if (fs.existsSync(full)) fs.rmSync(full, { force: true });
   }
   vi.resetModules();
-  auth = await import('../../server/authService');
+  auth = await import('../../server/modules/identity-access/infrastructure/jsonIdentityRepository');
   return auth;
 }
 
@@ -116,6 +116,60 @@ describe('account state affecting login', () => {
 });
 
 describe('token issuance: password reset', () => {
+  it('migrates legacy reset records without invalidating unexpired tokens', async () => {
+    auth.createUser({ name: 'R', email: 'legacy-reset@guigui.com', password: 'old', role: 'user', phone: '+1', neighborhood: 'Bissau' });
+    const token = auth.createPasswordReset('legacy-reset@guigui.com')!;
+    const resetStorePath = path.join(tempDir, 'password-reset-tokens.json');
+    const currentStore = JSON.parse(fs.readFileSync(resetStorePath, 'utf8')) as Record<string, unknown>;
+    const record = currentStore[Object.keys(currentStore)[0]];
+    fs.writeFileSync(resetStorePath, JSON.stringify({ [token]: record }), 'utf8');
+
+    vi.resetModules();
+    auth = await import('../../server/modules/identity-access/infrastructure/jsonIdentityRepository');
+
+    const migratedStore = fs.readFileSync(resetStorePath, 'utf8');
+    expect(migratedStore).not.toContain(token);
+    expect(auth.resetPassword(token, 'new-password')).toBe(true);
+  });
+
+  it('persists newly issued reset tokens by hash instead of plaintext', () => {
+    const token = auth.createPasswordReset('admin@guigui.com')!;
+    const resetStorePath = path.join(tempDir, 'password-reset-tokens.json');
+    const persisted = fs.readFileSync(resetStorePath, 'utf8');
+
+    expect(persisted).not.toContain(token);
+    const records = JSON.parse(persisted) as Record<string, { tokenHash: string }>;
+    expect(Object.keys(records)).toEqual([records[Object.keys(records)[0]].tokenHash]);
+  });
+
+  it('rejects reset tokens that have expired', async () => {
+    const token = auth.createPasswordReset('admin@guigui.com')!;
+    const resetStorePath = path.join(tempDir, 'password-reset-tokens.json');
+    const records = JSON.parse(fs.readFileSync(resetStorePath, 'utf8')) as Record<string, { expiresAt: number }>;
+    records[Object.keys(records)[0]].expiresAt = Date.now() - 1;
+    fs.writeFileSync(resetStorePath, JSON.stringify(records), 'utf8');
+    vi.resetModules();
+    auth = await import('../../server/modules/identity-access/infrastructure/jsonIdentityRepository');
+
+    expect(auth.resetPassword(token, 'new-password')).toBe(false);
+  });
+
+  it('fails explicitly when the reset-token JSON is corrupt', async () => {
+    const resetStorePath = path.join(tempDir, 'password-reset-tokens.json');
+    fs.writeFileSync(resetStorePath, '{broken', 'utf8');
+    vi.resetModules();
+
+    await expect(import('../../server/modules/identity-access/infrastructure/jsonIdentityRepository')).rejects.toThrow('password-reset-tokens.json');
+  });
+
+  it('fails explicitly when a stored reset record is malformed', async () => {
+    const resetStorePath = path.join(tempDir, 'password-reset-tokens.json');
+    fs.writeFileSync(resetStorePath, JSON.stringify({ broken: { email: 'reset@guigui.com' } }), 'utf8');
+    vi.resetModules();
+
+    await expect(import('../../server/modules/identity-access/infrastructure/jsonIdentityRepository')).rejects.toThrow('password-reset-tokens.json');
+  });
+
   it('issues a reset token for a known user and consumes it', () => {
     auth.createUser({ name: 'R', email: 'reset@guigui.com', password: 'old', role: 'user', phone: '+1', neighborhood: 'Bissau' });
     const token = auth.createPasswordReset('reset@guigui.com');
@@ -174,6 +228,33 @@ describe('token issuance: team invitations', () => {
     // The invitation is now used and cannot be reused.
     expect(auth.acceptTeamInvitation('accept-token', 'another-pass')).toBeNull();
     expect(auth.inspectTeamInvitation('accept-token')).toBeNull();
+  });
+
+  it('consumes an invitation once through the module repository without persisting its raw token', async () => {
+    const invitations = auth.createJsonTeamInvitationRepository();
+    const token = 'repository-invitation-token';
+    await invitations.create(invite, token);
+
+    expect(await invitations.inspect(token)).toMatchObject({
+      email: 'member@guigui.com',
+      businessId: 'biz-1',
+    });
+    expect(fs.readFileSync(path.join(tempDir, 'team-invitations.json'), 'utf8')).not.toContain(token);
+    await expect(invitations.consume(token)).resolves.toBe(true);
+    await expect(invitations.inspect(token)).resolves.toBeNull();
+    await expect(invitations.consume(token)).resolves.toBe(false);
+  });
+
+  it('expires invitations after 48 hours', () => {
+    vi.useFakeTimers();
+    const createdAt = Date.now();
+    try {
+      auth.createTeamInvitation(invite, 'expires-after-48-hours');
+      vi.setSystemTime(createdAt + 48 * 60 * 60 * 1000 + 1);
+      expect(auth.inspectTeamInvitation('expires-after-48-hours')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('returns null when accepting an unknown invitation', () => {

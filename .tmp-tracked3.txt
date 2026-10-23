@@ -1,0 +1,44 @@
+﻿diff --git a/server/ticketPurchaseDeliveryService.ts b/server/ticketPurchaseDeliveryService.ts
+index a66d3e5..1a9178b 100644
+--- a/server/ticketPurchaseDeliveryService.ts
++++ b/server/ticketPurchaseDeliveryService.ts
+@@ -96,6 +96,7 @@ export async function deliverConfirmedTicketPurchase(
+           ticketIds: input.tickets.map((ticket) => ticket.id),
+           ticketCodes: input.tickets.map((ticket) => ticket.ticketCode),
+           eventId: input.eventId,
++          ticketDestination: 'my-tickets',
+         },
+         createdAt: new Date().toISOString(),
+       });
+diff --git a/server/ticketPurchasePorts.ts b/server/ticketPurchasePorts.ts
+index 9b28734..f7e27ee 100644
+--- a/server/ticketPurchasePorts.ts
++++ b/server/ticketPurchasePorts.ts
+@@ -19,3 +19,8 @@ export interface TicketInventoryPort {
+ export interface TicketRepositoryPort {
+   issue(reservationId: string, tickets: TicketForValidation[], buyerUserId: string): Promise<TicketForValidation[]>;
+ }
++
++export interface TicketPurchaseIdempotencyPort<T> {
++  get(key: string): Promise<T | null>;
++  store(key: string, result: T): Promise<void>;
++}
+diff --git a/tests/unit/ticketPurchaseDelivery.test.ts b/tests/unit/ticketPurchaseDelivery.test.ts
+index 91a9afa..5d457d3 100644
+--- a/tests/unit/ticketPurchaseDelivery.test.ts
++++ b/tests/unit/ticketPurchaseDelivery.test.ts
+@@ -89,7 +89,13 @@ describe('confirmed ticket purchase delivery', () => {
+       id: 'notif-ticket-txn-1',
+       userId: 'user-1',
+       category: 'order_redemption',
+-      metadata: expect.objectContaining({ transactionId: 'txn-1', ticketIds: ['ticket-1', 'ticket-2', 'ticket-3'] }),
++      metadata: expect.objectContaining({
++        transactionId: 'txn-1',
++        ticketId: 'ticket-1',
++        ticketIds: ['ticket-1', 'ticket-2', 'ticket-3'],
++        eventId: 'event-1',
++        ticketDestination: 'my-tickets',
++      }),
+     }));
+     expect(deliveryMocks.smsSend).toHaveBeenCalledTimes(4);
+     expect(deliveryMocks.smsSend).toHaveBeenNthCalledWith(1, expect.objectContaining({

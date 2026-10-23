@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { databasePool } from './db';
+import { databasePool } from '../../../db';
+import type { IdentityMfaRepository } from '../application/identityAccessPorts';
 
 const base32Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 const mfaSecret = process.env.MFA_SECRET || process.env.SESSION_COOKIE_SECRET;
@@ -93,4 +94,8 @@ export async function verifyUserMfa(userId: string, code: string): Promise<boole
   if (step === null || (row.last_used_step !== null && Number(row.last_used_step) >= step)) return false;
   await databasePool.query(`UPDATE mfa_factors SET last_used_step=$2 WHERE user_id=$1 AND method='totp'`, [userId, step]);
   return true;
+}
+
+export function createMfaRepository(): IdentityMfaRepository {
+  return { hasEnabledMfa, beginMfaSetup, enableMfa, verifyUserMfa };
 }
