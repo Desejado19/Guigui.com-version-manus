@@ -303,6 +303,7 @@
 
 - [x] Run `npm run test:e2e -- tests/business-profile.spec.ts` against isolated test data.
 - [x] Run `npm run test:unit -- --maxWorkers=1 --no-file-parallelism`.
+- [x] Run `npm run test:integration` against a dedicated PostgreSQL test database.
 - [x] Run `npm run check`, `npm run test:i18n`, `npm run build`, and `git diff --check`.
 - [x] Report skipped tests and any environment-dependent E2E limitations; do not weaken or skip existing tests.
 

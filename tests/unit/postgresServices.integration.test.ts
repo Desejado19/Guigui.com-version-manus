@@ -83,12 +83,24 @@ const schemaSql = [
    )`,
   `CREATE TABLE IF NOT EXISTS moderation_items (
      id TEXT PRIMARY KEY, company_id TEXT REFERENCES companies(id) ON DELETE SET NULL,
-     content_type TEXT NOT NULL, content_id TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+     content_type TEXT NOT NULL, content_id TEXT NOT NULL,
+     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'appealed')),
      decision_reason TEXT, reviewed_by TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
      reviewed_at TIMESTAMPTZ, item_data JSONB
    )`,
-  // BDs de teste criadas antes da coluna existir (CREATE TABLE IF NOT EXISTS não altera).
+  // Keep older test databases aligned with the production migration.
   `ALTER TABLE moderation_items ADD COLUMN IF NOT EXISTS item_data JSONB`,
+  `DO $$ BEGIN
+     IF NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+       WHERE conname = 'moderation_items_status_check'
+         AND conrelid = 'moderation_items'::regclass
+     ) THEN
+       ALTER TABLE moderation_items
+         ADD CONSTRAINT moderation_items_status_check
+         CHECK (status IN ('pending', 'approved', 'rejected', 'appealed'));
+     END IF;
+   END $$`,
 ].join(';\n');
 
 describeIfDb('Postgres services integration (real test database)', () => {
@@ -162,10 +174,11 @@ describeIfDb('Postgres services integration (real test database)', () => {
       expect(member.rows[0].member_role).toBe('manager');
     });
 
-    it('is idempotent on conflict and returns the existing user', async () => {
+    it('does not create a duplicate account when the email conflicts', async () => {
       const first = await auth.createPostgresUser(newUser);
       const second = await auth.createPostgresUser({ ...newUser, name: 'Ignored' });
-      expect(second?.id).toBe(first!.id);
+      expect(second).toBeNull();
+      expect((await auth.findPostgresUserById(first!.id))?.name).toBe(newUser.name);
       const count = await pool.query('SELECT COUNT(*)::int AS n FROM users');
       expect(count.rows[0].n).toBe(1);
     });
