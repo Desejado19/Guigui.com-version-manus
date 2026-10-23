@@ -98,6 +98,7 @@ import { ClientExportHub } from './client/ClientExportHub';
 import { CommunicationHub } from './CommunicationHub';
 import {
   Business,
+  BusinessCategory,
   BusinessPost,
   Promotion,
   Language,
@@ -184,6 +185,7 @@ interface BusinessDashboardProps {
   business: Business;
   currentUser: UserProfile;
   businesses: Business[];
+  categories: BusinessCategory[];
   followerCount?: number;
   audienceReach?: number;
   initialTab?: BusinessDashboardTab;
@@ -229,6 +231,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
   business,
   currentUser,
   businesses,
+  categories,
   followerCount = 0,
   audienceReach = 0,
   initialTab = 'overview',
@@ -1988,6 +1991,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
       {activeTab === 'my_business' && (
         <ClientBusinessProfile
           business={business}
+          categories={categories}
           currentLang={currentLang}
           onUpdateBusiness={async (updatedBusiness) => {
             if (!denyPermission('profile')) throw new Error('Não tem permissão para editar o perfil.');
@@ -5401,7 +5405,6 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
     </div>
   );
 };
-
 
 
 

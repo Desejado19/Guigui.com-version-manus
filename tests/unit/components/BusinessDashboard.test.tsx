@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BusinessDashboard } from '../../../src/components/BusinessDashboard';
+import { MAIN_CATEGORIES } from '../../../src/data/categoryCatalog';
 import type { Business, UserProfile } from '../../../src/types';
 
 const business: Business = {
@@ -57,6 +58,7 @@ function renderDashboard(
       business={business}
       currentUser={currentUser}
       businesses={[business]}
+      categories={MAIN_CATEGORIES}
       currentLang="pt"
       initialTab="my_business"
       onAddPost={vi.fn()}

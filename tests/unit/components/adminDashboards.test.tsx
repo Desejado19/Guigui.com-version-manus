@@ -6,6 +6,7 @@ import React from 'react';
 import { AdminDashboard } from '../../../src/components/AdminDashboard';
 import { BusinessDashboard } from '../../../src/components/BusinessDashboard';
 import { INITIAL_BUSINESSES, INITIAL_EVENTS } from '../../../src/data/initialData';
+import { MAIN_CATEGORIES } from '../../../src/data/categoryCatalog';
 import type { UserProfile } from '../../../src/types';
 
 // These dashboards fetch on mount (payments, notifications, catalog, etc.).
@@ -134,6 +135,7 @@ describe('BusinessDashboard', () => {
         business={business}
         currentUser={ownerUser}
         businesses={INITIAL_BUSINESSES}
+        categories={MAIN_CATEGORIES}
         currentLang="pt"
         events={INITIAL_EVENTS}
         purchaseOrders={[]}

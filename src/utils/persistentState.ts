@@ -13,8 +13,6 @@ export function readStoredValue<T>(key: string, fallback: T): T {
 
 // Chaves do sistema que devem ser sincronizadas com o banco de dados PostgreSQL
 const SYNCABLE_STATE_KEYS = new Set([
-  'guigui_businesses',
-  'guigui_events',
   'guigui_user_posts',
   'guigui_promotions',
   'guigui_stories',
@@ -110,31 +108,6 @@ export function usePersistentState<T>(key: string, fallback: T) {
           // itens: cada chamada seria rejeitada e só desperdiça a quota da API,
           // bloqueando depois pedidos legítimos como o login com "Demasiados pedidos".
           if (!saved.ok) return;
-
-          // Se forem empresas ou eventos, sincroniza com tabelas estruturadas adicionais
-          if (key === 'guigui_businesses' && Array.isArray(value)) {
-            for (const item of value.slice(0, 50)) {
-              if (item && item.id && item.name) {
-                const response = await fetch('/api/businesses', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(item),
-                });
-                if (response.status === 401 || response.status === 403 || response.status === 429) break;
-              }
-            }
-          } else if (key === 'guigui_events' && Array.isArray(value)) {
-            for (const item of value.slice(0, 50)) {
-              if (item && item.id && item.title) {
-                const response = await fetch('/api/events', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(item),
-                });
-                if (response.status === 401 || response.status === 403 || response.status === 429) break;
-              }
-            }
-          }
         } catch {
           // Erro de rede não interrompe o uso local
         }
@@ -159,4 +132,3 @@ export function usePersistentState<T>(key: string, fallback: T) {
 
   return [value, setValue] as const;
 }
-

@@ -23,15 +23,15 @@ import {
   Instagram,
   X,
 } from 'lucide-react';
-import { Business, Language } from '../../types';
+import { Business, BusinessCategory, Language } from '../../types';
 import { getTranslation } from '../../utils/i18n';
 import { getBusinessProfileCompletion } from '../../utils/businessProfile';
-import { MAIN_CATEGORIES } from '../../data/initialData';
 import type { BusinessProfileNotApplicableField } from '../../types';
 import type { BusinessProfileRequiredField } from '../../utils/businessProfile';
 
 interface ClientBusinessProfileProps {
   business: Business;
+  categories: BusinessCategory[];
   currentLang?: Language;
   onUpdateBusiness: (updated: Business) => Promise<void>;
 }
@@ -53,6 +53,7 @@ const readLocalImage = (file: File): Promise<string> => new Promise((resolve, re
 
 export const ClientBusinessProfile: React.FC<ClientBusinessProfileProps> = ({
   business,
+  categories,
   currentLang = 'pt' as Language,
   onUpdateBusiness,
 }) => {
@@ -125,7 +126,7 @@ export const ClientBusinessProfile: React.FC<ClientBusinessProfileProps> = ({
     business.features,
   ]);
 
-  const selectedCategory = MAIN_CATEGORIES.find((category) => category.id === categoryId);
+  const selectedCategory = categories.find((category) => category.id === categoryId);
   const profileCompletion = getBusinessProfileCompletion({
     name,
     categoryId,
@@ -413,7 +414,7 @@ export const ClientBusinessProfile: React.FC<ClientBusinessProfileProps> = ({
                 className={textInputClass}
               >
                 <option value="">Selecione a categoria</option>
-                {MAIN_CATEGORIES.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
               </select>
             </div>
             <div>

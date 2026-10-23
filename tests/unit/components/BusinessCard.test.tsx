@@ -3,6 +3,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BusinessCard } from '../../../src/components/BusinessCard';
+import { MAIN_CATEGORIES } from '../../../src/data/categoryCatalog';
 import type { Business } from '../../../src/types';
 
 const business: Business = {
@@ -42,7 +43,7 @@ afterEach(cleanup);
 describe('BusinessCard', () => {
   it('uses branded local image fallbacks and omits ratings when no reviews exist', () => {
     const { container } = render(
-      <BusinessCard business={business} currentLang="pt" onSelect={vi.fn()} />,
+      <BusinessCard business={business} categories={MAIN_CATEGORIES} currentLang="pt" onSelect={vi.fn()} />,
     );
 
     expect(screen.getByRole('img', { name: 'Capa de Atelier Nô Pintcha' })).not.toBeNull();
@@ -56,6 +57,7 @@ describe('BusinessCard', () => {
     const { container } = render(
       <BusinessCard
         business={{ ...business, coverImage: '/capa-antiga.jpg', logo: '/logotipo-antigo.jpg' }}
+        categories={MAIN_CATEGORIES}
         currentLang="pt"
         onSelect={vi.fn()}
       />,
@@ -75,6 +77,7 @@ describe('BusinessCard', () => {
     render(
       <BusinessCard
         business={business}
+        categories={MAIN_CATEGORIES}
         currentLang="pt"
         onSelect={onSelect}
         onToggleFollow={onToggleFollow}
@@ -89,5 +92,19 @@ describe('BusinessCard', () => {
     expect(onToggleFollow).toHaveBeenCalledWith(business.id);
     expect(onMessage).toHaveBeenCalledWith(business.id);
     expect(onSelect).toHaveBeenCalledWith(business);
+  });
+
+  it('uses the supplied catalog to display database-backed categories', () => {
+    const category = { ...MAIN_CATEGORIES[0], id: 'postgres-category', name: 'Categoria PostgreSQL' };
+    render(
+      <BusinessCard
+        business={{ ...business, categoryId: category.id }}
+        categories={[category]}
+        currentLang="pt"
+        onSelect={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Categoria PostgreSQL')).not.toBeNull();
   });
 });

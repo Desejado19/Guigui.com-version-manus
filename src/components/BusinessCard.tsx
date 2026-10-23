@@ -14,14 +14,14 @@ import {
   Bell,
   BellOff,
 } from 'lucide-react';
-import { Business, Language } from '../types';
+import { Business, BusinessCategory, Language } from '../types';
 import { getTranslation } from '../utils/i18n';
 import { useTranslatedText } from '../utils/contentTranslation';
 import { Badge, Card } from './ui';
-import { MAIN_CATEGORIES } from '../data/initialData';
 
 interface BusinessCardProps {
   business: Business;
+  categories: BusinessCategory[];
   currentLang: Language;
   onSelect: (b: Business) => void;
   onToggleCompare?: (b: Business) => void;
@@ -37,6 +37,7 @@ interface BusinessCardProps {
 
 export const BusinessCard: React.FC<BusinessCardProps> = ({
   business,
+  categories,
   currentLang,
   onSelect,
   onToggleCompare,
@@ -58,7 +59,7 @@ export const BusinessCard: React.FC<BusinessCardProps> = ({
   const isPremium = business.tier === 'premium';
   const hasActivePromo = business.promotions.some((p) => p.isActive);
   const priceDots = business.priceRange?.repeat(1) ?? '';
-  const categoryName = business.category || MAIN_CATEGORIES.find((category) => category.id === business.categoryId)?.name;
+  const categoryName = business.category || categories.find((category) => category.id === business.categoryId)?.name;
   const initials = business.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || '?';
   const hasReviews = business.reviews.length > 0;
   const hasCoverImage = Boolean(business.coverImage.trim()) && failedCoverSource !== business.coverImage;

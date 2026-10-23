@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ClientBusinessProfile } from '../../../src/components/client/ClientBusinessProfile';
+import { MAIN_CATEGORIES } from '../../../src/data/categoryCatalog';
 import type { Business } from '../../../src/types';
 
 const business: Business = {
@@ -43,8 +44,9 @@ const business: Business = {
 function renderProfile(
   onUpdateBusiness: (updated: Business) => Promise<void> = vi.fn().mockResolvedValue(undefined),
   profile: Business = business,
+  categories = MAIN_CATEGORIES,
 ) {
-  render(<ClientBusinessProfile business={profile} currentLang="pt" onUpdateBusiness={onUpdateBusiness} />);
+  render(<ClientBusinessProfile business={profile} categories={categories} currentLang="pt" onUpdateBusiness={onUpdateBusiness} />);
   return onUpdateBusiness;
 }
 
@@ -74,6 +76,23 @@ describe('ClientBusinessProfile', () => {
     expect(missingFields).toContain('Subcategoria');
   });
 
+  it('uses the supplied catalog for category and subcategory options', () => {
+    const category = {
+      ...MAIN_CATEGORIES[0],
+      id: 'postgres-category',
+      name: 'Categoria PostgreSQL',
+      subcategories: ['Subcategoria PostgreSQL'],
+    };
+    renderProfile(undefined, {
+      ...business,
+      categoryId: category.id,
+      subcategoryId: 'Subcategoria PostgreSQL',
+    }, [category]);
+
+    expect(screen.getByRole('option', { name: 'Categoria PostgreSQL' })).not.toBeNull();
+    expect(screen.getByRole('option', { name: 'Subcategoria PostgreSQL' })).not.toBeNull();
+  });
+
   it('lists missing recommended information but excludes fields marked not applicable', () => {
     renderProfile(undefined, {
       ...business,
@@ -92,10 +111,10 @@ describe('ClientBusinessProfile', () => {
 
   it('hydrates updated persisted values into the editor', async () => {
     const { rerender } = render(
-      <ClientBusinessProfile business={{ ...business, name: 'Nome inicial' }} currentLang="pt" onUpdateBusiness={vi.fn()} />,
+      <ClientBusinessProfile business={{ ...business, name: 'Nome inicial' }} categories={MAIN_CATEGORIES} currentLang="pt" onUpdateBusiness={vi.fn()} />,
     );
     rerender(
-      <ClientBusinessProfile business={{ ...business, name: 'Nome persistido' }} currentLang="pt" onUpdateBusiness={vi.fn()} />,
+      <ClientBusinessProfile business={{ ...business, name: 'Nome persistido' }} categories={MAIN_CATEGORIES} currentLang="pt" onUpdateBusiness={vi.fn()} />,
     );
 
     await waitFor(() => {

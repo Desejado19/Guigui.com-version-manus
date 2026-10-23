@@ -31,16 +31,14 @@ import {
   SubscriptionPlan,
   MonetizationCatalog,
 } from './types';
-import {
-  INITIAL_STORIES,
-  MAIN_CATEGORIES,
-} from './data/initialData';
+import { INITIAL_STORIES } from './data/initialData';
 import { INITIAL_ADMIN_STAFF } from './data/adminStaffData';
 import { INITIAL_AUDIT_LOGS } from './data/auditLogsData';
 import { INITIAL_NOTIFICATIONS } from './data/notificationsData';
 import { motion, AnimatePresence } from 'motion/react';
 import { calculateBusinessRating } from './utils/reviews';
 import { usePersistentState } from './utils/persistentState';
+import { useMarketplaceData } from './hooks/useMarketplaceData';
 import { addSubscriptionPeriod, getSubscriptionAccessState, getSubscriptionAlertCode, getSubscriptionAlertMessage } from './utils/subscriptions';
 import { mergeStoredBusinessProfile } from './utils/businessProfile';
 import { DEFAULT_SUBSCRIPTION_PLANS, getBusinessPlan, getBusinessUsage, limitAllows, normaliseSubscriptionPlans } from './data/subscriptionCatalog';
@@ -83,10 +81,6 @@ import { SmsSimulatorToast } from './components/SmsSimulatorToast';
 const BusinessDashboard = lazy(() => import('./components/BusinessDashboard').then((module) => ({ default: module.BusinessDashboard })));
 const CitizenDashboard = lazy(() => import('./components/CitizenDashboard').then((module) => ({ default: module.CitizenDashboard })));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard').then((module) => ({ default: module.AdminDashboard })));
-
-type PersistedBusinessProfile = Partial<Omit<Business, 'email'>> & Pick<Business, 'id' | 'name'> & {
-  createdAt?: string;
-};
 
 import {
   Search,
@@ -1379,7 +1373,15 @@ export default function App() {
   };
 
   // Directory & Social Feed State Data
-  const [businesses, setBusinesses] = usePersistentState<Business[]>('guigui_businesses', []);
+  const {
+    businesses,
+    setBusinesses,
+    categories: marketplaceCategories,
+    events,
+    setEvents,
+    status: marketplaceStatus,
+    error: marketplaceError,
+  } = useMarketplaceData();
   React.useEffect(() => {
     let cancelled = false;
     const syncPublishedMarketing = async () => {
@@ -1420,79 +1422,8 @@ export default function App() {
   }, [setBusinesses]);
   const [userPosts, setUserPosts] = usePersistentState<BusinessPost[]>('guigui_user_posts', []);
   const [promotions, setPromotions] = usePersistentState<Promotion[]>('guigui_promotions', []);
-  const [events, setEvents] = usePersistentState<EventItem[]>('guigui_events', []);
   const [stories, setStories] = usePersistentState<Story[]>('guigui_stories', INITIAL_STORIES as Story[]);
   const [subscriptionPlans] = usePersistentState<SubscriptionPlan[]>('guigui_subscription_plans', DEFAULT_SUBSCRIPTION_PLANS);
-
-  React.useEffect(() => {
-    // Load data from database (PostgreSQL) instead of static initialData.ts fallback.
-    let cancelled = false;
-    const loadBusinessesFromDb = async () => {
-      try {
-        const response = await fetch('/api/businesses');
-        if (!response.ok) return;
-        const data = await response.json() as { businesses?: PersistedBusinessProfile[] };
-        if (cancelled || !Array.isArray(data.businesses)) return;
-        setBusinesses((previous) => {
-          const seen = new Set(previous.map((business) => business.id));
-          const storedById = new Map(data.businesses.map((business) => [business.id, business]));
-          const mergedPrevious = previous.map((business) => {
-            const stored = storedById.get(business.id);
-            return stored
-              ? { ...business, ...mergeStoredBusinessProfile(business, stored) }
-              : business;
-          });
-          const fromDb: Business[] = data.businesses
-            .filter((business) => business.id && !seen.has(business.id))
-            .map((biz) => {
-              const defaults: Business = {
-              id: biz.id,
-              name: biz.name,
-              slug: biz.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-              logo: '',
-              coverImage: '',
-              gallery: [],
-              description: '',
-              categoryId: biz.categoryId || '',
-              subcategoryId: '',
-              groupGroupId: 'corporativo_financeiro',
-              tier: 'basic',
-              neighborhood: '',
-              address: '',
-              phone: '',
-              whatsapp: '',
-              openingHours: '',
-              isOpenNow: false,
-              priceRange: '$$',
-              status: (biz.status as Business['status']) || 'active',
-              verified: false,
-              featured: false,
-              ratingLabel: '',
-              reviewsCount: 0,
-              reviews: [],
-              posts: [],
-              promotions: [],
-              metrics: { views: 0, whatsappClicks: 0, phoneClicks: 0, directionsClicks: 0, websiteClicks: 0 },
-              // A API já devolve a data de renovação do servidor; descartá-la aqui
-              // marcaria empresas com plano válido como expiradas. O watchdog de
-              // subscrição (efeito abaixo) suspende-as em massa e a persistência
-              // do estado regrava essas suspensões no banco de dados.
-              subscriptionRenewDate: biz.subscriptionRenewDate || biz.createdAt || new Date().toISOString(),
-              postsQuotaRemaining: 3,
-              };
-              return { ...defaults, ...mergeStoredBusinessProfile(defaults, biz) };
-            });
-          return [...fromDb, ...mergedPrevious];
-        });
-      } catch {
-        // Database unavailable: remain empty; no static fallback.
-      }
-    };
-    void loadBusinessesFromDb();
-    return () => {
-      cancelled = true;
-    };
-  }, [setBusinesses]);
 
   React.useEffect(() => {
     const activeBusinessIds = new Set(
@@ -2264,6 +2195,17 @@ export default function App() {
         onClose={() => { setShowLoginModal(false); setTeamInviteToken(null); window.history.replaceState({}, '', window.location.pathname); }}
       />
 
+      {marketplaceStatus === 'loading' && (
+        <p role="status" className="mx-auto w-full max-w-7xl px-4 py-2 text-sm text-slate-600 dark:text-slate-300">
+          A carregar os dados do marketplace...
+        </p>
+      )}
+      {marketplaceError && (
+        <p role="alert" className="mx-auto w-full max-w-7xl px-4 py-2 text-sm font-semibold text-red-700 dark:text-red-300">
+          Não foi possível sincronizar o marketplace: {marketplaceError}
+        </p>
+      )}
+
       {/* Facebook Sticky Top Navigation Header */}
       <Navbar
         currentLang={currentLang}
@@ -2699,7 +2641,7 @@ export default function App() {
                     Todas as Categorias
                   </button>
 
-                  {MAIN_CATEGORIES.map((cat) => (
+                  {marketplaceCategories.map((cat) => (
                     <button type="button"
                       key={cat.id}
                       onClick={() =>
@@ -2780,6 +2722,7 @@ export default function App() {
                       >
                         <BusinessCard
                           business={b}
+                          categories={marketplaceCategories}
                           currentLang={currentLang}
                           onSelect={(biz) => setSelectedBusiness(biz)}
                           onToggleCompare={handleToggleCompareBusiness}
@@ -2803,6 +2746,7 @@ export default function App() {
                     <BusinessCard
                       key={b.id}
                       business={b}
+                      categories={marketplaceCategories}
                       currentLang={currentLang}
                       onSelect={(biz) => setSelectedBusiness(biz)}
                       onToggleCompare={handleToggleCompareBusiness}
@@ -3014,6 +2958,7 @@ export default function App() {
                   business={activeBusiness}
                   currentUser={currentUser}
                   businesses={businesses}
+                  categories={marketplaceCategories}
                   followerCount={getFollowerIdsForBusiness(followedBusinessIdsByUser, activeBusiness.id).length}
                   audienceReach={getBusinessAudienceReach(activeBusiness)}
                   initialTab={businessDashboardStartTab}
