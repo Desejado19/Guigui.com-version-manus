@@ -13,10 +13,13 @@ coverage/
 
 # Estado de runtime e artefactos de validação (não versionar)
 data/
+!src/data/
+src/data/*
+!src/data/initialData.ts
+!src/data/categoryCatalog.ts
 backups/
 playwright-report/
 test-results/
 *.tmp
 *.out
 *.err
-
