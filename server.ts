@@ -33,6 +33,7 @@ import { LANGUAGE_CYCLE } from './src/utils/i18n';
 import { getBusinessProfileCompletion } from './src/utils/businessProfile';
 import { addSubscriptionPeriod } from './src/utils/subscriptions';
 import { checkDatabaseConnection, databaseConfigured, databasePool } from './server/db';
+import { createCategoryRouter } from './server/categoryRoutes';
 import { createHealthHandler } from './server/modules/platform-foundation/http/healthHandler';
 import { loadPlatformRuntimeConfig } from './server/modules/platform-foundation/config/platformRuntimeConfig';
 import { BUSINESS_ROLE_PERMISSIONS } from './src/utils/businessPermissions';
@@ -850,6 +851,8 @@ app.get('/api/sync/bootstrap', async (_req, res) => {
     res.status(500).json({ error: 'Erro ao sincronizar dados iniciais do banco.' });
   }
 });
+
+app.use('/api/categories', createCategoryRouter());
 
 app.get('/api/businesses', async (_req, res) => {
   try {

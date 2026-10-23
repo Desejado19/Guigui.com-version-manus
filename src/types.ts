@@ -328,6 +328,17 @@ export interface BusinessCategory {
   subcategories: string[];
 }
 
+export interface CategoryGroupSummary {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface CategoryCatalogResponse {
+  groups: CategoryGroupSummary[];
+  categories: BusinessCategory[];
+}
+
 export type QualitativeScore = 'nao_gostei' | 'gostei' | 'gostei_muito' | 'muito_bom';
 
 export interface Review {
