@@ -79,6 +79,7 @@
 - Create: `scripts/qa/validate-route-inventory.ts`
 - Create: `tests/unit/qa-route-inventory.test.ts`
 - Modify: `package.json` (Newman validation/run commands only)
+- Modify: `.gitignore` (keep local Newman reports out of version control)
 
 **Interfaces:**
 - Each inventory entry has `method`, `path`, `source`, `authentication`, `preconditions`, and exactly one of `scenario` or `exclusionReason`.
