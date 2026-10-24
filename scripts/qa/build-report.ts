@@ -40,6 +40,14 @@ export type SanitizedCampaignReport = Omit<CampaignResults, 'phases'> & {
   phases: Record<typeof PHASE_NAMES[number], CampaignPhaseResult>;
 };
 
+export type PlaywrightCounts = {
+  passed: number;
+  failed: number;
+  skipped: number;
+  blocked: number;
+  reportErrors: number;
+};
+
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const GUINEA_BISSAU_PHONE_PATTERN = /(?<!\w)\+?245[\s().-]*\d{2,3}[\s().-]*\d{3,4}[\s().-]*\d{2,4}(?!\w)/g;
 const JWT_PATTERN = /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g;
@@ -77,6 +85,74 @@ function hasK6Measurements(metrics: CampaignResults['k6Metrics']): boolean {
     && metrics.p95Ms !== null
     && metrics.failureRate !== null
     && metrics.checksPassed !== null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function readPlaywrightCounts(report: unknown): PlaywrightCounts {
+  if (!isRecord(report) || !isRecord(report.stats) || !Array.isArray(report.suites)) {
+    throw new Error('Playwright JSON must contain statistics and suites.');
+  }
+
+  const stats = report.stats;
+  const readStat = (name: string): number => {
+    const value = stats[name];
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+      throw new Error(`Playwright JSON contains invalid ${name} statistics.`);
+    }
+    return value;
+  };
+
+  let skipped = 0;
+  let blocked = 0;
+  const visitSuite = (suite: unknown): void => {
+    if (!isRecord(suite)) throw new Error('Playwright JSON contains an invalid suite.');
+    const specs = suite.specs ?? [];
+    const nestedSuites = suite.suites ?? [];
+    if (!Array.isArray(specs) || !Array.isArray(nestedSuites)) {
+      throw new Error('Playwright JSON contains invalid suite contents.');
+    }
+
+    for (const spec of specs) {
+      if (!isRecord(spec) || !Array.isArray(spec.tests)) {
+        throw new Error('Playwright JSON contains an invalid test specification.');
+      }
+      for (const test of spec.tests) {
+        if (!isRecord(test) || !Array.isArray(test.results) || !Array.isArray(test.annotations)) {
+          throw new Error('Playwright JSON contains an invalid test result.');
+        }
+        const hasSkipAnnotation = test.annotations.some((annotation) => (
+          isRecord(annotation) && (annotation.type === 'skip' || annotation.type === 'fixme')
+        ));
+        const hasSkippedResult = test.results.some((result) => (
+          isRecord(result) && result.status === 'skipped'
+        ));
+
+        if (hasSkipAnnotation || hasSkippedResult) {
+          skipped += 1;
+        } else if (test.results.length === 0) {
+          blocked += 1;
+        }
+      }
+    }
+
+    for (const nestedSuite of nestedSuites) visitSuite(nestedSuite);
+  };
+
+  for (const suite of report.suites) visitSuite(suite);
+
+  const errors = report.errors ?? [];
+  if (!Array.isArray(errors)) throw new Error('Playwright JSON contains invalid error records.');
+
+  return {
+    passed: readStat('expected'),
+    failed: readStat('unexpected') + readStat('flaky'),
+    skipped,
+    blocked,
+    reportErrors: errors.length,
+  };
 }
 
 function assessK6Thresholds(results: CampaignResults): boolean | null {
@@ -156,7 +232,18 @@ export function buildCampaignReport(results: CampaignResults): SanitizedCampaign
 }
 
 async function main(): Promise<void> {
-  const [inputPath, outputPath] = process.argv.slice(2);
+  const [mode, ...args] = process.argv.slice(2);
+  if (mode === '--playwright-counts') {
+    const [inputPath] = args;
+    if (!inputPath) {
+      throw new Error('Usage: tsx scripts/qa/build-report.ts --playwright-counts <playwright-report.json>.');
+    }
+    const input = JSON.parse(readFileSync(resolve(inputPath), 'utf8')) as unknown;
+    process.stdout.write(`${JSON.stringify(readPlaywrightCounts(input))}\n`);
+    return;
+  }
+
+  const [inputPath, outputPath] = [mode, ...args];
   if (!inputPath || !outputPath) {
     throw new Error('Usage: tsx scripts/qa/build-report.ts <raw-results.json> <sanitized-report.json>.');
   }

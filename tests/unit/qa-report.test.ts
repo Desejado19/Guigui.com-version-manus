@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildCampaignReport,
+  readPlaywrightCounts,
   type CampaignResults,
 } from '../../scripts/qa/build-report';
 
@@ -92,6 +93,54 @@ describe('buildCampaignReport', () => {
         ...results.k6Metrics,
         thresholdsPassed: true,
       },
+    });
+  });
+
+  describe('readPlaywrightCounts', () => {
+    it('counts unstarted tests as blocked separately from intentionally skipped tests', () => {
+      const report = {
+        stats: { expected: 1, unexpected: 1, flaky: 0, skipped: 2 },
+        errors: [],
+        suites: [{
+          specs: [{
+            tests: [
+              { status: 'expected', annotations: [], results: [{ status: 'passed' }] },
+              { status: 'unexpected', annotations: [], results: [{ status: 'failed' }] },
+              {
+                status: 'skipped',
+                annotations: [{ type: 'skip' }],
+                results: [{ status: 'skipped' }],
+              },
+              { status: 'skipped', annotations: [], results: [] },
+            ],
+          }],
+          suites: [],
+        }],
+      };
+
+      expect(readPlaywrightCounts(report)).toEqual({
+        passed: 1,
+        failed: 1,
+        skipped: 1,
+        blocked: 1,
+        reportErrors: 0,
+      });
+    });
+
+    it('reports collection errors without counting them as test cases', () => {
+      const report = {
+        stats: { expected: 0, unexpected: 0, flaky: 0, skipped: 0 },
+        errors: [{ message: 'Unable to load test file.' }],
+        suites: [],
+      };
+
+      expect(readPlaywrightCounts(report)).toEqual({
+        passed: 0,
+        failed: 0,
+        skipped: 0,
+        blocked: 0,
+        reportErrors: 1,
+      });
     });
   });
 

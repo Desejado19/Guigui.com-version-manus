@@ -251,20 +251,22 @@ function Read-PlaywrightCounts {
     Add-Limitation 'Playwright did not produce structured test counts; raw output remains local.'
     return
   }
+  $countsOutput = & $tsxPath $reportBuilderPath '--playwright-counts' $Path
+  if ($LASTEXITCODE -ne 0) {
+    Add-Limitation 'Playwright JSON could not be parsed; raw output remains local.'
+    return
+  }
   try {
-    $report = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
-    if ($null -eq $report.stats) {
-      Add-Limitation 'Playwright JSON did not contain test statistics; raw output remains local.'
-      return
-    }
-    $results.e2eCounts.passed = [int]$report.stats.expected
-    $results.e2eCounts.failed = [int]$report.stats.unexpected + [int]$report.stats.flaky
-    $results.e2eCounts.skipped = [int]$report.stats.skipped
-    if ($report.stats.PSObject.Properties.Name -contains 'didNotRun') {
-      $results.e2eCounts.blocked = [int]$report.stats.didNotRun
+    $counts = ($countsOutput -join [Environment]::NewLine) | ConvertFrom-Json
+    $results.e2eCounts.passed = [int]$counts.passed
+    $results.e2eCounts.failed = [int]$counts.failed
+    $results.e2eCounts.skipped = [int]$counts.skipped
+    $results.e2eCounts.blocked = [int]$counts.blocked
+    if ([int]$counts.reportErrors -gt 0) {
+      Add-Limitation "Playwright reported $($counts.reportErrors) global error record(s); some test cases may not have been enumerated."
     }
   } catch {
-    Add-Limitation 'Playwright JSON could not be parsed; raw output remains local.'
+    Add-Limitation 'Playwright count output could not be parsed; raw output remains local.'
   }
 }
 
