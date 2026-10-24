@@ -40,6 +40,8 @@
     "db:seed:synthetic": "tsx scripts/generate-postgres-synthetic-seed.ts",
     "db:seed:synthetic:10000": "tsx scripts/generate-postgres-synthetic-seed.ts --rows 10000",
     "qa:provision": "tsx scripts/qa/provision-database.ts",
+    "qa:api:check": "tsx scripts/qa/validate-route-inventory.ts",
+    "qa:api": "npm run qa:api:check && node -e \"require('node:fs').mkdirSync('.local-qa/api',{recursive:true})\" && newman run tests/api/guigui-local-qa.postman_collection.json --env-var qaBaseUrl=http://127.0.0.1:4313 --ignore-redirects --reporters cli,json --reporter-json-export .local-qa/api/newman.json",
     "test:tickets": "tsx scripts/audit-ticket-validation.ts && tsx scripts/audit-ticket-flow.ts",
     "test:e2e": "playwright test",
     "test:unit": "vitest run",
