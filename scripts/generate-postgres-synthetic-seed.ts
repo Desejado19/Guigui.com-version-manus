@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,6 +32,8 @@ export type SyntheticSeedManifest = typeof SYNTHETIC_SEED_MANIFEST;
 
 const TABLE_ORDER = Object.keys(SYNTHETIC_SEED_MANIFEST) as Array<keyof SyntheticSeedManifest>;
 const DEFAULT_TARGET_DATABASE_NAME = 'guigui_pg18_synthetic_target';
+const SEED_MARKER_KEY = 'guigui.synthetic_seed.1000';
+const SEED_VERSION = 1;
 
 function sqlString(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
@@ -71,7 +74,7 @@ function rowsForUsers(count: number): string[] {
       sqlString(['Bissau Velho', 'Bandim', 'Santa Luzia', 'Caracol', 'Praca dos Herois'][number % 5]),
       sqlString(`https://example.invalid/avatar/${id}.png`),
       sqlString('user'),
-      sqlString('active'),
+      sqlString('deactivated'),
       sqlString('synthetic_password_hash_' + id),
       sqlString('2026-01-01T00:00:00+00:00'),
       sqlString('2026-01-01T00:00:00+00:00'),
@@ -144,8 +147,8 @@ function rowsForTicketTypes(count: number): string[] {
 
 function rowsForTicketReservations(count: number): string[] {
   return Array.from({ length: count }, (_, index) => {
-    const eventIndex = (index % 30) + 1;
     const ticketTypeIndex = (index % 60) + 1;
+    const eventIndex = Math.floor((ticketTypeIndex - 1) / 2) + 1;
     const reservationId = `synthetic_reservation_${padNumber(index + 1)}`;
     return `(${[
       sqlString(reservationId),
@@ -153,7 +156,7 @@ function rowsForTicketReservations(count: number): string[] {
       sqlString(`synthetic_ticket_type_${padNumber(ticketTypeIndex)}`),
       String(2 + (index % 4)),
       sqlString(`2026-02-${String((index % 27) + 1).padStart(2, '0')}T18:00:00+00:00`),
-      sqlString(['pending', 'confirmed', 'confirmed', 'released', 'expired'][index % 5]),
+      sqlString(['confirmed', 'confirmed', 'released', 'expired'][index % 4]),
       sqlString('2026-01-05T00:00:00+00:00'),
       sqlString('2026-01-05T00:00:00+00:00'),
     ].join(', ')})`;
@@ -186,16 +189,19 @@ function rowsForOrders(count: number): string[] {
 function rowsForTickets(count: number): string[] {
   return Array.from({ length: count }, (_, index) => {
     const number = index + 1;
+    const orderIndex = (index % 80) + 1;
+    const eventIndex = ((orderIndex - 1) % 30) + 1;
+    const ticketTypeIndex = (eventIndex - 1) * 2 + (index % 2) + 1;
     return `(${[
       sqlString(`synthetic_ticket_${padNumber(number)}`),
-      sqlString(`synthetic_order_${padNumber((index % 80) + 1)}`),
-      sqlString(`synthetic_event_${padNumber((index % 30) + 1)}`),
-      sqlString(`synthetic_ticket_type_${padNumber((index % 60) + 1)}`),
+      sqlString(`synthetic_order_${padNumber(orderIndex)}`),
+      sqlString(`synthetic_event_${padNumber(eventIndex)}`),
+      sqlString(`synthetic_ticket_type_${padNumber(ticketTypeIndex)}`),
       sqlString(`synthetic_qr_${padNumber(number)}`),
       sqlString(`SYNT-${padNumber(number, 5)}`),
       sqlString(`synthetic_pin_hash_${padNumber(number)}`),
       sqlString(`synthetic_signature_${padNumber(number)}`),
-      sqlString(['valid', 'used', 'valid', 'cancelled', 'expired'][index % 5]),
+      sqlString(['pending', 'valid', 'used', 'expired', 'expired'][index % 5]),
       sqlString(`2026-06-${String((index % 28) + 1).padStart(2, '0')}T18:00:00+00:00`),
       sqlString('2026-01-07T00:00:00+00:00'),
       sqlString('Synthetic Buyer'),
@@ -484,49 +490,66 @@ export function createSyntheticSeedSql(manifest: Partial<SyntheticSeedManifest> 
     ['monetization_wallets', 'business_id, posts_extra_purchased, promotions_extra_purchased, posts_extra_used, promotions_extra_used, updated_at', rowsForMonetizationWallets(normalized.monetization_wallets), '(business_id)'],
   ] as const;
 
-  const finalCountQuery = `SELECT 'users' AS table_name, COUNT(*) AS row_count FROM users UNION ALL
-SELECT 'companies', COUNT(*) FROM companies UNION ALL
-SELECT 'company_members', COUNT(*) FROM company_members UNION ALL
-SELECT 'events', COUNT(*) FROM events UNION ALL
-SELECT 'ticket_types', COUNT(*) FROM ticket_types UNION ALL
-SELECT 'ticket_reservations', COUNT(*) FROM ticket_reservations UNION ALL
-SELECT 'orders', COUNT(*) FROM orders UNION ALL
-SELECT 'tickets', COUNT(*) FROM tickets UNION ALL
-SELECT 'payment_transactions', COUNT(*) FROM payment_transactions UNION ALL
-SELECT 'commissions', COUNT(*) FROM commissions UNION ALL
-SELECT 'refunds', COUNT(*) FROM refunds UNION ALL
-SELECT 'plans', COUNT(*) FROM plans UNION ALL
-SELECT 'subscriptions', COUNT(*) FROM subscriptions UNION ALL
-SELECT 'reviews', COUNT(*) FROM reviews UNION ALL
-SELECT 'moderation_items', COUNT(*) FROM moderation_items UNION ALL
-SELECT 'notifications', COUNT(*) FROM notifications UNION ALL
-SELECT 'conversations', COUNT(*) FROM conversations UNION ALL
-SELECT 'conversation_messages', COUNT(*) FROM conversation_messages UNION ALL
-SELECT 'support_tickets', COUNT(*) FROM support_tickets UNION ALL
-SELECT 'support_replies', COUNT(*) FROM support_replies UNION ALL
-SELECT 'monetization_ledger', COUNT(*) FROM monetization_ledger UNION ALL
-SELECT 'monetization_wallets', COUNT(*) FROM monetization_wallets;`;
+  const insertsSql = inserts.map(([tableName, columns, values, conflictColumn]) =>
+    `INSERT INTO ${tableName} (${columns}) VALUES ${values.join(',\n')} ON CONFLICT ${conflictColumn} DO NOTHING;`,
+  );
+  const seedHash = createHash('sha256')
+    .update(JSON.stringify({ version: SEED_VERSION, inserts }))
+    .digest('hex');
+  const seedIdColumn = (tableName: keyof SyntheticSeedManifest): string =>
+    tableName === 'company_members' ? 'company_id' : tableName === 'monetization_wallets' ? 'business_id' : 'id';
+  const emptyTableChecks = TABLE_ORDER.map((tableName) => `EXISTS (SELECT 1 FROM ${tableName} LIMIT 1)`).join('\n      OR ');
+  const seedRowCounts = TABLE_ORDER.map((tableName) =>
+    `(SELECT COUNT(*) FROM ${tableName} WHERE LEFT(${seedIdColumn(tableName)}, 10) = 'synthetic_')`,
+  );
+  const totalSeedRowCount = seedRowCounts.join(' +\n      ');
+  const finalCountQuery = TABLE_ORDER.map((tableName) =>
+    `SELECT ${sqlString(tableName)} AS table_name, COUNT(*)::integer AS row_count FROM ${tableName} WHERE LEFT(${seedIdColumn(tableName)}, 10) = 'synthetic_'`,
+  ).join('\nUNION ALL\n') + ';';
 
   const sqlSections = [
-    `-- Synthetic dataset generated for disposable PG18 import.`,
-    `-- Target database: ${DEFAULT_TARGET_DATABASE_NAME}`,
+    `-- Synthetic dataset generated for import in pgAdmin Query Tool.`,
+    `-- Target: local PostgreSQL 18 database ${DEFAULT_TARGET_DATABASE_NAME}.`,
+    `-- Apply all db/migrations/*.sql files and seed the category catalog before running this file.`,
+    `-- The script is transactional, guarded, and does not delete or update existing rows.`,
     `BEGIN;`,
-    `DO $$ BEGIN`,
-    `  IF current_setting('server_version_num', true)::int < 180000 THEN`,
+    `DO $$`,
+    `DECLARE`,
+    `  marker_exists BOOLEAN;`,
+    `  existing_hash TEXT;`,
+    `BEGIN`,
+    `  IF current_setting('server_version_num')::integer / 10000 <> 18 THEN`,
     `    RAISE EXCEPTION 'Synthetic seed requires PostgreSQL 18.';`,
     `  END IF;`,
-    `END $$;`,
-    `DO $$ BEGIN`,
+    `  IF to_regclass('public.app_state') IS NULL THEN`,
+    `    RAISE EXCEPTION 'Required schema is missing; apply project migrations first.';`,
+    `  END IF;`,
     `  IF current_database() <> ${sqlString(DEFAULT_TARGET_DATABASE_NAME)} THEN`,
     `    RAISE EXCEPTION 'Synthetic seed can only run on the disposable local PostgreSQL 18 target.';`,
     `  END IF;`,
-    `END $$;`,
-    `DO $$ BEGIN`,
-    `  IF EXISTS (SELECT 1 FROM users LIMIT 1) OR EXISTS (SELECT 1 FROM companies LIMIT 1) OR EXISTS (SELECT 1 FROM events LIMIT 1) THEN`,
-    `    RAISE EXCEPTION 'Synthetic seed target must be empty before import.';`,
+    `  SELECT EXISTS (SELECT 1 FROM app_state WHERE key = ${sqlString(SEED_MARKER_KEY)}) INTO marker_exists;`,
+    `  IF marker_exists THEN`,
+    `    SELECT value ->> 'hash' INTO existing_hash FROM app_state WHERE key = ${sqlString(SEED_MARKER_KEY)};`,
+    `    IF existing_hash IS DISTINCT FROM ${sqlString(seedHash)} THEN`,
+    `      RAISE EXCEPTION 'A different synthetic seed version is already recorded for this database.';`,
+    `    END IF;`,
+    `  ELSIF ${emptyTableChecks} THEN`,
+    `    RAISE EXCEPTION 'Synthetic seed target must be empty before first import.';`,
     `  END IF;`,
     `END $$;`,
-    ...inserts.map(([tableName, columns, values, conflictColumn]) => `INSERT INTO ${tableName} (${columns}) VALUES ${values.join(',\n')} ON CONFLICT ${conflictColumn} DO NOTHING;`),
+    ...insertsSql,
+    `INSERT INTO app_state (key, value)`,
+    `VALUES (${sqlString(SEED_MARKER_KEY)}, jsonb_build_object('version', ${SEED_VERSION}, 'hash', ${sqlString(seedHash)}, 'domain_rows', 1000))`,
+    `ON CONFLICT (key) DO NOTHING;`,
+    `DO $$`,
+    `DECLARE`,
+    `  total_seed_rows BIGINT;`,
+    `BEGIN`,
+    `  SELECT ${totalSeedRowCount} INTO total_seed_rows;`,
+    `  IF total_seed_rows <> 1000 THEN`,
+    `    RAISE EXCEPTION 'Synthetic seed expected exactly 1000 rows, found %.', total_seed_rows;`,
+    `  END IF;`,
+    `END $$;`,
     finalCountQuery,
     `COMMIT;`,
   ];

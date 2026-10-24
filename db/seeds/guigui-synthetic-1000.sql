@@ -1,20 +1,34 @@
--- Synthetic dataset generated for disposable PG18 import.
+-- Synthetic dataset generated for import in pgAdmin Query Tool.
 
--- Target database: guigui_pg18_synthetic_target
+-- Target: local PostgreSQL 18 database guigui_pg18_synthetic_target.
+
+-- Apply all db/migrations/*.sql files and seed the category catalog before running this file.
+
+-- The script is transactional, guarded, and does not delete or update existing rows.
 
 BEGIN;
 
-DO $$ BEGIN
+DO $$
 
-  IF current_setting('server_version_num', true)::int < 180000 THEN
+DECLARE
+
+  marker_exists BOOLEAN;
+
+  existing_hash TEXT;
+
+BEGIN
+
+  IF current_setting('server_version_num')::integer / 10000 <> 18 THEN
 
     RAISE EXCEPTION 'Synthetic seed requires PostgreSQL 18.';
 
   END IF;
 
-END $$;
+  IF to_regclass('public.app_state') IS NULL THEN
 
-DO $$ BEGIN
+    RAISE EXCEPTION 'Required schema is missing; apply project migrations first.';
+
+  END IF;
 
   IF current_database() <> 'guigui_pg18_synthetic_target' THEN
 
@@ -22,68 +36,97 @@ DO $$ BEGIN
 
   END IF;
 
-END $$;
+  SELECT EXISTS (SELECT 1 FROM app_state WHERE key = 'guigui.synthetic_seed.1000') INTO marker_exists;
 
-DO $$ BEGIN
+  IF marker_exists THEN
 
-  IF EXISTS (SELECT 1 FROM users LIMIT 1) OR EXISTS (SELECT 1 FROM companies LIMIT 1) OR EXISTS (SELECT 1 FROM events LIMIT 1) THEN
+    SELECT value ->> 'hash' INTO existing_hash FROM app_state WHERE key = 'guigui.synthetic_seed.1000';
 
-    RAISE EXCEPTION 'Synthetic seed target must be empty before import.';
+    IF existing_hash IS DISTINCT FROM 'c9331bdf104cb529a4db6ed5947d6a15c2c2360ccea13e71dfca40392f8cf6e1' THEN
+
+      RAISE EXCEPTION 'A different synthetic seed version is already recorded for this database.';
+
+    END IF;
+
+  ELSIF EXISTS (SELECT 1 FROM users LIMIT 1)
+      OR EXISTS (SELECT 1 FROM companies LIMIT 1)
+      OR EXISTS (SELECT 1 FROM company_members LIMIT 1)
+      OR EXISTS (SELECT 1 FROM events LIMIT 1)
+      OR EXISTS (SELECT 1 FROM ticket_types LIMIT 1)
+      OR EXISTS (SELECT 1 FROM ticket_reservations LIMIT 1)
+      OR EXISTS (SELECT 1 FROM orders LIMIT 1)
+      OR EXISTS (SELECT 1 FROM tickets LIMIT 1)
+      OR EXISTS (SELECT 1 FROM payment_transactions LIMIT 1)
+      OR EXISTS (SELECT 1 FROM commissions LIMIT 1)
+      OR EXISTS (SELECT 1 FROM refunds LIMIT 1)
+      OR EXISTS (SELECT 1 FROM plans LIMIT 1)
+      OR EXISTS (SELECT 1 FROM subscriptions LIMIT 1)
+      OR EXISTS (SELECT 1 FROM reviews LIMIT 1)
+      OR EXISTS (SELECT 1 FROM moderation_items LIMIT 1)
+      OR EXISTS (SELECT 1 FROM notifications LIMIT 1)
+      OR EXISTS (SELECT 1 FROM conversations LIMIT 1)
+      OR EXISTS (SELECT 1 FROM conversation_messages LIMIT 1)
+      OR EXISTS (SELECT 1 FROM support_tickets LIMIT 1)
+      OR EXISTS (SELECT 1 FROM support_replies LIMIT 1)
+      OR EXISTS (SELECT 1 FROM monetization_ledger LIMIT 1)
+      OR EXISTS (SELECT 1 FROM monetization_wallets LIMIT 1) THEN
+
+    RAISE EXCEPTION 'Synthetic seed target must be empty before first import.';
 
   END IF;
 
 END $$;
 
-INSERT INTO users (id, name, email, phone, neighborhood, avatar_url, role, account_status, password_hash, created_at, updated_at) VALUES ('synthetic_user_001', 'Synthetic User 1', 'synthetic.user001@example.test', '+245600000001', 'Bandim', 'https://example.invalid/avatar/synthetic_user_001.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_001', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_002', 'Synthetic User 2', 'synthetic.user002@example.test', '+245600000002', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_002.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_002', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_003', 'Synthetic User 3', 'synthetic.user003@example.test', '+245600000003', 'Caracol', 'https://example.invalid/avatar/synthetic_user_003.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_003', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_004', 'Synthetic User 4', 'synthetic.user004@example.test', '+245600000004', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_004.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_004', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_005', 'Synthetic User 5', 'synthetic.user005@example.test', '+245600000005', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_005.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_005', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_006', 'Synthetic User 6', 'synthetic.user006@example.test', '+245600000006', 'Bandim', 'https://example.invalid/avatar/synthetic_user_006.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_006', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_007', 'Synthetic User 7', 'synthetic.user007@example.test', '+245600000007', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_007.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_007', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_008', 'Synthetic User 8', 'synthetic.user008@example.test', '+245600000008', 'Caracol', 'https://example.invalid/avatar/synthetic_user_008.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_008', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_009', 'Synthetic User 9', 'synthetic.user009@example.test', '+245600000009', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_009.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_009', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_010', 'Synthetic User 10', 'synthetic.user010@example.test', '+245600000010', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_010.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_010', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_011', 'Synthetic User 11', 'synthetic.user011@example.test', '+245600000011', 'Bandim', 'https://example.invalid/avatar/synthetic_user_011.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_011', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_012', 'Synthetic User 12', 'synthetic.user012@example.test', '+245600000012', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_012.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_012', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_013', 'Synthetic User 13', 'synthetic.user013@example.test', '+245600000013', 'Caracol', 'https://example.invalid/avatar/synthetic_user_013.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_013', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_014', 'Synthetic User 14', 'synthetic.user014@example.test', '+245600000014', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_014.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_014', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_015', 'Synthetic User 15', 'synthetic.user015@example.test', '+245600000015', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_015.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_015', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_016', 'Synthetic User 16', 'synthetic.user016@example.test', '+245600000016', 'Bandim', 'https://example.invalid/avatar/synthetic_user_016.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_016', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_017', 'Synthetic User 17', 'synthetic.user017@example.test', '+245600000017', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_017.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_017', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_018', 'Synthetic User 18', 'synthetic.user018@example.test', '+245600000018', 'Caracol', 'https://example.invalid/avatar/synthetic_user_018.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_018', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_019', 'Synthetic User 19', 'synthetic.user019@example.test', '+245600000019', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_019.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_019', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_020', 'Synthetic User 20', 'synthetic.user020@example.test', '+245600000020', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_020.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_020', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_021', 'Synthetic User 21', 'synthetic.user021@example.test', '+245600000021', 'Bandim', 'https://example.invalid/avatar/synthetic_user_021.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_021', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_022', 'Synthetic User 22', 'synthetic.user022@example.test', '+245600000022', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_022.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_022', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_023', 'Synthetic User 23', 'synthetic.user023@example.test', '+245600000023', 'Caracol', 'https://example.invalid/avatar/synthetic_user_023.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_023', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_024', 'Synthetic User 24', 'synthetic.user024@example.test', '+245600000024', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_024.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_024', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_025', 'Synthetic User 25', 'synthetic.user025@example.test', '+245600000025', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_025.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_025', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_026', 'Synthetic User 26', 'synthetic.user026@example.test', '+245600000026', 'Bandim', 'https://example.invalid/avatar/synthetic_user_026.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_026', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_027', 'Synthetic User 27', 'synthetic.user027@example.test', '+245600000027', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_027.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_027', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_028', 'Synthetic User 28', 'synthetic.user028@example.test', '+245600000028', 'Caracol', 'https://example.invalid/avatar/synthetic_user_028.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_028', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_029', 'Synthetic User 29', 'synthetic.user029@example.test', '+245600000029', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_029.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_029', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_030', 'Synthetic User 30', 'synthetic.user030@example.test', '+245600000030', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_030.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_030', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_031', 'Synthetic User 31', 'synthetic.user031@example.test', '+245600000031', 'Bandim', 'https://example.invalid/avatar/synthetic_user_031.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_031', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_032', 'Synthetic User 32', 'synthetic.user032@example.test', '+245600000032', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_032.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_032', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_033', 'Synthetic User 33', 'synthetic.user033@example.test', '+245600000033', 'Caracol', 'https://example.invalid/avatar/synthetic_user_033.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_033', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_034', 'Synthetic User 34', 'synthetic.user034@example.test', '+245600000034', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_034.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_034', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_035', 'Synthetic User 35', 'synthetic.user035@example.test', '+245600000035', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_035.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_035', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_036', 'Synthetic User 36', 'synthetic.user036@example.test', '+245600000036', 'Bandim', 'https://example.invalid/avatar/synthetic_user_036.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_036', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_037', 'Synthetic User 37', 'synthetic.user037@example.test', '+245600000037', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_037.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_037', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_038', 'Synthetic User 38', 'synthetic.user038@example.test', '+245600000038', 'Caracol', 'https://example.invalid/avatar/synthetic_user_038.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_038', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_039', 'Synthetic User 39', 'synthetic.user039@example.test', '+245600000039', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_039.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_039', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_040', 'Synthetic User 40', 'synthetic.user040@example.test', '+245600000040', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_040.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_040', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_041', 'Synthetic User 41', 'synthetic.user041@example.test', '+245600000041', 'Bandim', 'https://example.invalid/avatar/synthetic_user_041.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_041', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_042', 'Synthetic User 42', 'synthetic.user042@example.test', '+245600000042', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_042.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_042', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_043', 'Synthetic User 43', 'synthetic.user043@example.test', '+245600000043', 'Caracol', 'https://example.invalid/avatar/synthetic_user_043.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_043', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_044', 'Synthetic User 44', 'synthetic.user044@example.test', '+245600000044', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_044.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_044', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_045', 'Synthetic User 45', 'synthetic.user045@example.test', '+245600000045', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_045.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_045', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_046', 'Synthetic User 46', 'synthetic.user046@example.test', '+245600000046', 'Bandim', 'https://example.invalid/avatar/synthetic_user_046.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_046', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_047', 'Synthetic User 47', 'synthetic.user047@example.test', '+245600000047', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_047.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_047', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_048', 'Synthetic User 48', 'synthetic.user048@example.test', '+245600000048', 'Caracol', 'https://example.invalid/avatar/synthetic_user_048.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_048', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_049', 'Synthetic User 49', 'synthetic.user049@example.test', '+245600000049', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_049.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_049', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
-('synthetic_user_050', 'Synthetic User 50', 'synthetic.user050@example.test', '+245600000050', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_050.png', 'user', 'active', 'synthetic_password_hash_synthetic_user_050', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00') ON CONFLICT (id) DO NOTHING;
+INSERT INTO users (id, name, email, phone, neighborhood, avatar_url, role, account_status, password_hash, created_at, updated_at) VALUES ('synthetic_user_001', 'Synthetic User 1', 'synthetic.user001@example.test', '+245600000001', 'Bandim', 'https://example.invalid/avatar/synthetic_user_001.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_001', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_002', 'Synthetic User 2', 'synthetic.user002@example.test', '+245600000002', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_002.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_002', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_003', 'Synthetic User 3', 'synthetic.user003@example.test', '+245600000003', 'Caracol', 'https://example.invalid/avatar/synthetic_user_003.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_003', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_004', 'Synthetic User 4', 'synthetic.user004@example.test', '+245600000004', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_004.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_004', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_005', 'Synthetic User 5', 'synthetic.user005@example.test', '+245600000005', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_005.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_005', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_006', 'Synthetic User 6', 'synthetic.user006@example.test', '+245600000006', 'Bandim', 'https://example.invalid/avatar/synthetic_user_006.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_006', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_007', 'Synthetic User 7', 'synthetic.user007@example.test', '+245600000007', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_007.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_007', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_008', 'Synthetic User 8', 'synthetic.user008@example.test', '+245600000008', 'Caracol', 'https://example.invalid/avatar/synthetic_user_008.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_008', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_009', 'Synthetic User 9', 'synthetic.user009@example.test', '+245600000009', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_009.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_009', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_010', 'Synthetic User 10', 'synthetic.user010@example.test', '+245600000010', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_010.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_010', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_011', 'Synthetic User 11', 'synthetic.user011@example.test', '+245600000011', 'Bandim', 'https://example.invalid/avatar/synthetic_user_011.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_011', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_012', 'Synthetic User 12', 'synthetic.user012@example.test', '+245600000012', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_012.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_012', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_013', 'Synthetic User 13', 'synthetic.user013@example.test', '+245600000013', 'Caracol', 'https://example.invalid/avatar/synthetic_user_013.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_013', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_014', 'Synthetic User 14', 'synthetic.user014@example.test', '+245600000014', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_014.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_014', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_015', 'Synthetic User 15', 'synthetic.user015@example.test', '+245600000015', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_015.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_015', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_016', 'Synthetic User 16', 'synthetic.user016@example.test', '+245600000016', 'Bandim', 'https://example.invalid/avatar/synthetic_user_016.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_016', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_017', 'Synthetic User 17', 'synthetic.user017@example.test', '+245600000017', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_017.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_017', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_018', 'Synthetic User 18', 'synthetic.user018@example.test', '+245600000018', 'Caracol', 'https://example.invalid/avatar/synthetic_user_018.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_018', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_019', 'Synthetic User 19', 'synthetic.user019@example.test', '+245600000019', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_019.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_019', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_020', 'Synthetic User 20', 'synthetic.user020@example.test', '+245600000020', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_020.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_020', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_021', 'Synthetic User 21', 'synthetic.user021@example.test', '+245600000021', 'Bandim', 'https://example.invalid/avatar/synthetic_user_021.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_021', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_022', 'Synthetic User 22', 'synthetic.user022@example.test', '+245600000022', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_022.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_022', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_023', 'Synthetic User 23', 'synthetic.user023@example.test', '+245600000023', 'Caracol', 'https://example.invalid/avatar/synthetic_user_023.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_023', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_024', 'Synthetic User 24', 'synthetic.user024@example.test', '+245600000024', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_024.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_024', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_025', 'Synthetic User 25', 'synthetic.user025@example.test', '+245600000025', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_025.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_025', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_026', 'Synthetic User 26', 'synthetic.user026@example.test', '+245600000026', 'Bandim', 'https://example.invalid/avatar/synthetic_user_026.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_026', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_027', 'Synthetic User 27', 'synthetic.user027@example.test', '+245600000027', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_027.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_027', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_028', 'Synthetic User 28', 'synthetic.user028@example.test', '+245600000028', 'Caracol', 'https://example.invalid/avatar/synthetic_user_028.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_028', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_029', 'Synthetic User 29', 'synthetic.user029@example.test', '+245600000029', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_029.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_029', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_030', 'Synthetic User 30', 'synthetic.user030@example.test', '+245600000030', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_030.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_030', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_031', 'Synthetic User 31', 'synthetic.user031@example.test', '+245600000031', 'Bandim', 'https://example.invalid/avatar/synthetic_user_031.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_031', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_032', 'Synthetic User 32', 'synthetic.user032@example.test', '+245600000032', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_032.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_032', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_033', 'Synthetic User 33', 'synthetic.user033@example.test', '+245600000033', 'Caracol', 'https://example.invalid/avatar/synthetic_user_033.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_033', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_034', 'Synthetic User 34', 'synthetic.user034@example.test', '+245600000034', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_034.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_034', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_035', 'Synthetic User 35', 'synthetic.user035@example.test', '+245600000035', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_035.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_035', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_036', 'Synthetic User 36', 'synthetic.user036@example.test', '+245600000036', 'Bandim', 'https://example.invalid/avatar/synthetic_user_036.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_036', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_037', 'Synthetic User 37', 'synthetic.user037@example.test', '+245600000037', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_037.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_037', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_038', 'Synthetic User 38', 'synthetic.user038@example.test', '+245600000038', 'Caracol', 'https://example.invalid/avatar/synthetic_user_038.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_038', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_039', 'Synthetic User 39', 'synthetic.user039@example.test', '+245600000039', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_039.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_039', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_040', 'Synthetic User 40', 'synthetic.user040@example.test', '+245600000040', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_040.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_040', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_041', 'Synthetic User 41', 'synthetic.user041@example.test', '+245600000041', 'Bandim', 'https://example.invalid/avatar/synthetic_user_041.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_041', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_042', 'Synthetic User 42', 'synthetic.user042@example.test', '+245600000042', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_042.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_042', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_043', 'Synthetic User 43', 'synthetic.user043@example.test', '+245600000043', 'Caracol', 'https://example.invalid/avatar/synthetic_user_043.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_043', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_044', 'Synthetic User 44', 'synthetic.user044@example.test', '+245600000044', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_044.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_044', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_045', 'Synthetic User 45', 'synthetic.user045@example.test', '+245600000045', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_045.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_045', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_046', 'Synthetic User 46', 'synthetic.user046@example.test', '+245600000046', 'Bandim', 'https://example.invalid/avatar/synthetic_user_046.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_046', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_047', 'Synthetic User 47', 'synthetic.user047@example.test', '+245600000047', 'Santa Luzia', 'https://example.invalid/avatar/synthetic_user_047.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_047', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_048', 'Synthetic User 48', 'synthetic.user048@example.test', '+245600000048', 'Caracol', 'https://example.invalid/avatar/synthetic_user_048.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_048', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_049', 'Synthetic User 49', 'synthetic.user049@example.test', '+245600000049', 'Praca dos Herois', 'https://example.invalid/avatar/synthetic_user_049.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_049', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'),
+('synthetic_user_050', 'Synthetic User 50', 'synthetic.user050@example.test', '+245600000050', 'Bissau Velho', 'https://example.invalid/avatar/synthetic_user_050.png', 'user', 'deactivated', 'synthetic_password_hash_synthetic_user_050', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00') ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO companies (id, owner_user_id, name, status, category_id, created_at, updated_at) VALUES ('synthetic_company_001', 'synthetic_user_001', 'Synthetic Company 1', 'pending', 'cat-1', '2026-01-02T00:00:00+00:00', '2026-01-02T00:00:00+00:00'),
 ('synthetic_company_002', 'synthetic_user_002', 'Synthetic Company 2', 'active', 'cat-2', '2026-01-02T00:00:00+00:00', '2026-01-02T00:00:00+00:00'),
@@ -239,106 +282,106 @@ INSERT INTO ticket_types (id, event_id, name, price_xof, quantity) VALUES ('synt
 ('synthetic_ticket_type_059', 'synthetic_event_030', 'VIP', 5500, 60),
 ('synthetic_ticket_type_060', 'synthetic_event_030', 'Backstage', 7000, 65) ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO ticket_reservations (id, event_id, ticket_type_id, quantity, expires_at, status, created_at, updated_at) VALUES ('synthetic_reservation_001', 'synthetic_event_001', 'synthetic_ticket_type_001', 2, '2026-02-01T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_002', 'synthetic_event_002', 'synthetic_ticket_type_002', 3, '2026-02-02T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_003', 'synthetic_event_003', 'synthetic_ticket_type_003', 4, '2026-02-03T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_004', 'synthetic_event_004', 'synthetic_ticket_type_004', 5, '2026-02-04T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_005', 'synthetic_event_005', 'synthetic_ticket_type_005', 2, '2026-02-05T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_006', 'synthetic_event_006', 'synthetic_ticket_type_006', 3, '2026-02-06T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_007', 'synthetic_event_007', 'synthetic_ticket_type_007', 4, '2026-02-07T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_008', 'synthetic_event_008', 'synthetic_ticket_type_008', 5, '2026-02-08T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_009', 'synthetic_event_009', 'synthetic_ticket_type_009', 2, '2026-02-09T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_010', 'synthetic_event_010', 'synthetic_ticket_type_010', 3, '2026-02-10T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_011', 'synthetic_event_011', 'synthetic_ticket_type_011', 4, '2026-02-11T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_012', 'synthetic_event_012', 'synthetic_ticket_type_012', 5, '2026-02-12T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_013', 'synthetic_event_013', 'synthetic_ticket_type_013', 2, '2026-02-13T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_014', 'synthetic_event_014', 'synthetic_ticket_type_014', 3, '2026-02-14T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_015', 'synthetic_event_015', 'synthetic_ticket_type_015', 4, '2026-02-15T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_016', 'synthetic_event_016', 'synthetic_ticket_type_016', 5, '2026-02-16T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_017', 'synthetic_event_017', 'synthetic_ticket_type_017', 2, '2026-02-17T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_018', 'synthetic_event_018', 'synthetic_ticket_type_018', 3, '2026-02-18T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_019', 'synthetic_event_019', 'synthetic_ticket_type_019', 4, '2026-02-19T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_020', 'synthetic_event_020', 'synthetic_ticket_type_020', 5, '2026-02-20T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_021', 'synthetic_event_021', 'synthetic_ticket_type_021', 2, '2026-02-21T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_022', 'synthetic_event_022', 'synthetic_ticket_type_022', 3, '2026-02-22T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_023', 'synthetic_event_023', 'synthetic_ticket_type_023', 4, '2026-02-23T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_024', 'synthetic_event_024', 'synthetic_ticket_type_024', 5, '2026-02-24T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_025', 'synthetic_event_025', 'synthetic_ticket_type_025', 2, '2026-02-25T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_026', 'synthetic_event_026', 'synthetic_ticket_type_026', 3, '2026-02-26T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_027', 'synthetic_event_027', 'synthetic_ticket_type_027', 4, '2026-02-27T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_028', 'synthetic_event_028', 'synthetic_ticket_type_028', 5, '2026-02-01T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_029', 'synthetic_event_029', 'synthetic_ticket_type_029', 2, '2026-02-02T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_030', 'synthetic_event_030', 'synthetic_ticket_type_030', 3, '2026-02-03T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_031', 'synthetic_event_001', 'synthetic_ticket_type_031', 4, '2026-02-04T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_032', 'synthetic_event_002', 'synthetic_ticket_type_032', 5, '2026-02-05T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_033', 'synthetic_event_003', 'synthetic_ticket_type_033', 2, '2026-02-06T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_034', 'synthetic_event_004', 'synthetic_ticket_type_034', 3, '2026-02-07T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_035', 'synthetic_event_005', 'synthetic_ticket_type_035', 4, '2026-02-08T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_036', 'synthetic_event_006', 'synthetic_ticket_type_036', 5, '2026-02-09T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_037', 'synthetic_event_007', 'synthetic_ticket_type_037', 2, '2026-02-10T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_038', 'synthetic_event_008', 'synthetic_ticket_type_038', 3, '2026-02-11T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_039', 'synthetic_event_009', 'synthetic_ticket_type_039', 4, '2026-02-12T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_040', 'synthetic_event_010', 'synthetic_ticket_type_040', 5, '2026-02-13T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_041', 'synthetic_event_011', 'synthetic_ticket_type_041', 2, '2026-02-14T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_042', 'synthetic_event_012', 'synthetic_ticket_type_042', 3, '2026-02-15T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_043', 'synthetic_event_013', 'synthetic_ticket_type_043', 4, '2026-02-16T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_044', 'synthetic_event_014', 'synthetic_ticket_type_044', 5, '2026-02-17T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_045', 'synthetic_event_015', 'synthetic_ticket_type_045', 2, '2026-02-18T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_046', 'synthetic_event_016', 'synthetic_ticket_type_046', 3, '2026-02-19T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_047', 'synthetic_event_017', 'synthetic_ticket_type_047', 4, '2026-02-20T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_048', 'synthetic_event_018', 'synthetic_ticket_type_048', 5, '2026-02-21T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_049', 'synthetic_event_019', 'synthetic_ticket_type_049', 2, '2026-02-22T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_050', 'synthetic_event_020', 'synthetic_ticket_type_050', 3, '2026-02-23T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_051', 'synthetic_event_021', 'synthetic_ticket_type_051', 4, '2026-02-24T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_052', 'synthetic_event_022', 'synthetic_ticket_type_052', 5, '2026-02-25T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_053', 'synthetic_event_023', 'synthetic_ticket_type_053', 2, '2026-02-26T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_054', 'synthetic_event_024', 'synthetic_ticket_type_054', 3, '2026-02-27T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_055', 'synthetic_event_025', 'synthetic_ticket_type_055', 4, '2026-02-01T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_056', 'synthetic_event_026', 'synthetic_ticket_type_056', 5, '2026-02-02T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_057', 'synthetic_event_027', 'synthetic_ticket_type_057', 2, '2026-02-03T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_058', 'synthetic_event_028', 'synthetic_ticket_type_058', 3, '2026-02-04T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_059', 'synthetic_event_029', 'synthetic_ticket_type_059', 4, '2026-02-05T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+INSERT INTO ticket_reservations (id, event_id, ticket_type_id, quantity, expires_at, status, created_at, updated_at) VALUES ('synthetic_reservation_001', 'synthetic_event_001', 'synthetic_ticket_type_001', 2, '2026-02-01T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_002', 'synthetic_event_001', 'synthetic_ticket_type_002', 3, '2026-02-02T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_003', 'synthetic_event_002', 'synthetic_ticket_type_003', 4, '2026-02-03T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_004', 'synthetic_event_002', 'synthetic_ticket_type_004', 5, '2026-02-04T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_005', 'synthetic_event_003', 'synthetic_ticket_type_005', 2, '2026-02-05T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_006', 'synthetic_event_003', 'synthetic_ticket_type_006', 3, '2026-02-06T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_007', 'synthetic_event_004', 'synthetic_ticket_type_007', 4, '2026-02-07T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_008', 'synthetic_event_004', 'synthetic_ticket_type_008', 5, '2026-02-08T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_009', 'synthetic_event_005', 'synthetic_ticket_type_009', 2, '2026-02-09T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_010', 'synthetic_event_005', 'synthetic_ticket_type_010', 3, '2026-02-10T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_011', 'synthetic_event_006', 'synthetic_ticket_type_011', 4, '2026-02-11T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_012', 'synthetic_event_006', 'synthetic_ticket_type_012', 5, '2026-02-12T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_013', 'synthetic_event_007', 'synthetic_ticket_type_013', 2, '2026-02-13T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_014', 'synthetic_event_007', 'synthetic_ticket_type_014', 3, '2026-02-14T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_015', 'synthetic_event_008', 'synthetic_ticket_type_015', 4, '2026-02-15T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_016', 'synthetic_event_008', 'synthetic_ticket_type_016', 5, '2026-02-16T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_017', 'synthetic_event_009', 'synthetic_ticket_type_017', 2, '2026-02-17T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_018', 'synthetic_event_009', 'synthetic_ticket_type_018', 3, '2026-02-18T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_019', 'synthetic_event_010', 'synthetic_ticket_type_019', 4, '2026-02-19T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_020', 'synthetic_event_010', 'synthetic_ticket_type_020', 5, '2026-02-20T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_021', 'synthetic_event_011', 'synthetic_ticket_type_021', 2, '2026-02-21T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_022', 'synthetic_event_011', 'synthetic_ticket_type_022', 3, '2026-02-22T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_023', 'synthetic_event_012', 'synthetic_ticket_type_023', 4, '2026-02-23T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_024', 'synthetic_event_012', 'synthetic_ticket_type_024', 5, '2026-02-24T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_025', 'synthetic_event_013', 'synthetic_ticket_type_025', 2, '2026-02-25T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_026', 'synthetic_event_013', 'synthetic_ticket_type_026', 3, '2026-02-26T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_027', 'synthetic_event_014', 'synthetic_ticket_type_027', 4, '2026-02-27T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_028', 'synthetic_event_014', 'synthetic_ticket_type_028', 5, '2026-02-01T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_029', 'synthetic_event_015', 'synthetic_ticket_type_029', 2, '2026-02-02T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_030', 'synthetic_event_015', 'synthetic_ticket_type_030', 3, '2026-02-03T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_031', 'synthetic_event_016', 'synthetic_ticket_type_031', 4, '2026-02-04T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_032', 'synthetic_event_016', 'synthetic_ticket_type_032', 5, '2026-02-05T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_033', 'synthetic_event_017', 'synthetic_ticket_type_033', 2, '2026-02-06T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_034', 'synthetic_event_017', 'synthetic_ticket_type_034', 3, '2026-02-07T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_035', 'synthetic_event_018', 'synthetic_ticket_type_035', 4, '2026-02-08T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_036', 'synthetic_event_018', 'synthetic_ticket_type_036', 5, '2026-02-09T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_037', 'synthetic_event_019', 'synthetic_ticket_type_037', 2, '2026-02-10T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_038', 'synthetic_event_019', 'synthetic_ticket_type_038', 3, '2026-02-11T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_039', 'synthetic_event_020', 'synthetic_ticket_type_039', 4, '2026-02-12T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_040', 'synthetic_event_020', 'synthetic_ticket_type_040', 5, '2026-02-13T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_041', 'synthetic_event_021', 'synthetic_ticket_type_041', 2, '2026-02-14T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_042', 'synthetic_event_021', 'synthetic_ticket_type_042', 3, '2026-02-15T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_043', 'synthetic_event_022', 'synthetic_ticket_type_043', 4, '2026-02-16T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_044', 'synthetic_event_022', 'synthetic_ticket_type_044', 5, '2026-02-17T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_045', 'synthetic_event_023', 'synthetic_ticket_type_045', 2, '2026-02-18T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_046', 'synthetic_event_023', 'synthetic_ticket_type_046', 3, '2026-02-19T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_047', 'synthetic_event_024', 'synthetic_ticket_type_047', 4, '2026-02-20T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_048', 'synthetic_event_024', 'synthetic_ticket_type_048', 5, '2026-02-21T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_049', 'synthetic_event_025', 'synthetic_ticket_type_049', 2, '2026-02-22T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_050', 'synthetic_event_025', 'synthetic_ticket_type_050', 3, '2026-02-23T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_051', 'synthetic_event_026', 'synthetic_ticket_type_051', 4, '2026-02-24T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_052', 'synthetic_event_026', 'synthetic_ticket_type_052', 5, '2026-02-25T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_053', 'synthetic_event_027', 'synthetic_ticket_type_053', 2, '2026-02-26T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_054', 'synthetic_event_027', 'synthetic_ticket_type_054', 3, '2026-02-27T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_055', 'synthetic_event_028', 'synthetic_ticket_type_055', 4, '2026-02-01T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_056', 'synthetic_event_028', 'synthetic_ticket_type_056', 5, '2026-02-02T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_057', 'synthetic_event_029', 'synthetic_ticket_type_057', 2, '2026-02-03T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_058', 'synthetic_event_029', 'synthetic_ticket_type_058', 3, '2026-02-04T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_059', 'synthetic_event_030', 'synthetic_ticket_type_059', 4, '2026-02-05T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
 ('synthetic_reservation_060', 'synthetic_event_030', 'synthetic_ticket_type_060', 5, '2026-02-06T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_061', 'synthetic_event_001', 'synthetic_ticket_type_001', 2, '2026-02-07T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_062', 'synthetic_event_002', 'synthetic_ticket_type_002', 3, '2026-02-08T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_063', 'synthetic_event_003', 'synthetic_ticket_type_003', 4, '2026-02-09T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_064', 'synthetic_event_004', 'synthetic_ticket_type_004', 5, '2026-02-10T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_065', 'synthetic_event_005', 'synthetic_ticket_type_005', 2, '2026-02-11T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_066', 'synthetic_event_006', 'synthetic_ticket_type_006', 3, '2026-02-12T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_067', 'synthetic_event_007', 'synthetic_ticket_type_007', 4, '2026-02-13T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_068', 'synthetic_event_008', 'synthetic_ticket_type_008', 5, '2026-02-14T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_069', 'synthetic_event_009', 'synthetic_ticket_type_009', 2, '2026-02-15T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_070', 'synthetic_event_010', 'synthetic_ticket_type_010', 3, '2026-02-16T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_071', 'synthetic_event_011', 'synthetic_ticket_type_011', 4, '2026-02-17T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_072', 'synthetic_event_012', 'synthetic_ticket_type_012', 5, '2026-02-18T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_073', 'synthetic_event_013', 'synthetic_ticket_type_013', 2, '2026-02-19T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_074', 'synthetic_event_014', 'synthetic_ticket_type_014', 3, '2026-02-20T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_075', 'synthetic_event_015', 'synthetic_ticket_type_015', 4, '2026-02-21T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_076', 'synthetic_event_016', 'synthetic_ticket_type_016', 5, '2026-02-22T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_077', 'synthetic_event_017', 'synthetic_ticket_type_017', 2, '2026-02-23T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_078', 'synthetic_event_018', 'synthetic_ticket_type_018', 3, '2026-02-24T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_079', 'synthetic_event_019', 'synthetic_ticket_type_019', 4, '2026-02-25T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_080', 'synthetic_event_020', 'synthetic_ticket_type_020', 5, '2026-02-26T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_081', 'synthetic_event_021', 'synthetic_ticket_type_021', 2, '2026-02-27T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_082', 'synthetic_event_022', 'synthetic_ticket_type_022', 3, '2026-02-01T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_083', 'synthetic_event_023', 'synthetic_ticket_type_023', 4, '2026-02-02T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_084', 'synthetic_event_024', 'synthetic_ticket_type_024', 5, '2026-02-03T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_085', 'synthetic_event_025', 'synthetic_ticket_type_025', 2, '2026-02-04T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_086', 'synthetic_event_026', 'synthetic_ticket_type_026', 3, '2026-02-05T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_087', 'synthetic_event_027', 'synthetic_ticket_type_027', 4, '2026-02-06T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_088', 'synthetic_event_028', 'synthetic_ticket_type_028', 5, '2026-02-07T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_089', 'synthetic_event_029', 'synthetic_ticket_type_029', 2, '2026-02-08T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_090', 'synthetic_event_030', 'synthetic_ticket_type_030', 3, '2026-02-09T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_091', 'synthetic_event_001', 'synthetic_ticket_type_031', 4, '2026-02-10T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_092', 'synthetic_event_002', 'synthetic_ticket_type_032', 5, '2026-02-11T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_093', 'synthetic_event_003', 'synthetic_ticket_type_033', 2, '2026-02-12T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_094', 'synthetic_event_004', 'synthetic_ticket_type_034', 3, '2026-02-13T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_095', 'synthetic_event_005', 'synthetic_ticket_type_035', 4, '2026-02-14T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_096', 'synthetic_event_006', 'synthetic_ticket_type_036', 5, '2026-02-15T18:00:00+00:00', 'pending', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_097', 'synthetic_event_007', 'synthetic_ticket_type_037', 2, '2026-02-16T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_098', 'synthetic_event_008', 'synthetic_ticket_type_038', 3, '2026-02-17T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_099', 'synthetic_event_009', 'synthetic_ticket_type_039', 4, '2026-02-18T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
-('synthetic_reservation_100', 'synthetic_event_010', 'synthetic_ticket_type_040', 5, '2026-02-19T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00') ON CONFLICT (id) DO NOTHING;
+('synthetic_reservation_061', 'synthetic_event_001', 'synthetic_ticket_type_001', 2, '2026-02-07T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_062', 'synthetic_event_001', 'synthetic_ticket_type_002', 3, '2026-02-08T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_063', 'synthetic_event_002', 'synthetic_ticket_type_003', 4, '2026-02-09T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_064', 'synthetic_event_002', 'synthetic_ticket_type_004', 5, '2026-02-10T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_065', 'synthetic_event_003', 'synthetic_ticket_type_005', 2, '2026-02-11T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_066', 'synthetic_event_003', 'synthetic_ticket_type_006', 3, '2026-02-12T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_067', 'synthetic_event_004', 'synthetic_ticket_type_007', 4, '2026-02-13T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_068', 'synthetic_event_004', 'synthetic_ticket_type_008', 5, '2026-02-14T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_069', 'synthetic_event_005', 'synthetic_ticket_type_009', 2, '2026-02-15T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_070', 'synthetic_event_005', 'synthetic_ticket_type_010', 3, '2026-02-16T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_071', 'synthetic_event_006', 'synthetic_ticket_type_011', 4, '2026-02-17T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_072', 'synthetic_event_006', 'synthetic_ticket_type_012', 5, '2026-02-18T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_073', 'synthetic_event_007', 'synthetic_ticket_type_013', 2, '2026-02-19T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_074', 'synthetic_event_007', 'synthetic_ticket_type_014', 3, '2026-02-20T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_075', 'synthetic_event_008', 'synthetic_ticket_type_015', 4, '2026-02-21T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_076', 'synthetic_event_008', 'synthetic_ticket_type_016', 5, '2026-02-22T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_077', 'synthetic_event_009', 'synthetic_ticket_type_017', 2, '2026-02-23T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_078', 'synthetic_event_009', 'synthetic_ticket_type_018', 3, '2026-02-24T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_079', 'synthetic_event_010', 'synthetic_ticket_type_019', 4, '2026-02-25T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_080', 'synthetic_event_010', 'synthetic_ticket_type_020', 5, '2026-02-26T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_081', 'synthetic_event_011', 'synthetic_ticket_type_021', 2, '2026-02-27T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_082', 'synthetic_event_011', 'synthetic_ticket_type_022', 3, '2026-02-01T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_083', 'synthetic_event_012', 'synthetic_ticket_type_023', 4, '2026-02-02T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_084', 'synthetic_event_012', 'synthetic_ticket_type_024', 5, '2026-02-03T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_085', 'synthetic_event_013', 'synthetic_ticket_type_025', 2, '2026-02-04T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_086', 'synthetic_event_013', 'synthetic_ticket_type_026', 3, '2026-02-05T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_087', 'synthetic_event_014', 'synthetic_ticket_type_027', 4, '2026-02-06T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_088', 'synthetic_event_014', 'synthetic_ticket_type_028', 5, '2026-02-07T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_089', 'synthetic_event_015', 'synthetic_ticket_type_029', 2, '2026-02-08T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_090', 'synthetic_event_015', 'synthetic_ticket_type_030', 3, '2026-02-09T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_091', 'synthetic_event_016', 'synthetic_ticket_type_031', 4, '2026-02-10T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_092', 'synthetic_event_016', 'synthetic_ticket_type_032', 5, '2026-02-11T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_093', 'synthetic_event_017', 'synthetic_ticket_type_033', 2, '2026-02-12T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_094', 'synthetic_event_017', 'synthetic_ticket_type_034', 3, '2026-02-13T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_095', 'synthetic_event_018', 'synthetic_ticket_type_035', 4, '2026-02-14T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_096', 'synthetic_event_018', 'synthetic_ticket_type_036', 5, '2026-02-15T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_097', 'synthetic_event_019', 'synthetic_ticket_type_037', 2, '2026-02-16T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_098', 'synthetic_event_019', 'synthetic_ticket_type_038', 3, '2026-02-17T18:00:00+00:00', 'confirmed', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_099', 'synthetic_event_020', 'synthetic_ticket_type_039', 4, '2026-02-18T18:00:00+00:00', 'released', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00'),
+('synthetic_reservation_100', 'synthetic_event_020', 'synthetic_ticket_type_040', 5, '2026-02-19T18:00:00+00:00', 'expired', '2026-01-05T00:00:00+00:00', '2026-01-05T00:00:00+00:00') ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO orders (id, buyer_user_id, event_id, status, gross_amount_xof, fee_amount_xof, net_amount_xof, idempotency_key, created_at, updated_at) VALUES ('synthetic_order_001', 'synthetic_user_001', 'synthetic_event_001', 'created', 2500, 200, 2300, 'synthetic_order_key_1', '2026-01-06T00:00:00+00:00', '2026-01-06T00:00:00+00:00'),
 ('synthetic_order_002', 'synthetic_user_002', 'synthetic_event_002', 'paid', 4250, 340, 3910, 'synthetic_order_key_2', '2026-01-06T00:00:00+00:00', '2026-01-06T00:00:00+00:00'),
@@ -421,86 +464,86 @@ INSERT INTO orders (id, buyer_user_id, event_id, status, gross_amount_xof, fee_a
 ('synthetic_order_079', 'synthetic_user_029', 'synthetic_event_019', 'cancelled', 4250, 340, 3910, 'synthetic_order_key_79', '2026-01-06T00:00:00+00:00', '2026-01-06T00:00:00+00:00'),
 ('synthetic_order_080', 'synthetic_user_030', 'synthetic_event_020', 'refunded', 6000, 480, 5520, 'synthetic_order_key_80', '2026-01-06T00:00:00+00:00', '2026-01-06T00:00:00+00:00') ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO tickets (id, order_id, event_id, ticket_type_id, qr_token, ticket_code, pin_hash, signature, status, expires_at, created_at, buyer_name, buyer_phone, holder_name, holder_phone, payment_method) VALUES ('synthetic_ticket_001', 'synthetic_order_001', 'synthetic_event_001', 'synthetic_ticket_type_001', 'synthetic_qr_001', 'SYNT-00001', 'synthetic_pin_hash_001', 'synthetic_signature_001', 'valid', '2026-06-01T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_002', 'synthetic_order_002', 'synthetic_event_002', 'synthetic_ticket_type_002', 'synthetic_qr_002', 'SYNT-00002', 'synthetic_pin_hash_002', 'synthetic_signature_002', 'used', '2026-06-02T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_003', 'synthetic_order_003', 'synthetic_event_003', 'synthetic_ticket_type_003', 'synthetic_qr_003', 'SYNT-00003', 'synthetic_pin_hash_003', 'synthetic_signature_003', 'valid', '2026-06-03T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_004', 'synthetic_order_004', 'synthetic_event_004', 'synthetic_ticket_type_004', 'synthetic_qr_004', 'SYNT-00004', 'synthetic_pin_hash_004', 'synthetic_signature_004', 'cancelled', '2026-06-04T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_005', 'synthetic_order_005', 'synthetic_event_005', 'synthetic_ticket_type_005', 'synthetic_qr_005', 'SYNT-00005', 'synthetic_pin_hash_005', 'synthetic_signature_005', 'expired', '2026-06-05T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_006', 'synthetic_order_006', 'synthetic_event_006', 'synthetic_ticket_type_006', 'synthetic_qr_006', 'SYNT-00006', 'synthetic_pin_hash_006', 'synthetic_signature_006', 'valid', '2026-06-06T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_007', 'synthetic_order_007', 'synthetic_event_007', 'synthetic_ticket_type_007', 'synthetic_qr_007', 'SYNT-00007', 'synthetic_pin_hash_007', 'synthetic_signature_007', 'used', '2026-06-07T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_008', 'synthetic_order_008', 'synthetic_event_008', 'synthetic_ticket_type_008', 'synthetic_qr_008', 'SYNT-00008', 'synthetic_pin_hash_008', 'synthetic_signature_008', 'valid', '2026-06-08T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_009', 'synthetic_order_009', 'synthetic_event_009', 'synthetic_ticket_type_009', 'synthetic_qr_009', 'SYNT-00009', 'synthetic_pin_hash_009', 'synthetic_signature_009', 'cancelled', '2026-06-09T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_010', 'synthetic_order_010', 'synthetic_event_010', 'synthetic_ticket_type_010', 'synthetic_qr_010', 'SYNT-00010', 'synthetic_pin_hash_010', 'synthetic_signature_010', 'expired', '2026-06-10T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_011', 'synthetic_order_011', 'synthetic_event_011', 'synthetic_ticket_type_011', 'synthetic_qr_011', 'SYNT-00011', 'synthetic_pin_hash_011', 'synthetic_signature_011', 'valid', '2026-06-11T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_012', 'synthetic_order_012', 'synthetic_event_012', 'synthetic_ticket_type_012', 'synthetic_qr_012', 'SYNT-00012', 'synthetic_pin_hash_012', 'synthetic_signature_012', 'used', '2026-06-12T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_013', 'synthetic_order_013', 'synthetic_event_013', 'synthetic_ticket_type_013', 'synthetic_qr_013', 'SYNT-00013', 'synthetic_pin_hash_013', 'synthetic_signature_013', 'valid', '2026-06-13T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_014', 'synthetic_order_014', 'synthetic_event_014', 'synthetic_ticket_type_014', 'synthetic_qr_014', 'SYNT-00014', 'synthetic_pin_hash_014', 'synthetic_signature_014', 'cancelled', '2026-06-14T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_015', 'synthetic_order_015', 'synthetic_event_015', 'synthetic_ticket_type_015', 'synthetic_qr_015', 'SYNT-00015', 'synthetic_pin_hash_015', 'synthetic_signature_015', 'expired', '2026-06-15T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_016', 'synthetic_order_016', 'synthetic_event_016', 'synthetic_ticket_type_016', 'synthetic_qr_016', 'SYNT-00016', 'synthetic_pin_hash_016', 'synthetic_signature_016', 'valid', '2026-06-16T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_017', 'synthetic_order_017', 'synthetic_event_017', 'synthetic_ticket_type_017', 'synthetic_qr_017', 'SYNT-00017', 'synthetic_pin_hash_017', 'synthetic_signature_017', 'used', '2026-06-17T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_018', 'synthetic_order_018', 'synthetic_event_018', 'synthetic_ticket_type_018', 'synthetic_qr_018', 'SYNT-00018', 'synthetic_pin_hash_018', 'synthetic_signature_018', 'valid', '2026-06-18T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_019', 'synthetic_order_019', 'synthetic_event_019', 'synthetic_ticket_type_019', 'synthetic_qr_019', 'SYNT-00019', 'synthetic_pin_hash_019', 'synthetic_signature_019', 'cancelled', '2026-06-19T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_020', 'synthetic_order_020', 'synthetic_event_020', 'synthetic_ticket_type_020', 'synthetic_qr_020', 'SYNT-00020', 'synthetic_pin_hash_020', 'synthetic_signature_020', 'expired', '2026-06-20T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_021', 'synthetic_order_021', 'synthetic_event_021', 'synthetic_ticket_type_021', 'synthetic_qr_021', 'SYNT-00021', 'synthetic_pin_hash_021', 'synthetic_signature_021', 'valid', '2026-06-21T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_022', 'synthetic_order_022', 'synthetic_event_022', 'synthetic_ticket_type_022', 'synthetic_qr_022', 'SYNT-00022', 'synthetic_pin_hash_022', 'synthetic_signature_022', 'used', '2026-06-22T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_023', 'synthetic_order_023', 'synthetic_event_023', 'synthetic_ticket_type_023', 'synthetic_qr_023', 'SYNT-00023', 'synthetic_pin_hash_023', 'synthetic_signature_023', 'valid', '2026-06-23T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_024', 'synthetic_order_024', 'synthetic_event_024', 'synthetic_ticket_type_024', 'synthetic_qr_024', 'SYNT-00024', 'synthetic_pin_hash_024', 'synthetic_signature_024', 'cancelled', '2026-06-24T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_025', 'synthetic_order_025', 'synthetic_event_025', 'synthetic_ticket_type_025', 'synthetic_qr_025', 'SYNT-00025', 'synthetic_pin_hash_025', 'synthetic_signature_025', 'expired', '2026-06-25T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_026', 'synthetic_order_026', 'synthetic_event_026', 'synthetic_ticket_type_026', 'synthetic_qr_026', 'SYNT-00026', 'synthetic_pin_hash_026', 'synthetic_signature_026', 'valid', '2026-06-26T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_027', 'synthetic_order_027', 'synthetic_event_027', 'synthetic_ticket_type_027', 'synthetic_qr_027', 'SYNT-00027', 'synthetic_pin_hash_027', 'synthetic_signature_027', 'used', '2026-06-27T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_028', 'synthetic_order_028', 'synthetic_event_028', 'synthetic_ticket_type_028', 'synthetic_qr_028', 'SYNT-00028', 'synthetic_pin_hash_028', 'synthetic_signature_028', 'valid', '2026-06-28T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_029', 'synthetic_order_029', 'synthetic_event_029', 'synthetic_ticket_type_029', 'synthetic_qr_029', 'SYNT-00029', 'synthetic_pin_hash_029', 'synthetic_signature_029', 'cancelled', '2026-06-01T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_030', 'synthetic_order_030', 'synthetic_event_030', 'synthetic_ticket_type_030', 'synthetic_qr_030', 'SYNT-00030', 'synthetic_pin_hash_030', 'synthetic_signature_030', 'expired', '2026-06-02T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_031', 'synthetic_order_031', 'synthetic_event_001', 'synthetic_ticket_type_031', 'synthetic_qr_031', 'SYNT-00031', 'synthetic_pin_hash_031', 'synthetic_signature_031', 'valid', '2026-06-03T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_032', 'synthetic_order_032', 'synthetic_event_002', 'synthetic_ticket_type_032', 'synthetic_qr_032', 'SYNT-00032', 'synthetic_pin_hash_032', 'synthetic_signature_032', 'used', '2026-06-04T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_033', 'synthetic_order_033', 'synthetic_event_003', 'synthetic_ticket_type_033', 'synthetic_qr_033', 'SYNT-00033', 'synthetic_pin_hash_033', 'synthetic_signature_033', 'valid', '2026-06-05T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_034', 'synthetic_order_034', 'synthetic_event_004', 'synthetic_ticket_type_034', 'synthetic_qr_034', 'SYNT-00034', 'synthetic_pin_hash_034', 'synthetic_signature_034', 'cancelled', '2026-06-06T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_035', 'synthetic_order_035', 'synthetic_event_005', 'synthetic_ticket_type_035', 'synthetic_qr_035', 'SYNT-00035', 'synthetic_pin_hash_035', 'synthetic_signature_035', 'expired', '2026-06-07T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_036', 'synthetic_order_036', 'synthetic_event_006', 'synthetic_ticket_type_036', 'synthetic_qr_036', 'SYNT-00036', 'synthetic_pin_hash_036', 'synthetic_signature_036', 'valid', '2026-06-08T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_037', 'synthetic_order_037', 'synthetic_event_007', 'synthetic_ticket_type_037', 'synthetic_qr_037', 'SYNT-00037', 'synthetic_pin_hash_037', 'synthetic_signature_037', 'used', '2026-06-09T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_038', 'synthetic_order_038', 'synthetic_event_008', 'synthetic_ticket_type_038', 'synthetic_qr_038', 'SYNT-00038', 'synthetic_pin_hash_038', 'synthetic_signature_038', 'valid', '2026-06-10T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_039', 'synthetic_order_039', 'synthetic_event_009', 'synthetic_ticket_type_039', 'synthetic_qr_039', 'SYNT-00039', 'synthetic_pin_hash_039', 'synthetic_signature_039', 'cancelled', '2026-06-11T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_040', 'synthetic_order_040', 'synthetic_event_010', 'synthetic_ticket_type_040', 'synthetic_qr_040', 'SYNT-00040', 'synthetic_pin_hash_040', 'synthetic_signature_040', 'expired', '2026-06-12T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_041', 'synthetic_order_041', 'synthetic_event_011', 'synthetic_ticket_type_041', 'synthetic_qr_041', 'SYNT-00041', 'synthetic_pin_hash_041', 'synthetic_signature_041', 'valid', '2026-06-13T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_042', 'synthetic_order_042', 'synthetic_event_012', 'synthetic_ticket_type_042', 'synthetic_qr_042', 'SYNT-00042', 'synthetic_pin_hash_042', 'synthetic_signature_042', 'used', '2026-06-14T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_043', 'synthetic_order_043', 'synthetic_event_013', 'synthetic_ticket_type_043', 'synthetic_qr_043', 'SYNT-00043', 'synthetic_pin_hash_043', 'synthetic_signature_043', 'valid', '2026-06-15T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_044', 'synthetic_order_044', 'synthetic_event_014', 'synthetic_ticket_type_044', 'synthetic_qr_044', 'SYNT-00044', 'synthetic_pin_hash_044', 'synthetic_signature_044', 'cancelled', '2026-06-16T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_045', 'synthetic_order_045', 'synthetic_event_015', 'synthetic_ticket_type_045', 'synthetic_qr_045', 'SYNT-00045', 'synthetic_pin_hash_045', 'synthetic_signature_045', 'expired', '2026-06-17T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_046', 'synthetic_order_046', 'synthetic_event_016', 'synthetic_ticket_type_046', 'synthetic_qr_046', 'SYNT-00046', 'synthetic_pin_hash_046', 'synthetic_signature_046', 'valid', '2026-06-18T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_047', 'synthetic_order_047', 'synthetic_event_017', 'synthetic_ticket_type_047', 'synthetic_qr_047', 'SYNT-00047', 'synthetic_pin_hash_047', 'synthetic_signature_047', 'used', '2026-06-19T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_048', 'synthetic_order_048', 'synthetic_event_018', 'synthetic_ticket_type_048', 'synthetic_qr_048', 'SYNT-00048', 'synthetic_pin_hash_048', 'synthetic_signature_048', 'valid', '2026-06-20T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_049', 'synthetic_order_049', 'synthetic_event_019', 'synthetic_ticket_type_049', 'synthetic_qr_049', 'SYNT-00049', 'synthetic_pin_hash_049', 'synthetic_signature_049', 'cancelled', '2026-06-21T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_050', 'synthetic_order_050', 'synthetic_event_020', 'synthetic_ticket_type_050', 'synthetic_qr_050', 'SYNT-00050', 'synthetic_pin_hash_050', 'synthetic_signature_050', 'expired', '2026-06-22T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_051', 'synthetic_order_051', 'synthetic_event_021', 'synthetic_ticket_type_051', 'synthetic_qr_051', 'SYNT-00051', 'synthetic_pin_hash_051', 'synthetic_signature_051', 'valid', '2026-06-23T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_052', 'synthetic_order_052', 'synthetic_event_022', 'synthetic_ticket_type_052', 'synthetic_qr_052', 'SYNT-00052', 'synthetic_pin_hash_052', 'synthetic_signature_052', 'used', '2026-06-24T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_053', 'synthetic_order_053', 'synthetic_event_023', 'synthetic_ticket_type_053', 'synthetic_qr_053', 'SYNT-00053', 'synthetic_pin_hash_053', 'synthetic_signature_053', 'valid', '2026-06-25T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_054', 'synthetic_order_054', 'synthetic_event_024', 'synthetic_ticket_type_054', 'synthetic_qr_054', 'SYNT-00054', 'synthetic_pin_hash_054', 'synthetic_signature_054', 'cancelled', '2026-06-26T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_055', 'synthetic_order_055', 'synthetic_event_025', 'synthetic_ticket_type_055', 'synthetic_qr_055', 'SYNT-00055', 'synthetic_pin_hash_055', 'synthetic_signature_055', 'expired', '2026-06-27T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_056', 'synthetic_order_056', 'synthetic_event_026', 'synthetic_ticket_type_056', 'synthetic_qr_056', 'SYNT-00056', 'synthetic_pin_hash_056', 'synthetic_signature_056', 'valid', '2026-06-28T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_057', 'synthetic_order_057', 'synthetic_event_027', 'synthetic_ticket_type_057', 'synthetic_qr_057', 'SYNT-00057', 'synthetic_pin_hash_057', 'synthetic_signature_057', 'used', '2026-06-01T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_058', 'synthetic_order_058', 'synthetic_event_028', 'synthetic_ticket_type_058', 'synthetic_qr_058', 'SYNT-00058', 'synthetic_pin_hash_058', 'synthetic_signature_058', 'valid', '2026-06-02T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_059', 'synthetic_order_059', 'synthetic_event_029', 'synthetic_ticket_type_059', 'synthetic_qr_059', 'SYNT-00059', 'synthetic_pin_hash_059', 'synthetic_signature_059', 'cancelled', '2026-06-03T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+INSERT INTO tickets (id, order_id, event_id, ticket_type_id, qr_token, ticket_code, pin_hash, signature, status, expires_at, created_at, buyer_name, buyer_phone, holder_name, holder_phone, payment_method) VALUES ('synthetic_ticket_001', 'synthetic_order_001', 'synthetic_event_001', 'synthetic_ticket_type_001', 'synthetic_qr_001', 'SYNT-00001', 'synthetic_pin_hash_001', 'synthetic_signature_001', 'pending', '2026-06-01T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_002', 'synthetic_order_002', 'synthetic_event_002', 'synthetic_ticket_type_004', 'synthetic_qr_002', 'SYNT-00002', 'synthetic_pin_hash_002', 'synthetic_signature_002', 'valid', '2026-06-02T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_003', 'synthetic_order_003', 'synthetic_event_003', 'synthetic_ticket_type_005', 'synthetic_qr_003', 'SYNT-00003', 'synthetic_pin_hash_003', 'synthetic_signature_003', 'used', '2026-06-03T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_004', 'synthetic_order_004', 'synthetic_event_004', 'synthetic_ticket_type_008', 'synthetic_qr_004', 'SYNT-00004', 'synthetic_pin_hash_004', 'synthetic_signature_004', 'expired', '2026-06-04T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_005', 'synthetic_order_005', 'synthetic_event_005', 'synthetic_ticket_type_009', 'synthetic_qr_005', 'SYNT-00005', 'synthetic_pin_hash_005', 'synthetic_signature_005', 'expired', '2026-06-05T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_006', 'synthetic_order_006', 'synthetic_event_006', 'synthetic_ticket_type_012', 'synthetic_qr_006', 'SYNT-00006', 'synthetic_pin_hash_006', 'synthetic_signature_006', 'pending', '2026-06-06T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_007', 'synthetic_order_007', 'synthetic_event_007', 'synthetic_ticket_type_013', 'synthetic_qr_007', 'SYNT-00007', 'synthetic_pin_hash_007', 'synthetic_signature_007', 'valid', '2026-06-07T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_008', 'synthetic_order_008', 'synthetic_event_008', 'synthetic_ticket_type_016', 'synthetic_qr_008', 'SYNT-00008', 'synthetic_pin_hash_008', 'synthetic_signature_008', 'used', '2026-06-08T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_009', 'synthetic_order_009', 'synthetic_event_009', 'synthetic_ticket_type_017', 'synthetic_qr_009', 'SYNT-00009', 'synthetic_pin_hash_009', 'synthetic_signature_009', 'expired', '2026-06-09T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_010', 'synthetic_order_010', 'synthetic_event_010', 'synthetic_ticket_type_020', 'synthetic_qr_010', 'SYNT-00010', 'synthetic_pin_hash_010', 'synthetic_signature_010', 'expired', '2026-06-10T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_011', 'synthetic_order_011', 'synthetic_event_011', 'synthetic_ticket_type_021', 'synthetic_qr_011', 'SYNT-00011', 'synthetic_pin_hash_011', 'synthetic_signature_011', 'pending', '2026-06-11T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_012', 'synthetic_order_012', 'synthetic_event_012', 'synthetic_ticket_type_024', 'synthetic_qr_012', 'SYNT-00012', 'synthetic_pin_hash_012', 'synthetic_signature_012', 'valid', '2026-06-12T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_013', 'synthetic_order_013', 'synthetic_event_013', 'synthetic_ticket_type_025', 'synthetic_qr_013', 'SYNT-00013', 'synthetic_pin_hash_013', 'synthetic_signature_013', 'used', '2026-06-13T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_014', 'synthetic_order_014', 'synthetic_event_014', 'synthetic_ticket_type_028', 'synthetic_qr_014', 'SYNT-00014', 'synthetic_pin_hash_014', 'synthetic_signature_014', 'expired', '2026-06-14T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_015', 'synthetic_order_015', 'synthetic_event_015', 'synthetic_ticket_type_029', 'synthetic_qr_015', 'SYNT-00015', 'synthetic_pin_hash_015', 'synthetic_signature_015', 'expired', '2026-06-15T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_016', 'synthetic_order_016', 'synthetic_event_016', 'synthetic_ticket_type_032', 'synthetic_qr_016', 'SYNT-00016', 'synthetic_pin_hash_016', 'synthetic_signature_016', 'pending', '2026-06-16T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_017', 'synthetic_order_017', 'synthetic_event_017', 'synthetic_ticket_type_033', 'synthetic_qr_017', 'SYNT-00017', 'synthetic_pin_hash_017', 'synthetic_signature_017', 'valid', '2026-06-17T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_018', 'synthetic_order_018', 'synthetic_event_018', 'synthetic_ticket_type_036', 'synthetic_qr_018', 'SYNT-00018', 'synthetic_pin_hash_018', 'synthetic_signature_018', 'used', '2026-06-18T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_019', 'synthetic_order_019', 'synthetic_event_019', 'synthetic_ticket_type_037', 'synthetic_qr_019', 'SYNT-00019', 'synthetic_pin_hash_019', 'synthetic_signature_019', 'expired', '2026-06-19T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_020', 'synthetic_order_020', 'synthetic_event_020', 'synthetic_ticket_type_040', 'synthetic_qr_020', 'SYNT-00020', 'synthetic_pin_hash_020', 'synthetic_signature_020', 'expired', '2026-06-20T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_021', 'synthetic_order_021', 'synthetic_event_021', 'synthetic_ticket_type_041', 'synthetic_qr_021', 'SYNT-00021', 'synthetic_pin_hash_021', 'synthetic_signature_021', 'pending', '2026-06-21T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_022', 'synthetic_order_022', 'synthetic_event_022', 'synthetic_ticket_type_044', 'synthetic_qr_022', 'SYNT-00022', 'synthetic_pin_hash_022', 'synthetic_signature_022', 'valid', '2026-06-22T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_023', 'synthetic_order_023', 'synthetic_event_023', 'synthetic_ticket_type_045', 'synthetic_qr_023', 'SYNT-00023', 'synthetic_pin_hash_023', 'synthetic_signature_023', 'used', '2026-06-23T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_024', 'synthetic_order_024', 'synthetic_event_024', 'synthetic_ticket_type_048', 'synthetic_qr_024', 'SYNT-00024', 'synthetic_pin_hash_024', 'synthetic_signature_024', 'expired', '2026-06-24T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_025', 'synthetic_order_025', 'synthetic_event_025', 'synthetic_ticket_type_049', 'synthetic_qr_025', 'SYNT-00025', 'synthetic_pin_hash_025', 'synthetic_signature_025', 'expired', '2026-06-25T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_026', 'synthetic_order_026', 'synthetic_event_026', 'synthetic_ticket_type_052', 'synthetic_qr_026', 'SYNT-00026', 'synthetic_pin_hash_026', 'synthetic_signature_026', 'pending', '2026-06-26T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_027', 'synthetic_order_027', 'synthetic_event_027', 'synthetic_ticket_type_053', 'synthetic_qr_027', 'SYNT-00027', 'synthetic_pin_hash_027', 'synthetic_signature_027', 'valid', '2026-06-27T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_028', 'synthetic_order_028', 'synthetic_event_028', 'synthetic_ticket_type_056', 'synthetic_qr_028', 'SYNT-00028', 'synthetic_pin_hash_028', 'synthetic_signature_028', 'used', '2026-06-28T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_029', 'synthetic_order_029', 'synthetic_event_029', 'synthetic_ticket_type_057', 'synthetic_qr_029', 'SYNT-00029', 'synthetic_pin_hash_029', 'synthetic_signature_029', 'expired', '2026-06-01T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_030', 'synthetic_order_030', 'synthetic_event_030', 'synthetic_ticket_type_060', 'synthetic_qr_030', 'SYNT-00030', 'synthetic_pin_hash_030', 'synthetic_signature_030', 'expired', '2026-06-02T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_031', 'synthetic_order_031', 'synthetic_event_001', 'synthetic_ticket_type_001', 'synthetic_qr_031', 'SYNT-00031', 'synthetic_pin_hash_031', 'synthetic_signature_031', 'pending', '2026-06-03T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_032', 'synthetic_order_032', 'synthetic_event_002', 'synthetic_ticket_type_004', 'synthetic_qr_032', 'SYNT-00032', 'synthetic_pin_hash_032', 'synthetic_signature_032', 'valid', '2026-06-04T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_033', 'synthetic_order_033', 'synthetic_event_003', 'synthetic_ticket_type_005', 'synthetic_qr_033', 'SYNT-00033', 'synthetic_pin_hash_033', 'synthetic_signature_033', 'used', '2026-06-05T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_034', 'synthetic_order_034', 'synthetic_event_004', 'synthetic_ticket_type_008', 'synthetic_qr_034', 'SYNT-00034', 'synthetic_pin_hash_034', 'synthetic_signature_034', 'expired', '2026-06-06T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_035', 'synthetic_order_035', 'synthetic_event_005', 'synthetic_ticket_type_009', 'synthetic_qr_035', 'SYNT-00035', 'synthetic_pin_hash_035', 'synthetic_signature_035', 'expired', '2026-06-07T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_036', 'synthetic_order_036', 'synthetic_event_006', 'synthetic_ticket_type_012', 'synthetic_qr_036', 'SYNT-00036', 'synthetic_pin_hash_036', 'synthetic_signature_036', 'pending', '2026-06-08T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_037', 'synthetic_order_037', 'synthetic_event_007', 'synthetic_ticket_type_013', 'synthetic_qr_037', 'SYNT-00037', 'synthetic_pin_hash_037', 'synthetic_signature_037', 'valid', '2026-06-09T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_038', 'synthetic_order_038', 'synthetic_event_008', 'synthetic_ticket_type_016', 'synthetic_qr_038', 'SYNT-00038', 'synthetic_pin_hash_038', 'synthetic_signature_038', 'used', '2026-06-10T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_039', 'synthetic_order_039', 'synthetic_event_009', 'synthetic_ticket_type_017', 'synthetic_qr_039', 'SYNT-00039', 'synthetic_pin_hash_039', 'synthetic_signature_039', 'expired', '2026-06-11T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_040', 'synthetic_order_040', 'synthetic_event_010', 'synthetic_ticket_type_020', 'synthetic_qr_040', 'SYNT-00040', 'synthetic_pin_hash_040', 'synthetic_signature_040', 'expired', '2026-06-12T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_041', 'synthetic_order_041', 'synthetic_event_011', 'synthetic_ticket_type_021', 'synthetic_qr_041', 'SYNT-00041', 'synthetic_pin_hash_041', 'synthetic_signature_041', 'pending', '2026-06-13T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_042', 'synthetic_order_042', 'synthetic_event_012', 'synthetic_ticket_type_024', 'synthetic_qr_042', 'SYNT-00042', 'synthetic_pin_hash_042', 'synthetic_signature_042', 'valid', '2026-06-14T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_043', 'synthetic_order_043', 'synthetic_event_013', 'synthetic_ticket_type_025', 'synthetic_qr_043', 'SYNT-00043', 'synthetic_pin_hash_043', 'synthetic_signature_043', 'used', '2026-06-15T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_044', 'synthetic_order_044', 'synthetic_event_014', 'synthetic_ticket_type_028', 'synthetic_qr_044', 'SYNT-00044', 'synthetic_pin_hash_044', 'synthetic_signature_044', 'expired', '2026-06-16T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_045', 'synthetic_order_045', 'synthetic_event_015', 'synthetic_ticket_type_029', 'synthetic_qr_045', 'SYNT-00045', 'synthetic_pin_hash_045', 'synthetic_signature_045', 'expired', '2026-06-17T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_046', 'synthetic_order_046', 'synthetic_event_016', 'synthetic_ticket_type_032', 'synthetic_qr_046', 'SYNT-00046', 'synthetic_pin_hash_046', 'synthetic_signature_046', 'pending', '2026-06-18T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_047', 'synthetic_order_047', 'synthetic_event_017', 'synthetic_ticket_type_033', 'synthetic_qr_047', 'SYNT-00047', 'synthetic_pin_hash_047', 'synthetic_signature_047', 'valid', '2026-06-19T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_048', 'synthetic_order_048', 'synthetic_event_018', 'synthetic_ticket_type_036', 'synthetic_qr_048', 'SYNT-00048', 'synthetic_pin_hash_048', 'synthetic_signature_048', 'used', '2026-06-20T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_049', 'synthetic_order_049', 'synthetic_event_019', 'synthetic_ticket_type_037', 'synthetic_qr_049', 'SYNT-00049', 'synthetic_pin_hash_049', 'synthetic_signature_049', 'expired', '2026-06-21T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_050', 'synthetic_order_050', 'synthetic_event_020', 'synthetic_ticket_type_040', 'synthetic_qr_050', 'SYNT-00050', 'synthetic_pin_hash_050', 'synthetic_signature_050', 'expired', '2026-06-22T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_051', 'synthetic_order_051', 'synthetic_event_021', 'synthetic_ticket_type_041', 'synthetic_qr_051', 'SYNT-00051', 'synthetic_pin_hash_051', 'synthetic_signature_051', 'pending', '2026-06-23T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_052', 'synthetic_order_052', 'synthetic_event_022', 'synthetic_ticket_type_044', 'synthetic_qr_052', 'SYNT-00052', 'synthetic_pin_hash_052', 'synthetic_signature_052', 'valid', '2026-06-24T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_053', 'synthetic_order_053', 'synthetic_event_023', 'synthetic_ticket_type_045', 'synthetic_qr_053', 'SYNT-00053', 'synthetic_pin_hash_053', 'synthetic_signature_053', 'used', '2026-06-25T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_054', 'synthetic_order_054', 'synthetic_event_024', 'synthetic_ticket_type_048', 'synthetic_qr_054', 'SYNT-00054', 'synthetic_pin_hash_054', 'synthetic_signature_054', 'expired', '2026-06-26T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_055', 'synthetic_order_055', 'synthetic_event_025', 'synthetic_ticket_type_049', 'synthetic_qr_055', 'SYNT-00055', 'synthetic_pin_hash_055', 'synthetic_signature_055', 'expired', '2026-06-27T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_056', 'synthetic_order_056', 'synthetic_event_026', 'synthetic_ticket_type_052', 'synthetic_qr_056', 'SYNT-00056', 'synthetic_pin_hash_056', 'synthetic_signature_056', 'pending', '2026-06-28T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_057', 'synthetic_order_057', 'synthetic_event_027', 'synthetic_ticket_type_053', 'synthetic_qr_057', 'SYNT-00057', 'synthetic_pin_hash_057', 'synthetic_signature_057', 'valid', '2026-06-01T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_058', 'synthetic_order_058', 'synthetic_event_028', 'synthetic_ticket_type_056', 'synthetic_qr_058', 'SYNT-00058', 'synthetic_pin_hash_058', 'synthetic_signature_058', 'used', '2026-06-02T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_059', 'synthetic_order_059', 'synthetic_event_029', 'synthetic_ticket_type_057', 'synthetic_qr_059', 'SYNT-00059', 'synthetic_pin_hash_059', 'synthetic_signature_059', 'expired', '2026-06-03T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
 ('synthetic_ticket_060', 'synthetic_order_060', 'synthetic_event_030', 'synthetic_ticket_type_060', 'synthetic_qr_060', 'SYNT-00060', 'synthetic_pin_hash_060', 'synthetic_signature_060', 'expired', '2026-06-04T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_061', 'synthetic_order_061', 'synthetic_event_001', 'synthetic_ticket_type_001', 'synthetic_qr_061', 'SYNT-00061', 'synthetic_pin_hash_061', 'synthetic_signature_061', 'valid', '2026-06-05T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_062', 'synthetic_order_062', 'synthetic_event_002', 'synthetic_ticket_type_002', 'synthetic_qr_062', 'SYNT-00062', 'synthetic_pin_hash_062', 'synthetic_signature_062', 'used', '2026-06-06T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_063', 'synthetic_order_063', 'synthetic_event_003', 'synthetic_ticket_type_003', 'synthetic_qr_063', 'SYNT-00063', 'synthetic_pin_hash_063', 'synthetic_signature_063', 'valid', '2026-06-07T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_064', 'synthetic_order_064', 'synthetic_event_004', 'synthetic_ticket_type_004', 'synthetic_qr_064', 'SYNT-00064', 'synthetic_pin_hash_064', 'synthetic_signature_064', 'cancelled', '2026-06-08T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_065', 'synthetic_order_065', 'synthetic_event_005', 'synthetic_ticket_type_005', 'synthetic_qr_065', 'SYNT-00065', 'synthetic_pin_hash_065', 'synthetic_signature_065', 'expired', '2026-06-09T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_066', 'synthetic_order_066', 'synthetic_event_006', 'synthetic_ticket_type_006', 'synthetic_qr_066', 'SYNT-00066', 'synthetic_pin_hash_066', 'synthetic_signature_066', 'valid', '2026-06-10T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_067', 'synthetic_order_067', 'synthetic_event_007', 'synthetic_ticket_type_007', 'synthetic_qr_067', 'SYNT-00067', 'synthetic_pin_hash_067', 'synthetic_signature_067', 'used', '2026-06-11T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_068', 'synthetic_order_068', 'synthetic_event_008', 'synthetic_ticket_type_008', 'synthetic_qr_068', 'SYNT-00068', 'synthetic_pin_hash_068', 'synthetic_signature_068', 'valid', '2026-06-12T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_069', 'synthetic_order_069', 'synthetic_event_009', 'synthetic_ticket_type_009', 'synthetic_qr_069', 'SYNT-00069', 'synthetic_pin_hash_069', 'synthetic_signature_069', 'cancelled', '2026-06-13T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_070', 'synthetic_order_070', 'synthetic_event_010', 'synthetic_ticket_type_010', 'synthetic_qr_070', 'SYNT-00070', 'synthetic_pin_hash_070', 'synthetic_signature_070', 'expired', '2026-06-14T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_071', 'synthetic_order_071', 'synthetic_event_011', 'synthetic_ticket_type_011', 'synthetic_qr_071', 'SYNT-00071', 'synthetic_pin_hash_071', 'synthetic_signature_071', 'valid', '2026-06-15T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_072', 'synthetic_order_072', 'synthetic_event_012', 'synthetic_ticket_type_012', 'synthetic_qr_072', 'SYNT-00072', 'synthetic_pin_hash_072', 'synthetic_signature_072', 'used', '2026-06-16T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_073', 'synthetic_order_073', 'synthetic_event_013', 'synthetic_ticket_type_013', 'synthetic_qr_073', 'SYNT-00073', 'synthetic_pin_hash_073', 'synthetic_signature_073', 'valid', '2026-06-17T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_074', 'synthetic_order_074', 'synthetic_event_014', 'synthetic_ticket_type_014', 'synthetic_qr_074', 'SYNT-00074', 'synthetic_pin_hash_074', 'synthetic_signature_074', 'cancelled', '2026-06-18T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_075', 'synthetic_order_075', 'synthetic_event_015', 'synthetic_ticket_type_015', 'synthetic_qr_075', 'SYNT-00075', 'synthetic_pin_hash_075', 'synthetic_signature_075', 'expired', '2026-06-19T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_076', 'synthetic_order_076', 'synthetic_event_016', 'synthetic_ticket_type_016', 'synthetic_qr_076', 'SYNT-00076', 'synthetic_pin_hash_076', 'synthetic_signature_076', 'valid', '2026-06-20T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_077', 'synthetic_order_077', 'synthetic_event_017', 'synthetic_ticket_type_017', 'synthetic_qr_077', 'SYNT-00077', 'synthetic_pin_hash_077', 'synthetic_signature_077', 'used', '2026-06-21T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_078', 'synthetic_order_078', 'synthetic_event_018', 'synthetic_ticket_type_018', 'synthetic_qr_078', 'SYNT-00078', 'synthetic_pin_hash_078', 'synthetic_signature_078', 'valid', '2026-06-22T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_079', 'synthetic_order_079', 'synthetic_event_019', 'synthetic_ticket_type_019', 'synthetic_qr_079', 'SYNT-00079', 'synthetic_pin_hash_079', 'synthetic_signature_079', 'cancelled', '2026-06-23T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
-('synthetic_ticket_080', 'synthetic_order_080', 'synthetic_event_020', 'synthetic_ticket_type_020', 'synthetic_qr_080', 'SYNT-00080', 'synthetic_pin_hash_080', 'synthetic_signature_080', 'expired', '2026-06-24T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy') ON CONFLICT (id) DO NOTHING;
+('synthetic_ticket_061', 'synthetic_order_061', 'synthetic_event_001', 'synthetic_ticket_type_001', 'synthetic_qr_061', 'SYNT-00061', 'synthetic_pin_hash_061', 'synthetic_signature_061', 'pending', '2026-06-05T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_062', 'synthetic_order_062', 'synthetic_event_002', 'synthetic_ticket_type_004', 'synthetic_qr_062', 'SYNT-00062', 'synthetic_pin_hash_062', 'synthetic_signature_062', 'valid', '2026-06-06T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_063', 'synthetic_order_063', 'synthetic_event_003', 'synthetic_ticket_type_005', 'synthetic_qr_063', 'SYNT-00063', 'synthetic_pin_hash_063', 'synthetic_signature_063', 'used', '2026-06-07T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_064', 'synthetic_order_064', 'synthetic_event_004', 'synthetic_ticket_type_008', 'synthetic_qr_064', 'SYNT-00064', 'synthetic_pin_hash_064', 'synthetic_signature_064', 'expired', '2026-06-08T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_065', 'synthetic_order_065', 'synthetic_event_005', 'synthetic_ticket_type_009', 'synthetic_qr_065', 'SYNT-00065', 'synthetic_pin_hash_065', 'synthetic_signature_065', 'expired', '2026-06-09T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_066', 'synthetic_order_066', 'synthetic_event_006', 'synthetic_ticket_type_012', 'synthetic_qr_066', 'SYNT-00066', 'synthetic_pin_hash_066', 'synthetic_signature_066', 'pending', '2026-06-10T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_067', 'synthetic_order_067', 'synthetic_event_007', 'synthetic_ticket_type_013', 'synthetic_qr_067', 'SYNT-00067', 'synthetic_pin_hash_067', 'synthetic_signature_067', 'valid', '2026-06-11T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_068', 'synthetic_order_068', 'synthetic_event_008', 'synthetic_ticket_type_016', 'synthetic_qr_068', 'SYNT-00068', 'synthetic_pin_hash_068', 'synthetic_signature_068', 'used', '2026-06-12T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_069', 'synthetic_order_069', 'synthetic_event_009', 'synthetic_ticket_type_017', 'synthetic_qr_069', 'SYNT-00069', 'synthetic_pin_hash_069', 'synthetic_signature_069', 'expired', '2026-06-13T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_070', 'synthetic_order_070', 'synthetic_event_010', 'synthetic_ticket_type_020', 'synthetic_qr_070', 'SYNT-00070', 'synthetic_pin_hash_070', 'synthetic_signature_070', 'expired', '2026-06-14T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_071', 'synthetic_order_071', 'synthetic_event_011', 'synthetic_ticket_type_021', 'synthetic_qr_071', 'SYNT-00071', 'synthetic_pin_hash_071', 'synthetic_signature_071', 'pending', '2026-06-15T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_072', 'synthetic_order_072', 'synthetic_event_012', 'synthetic_ticket_type_024', 'synthetic_qr_072', 'SYNT-00072', 'synthetic_pin_hash_072', 'synthetic_signature_072', 'valid', '2026-06-16T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_073', 'synthetic_order_073', 'synthetic_event_013', 'synthetic_ticket_type_025', 'synthetic_qr_073', 'SYNT-00073', 'synthetic_pin_hash_073', 'synthetic_signature_073', 'used', '2026-06-17T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_074', 'synthetic_order_074', 'synthetic_event_014', 'synthetic_ticket_type_028', 'synthetic_qr_074', 'SYNT-00074', 'synthetic_pin_hash_074', 'synthetic_signature_074', 'expired', '2026-06-18T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_075', 'synthetic_order_075', 'synthetic_event_015', 'synthetic_ticket_type_029', 'synthetic_qr_075', 'SYNT-00075', 'synthetic_pin_hash_075', 'synthetic_signature_075', 'expired', '2026-06-19T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_076', 'synthetic_order_076', 'synthetic_event_016', 'synthetic_ticket_type_032', 'synthetic_qr_076', 'SYNT-00076', 'synthetic_pin_hash_076', 'synthetic_signature_076', 'pending', '2026-06-20T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_077', 'synthetic_order_077', 'synthetic_event_017', 'synthetic_ticket_type_033', 'synthetic_qr_077', 'SYNT-00077', 'synthetic_pin_hash_077', 'synthetic_signature_077', 'valid', '2026-06-21T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_078', 'synthetic_order_078', 'synthetic_event_018', 'synthetic_ticket_type_036', 'synthetic_qr_078', 'SYNT-00078', 'synthetic_pin_hash_078', 'synthetic_signature_078', 'used', '2026-06-22T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_079', 'synthetic_order_079', 'synthetic_event_019', 'synthetic_ticket_type_037', 'synthetic_qr_079', 'SYNT-00079', 'synthetic_pin_hash_079', 'synthetic_signature_079', 'expired', '2026-06-23T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy'),
+('synthetic_ticket_080', 'synthetic_order_080', 'synthetic_event_020', 'synthetic_ticket_type_040', 'synthetic_qr_080', 'SYNT-00080', 'synthetic_pin_hash_080', 'synthetic_signature_080', 'expired', '2026-06-24T18:00:00+00:00', '2026-01-07T00:00:00+00:00', 'Synthetic Buyer', '+245601000000', 'Synthetic Holder', '+245601000001', 'synthetic_proxy') ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO payment_transactions (id, order_id, provider, provider_reference, status, gross_amount_xof, fee_amount_xof, commission_amount_xof, net_amount_xof, idempotency_key, created_at, updated_at, payer_name, payer_phone, use_case, provider_mode, confirmed_at) VALUES ('synthetic_payment_001', 'synthetic_order_001', 'synthetic_gateway', 'synthetic_reference_001', 'paid', 2100, 210, 105, 1785, 'synthetic_payment_key_001', '2026-01-08T00:00:00+00:00', '2026-01-08T00:00:00+00:00', 'Synthetic Buyer', '+245601000101', 'checkout', 'test', '2026-01-08T00:00:00+00:00'),
 ('synthetic_payment_002', 'synthetic_order_002', 'synthetic_gateway', 'synthetic_reference_002', 'pending', 4500, 450, 225, 3825, 'synthetic_payment_key_002', '2026-01-08T00:00:00+00:00', '2026-01-08T00:00:00+00:00', 'Synthetic Buyer', '+245601000102', 'checkout', 'test', '2026-01-08T00:00:00+00:00'),
@@ -1056,27 +1099,93 @@ INSERT INTO monetization_wallets (business_id, posts_extra_purchased, promotions
 ('synthetic_company_029', 0, 1, 0, 1, '2026-01-20T00:00:00+00:00'),
 ('synthetic_company_030', 1, 2, 1, 0, '2026-01-20T00:00:00+00:00') ON CONFLICT (business_id) DO NOTHING;
 
-SELECT 'users' AS table_name, COUNT(*) AS row_count FROM users UNION ALL
-SELECT 'companies', COUNT(*) FROM companies UNION ALL
-SELECT 'company_members', COUNT(*) FROM company_members UNION ALL
-SELECT 'events', COUNT(*) FROM events UNION ALL
-SELECT 'ticket_types', COUNT(*) FROM ticket_types UNION ALL
-SELECT 'ticket_reservations', COUNT(*) FROM ticket_reservations UNION ALL
-SELECT 'orders', COUNT(*) FROM orders UNION ALL
-SELECT 'tickets', COUNT(*) FROM tickets UNION ALL
-SELECT 'payment_transactions', COUNT(*) FROM payment_transactions UNION ALL
-SELECT 'commissions', COUNT(*) FROM commissions UNION ALL
-SELECT 'refunds', COUNT(*) FROM refunds UNION ALL
-SELECT 'plans', COUNT(*) FROM plans UNION ALL
-SELECT 'subscriptions', COUNT(*) FROM subscriptions UNION ALL
-SELECT 'reviews', COUNT(*) FROM reviews UNION ALL
-SELECT 'moderation_items', COUNT(*) FROM moderation_items UNION ALL
-SELECT 'notifications', COUNT(*) FROM notifications UNION ALL
-SELECT 'conversations', COUNT(*) FROM conversations UNION ALL
-SELECT 'conversation_messages', COUNT(*) FROM conversation_messages UNION ALL
-SELECT 'support_tickets', COUNT(*) FROM support_tickets UNION ALL
-SELECT 'support_replies', COUNT(*) FROM support_replies UNION ALL
-SELECT 'monetization_ledger', COUNT(*) FROM monetization_ledger UNION ALL
-SELECT 'monetization_wallets', COUNT(*) FROM monetization_wallets;
+INSERT INTO app_state (key, value)
+
+VALUES ('guigui.synthetic_seed.1000', jsonb_build_object('version', 1, 'hash', 'c9331bdf104cb529a4db6ed5947d6a15c2c2360ccea13e71dfca40392f8cf6e1', 'domain_rows', 1000))
+
+ON CONFLICT (key) DO NOTHING;
+
+DO $$
+
+DECLARE
+
+  total_seed_rows BIGINT;
+
+BEGIN
+
+  SELECT (SELECT COUNT(*) FROM users WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM companies WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM company_members WHERE LEFT(company_id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM events WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM ticket_types WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM ticket_reservations WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM orders WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM tickets WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM payment_transactions WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM commissions WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM refunds WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM plans WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM subscriptions WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM reviews WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM moderation_items WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM notifications WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM conversations WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM conversation_messages WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM support_tickets WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM support_replies WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM monetization_ledger WHERE LEFT(id, 10) = 'synthetic_') +
+      (SELECT COUNT(*) FROM monetization_wallets WHERE LEFT(business_id, 10) = 'synthetic_') INTO total_seed_rows;
+
+  IF total_seed_rows <> 1000 THEN
+
+    RAISE EXCEPTION 'Synthetic seed expected exactly 1000 rows, found %.', total_seed_rows;
+
+  END IF;
+
+END $$;
+
+SELECT 'users' AS table_name, COUNT(*)::integer AS row_count FROM users WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'companies' AS table_name, COUNT(*)::integer AS row_count FROM companies WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'company_members' AS table_name, COUNT(*)::integer AS row_count FROM company_members WHERE LEFT(company_id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'events' AS table_name, COUNT(*)::integer AS row_count FROM events WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'ticket_types' AS table_name, COUNT(*)::integer AS row_count FROM ticket_types WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'ticket_reservations' AS table_name, COUNT(*)::integer AS row_count FROM ticket_reservations WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'orders' AS table_name, COUNT(*)::integer AS row_count FROM orders WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'tickets' AS table_name, COUNT(*)::integer AS row_count FROM tickets WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'payment_transactions' AS table_name, COUNT(*)::integer AS row_count FROM payment_transactions WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'commissions' AS table_name, COUNT(*)::integer AS row_count FROM commissions WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'refunds' AS table_name, COUNT(*)::integer AS row_count FROM refunds WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'plans' AS table_name, COUNT(*)::integer AS row_count FROM plans WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'subscriptions' AS table_name, COUNT(*)::integer AS row_count FROM subscriptions WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'reviews' AS table_name, COUNT(*)::integer AS row_count FROM reviews WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'moderation_items' AS table_name, COUNT(*)::integer AS row_count FROM moderation_items WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'notifications' AS table_name, COUNT(*)::integer AS row_count FROM notifications WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'conversations' AS table_name, COUNT(*)::integer AS row_count FROM conversations WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'conversation_messages' AS table_name, COUNT(*)::integer AS row_count FROM conversation_messages WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'support_tickets' AS table_name, COUNT(*)::integer AS row_count FROM support_tickets WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'support_replies' AS table_name, COUNT(*)::integer AS row_count FROM support_replies WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'monetization_ledger' AS table_name, COUNT(*)::integer AS row_count FROM monetization_ledger WHERE LEFT(id, 10) = 'synthetic_'
+UNION ALL
+SELECT 'monetization_wallets' AS table_name, COUNT(*)::integer AS row_count FROM monetization_wallets WHERE LEFT(business_id, 10) = 'synthetic_';
 
 COMMIT;

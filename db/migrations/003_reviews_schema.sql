@@ -34,32 +34,49 @@ CREATE TABLE IF NOT EXISTS review_antiabuse (
 
 CREATE INDEX IF NOT EXISTS review_antiabuse_phone_idx ON review_antiabuse(author_phone_hash, created_at DESC);
 
--- Migração aditiva: garante que empresas já existentes têm linha na tabela de avaliações.
-INSERT INTO reviews (id, business_id, author_name, author_phone_hash, author_phone_masked, qualitative_score, score_weight, comment, status, verified_sms, created_at)
-SELECT
-  gen_random_uuid()::text,
-  c.id,
-  COALESCE(NULLIF(c.data->'reviews', 'null'::jsonb)->0->>'authorName', 'Cliente Guigui'),
-  'legacy:' || c.id,
-  '+245 ***',
-  CASE COALESCE(NULLIF(c.data->'reviews', 'null'::jsonb)->0->>'qualitativeScore', 'gostei')
-    WHEN 'nao_gostei' THEN 'nao_gostei'
-    WHEN 'gostei_muito' THEN 'gostei_muito'
-    WHEN 'muito_bom' THEN 'muito_bom'
-    ELSE 'gostei'
-  END,
-  CASE COALESCE(NULLIF(c.data->'reviews', 'null'::jsonb)->0->>'qualitativeScore', 'gostei')
-    WHEN 'nao_gostei' THEN 1
-    WHEN 'gostei' THEN 2
-    WHEN 'gostei_muito' THEN 3
-    ELSE 4
-  END,
-  LEFT(COALESCE(NULLIF(c.data->'reviews', 'null'::jsonb)->0->>'comment', ''), 200),
-  'approved',
-  COALESCE((NULLIF(c.data->'reviews', 'null'::jsonb)->0->>'verifiedSms')::boolean, FALSE),
-  COALESCE((NULLIF(c.data->'reviews', 'null'::jsonb)->0->>'createdAt')::timestamptz, NOW())
-FROM companies c
-WHERE c.data->'reviews' IS NOT NULL
-  AND jsonb_typeof(c.data->'reviews') = 'array'
-  AND jsonb_array_length(c.data->'reviews') > 0
-ON CONFLICT (id) DO NOTHING;
+-- Older deployments may store legacy reviews in companies.data; fresh schemas do not.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'companies'
+      AND column_name = 'data'
+  ) THEN
+    EXECUTE $migration$
+      INSERT INTO reviews (id, business_id, author_name, author_phone_hash, author_phone_masked, qualitative_score, score_weight, comment, status, verified_sms, created_at)
+      SELECT
+        gen_random_uuid()::text,
+        c.id,
+        COALESCE(NULLIF(c.data->'reviews', 'null'::jsonb)->0->>'authorName', 'Cliente Guigui'),
+        'legacy:' || c.id,
+        '+245 ***',
+        CASE COALESCE(NULLIF(c.data->'reviews', 'null'::jsonb)->0->>'qualitativeScore', 'gostei')
+          WHEN 'nao_gostei' THEN 'nao_gostei'
+          WHEN 'gostei_muito' THEN 'gostei_muito'
+          WHEN 'muito_bom' THEN 'muito_bom'
+          ELSE 'gostei'
+        END,
+        CASE COALESCE(NULLIF(c.data->'reviews', 'null'::jsonb)->0->>'qualitativeScore', 'gostei')
+          WHEN 'nao_gostei' THEN 1
+          WHEN 'gostei' THEN 2
+          WHEN 'gostei_muito' THEN 3
+          ELSE 4
+        END,
+        LEFT(COALESCE(NULLIF(c.data->'reviews', 'null'::jsonb)->0->>'comment', ''), 200),
+        'approved',
+        COALESCE((NULLIF(c.data->'reviews', 'null'::jsonb)->0->>'verifiedSms')::boolean, FALSE),
+        COALESCE((NULLIF(c.data->'reviews', 'null'::jsonb)->0->>'createdAt')::timestamptz, NOW())
+      FROM companies c
+      WHERE c.data->'reviews' IS NOT NULL
+        AND jsonb_typeof(c.data->'reviews') = 'array'
+        AND jsonb_array_length(c.data->'reviews') > 0
+        AND NOT EXISTS (
+          SELECT 1 FROM reviews r
+          WHERE r.business_id = c.id
+            AND r.author_phone_hash = 'legacy:' || c.id
+        )
+    $migration$;
+  END IF;
+END $$;
