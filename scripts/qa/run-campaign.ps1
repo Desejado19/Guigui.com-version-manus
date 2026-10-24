@@ -131,6 +131,10 @@ $results = [ordered]@{
     thresholdsPassed = $null
   }
   zapCounts = [ordered]@{ critical = 0; high = 0; medium = 0; low = 0; informational = 0 }
+  zapConfidenceCounts = [ordered]@{
+    high = 0; medium = 0; low = 0; falsePositive = 0; unknown = 0
+  }
+  zapAlertedEndpointCount = 0
   zapBaselineDelta = [ordered]@{ new = 0; resolved = 0; unchanged = 0 }
   limitations = @()
 }
@@ -320,6 +324,15 @@ function Read-ZapCounts {
     $results.zapCounts.informational = [int]$riskCounts.Informational
     if ([int]$riskCounts.Unknown -gt 0) {
       Add-Limitation 'ZAP reported alerts with an unknown risk category.'
+    }
+
+    $supplementalOutput = & $tsxPath $reportBuilderPath '--zap-supplemental-counts' $Path
+    if ($LASTEXITCODE -ne 0) {
+      Add-Limitation 'ZAP confidence and alerted-endpoint counts could not be parsed.'
+    } else {
+      $supplemental = ($supplementalOutput -join [Environment]::NewLine) | ConvertFrom-Json
+      $results.zapConfidenceCounts = $supplemental.confidenceCounts
+      $results.zapAlertedEndpointCount = [int]$supplemental.alertedEndpointCount
     }
 
     $baseline = [ordered]@{

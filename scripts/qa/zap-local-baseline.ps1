@@ -159,6 +159,16 @@ $riskCounts = [ordered]@{
   Unknown = 0
 }
 $riskConfidenceCounts = @{}
+$confidenceCounts = [ordered]@{
+  High = 0
+  Medium = 0
+  Low = 0
+  'False Positive' = 0
+  Unknown = 0
+}
+$alertedEndpoints = [System.Collections.Generic.HashSet[string]]::new(
+  [System.StringComparer]::OrdinalIgnoreCase
+)
 foreach ($alert in $alerts) {
   $risk = switch ([string]$alert.riskcode) {
     '3' { 'High' }
@@ -180,11 +190,22 @@ foreach ($alert in $alerts) {
   } else {
     [string]$alert.confidence
   }
+  if (-not $confidenceCounts.Contains($confidence)) {
+    $confidence = 'Unknown'
+  }
+  $confidenceCounts[$confidence]++
   $key = "$risk/$confidence"
   if (-not $riskConfidenceCounts.ContainsKey($key)) {
     $riskConfidenceCounts[$key] = 0
   }
   $riskConfidenceCounts[$key]++
+
+  foreach ($instance in @($alert.instances)) {
+    if (-not [string]::IsNullOrWhiteSpace([string]$instance.uri)) {
+      $uri = [System.Uri]::new([string]$instance.uri, [System.UriKind]::Absolute)
+      $alertedEndpoints.Add($uri.GetLeftPart([System.UriPartial]::Path)) | Out-Null
+    }
+  }
 }
 
 $counts = [ordered]@{
@@ -192,6 +213,8 @@ $counts = [ordered]@{
   totalAlerts = $alerts.Count
   byRisk = $riskCounts
   byRiskAndConfidence = $riskConfidenceCounts
+  byConfidence = $confidenceCounts
+  alertedEndpointCount = $alertedEndpoints.Count
 }
 $countsPath = Join-Path $outputDirectory 'alert-counts.json'
 Set-Content -LiteralPath $countsPath -Value ($counts | ConvertTo-Json -Depth 5) -Encoding UTF8

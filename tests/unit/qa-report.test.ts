@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCampaignReport,
   readPlaywrightCounts,
+  readZapSupplementalCounts,
   type CampaignResults,
 } from '../../scripts/qa/build-report';
 
@@ -56,6 +57,14 @@ function createCampaignResults(): CampaignResults {
       low: 1,
       informational: 2,
     },
+    zapConfidenceCounts: {
+      high: 1,
+      medium: 3,
+      low: 2,
+      falsePositive: 0,
+      unknown: 1,
+    },
+    zapAlertedEndpointCount: 3,
     zapBaselineDelta: { new: 0, resolved: 0, unchanged: 7 },
     limitations: ['Live-only checks require the reserved isolated QA database.'],
   };
@@ -141,6 +150,47 @@ describe('buildCampaignReport', () => {
         blocked: 0,
         reportErrors: 1,
       });
+    });
+  });
+
+  describe('readZapSupplementalCounts', () => {
+    it('reports confidence buckets and distinct endpoints with alerts', () => {
+      expect(readZapSupplementalCounts({
+        byConfidence: {
+          High: 1,
+          Medium: 3,
+          Low: 2,
+          'False Positive': 0,
+          Unknown: 1,
+        },
+        alertedEndpointCount: 3,
+      })).toEqual({
+        confidenceCounts: {
+          high: 1,
+          medium: 3,
+          low: 2,
+          falsePositive: 0,
+          unknown: 1,
+        },
+        alertedEndpointCount: 3,
+      });
+    });
+
+    it('rejects incomplete or invalid supplemental counts', () => {
+      expect(() => readZapSupplementalCounts({
+        byConfidence: { High: 1 },
+        alertedEndpointCount: 3,
+      })).toThrow('ZAP confidence counts are incomplete.');
+      expect(() => readZapSupplementalCounts({
+        byConfidence: {
+          High: 1,
+          Medium: 0,
+          Low: 0,
+          'False Positive': 0,
+          Unknown: 0,
+        },
+        alertedEndpointCount: -1,
+      })).toThrow('ZAP alerted endpoint count is invalid.');
     });
   });
 

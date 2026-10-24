@@ -32,6 +32,8 @@ export type CampaignResults = {
     thresholdsPassed: boolean | null;
   };
   zapCounts: Record<'critical' | 'high' | 'medium' | 'low' | 'informational', number>;
+  zapConfidenceCounts: Record<'high' | 'medium' | 'low' | 'falsePositive' | 'unknown', number>;
+  zapAlertedEndpointCount: number;
   zapBaselineDelta: { new: number; resolved: number; unchanged: number };
   limitations: string[];
 };
@@ -46,6 +48,11 @@ export type PlaywrightCounts = {
   skipped: number;
   blocked: number;
   reportErrors: number;
+};
+
+export type ZapSupplementalCounts = {
+  confidenceCounts: CampaignResults['zapConfidenceCounts'];
+  alertedEndpointCount: number;
 };
 
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
@@ -89,6 +96,11 @@ function hasK6Measurements(metrics: CampaignResults['k6Metrics']): boolean {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readJsonFile(path: string): unknown {
+  const contents = readFileSync(resolve(path), 'utf8').replace(/^\uFEFF/, '');
+  return JSON.parse(contents) as unknown;
 }
 
 export function readPlaywrightCounts(report: unknown): PlaywrightCounts {
@@ -153,6 +165,45 @@ export function readPlaywrightCounts(report: unknown): PlaywrightCounts {
     blocked,
     reportErrors: errors.length,
   };
+}
+
+export function readZapSupplementalCounts(report: unknown): ZapSupplementalCounts {
+  if (!isRecord(report) || !isRecord(report.byConfidence)) {
+    throw new Error('ZAP JSON must contain confidence statistics.');
+  }
+
+  const confidenceNames = [
+    ['High', 'high'],
+    ['Medium', 'medium'],
+    ['Low', 'low'],
+    ['False Positive', 'falsePositive'],
+    ['Unknown', 'unknown'],
+  ] as const;
+  const confidenceCounts: ZapSupplementalCounts['confidenceCounts'] = {
+    high: 0,
+    medium: 0,
+    low: 0,
+    falsePositive: 0,
+    unknown: 0,
+  };
+  for (const [sourceName, targetName] of confidenceNames) {
+    const value = report.byConfidence[sourceName];
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+      throw new Error('ZAP confidence counts are incomplete.');
+    }
+    confidenceCounts[targetName] = value;
+  }
+
+  const alertedEndpointCount = report.alertedEndpointCount;
+  if (
+    typeof alertedEndpointCount !== 'number'
+    || !Number.isInteger(alertedEndpointCount)
+    || alertedEndpointCount < 0
+  ) {
+    throw new Error('ZAP alerted endpoint count is invalid.');
+  }
+
+  return { confidenceCounts, alertedEndpointCount };
 }
 
 function assessK6Thresholds(results: CampaignResults): boolean | null {
@@ -226,6 +277,8 @@ export function buildCampaignReport(results: CampaignResults): SanitizedCampaign
       thresholdsPassed,
     },
     zapCounts: { ...results.zapCounts },
+    zapConfidenceCounts: { ...results.zapConfidenceCounts },
+    zapAlertedEndpointCount: results.zapAlertedEndpointCount,
     zapBaselineDelta: { ...results.zapBaselineDelta },
     limitations: results.limitations.map(sanitizeText),
   };
@@ -238,8 +291,17 @@ async function main(): Promise<void> {
     if (!inputPath) {
       throw new Error('Usage: tsx scripts/qa/build-report.ts --playwright-counts <playwright-report.json>.');
     }
-    const input = JSON.parse(readFileSync(resolve(inputPath), 'utf8')) as unknown;
+    const input = readJsonFile(inputPath);
     process.stdout.write(`${JSON.stringify(readPlaywrightCounts(input))}\n`);
+    return;
+  }
+  if (mode === '--zap-supplemental-counts') {
+    const [inputPath] = args;
+    if (!inputPath) {
+      throw new Error('Usage: tsx scripts/qa/build-report.ts --zap-supplemental-counts <zap-counts.json>.');
+    }
+    const input = readJsonFile(inputPath);
+    process.stdout.write(`${JSON.stringify(readZapSupplementalCounts(input))}\n`);
     return;
   }
 
@@ -248,7 +310,7 @@ async function main(): Promise<void> {
     throw new Error('Usage: tsx scripts/qa/build-report.ts <raw-results.json> <sanitized-report.json>.');
   }
 
-  const input = JSON.parse(readFileSync(resolve(inputPath), 'utf8')) as CampaignResults;
+  const input = readJsonFile(inputPath) as CampaignResults;
   const report = buildCampaignReport(input);
   const destination = resolve(outputPath);
   mkdirSync(dirname(destination), { recursive: true });
