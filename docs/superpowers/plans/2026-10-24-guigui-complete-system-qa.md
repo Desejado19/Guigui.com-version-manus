@@ -102,6 +102,7 @@
 **Files:**
 - Create: `playwright.qa.config.ts`
 - Create: `scripts/qa/assert-running-target.ts`
+- Create: `scripts/qa/playwright-global-setup.ts`
 - Create: `tests/unit/qa-running-target.test.ts`
 - Modify: `server/modules/platform-foundation/config/platformRuntimeConfig.ts`
 - Modify: `server.ts`
@@ -117,7 +118,7 @@
 - [ ] **Step 1: Write failing tests** in `tests/unit/qa-running-target.test.ts` for `assertRunningTarget`, covering a valid loopback QA URL, port 3000, a non-loopback host, and an unavailable health endpoint; assert no connection details are printed.
 - [ ] **Step 2: Run `npx vitest run tests/unit/qa-running-target.test.ts`** and verify the tests fail before the target checker exists.
 - [ ] **Step 3: Add a failing platform-config assertion** that `HOST=127.0.0.1` selects loopback while an omitted `HOST` still selects `0.0.0.0`; update `loadPlatformRuntimeConfig` and `app.listen` to use the selected host.
-- [ ] **Step 4: Implement `assertRunningTarget`** and add `playwright.qa.config.ts` to run all current `tests/*.spec.ts` in Chromium against the required `QA_BASE_URL`, retaining failures, traces, screenshots, and HTML/JSON reports.
+- [ ] **Step 4: Implement `assertRunningTarget`**, add a Playwright global-setup module that checks it, and configure `playwright.qa.config.ts` to run all current `tests/*.spec.ts` in Chromium against the required `QA_BASE_URL`, retaining failures, traces, screenshots, and HTML/JSON reports.
 - [ ] **Step 5: Add `qa:e2e` to `package.json`** and ensure the config does not start, reuse, or contact an unverified existing server.
 - [ ] **Step 6: Compare the 17 existing E2E specs with the citizen, business, and admin critical flows; add only missing role-flow assertions, without deleting or weakening existing coverage.**
 - [ ] **Step 7: Run the focused target-checker and platform-config tests, then `npm run qa:e2e` against the isolated app; account for all existing E2E files as passed, failed, or explicitly blocked.**
