@@ -1,5 +1,6 @@
 export type PlatformRuntimeConfig = {
   port: number;
+  host: string;
   isProduction: boolean;
   isVercel: boolean;
   appUrl: string | undefined;
@@ -11,6 +12,7 @@ export function loadPlatformRuntimeConfig(
 ): PlatformRuntimeConfig {
   return {
     port: Number(env.PORT) || 3000,
+    host: env.HOST?.trim() || '0.0.0.0',
     isProduction: env.NODE_ENV === 'production',
     isVercel: Boolean(env.VERCEL),
     appUrl: env.APP_URL,

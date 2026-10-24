@@ -5,11 +5,17 @@ describe('loadPlatformRuntimeConfig', () => {
   it('uses local defaults when no shared runtime variables are configured', () => {
     expect(loadPlatformRuntimeConfig({})).toEqual({
       port: 3000,
+      host: '0.0.0.0',
       isProduction: false,
       isVercel: false,
       appUrl: undefined,
       allowedOrigins: [],
     });
+  });
+
+  it('binds QA to loopback when configured and preserves the existing default', () => {
+    expect(loadPlatformRuntimeConfig({ HOST: '127.0.0.1' }).host).toBe('127.0.0.1');
+    expect(loadPlatformRuntimeConfig({}).host).toBe('0.0.0.0');
   });
 
   it('preserves the existing port fallback', () => {

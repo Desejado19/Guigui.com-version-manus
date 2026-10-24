@@ -3914,8 +3914,8 @@ async function startServer() {
     void processDueScheduledItems().catch((error) => console.error('scheduled-items-processing-failed', error));
   }, 30_000);
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Guigui.com] Servidor a rodar na porta ${PORT} em http://0.0.0.0:${PORT}`);
+  app.listen(PORT, runtimeConfig.host, () => {
+    console.log(`[Guigui.com] Servidor a rodar na porta ${PORT} em http://${runtimeConfig.host}:${PORT}`);
   });
 
   // Cópias de segurança periódicas, cifradas e replicadas (ver backupService).
