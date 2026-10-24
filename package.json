@@ -37,6 +37,7 @@
     "db:import-catalog": "tsx scripts/import-catalog-postgres.ts",
     "db:migrate": "tsx scripts/migrate-db.ts",
     "db:seed-demo": "tsx scripts/seed-demo-dataset.ts",
+    "db:seed:synthetic": "tsx scripts/generate-postgres-synthetic-seed.ts",
     "test:tickets": "tsx scripts/audit-ticket-validation.ts && tsx scripts/audit-ticket-flow.ts",
     "test:e2e": "playwright test",
     "test:unit": "vitest run",
