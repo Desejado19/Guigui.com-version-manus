@@ -1,0 +1,18 @@
+{
+  "options": {
+    "vus": 10,
+    "duration": "60s",
+    "thresholds": {
+      "http_req_duration": ["p(95)<2000"],
+      "http_req_failed": ["rate<0.01"],
+      "checks": ["rate==1"]
+    }
+  },
+  "endpoints": [
+    { "method": "GET", "path": "/api/health", "readOnly": true },
+    { "method": "GET", "path": "/api/businesses", "readOnly": true },
+    { "method": "GET", "path": "/api/businesses/featured", "readOnly": true },
+    { "method": "GET", "path": "/api/categories", "readOnly": true },
+    { "method": "GET", "path": "/api/events", "readOnly": true }
+  ]
+}

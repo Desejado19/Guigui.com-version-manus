@@ -43,6 +43,7 @@
     "qa:api:check": "tsx scripts/qa/validate-route-inventory.ts",
     "qa:api": "npm run qa:api:check && node -e \"require('node:fs').mkdirSync('.local-qa/api',{recursive:true})\" && newman run tests/api/guigui-local-qa.postman_collection.json --env-var qaBaseUrl=http://127.0.0.1:4313 --ignore-redirects --reporters cli,json --reporter-json-export .local-qa/api/newman.json",
     "qa:e2e": "playwright test --config=playwright.qa.config.ts",
+    "qa:load": "tsx scripts/qa/run-k6.ts",
     "test:tickets": "tsx scripts/audit-ticket-validation.ts && tsx scripts/audit-ticket-flow.ts",
     "test:e2e": "playwright test",
     "test:unit": "vitest run",
