@@ -45,6 +45,7 @@
     "qa:e2e": "playwright test --config=playwright.qa.config.ts",
     "qa:load": "tsx scripts/qa/run-k6.ts",
     "qa:zap": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/qa/zap-local-baseline.ps1",
+    "qa:full": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/qa/run-campaign.ps1",
     "test:tickets": "tsx scripts/audit-ticket-validation.ts && tsx scripts/audit-ticket-flow.ts",
     "test:e2e": "playwright test",
     "test:unit": "vitest run",

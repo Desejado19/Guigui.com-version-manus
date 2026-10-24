@@ -13,6 +13,9 @@ import type {
   PublicIdentity,
   TeamInvitation as IdentityTeamInvitation,
 } from '../domain/identityTypes';
+import { hashPassword, verifyPassword } from './passwordHash';
+
+export { hashPassword, verifyPassword } from './passwordHash';
 
 export type AuthRole = IdentityRole;
 export type PublicUser = PublicIdentity;
@@ -179,20 +182,6 @@ const demoPasswordStore = loadDemoPasswordStore();
 function persistStore() {
   fs.mkdirSync(dataDirectory, { recursive: true });
   fs.writeFileSync(storePath, JSON.stringify(store, null, 2), 'utf8');
-}
-
-export function hashPassword(password: string) {
-  const salt = randomBytes(16).toString('hex');
-  const derivedKey = scryptSync(password, salt, 64).toString('hex');
-  return `${salt}:${derivedKey}`;
-}
-
-export function verifyPassword(password: string, encoded: string) {
-  const [salt, expectedHex] = encoded.split(':');
-  if (!salt || !expectedHex) return false;
-  const actual = scryptSync(password, salt, 64);
-  const expected = Buffer.from(expectedHex, 'hex');
-  return expected.length === actual.length && timingSafeEqual(actual, expected);
 }
 
 export function findUserByEmail(email: string) {

@@ -61,9 +61,18 @@ if ($existingProxy) {
   throw "ZAP's loopback proxy port $proxyPort is already in use; refusing to bind."
 }
 
-$qaDirectory = Join-Path $repoRoot '.local-qa\zap'
 $runId = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
-$outputDirectory = Join-Path $qaDirectory $runId
+if ([string]::IsNullOrWhiteSpace($env:QA_ARTIFACT_DIR)) {
+  $qaDirectory = Join-Path $repoRoot '.local-qa\zap'
+  $outputDirectory = Join-Path $qaDirectory $runId
+} else {
+  $campaignRoot = [System.IO.Path]::GetFullPath($env:QA_ARTIFACT_DIR)
+  $allowedRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot 'test-results\qa')).TrimEnd('\') + '\'
+  if (-not $campaignRoot.StartsWith($allowedRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw 'QA_ARTIFACT_DIR must be inside the campaign test-results/qa directory.'
+  }
+  $outputDirectory = Join-Path $campaignRoot 'zap'
+}
 if (Test-Path -LiteralPath $outputDirectory) {
   throw 'The ZAP output directory already exists; refusing to overwrite previous artifacts.'
 }

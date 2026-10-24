@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertRunningTarget } from './assert-running-target';
+import { resolveQaToolOutputDirectory } from './qa-artifact-paths';
 import { loadK6Config, validateK6Config } from './validate-k6-config';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -17,7 +18,11 @@ async function main(): Promise<void> {
   validateK6Config(target, config.options, config.endpoints);
   await assertRunningTarget(target);
 
-  const outputDirectory = resolve(projectRoot, '.local-qa', 'k6');
+  const outputDirectory = resolveQaToolOutputDirectory(
+    projectRoot,
+    'k6',
+    process.env.QA_ARTIFACT_DIR?.trim() || undefined,
+  );
   mkdirSync(outputDirectory, { recursive: true });
 
   const result = spawnSync('k6', [

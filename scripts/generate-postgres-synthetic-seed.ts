@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveQaCampaignArtifactPath } from './qa/qa-artifact-paths';
 
 export const SYNTHETIC_SEED_MANIFEST = Object.freeze({
   users: 50,
@@ -615,7 +616,14 @@ async function main(): Promise<void> {
     throw new Error('Synthetic seed supports exactly 1000 or 10000 domain rows.');
   }
 
-  const outputPath = resolve(rootDir, 'db', 'seeds', `guigui-synthetic-${requestedRows}.sql`);
+  const outputPath = process.env.QA_ARTIFACT_DIR?.trim()
+    ? resolveQaCampaignArtifactPath(
+      rootDir,
+      process.env.QA_ARTIFACT_DIR.trim(),
+      'seed',
+      `guigui-synthetic-${requestedRows}.sql`,
+    )
+    : resolve(rootDir, 'db', 'seeds', `guigui-synthetic-${requestedRows}.sql`);
   await writeSyntheticSeedFile(outputPath, profile);
   console.log(`Generated synthetic PostgreSQL seed at ${outputPath}`);
 }
