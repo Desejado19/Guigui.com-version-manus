@@ -128,7 +128,9 @@
 
 **Files:**
 - Create: `tests/load/guigui-readonly.js`
+- Create: `tests/load/k6-config.json`
 - Create: `scripts/qa/validate-k6-config.ts`
+- Create: `scripts/qa/run-k6.ts`
 - Create: `tests/unit/qa-k6-config.test.ts`
 - Modify: `package.json` (k6 QA command only)
 
@@ -136,13 +138,13 @@
 - `K6Options` is `{ vus: number; duration: string; thresholds: Record<string, string[]> }`; each `K6Endpoint` is `{ method: string; path: string; readOnly: boolean }`.
 - `validateK6Config(target: string, options: K6Options, endpoints: K6Endpoint[]): void` rejects non-loopback targets, write methods, options outside the approved limits, or endpoints not marked read-only in the route inventory.
 - k6 reads `QA_BASE_URL` and targets only read endpoints classified as safe in `tests/api/route-inventory.json`.
-- Fixed options are `vus: 10`, `duration: '60s'`, `http_req_duration: ['p(95)<2000']`, and `http_req_failed: ['rate<0.01']`; checks must all pass.
+- Fixed options are `vus: 10`, `duration: '60s'`, `http_req_duration: ['p(95)<2000']`, and `http_req_failed: ['rate<0.01']`; require `checks: ['rate==1']` so any failed check fails the run.
 
 - [ ] **Step 1: Write failing config tests** in `tests/unit/qa-k6-config.test.ts` for missing/non-loopback target, a write-method endpoint, more than 10 VUs, duration over 60 seconds, and altered thresholds.
 - [ ] **Step 2: Run `npx vitest run tests/unit/qa-k6-config.test.ts`** and verify it fails before the safety validator exists.
-- [ ] **Step 3: Implement `validateK6Config`** in `scripts/qa/validate-k6-config.ts` and have the runner verify the target, fixed options, and endpoint methods before starting k6.
-- [ ] **Step 4: Implement `tests/load/guigui-readonly.js`** with a loopback-only target guard, GET-only approved endpoints, explicit response checks, the fixed VU/duration options, and the exact thresholds above.
-- [ ] **Step 5: Add `qa:load`** to invoke `k6 run` with a local summary export; do not install k6 if absent.
+- [ ] **Step 3: Implement `validateK6Config`** in `scripts/qa/validate-k6-config.ts`; have `scripts/qa/run-k6.ts` read the shared config, verify the target/options/endpoints and target health, then propagate the k6 exit status.
+- [ ] **Step 4: Implement `tests/load/guigui-readonly.js`** using the shared `tests/load/k6-config.json`, with a loopback-only target guard, GET-only approved endpoints, explicit response checks, the fixed VU/duration options, and the exact thresholds above.
+- [ ] **Step 5: Add `qa:load`** to invoke the validated runner with a local summary export; do not install k6 if absent.
 - [ ] **Step 6: Run the config tests and, only after the disposable DB and application preflight plus the Playwright/Newman phases complete, run k6 for exactly 10 VUs and 60 seconds. Verify CLI exit status, raw metrics, and exported thresholds together; block k6 if target health is degraded.**
 - [ ] **Step 7: Commit only Task 4 files** with message `test: add bounded read-only k6 campaign`.
 
