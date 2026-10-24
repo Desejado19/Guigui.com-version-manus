@@ -66,7 +66,7 @@ function businessFromRecord(record: PersistedBusinessProfile): Business {
     posts: [],
     promotions: [],
     metrics: { views: 0, whatsappClicks: 0, phoneClicks: 0, directionsClicks: 0, websiteClicks: 0 },
-    subscriptionRenewDate: record.subscriptionRenewDate || record.createdAt || new Date().toISOString(),
+    subscriptionRenewDate: record.subscriptionRenewDate || '',
     postsQuotaRemaining: 3,
   };
 
@@ -153,7 +153,8 @@ export function useMarketplaceData(): MarketplaceData {
           ]);
           const loadedGroups = arrayFromPayload<CategoryGroupSummary>(categoryPayload, 'groups', '/api/categories');
           const loadedCategories = arrayFromPayload<BusinessCategory>(categoryPayload, 'categories', '/api/categories');
-          const loadedBusinesses = arrayFromPayload<Business>(businessPayload, 'businesses', '/api/businesses');
+          const loadedBusinesses = arrayFromPayload<PersistedBusinessProfile>(businessPayload, 'businesses', '/api/businesses')
+            .map(businessFromRecord);
           const loadedEvents = arrayFromPayload<EventItem>(eventPayload, 'events', '/api/events');
 
           if (cancelled) return;

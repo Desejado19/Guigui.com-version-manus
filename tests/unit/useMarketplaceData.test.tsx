@@ -76,6 +76,40 @@ describe('useMarketplaceData', () => {
     expect(fetchMock.mock.calls.some(([url, init]) => String(url).includes('/api/app-state') && init?.method === 'POST')).toBe(false);
   });
 
+  it('normalizes incomplete PostgreSQL business records before exposing them to the UI', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/health') return jsonResponse({ database: { configured: true } });
+      if (url === '/api/categories') return jsonResponse({ groups: [], categories: [] });
+      if (url === '/api/businesses') return jsonResponse({
+        businesses: [{ id: 'postgres-business-incomplete', name: 'Synthetic Business', createdAt: '2026-01-02T00:00:00.000Z' }],
+      });
+      if (url === '/api/events') return jsonResponse({ events: [] });
+      return jsonResponse({}, 404);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useMarketplaceData());
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(result.current.businesses[0]).toMatchObject({
+      id: 'postgres-business-incomplete',
+      name: 'Synthetic Business',
+      posts: [],
+      promotions: [],
+      reviews: [],
+      gallery: [],
+      subscriptionRenewDate: '',
+      metrics: {
+        views: 0,
+        whatsappClicks: 0,
+        phoneClicks: 0,
+        directionsClicks: 0,
+        websiteClicks: 0,
+      },
+    });
+  });
+
   it('preservesLocalMarketplaceWhenDatabaseIsNotConfigured', async () => {
     localStorage.setItem('guigui_businesses', JSON.stringify([staleBusiness]));
     localStorage.setItem('guigui_events', JSON.stringify([staleEvent]));
