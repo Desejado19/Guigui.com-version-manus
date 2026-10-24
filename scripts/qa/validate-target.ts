@@ -22,6 +22,10 @@ function parseLoopbackPostgresUrl(value: string): URL {
     throw new Error('QA_ADMIN_DATABASE_URL must use PostgreSQL on 127.0.0.1 or ::1.');
   }
 
+  if ([...url.searchParams.keys()].some((name) => ['host', 'hostaddr', 'port'].includes(name.toLowerCase()))) {
+    throw new Error('QA_ADMIN_DATABASE_URL must not override its PostgreSQL host or port.');
+  }
+
   return url;
 }
 

@@ -34,6 +34,18 @@ describe('parseQaTarget', () => {
     expect(() => parseQaTarget(env)).toThrow();
   });
 
+  it.each([
+    ['host', 'host=203.0.113.9'],
+    ['port', 'port=6543'],
+  ])('rejects PostgreSQL URL %s overrides', (_setting, override) => {
+    const adminUrl = `postgres://qa-user:qa-test@127.0.0.1:5432/postgres?${override}`;
+
+    expect(() => parseQaTarget({
+      ...validQaEnvironment,
+      QA_ADMIN_DATABASE_URL: adminUrl,
+    })).toThrow();
+  });
+
   it('does not expose database credentials in validation errors', () => {
     const secretUrl = 'postgresql://qa_user:do-not-leak@remote.example:5432/postgres';
     let caughtError: unknown;
@@ -93,5 +105,12 @@ describe('provisionQaDatabase', () => {
       .rejects.toThrow(/PostgreSQL 18/i);
     expect(adminPool.query).toHaveBeenCalledOnce();
     expect(adminPool.end).toHaveBeenCalledOnce();
+  });
+
+  it('rejects endpoint overrides before constructing a connection pool', async () => {
+    const adminUrl = 'postgres://qa-user:qa-test@127.0.0.1:5432/postgres?host=203.0.113.9&port=6543';
+
+    await expect(provisionQaDatabase(target, adminUrl)).rejects.toThrow();
+    expect(poolConstructor).not.toHaveBeenCalled();
   });
 });
