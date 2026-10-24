@@ -41,6 +41,7 @@
 - `playwright.qa.config.ts`: dedicated QA base URL and report output, with no fallback to port 3000 or reuse of an unknown server.
 - `tests/api/route-inventory.json`: exhaustive route matrix with method, path, source registration, auth/preconditions, safe scenario, and exclusion reason where applicable.
 - `tests/api/guigui-local-qa.postman_collection.json`: local-only Newman collection whose requests and tests correspond to the inventory.
+- `scripts/qa/discover-routes.ts`: statically discover Express routes in `server.ts` and mounted routers under `server/`; report unresolved dynamic registrations instead of silently omitting them.
 - `tests/load/guigui-readonly.js`: bounded k6 GET-only scenario and exact thresholds.
 - `scripts/qa/build-report.ts`: combine tool summaries into a sanitized local report without copying secrets, cookies, tokens, personal data, or raw request bodies.
 - `tests/unit/qa-target.test.ts`, `tests/unit/qa-route-inventory.test.ts`, `tests/unit/qa-running-target.test.ts`, `tests/unit/qa-k6-config.test.ts`, `tests/unit/qa-zap-scope.test.ts`, and `tests/unit/qa-report.test.ts`: regression coverage for target safety, route accounting, tool scope, and report redaction.
@@ -74,23 +75,26 @@
 **Files:**
 - Create: `tests/api/route-inventory.json`
 - Create: `tests/api/guigui-local-qa.postman_collection.json`
+- Create: `scripts/qa/discover-routes.ts`
 - Create: `scripts/qa/validate-route-inventory.ts`
 - Create: `tests/unit/qa-route-inventory.test.ts`
 - Modify: `package.json` (Newman validation/run commands only)
 
 **Interfaces:**
 - Each inventory entry has `method`, `path`, `source`, `authentication`, `preconditions`, and exactly one of `scenario` or `exclusionReason`.
-- `validateRouteInventory(inventory, collection): RouteCoverageResult` rejects duplicate method/path entries, entries without a safe scenario or exclusion, covered routes missing a collection request, and collection requests not represented in the inventory.
+- `discoverExpressRoutes(rootDir: string): RouteDiscoveryResult` returns the direct/mounted method, path, source file/line, compatibility prefix where declared, and unresolved dynamic registrations.
+- `validateRouteInventory(inventory, collection, discoveredRoutes): RouteCoverageResult` rejects duplicate method/path entries, discovered routes missing from inventory, inventory entries missing from source, entries without a safe scenario or exclusion, covered routes missing a collection request, and collection requests not represented in the inventory.
 - Collection variables are limited to `qaBaseUrl`, synthetic fixture IDs, and authentication tokens created during the same local run; no Postman Cloud workspace or environment is used.
 
-- [ ] **Step 1: Write failing inventory tests** in `tests/unit/qa-route-inventory.test.ts` for duplicate routes, an unclassified route, a missing collection request, and a valid explicitly excluded route.
+- [ ] **Step 1: Write failing inventory tests** in `tests/unit/qa-route-inventory.test.ts` for duplicate routes, an unclassified route, a source route absent from inventory, an unresolved dynamic route, a missing collection request, and a valid explicitly excluded route.
 - [ ] **Step 2: Run `npx vitest run tests/unit/qa-route-inventory.test.ts`** and verify it fails before the validator exists.
 - [ ] **Step 3: Enumerate every Express HTTP route** registered from `server.ts` and mounted routers under `server/`; include both `/api` and `/api/v1` compatibility behavior where applicable. Record the source registration for every route, resolve each router mount, and explicitly map any dynamic registration. Put every route in `tests/api/route-inventory.json`, assigning a safe test or a concrete exclusion reason to each; do not accept unresolved registrations.
-- [ ] **Step 4: Implement `validateRouteInventory`** in `scripts/qa/validate-route-inventory.ts` and verify that every non-excluded inventory route maps to exactly one collection request, every excluded route has no request, and there are no duplicate, source-less, or unclassified entries.
-- [ ] **Step 5: Create the Newman collection** with local `qaBaseUrl`, authentication setup where required, unique synthetic IDs for write scenarios, and safe negative cases. Exclude any operation that could contact an external provider or create a real payment/message.
-- [ ] **Step 6: Add `qa:api:check` and `qa:api` commands**; the run command must invoke local Newman against the explicit QA URL and write JSON/CLI results only under the local campaign output directory.
-- [ ] **Step 7: Run `npx vitest run tests/unit/qa-route-inventory.test.ts`, `npm run qa:api:check`, and Newman against the disposable QA database**; verify matrix counts, request counts, exit code, and sanitized output agree.
-- [ ] **Step 8: Commit only Task 2 files** with message `test: add complete local API route coverage`.
+- [ ] **Step 4: Implement `discoverExpressRoutes`** in `scripts/qa/discover-routes.ts` using the TypeScript AST; resolve direct route declarations and statically imported/mounted routers, and report computed method/path registrations or unresolved router mounts explicitly.
+- [ ] **Step 5: Implement `validateRouteInventory`** in `scripts/qa/validate-route-inventory.ts` and verify every discovered route has exactly one inventory entry, every inventory entry maps back to source, every non-excluded entry has a collection request, and excluded routes have none.
+- [ ] **Step 6: Create the Newman collection** with local `qaBaseUrl`, authentication setup where required, unique synthetic IDs for write scenarios, and safe negative cases. Exclude any operation that could contact an external provider or create a real payment/message.
+- [ ] **Step 7: Add `qa:api:check` and `qa:api` commands**; the check must compare the source AST, inventory, and collection. The run command must invoke local Newman against the explicit QA URL and write JSON/CLI results only under the local campaign output directory.
+- [ ] **Step 8: Run `npx vitest run tests/unit/qa-route-inventory.test.ts` and `npm run qa:api:check`; run Newman only when the disposable DB preflight is available, then verify matrix counts, request counts, exit code, and sanitized output agree.**
+- [ ] **Step 9: Commit only Task 2 files** with message `test: add complete local API route coverage`.
 
 ### Task 3: Run the Existing Playwright Suite Against the Isolated App
 
