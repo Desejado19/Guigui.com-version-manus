@@ -28,11 +28,37 @@ export const SYNTHETIC_SEED_MANIFEST = Object.freeze({
   monetization_wallets: 30,
 } as const);
 
-export type SyntheticSeedManifest = typeof SYNTHETIC_SEED_MANIFEST;
+export type SyntheticSeedManifest = {
+  [Table in keyof typeof SYNTHETIC_SEED_MANIFEST]: number;
+};
+
+export const SYNTHETIC_SEED_10000_MANIFEST: SyntheticSeedManifest = Object.freeze({
+  users: 500,
+  companies: 300,
+  company_members: 300,
+  events: 300,
+  ticket_types: 600,
+  ticket_reservations: 1000,
+  orders: 800,
+  tickets: 800,
+  payment_transactions: 800,
+  commissions: 300,
+  refunds: 100,
+  plans: 4,
+  subscriptions: 300,
+  reviews: 700,
+  moderation_items: 300,
+  notifications: 696,
+  conversations: 300,
+  conversation_messages: 800,
+  support_tickets: 200,
+  support_replies: 300,
+  monetization_ledger: 300,
+  monetization_wallets: 300,
+});
 
 const TABLE_ORDER = Object.keys(SYNTHETIC_SEED_MANIFEST) as Array<keyof SyntheticSeedManifest>;
 const DEFAULT_TARGET_DATABASE_NAME = 'guigui_pg18_synthetic_target';
-const SEED_MARKER_KEY = 'guigui.synthetic_seed.1000';
 const SEED_VERSION = 1;
 
 function sqlString(value: string): string {
@@ -43,7 +69,10 @@ function padNumber(value: number, width = 3): string {
   return String(value).padStart(width, '0');
 }
 
-export function assertSyntheticSeedValid(manifest: Partial<SyntheticSeedManifest> = SYNTHETIC_SEED_MANIFEST): void {
+export function assertSyntheticSeedValid(
+  manifest: Partial<SyntheticSeedManifest> = SYNTHETIC_SEED_MANIFEST,
+  expectedTotal = 1000,
+): void {
   const normalized = { ...SYNTHETIC_SEED_MANIFEST, ...manifest } as SyntheticSeedManifest;
 
   for (const [tableName, count] of Object.entries(normalized)) {
@@ -53,8 +82,8 @@ export function assertSyntheticSeedValid(manifest: Partial<SyntheticSeedManifest
   }
 
   const total = Object.values(normalized).reduce((sum, value) => sum + value, 0);
-  if (total !== 1000) {
-    throw new Error(`Synthetic seed total rows must be exactly 1000, got ${total}.`);
+  if (!Number.isInteger(expectedTotal) || expectedTotal < 1 || total !== expectedTotal) {
+    throw new Error(`Synthetic seed total rows must be exactly ${expectedTotal}, got ${total}.`);
   }
 
   if (TABLE_ORDER.length !== Object.keys(normalized).length) {
@@ -356,11 +385,11 @@ function rowsForNotifications(count: number): string[] {
   });
 }
 
-function rowsForConversations(count: number): string[] {
+function rowsForConversations(count: number, userCount: number, companyCount: number): string[] {
   return Array.from({ length: count }, (_, index) => {
     const number = index + 1;
-    const userId = `synthetic_user_${padNumber((index % 50) + 1)}`;
-    const businessId = `synthetic_company_${padNumber((index % 30) + 1)}`;
+    const userId = `synthetic_user_${padNumber((index % userCount) + 1)}`;
+    const businessId = `synthetic_company_${padNumber((index % companyCount) + 1)}`;
     return `(${[
       sqlString(`synthetic_conversation_${padNumber(number)}`),
       sqlString(userId),
@@ -462,8 +491,13 @@ function rowsForMonetizationWallets(count: number): string[] {
 }
 
 export function createSyntheticSeedSql(manifest: Partial<SyntheticSeedManifest> = SYNTHETIC_SEED_MANIFEST): string {
-  assertSyntheticSeedValid(manifest);
   const normalized = { ...SYNTHETIC_SEED_MANIFEST, ...manifest } as SyntheticSeedManifest;
+  const totalRows = Object.values(normalized).reduce((sum, value) => sum + value, 0);
+  if (totalRows !== 1000 && totalRows !== 10000) {
+    throw new Error(`Synthetic seed supports exactly 1000 or 10000 domain rows, got ${totalRows}.`);
+  }
+  assertSyntheticSeedValid(manifest, totalRows);
+  const seedMarkerKey = `guigui.synthetic_seed.${totalRows}`;
 
   const inserts = [
     ['users', 'id, name, email, phone, neighborhood, avatar_url, role, account_status, password_hash, created_at, updated_at', rowsForUsers(normalized.users), '(id)'],
@@ -482,7 +516,7 @@ export function createSyntheticSeedSql(manifest: Partial<SyntheticSeedManifest> 
     ['reviews', 'id, business_id, author_user_id, author_name, author_phone_hash, author_phone_masked, qualitative_score, score_weight, comment, status, moderation_reason, owner_reply, verified_sms, created_at, updated_at', rowsForReviews(normalized.reviews), '(id)'],
     ['moderation_items', 'id, company_id, content_type, content_id, status, decision_reason, reviewed_by, created_at, reviewed_at', rowsForModerationItems(normalized.moderation_items), '(id)'],
     ['notifications', 'id, user_id, category, title, message, read_at, metadata, created_at', rowsForNotifications(normalized.notifications), '(id)'],
-    ['conversations', 'id, user_id, business_id, subject, last_message, unread_for_user, unread_for_business, created_at, updated_at', rowsForConversations(normalized.conversations), '(user_id, business_id)'],
+    ['conversations', 'id, user_id, business_id, subject, last_message, unread_for_user, unread_for_business, created_at, updated_at', rowsForConversations(normalized.conversations, normalized.users, normalized.companies), '(user_id, business_id)'],
     ['conversation_messages', 'id, conversation_id, sender_id, sender_role, text, read_by_user, read_by_business, created_at', rowsForConversationMessages(normalized.conversation_messages), '(id)'],
     ['support_tickets', 'id, requester_user_id, assigned_user_id, category, subject, description, status, created_at, updated_at', rowsForSupportTickets(normalized.support_tickets), '(id)'],
     ['support_replies', 'id, support_ticket_id, sender_user_id, sender_role, text, created_at', rowsForSupportReplies(normalized.support_replies), '(id)'],
@@ -527,9 +561,9 @@ export function createSyntheticSeedSql(manifest: Partial<SyntheticSeedManifest> 
     `  IF current_database() <> ${sqlString(DEFAULT_TARGET_DATABASE_NAME)} THEN`,
     `    RAISE EXCEPTION 'Synthetic seed can only run on the disposable local PostgreSQL 18 target.';`,
     `  END IF;`,
-    `  SELECT EXISTS (SELECT 1 FROM app_state WHERE key = ${sqlString(SEED_MARKER_KEY)}) INTO marker_exists;`,
+    `  SELECT EXISTS (SELECT 1 FROM app_state WHERE key = ${sqlString(seedMarkerKey)}) INTO marker_exists;`,
     `  IF marker_exists THEN`,
-    `    SELECT value ->> 'hash' INTO existing_hash FROM app_state WHERE key = ${sqlString(SEED_MARKER_KEY)};`,
+    `    SELECT value ->> 'hash' INTO existing_hash FROM app_state WHERE key = ${sqlString(seedMarkerKey)};`,
     `    IF existing_hash IS DISTINCT FROM ${sqlString(seedHash)} THEN`,
     `      RAISE EXCEPTION 'A different synthetic seed version is already recorded for this database.';`,
     `    END IF;`,
@@ -539,15 +573,15 @@ export function createSyntheticSeedSql(manifest: Partial<SyntheticSeedManifest> 
     `END $$;`,
     ...insertsSql,
     `INSERT INTO app_state (key, value)`,
-    `VALUES (${sqlString(SEED_MARKER_KEY)}, jsonb_build_object('version', ${SEED_VERSION}, 'hash', ${sqlString(seedHash)}, 'domain_rows', 1000))`,
+    `VALUES (${sqlString(seedMarkerKey)}, jsonb_build_object('version', ${SEED_VERSION}, 'hash', ${sqlString(seedHash)}, 'domain_rows', ${totalRows}))`,
     `ON CONFLICT (key) DO NOTHING;`,
     `DO $$`,
     `DECLARE`,
     `  total_seed_rows BIGINT;`,
     `BEGIN`,
     `  SELECT ${totalSeedRowCount} INTO total_seed_rows;`,
-    `  IF total_seed_rows <> 1000 THEN`,
-    `    RAISE EXCEPTION 'Synthetic seed expected exactly 1000 rows, found %.', total_seed_rows;`,
+    `  IF total_seed_rows <> ${totalRows} THEN`,
+    `    RAISE EXCEPTION 'Synthetic seed expected exactly ${totalRows} rows, found %.', total_seed_rows;`,
     `  END IF;`,
     `END $$;`,
     finalCountQuery,
@@ -566,8 +600,23 @@ export async function writeSyntheticSeedFile(outputPath: string, manifest: Parti
 
 async function main(): Promise<void> {
   const rootDir = resolve(fileURLToPath(new URL('..', import.meta.url)));
-  const outputPath = resolve(rootDir, 'db', 'seeds', 'guigui-synthetic-1000.sql');
-  await writeSyntheticSeedFile(outputPath);
+  const args = process.argv.slice(2);
+  if (args.length !== 0 && (args.length !== 2 || args[0] !== '--rows')) {
+    throw new Error('Usage: npm run db:seed:synthetic -- [--rows 1000|10000]');
+  }
+
+  const requestedRows = args.length === 0 ? 1000 : Number(args[1]);
+  const profile = requestedRows === 1000
+    ? SYNTHETIC_SEED_MANIFEST
+    : requestedRows === 10000
+      ? SYNTHETIC_SEED_10000_MANIFEST
+      : null;
+  if (!profile) {
+    throw new Error('Synthetic seed supports exactly 1000 or 10000 domain rows.');
+  }
+
+  const outputPath = resolve(rootDir, 'db', 'seeds', `guigui-synthetic-${requestedRows}.sql`);
+  await writeSyntheticSeedFile(outputPath, profile);
   console.log(`Generated synthetic PostgreSQL seed at ${outputPath}`);
 }
 
