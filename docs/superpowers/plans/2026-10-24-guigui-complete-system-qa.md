@@ -158,13 +158,14 @@
 
 **Interfaces:**
 - `validateZapScope(baseUrl: string, mode: 'baseline' | 'passive'): void` accepts only the explicit loopback QA URL and baseline/passive mode.
-- The wrapper requires the explicit QA base URL and limits ZAP to that localhost target in baseline/passive mode.
+- The wrapper requires the explicit QA base URL, passes the shared running-target health check, and limits ZAP to that localhost target in baseline/passive mode.
+- Bind ZAP's internal proxy to `127.0.0.1:4314`; refuse to start if that port is occupied rather than changing or terminating an existing listener.
 - Output includes machine-readable alert counts and a local raw report; it does not launch active scan, fuzzing, or exploit tests.
 
 - [ ] **Step 1: Write failing scope tests** in `tests/unit/qa-zap-scope.test.ts` for loopback allow, non-loopback reject, port-3000 reject, and baseline-only mode.
 - [ ] **Step 2: Run `npx vitest run tests/unit/qa-zap-scope.test.ts`** and verify it fails before the scope validator exists.
 - [ ] **Step 3: Implement `validateZapScope`** in `scripts/qa/validate-zap-scope.ts` and call it from the wrapper before invoking ZAP.
-- [ ] **Step 4: Implement the ZAP wrapper**; pin the scan target to `http://127.0.0.1:<QA_PORT>`, use only the baseline/passive scanner, and write raw output to the local campaign directory.
+- [ ] **Step 4: Implement the ZAP wrapper**; pin the scan target to `http://127.0.0.1:<QA_PORT>`, require the Task 3 health check, use only the baseline/passive scanner, and write raw output to the local campaign directory.
 - [ ] **Step 5: Add `qa:zap`** without adding an installation step. If ZAP is unavailable, the runner must mark it blocked and request authorization rather than installing it.
 - [ ] **Step 6: Run scope tests and, if the tool is available or separately authorized, execute the passive baseline; compare the result with the prior baseline of seven alerts (four medium-severity/high-confidence CSP wildcard alerts, one low, and two informational).**
 - [ ] **Step 7: Commit only Task 5 files** with message `test: add localhost-only passive ZAP baseline`.
