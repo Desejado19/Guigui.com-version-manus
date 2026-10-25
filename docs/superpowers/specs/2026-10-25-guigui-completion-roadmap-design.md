@@ -26,7 +26,7 @@ The missing data modules are a stop gate for restoring behavior: locate an autho
 
 1. **Use a reconciliation roadmap, not a replacement mega-plan.** Retain context-specific plans and specifications. The new roadmap records dependencies, evidence, and sequencing; it links to existing tasks rather than duplicating their implementation steps.
 2. **Restore a trustworthy runtime baseline before system tests.** Missing source modules currently prevent build and startup. Resolve those using verified sources, then restore type-check, build, unit tests, and isolated startup before interpreting live QA results.
-3. **Capture a behavioral baseline before substantial DDD movement.** Once the app and its isolated QA prerequisites work, run the existing local campaign. Use findings to guide approved fixes and retain regression coverage during each context extraction.
+3. **Capture a behavioral baseline before functional fixes and substantial DDD movement.** Once the app and its isolated QA prerequisites work, run the existing local campaign. Use findings to guide approved fixes and retain regression coverage during each context extraction.
 4. **Keep the DDD migration sequential.** Complete/reconcile platform foundation and identity first, then migrate the five remaining bounded contexts in the approved order. Each context-specific implementation continues to require its own reviewed specification and plan where one is absent or materially stale.
 5. **Keep external and persistent side effects gated.** No Render changes, production database access, schema migrations, paid resources, real provider calls, or changes to the unknown port-3000 process are part of this roadmap.
 
@@ -44,7 +44,13 @@ Trace each missing import to its consumers and search only trusted local reposit
 
 After recovery, require `npm run check`, `npm run test:unit`, and `npm run build` to pass, accounting explicitly for existing intentional skips. Start this checkout only with isolated environment variables, an empty dotenv source, and a temporary `GUIGUI_DATA_DIR`; require a successful health response and SPA response. Do not reuse port 3000 or a process whose source checkout is unknown.
 
-### Phase 2 — Reconcile and close approved functional/persistence plans
+### Phase 2 — Establish the behavioral QA baseline
+
+Use the existing complete-system QA plan and harness after Phase 1 succeeds. Before any database creation, require all its loopback, PostgreSQL-version, uniqueness, fixture, and tool checks to pass. Use only the new synthetic QA database and its generated records; do not consume the process's inherited `DATABASE_URL`, application data snapshots, or production data.
+
+Run the approved sequence: Playwright E2E, Newman API collection, bounded GET-only k6 (10 VUs for 60 seconds), then localhost-only passive ZAP. Preserve raw artifacts locally and publish the sanitized report. If prerequisites are unavailable, record phases as blocked, not passed; request only the missing local setup and do not install or provision anything outside the plan's approval rules.
+
+### Phase 3 — Reconcile and close approved functional/persistence plans
 
 Use Phase 0's crosswalk to resume only genuinely incomplete tasks from:
 
@@ -56,13 +62,7 @@ Use Phase 0's crosswalk to resume only genuinely incomplete tasks from:
 - PostgreSQL synthetic seed;
 - persistence inventory.
 
-Follow the approved plan for each task, preserve HTTP/persistence contracts, and add no parallel or replacement implementation. If a plan conflicts with an approved specification or a verified shared interface, record the smallest explicit ruling and stop for user input when the decision changes business policy, schema, security policy, or persisted data.
-
-### Phase 3 — Establish and run the isolated system-QA campaign
-
-Use the existing complete-system QA plan and harness. Before any database creation, require all its loopback, PostgreSQL-version, uniqueness, fixture, and tool checks to pass. Use only the new synthetic QA database and its generated records; do not consume the process's inherited `DATABASE_URL`, application data snapshots, or production data.
-
-Run the approved sequence: Playwright E2E, Newman API collection, bounded GET-only k6 (10 VUs for 60 seconds), then localhost-only passive ZAP. Preserve raw artifacts locally and publish the sanitized report. If prerequisites are unavailable, record phases as blocked, not passed; request only the missing local setup and do not install or provision anything outside the plan's approval rules.
+Follow the approved plan for each task, preserve HTTP/persistence contracts, and add no parallel or replacement implementation. Use the Phase 2 QA report to prioritize confirmed behavior gaps. If a plan conflicts with an approved specification or a verified shared interface, record the smallest explicit ruling and stop for user input when the decision changes business policy, schema, security policy, or persisted data.
 
 ### Phase 4 — Complete the seven-context modular-monolith roadmap
 
@@ -103,7 +103,7 @@ The roadmap is complete only when:
 1. Every non-Render approved plan has a reconciled status and evidence; no completed task was repeated without cause.
 2. The source modules required for this checkout are restored from trusted sources, or unresolved source gaps are explicitly documented and approved by the user.
 3. Type-check, unit tests, build, and isolated startup/health checks pass on the final tree; all skips and exclusions are accounted for.
-4. The complete-system QA campaign has executed each approved phase successfully, or the user has explicitly accepted a documented blocker/deferral for the specific phase.
+4. The baseline and final complete-system QA campaigns have executed each approved phase successfully, or the user has explicitly accepted a documented blocker/deferral for the specific phase.
 5. All seven DDD contexts satisfy their approved context-level acceptance criteria, with compatibility verification after each context.
 6. The final report distinguishes verified passes, failures, and accepted/unaccepted blocks and links sanitized artifacts.
 7. Render remains untouched by this roadmap.
