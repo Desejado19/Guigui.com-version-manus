@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Provide a configurable fake pool so we can exercise the threshold logic and
 // both the "no distributed store" and query-mock paths.
@@ -17,6 +17,13 @@ const { consumeDistributedRateLimit } = await import('../../server/rateLimitServ
 beforeEach(() => {
   queryMock.mockReset();
   pool = null;
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-10-25T12:00:00.000Z'));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe('consumeDistributedRateLimit', () => {
@@ -56,5 +63,51 @@ describe('consumeDistributedRateLimit', () => {
     await consumeDistributedRateLimit('user:42', 30_000, 5);
     expect(queryMock).toHaveBeenCalledTimes(1);
     expect(queryMock.mock.calls[0][1]).toEqual(['user:42', 30_000]);
+  });
+
+  it('sets expiry at the end of the current window', async () => {
+    pool = { query: queryMock };
+    queryMock.mockResolvedValue({ rows: [{ request_count: 1 }] });
+
+    await consumeDistributedRateLimit('ip:expiry', 60_000, 5);
+
+    expect(queryMock.mock.calls[0][1]).toEqual(['ip:expiry', 60_000]);
+    expect(queryMock.mock.calls[0][0]).toContain("NOW() + ($2 * INTERVAL '1 millisecond')");
+  });
+
+  it('starts a new window with a new expiry after the old window ends', async () => {
+    pool = { query: queryMock };
+    queryMock.mockResolvedValue({ rows: [{ request_count: 1 }] });
+
+    await consumeDistributedRateLimit('ip:window', 60_000, 5);
+    vi.advanceTimersByTime(60_000);
+    await consumeDistributedRateLimit('ip:window', 60_000, 5);
+
+    const query = queryMock.mock.calls[1][0] as string;
+    expect(queryMock.mock.calls[1][1]).toEqual(['ip:window', 60_000]);
+    expect(query).toContain('rate_limit_buckets.expires_at <= NOW()');
+    expect(query).toContain('window_started_at=CASE');
+    expect(query).toContain('expires_at=CASE');
+  });
+
+  it('rejects invalid window and request limits', async () => {
+    await expect(consumeDistributedRateLimit('ip:invalid', 0, 5)).rejects.toThrow(
+      'windowMs must be a positive integer.',
+    );
+    await expect(consumeDistributedRateLimit('ip:invalid', 1_000, 0)).rejects.toThrow(
+      'maxRequests must be a positive integer.',
+    );
+  });
+
+  it('does not log or include the bucket key when persistence fails', async () => {
+    pool = { query: queryMock };
+    queryMock.mockRejectedValue(new Error('database unavailable'));
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(consumeDistributedRateLimit('private-bucket-key', 1_000, 5))
+      .rejects.toThrow('database unavailable');
+
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(queryMock.mock.calls[0][1][0]).toBe('private-bucket-key');
   });
 });
