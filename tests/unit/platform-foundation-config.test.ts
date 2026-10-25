@@ -5,6 +5,7 @@ describe('loadPlatformRuntimeConfig', () => {
   it('uses local defaults when no shared runtime variables are configured', () => {
     expect(loadPlatformRuntimeConfig({})).toEqual({
       port: 3000,
+      host: '0.0.0.0',
       isProduction: false,
       isVercel: false,
       appUrl: undefined,
@@ -17,6 +18,11 @@ describe('loadPlatformRuntimeConfig', () => {
     expect(loadPlatformRuntimeConfig({ PORT: '0' }).port).toBe(3000);
     expect(loadPlatformRuntimeConfig({ PORT: 'invalid' }).port).toBe(3000);
     expect(loadPlatformRuntimeConfig({ PORT: '3102' }).port).toBe(3102);
+  });
+
+  it('uses a configured host and defaults to all interfaces', () => {
+    expect(loadPlatformRuntimeConfig({}).host).toBe('0.0.0.0');
+    expect(loadPlatformRuntimeConfig({ HOST: '127.0.0.1' }).host).toBe('127.0.0.1');
   });
 
   it('parses configured CORS origins and APP_URL fallback', () => {
