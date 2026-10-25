@@ -174,7 +174,7 @@
 - Produces:
   - `runOperationsMaintenance(repository: OperationsMaintenanceRepository, now: Date): Promise<OperationsMaintenanceSummary>`
   - `type OperationsMaintenanceSummary = { expiredRateLimitBuckets: number; completedJobs: number; deadLetterJobs: number; expiredProductEvents: number }`
-  - `OperationsMaintenanceRepository.deleteExpiredRateLimitBuckets(now: Date): Promise<number>`
+  - `OperationsMaintenanceRepository.deleteExpiredRateLimitBuckets(): Promise<number>`
   - `OperationsMaintenanceRepository.deleteCompletedJobs(cutoff: Date): Promise<number>`
   - `OperationsMaintenanceRepository.deleteDeadLetterJobs(cutoff: Date): Promise<number>`
   - `OperationsMaintenanceRepository.deleteExpiredProductEvents(cutoff: Date): Promise<number>`
@@ -190,7 +190,7 @@
 
 - [ ] **Step 3: Implement maintenance repositories and retention rules**
 
-  Use terminal timestamps for the 30-day job policies and `occurred_at` for the 365-day event policy. Delete only expired rate buckets. Do not delete pending/processing jobs or any `request_metrics` rows. Return explicit deletion counts; propagate database errors.
+  Use terminal timestamps for the 30-day job policies and `occurred_at` for the 365-day event policy. Delete only expired rate buckets using PostgreSQL `NOW()` as the authoritative clock. Do not delete pending/processing jobs or any `request_metrics` rows. Return explicit deletion counts; propagate database errors.
 
 - [ ] **Step 4: Run retention tests**
 

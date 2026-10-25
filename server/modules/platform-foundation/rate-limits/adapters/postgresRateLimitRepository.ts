@@ -35,12 +35,11 @@ export function createPostgresRateLimitRepository(
       const row = result.rows[0];
       return row ? Number(row.request_count) : null;
     },
-    async deleteExpiredRateLimitBuckets(now) {
+    async deleteExpiredRateLimitBuckets() {
       const result = await queryPort.query<{ bucket_key: string }>(
         `DELETE FROM rate_limit_buckets
-         WHERE expires_at <= $1
+         WHERE expires_at <= NOW()
          RETURNING bucket_key`,
-        [now],
       );
       return result.rows.length;
     },

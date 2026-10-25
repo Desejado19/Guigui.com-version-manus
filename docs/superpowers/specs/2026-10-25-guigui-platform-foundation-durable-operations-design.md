@@ -80,7 +80,7 @@ O middleware de observabilidade usa atualmente `request.route?.path || request.p
 - A API existente de consumo continua a ser atómica no PostgreSQL e mantém o resultado `boolean | null` para compatibilidade local.
 - Em produção, a ausência de banco é bloqueada pelo preflight; indisponibilidade durante uma operação propaga erro explícito, sem fallback em memória.
 - Cada bucket guarda o instante de expiração associado à sua janela atual. Uma janela expirada reinicia a contagem e a expiração.
-- A limpeza horária remove buckets expirados, no máximo uma hora após o fim da janela. A limpeza não é executada por cada requisição.
+- A limpeza horária remove buckets expirados, no máximo uma hora após o fim da janela. A criação da janela, a expiração e a limpeza usam `NOW()` do PostgreSQL como relógio autoritativo, evitando divergência entre relógios dos workers. A limpeza não é executada por cada requisição.
 - O serviço não regista a chave do bucket nem inclui valores de chave em mensagens de erro.
 - As linhas atuais não guardam a duração da janela; a migration marca esses buckets legados como expirados em vez de inventar uma duração, e a próxima chamada inicia uma janela nova.
 

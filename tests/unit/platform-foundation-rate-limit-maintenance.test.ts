@@ -3,22 +3,21 @@ import { createPostgresRateLimitRepository } from '../../server/modules/platform
 import { createRateLimitService } from '../../server/modules/platform-foundation/rate-limits/application/rateLimitService';
 
 describe('platform-foundation rate-limit maintenance', () => {
-  it('deletes only buckets expired at the maintenance time', async () => {
+  it('deletes expired buckets using the PostgreSQL clock', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ bucket_key: 'expired-a' }, { bucket_key: 'expired-b' }] });
     const repository = createPostgresRateLimitRepository({ query });
-    const now = new Date('2026-10-25T13:00:00.000Z');
 
-    const deleted = await repository.deleteExpiredRateLimitBuckets(now);
+    const deleted = await repository.deleteExpiredRateLimitBuckets();
 
     expect(deleted).toBe(2);
-    expect(query.mock.calls[0][0]).toContain('expires_at <= $1');
-    expect(query.mock.calls[0][1]).toEqual([now]);
+    expect(query.mock.calls[0][0]).toContain('expires_at <= NOW()');
+    expect(query.mock.calls[0][1]).toBeUndefined();
   });
 
   it('treats a bucket without a recorded expiry as expired', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ request_count: 1 }] });
     const repository = createPostgresRateLimitRepository({ query });
-    const service = createRateLimitService(repository, () => new Date('2026-10-25T13:00:00.000Z'));
+    const service = createRateLimitService(repository);
 
     await service.consumeDistributedRateLimit('legacy-bucket', 60_000, 5);
 
@@ -30,7 +29,6 @@ describe('platform-foundation rate-limit maintenance', () => {
     const query = vi.fn();
     const service = createRateLimitService(
       createPostgresRateLimitRepository({ query }),
-      () => new Date('2026-10-25T13:00:00.000Z'),
     );
 
     await expect(service.consumeDistributedRateLimit('invalid', -1, 1)).rejects.toThrow();

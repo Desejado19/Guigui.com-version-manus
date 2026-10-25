@@ -14,10 +14,9 @@ export function createPostgresOperationsMaintenanceRepository(
   queryPort: OperationsMaintenanceQueryPort,
 ): OperationsMaintenanceRepository {
   return {
-    async deleteExpiredRateLimitBuckets(now) {
+    async deleteExpiredRateLimitBuckets() {
       const result = await queryPort.query(
-        'DELETE FROM rate_limit_buckets WHERE expires_at <= $1',
-        [now],
+        'DELETE FROM rate_limit_buckets WHERE expires_at <= NOW()',
       );
       return deletedCount(result.rowCount, 'rate_limit_buckets');
     },

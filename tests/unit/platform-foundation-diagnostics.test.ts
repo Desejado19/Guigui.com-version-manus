@@ -42,4 +42,14 @@ describe('platform-foundation diagnostic sanitization', () => {
     expect(diagnostic).not.toContain('object-bearer-secret');
     expect(diagnostic).toContain('ECONNRESET');
   });
+
+  it('redacts credentials in compound camel-case keys', () => {
+    const diagnostic = sanitizeDiagnostic({
+      dbPassword: 'database-secret',
+      code: 'ECONNRESET',
+    });
+
+    expect(diagnostic).not.toContain('database-secret');
+    expect(diagnostic).toContain('ECONNRESET');
+  });
 });

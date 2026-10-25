@@ -3,7 +3,7 @@ export interface RateLimitRepository {
     key: string,
     windowMs: number,
   ): Promise<number | null>;
-  deleteExpiredRateLimitBuckets(now: Date): Promise<number>;
+  deleteExpiredRateLimitBuckets(): Promise<number>;
 }
 
 export interface RateLimitService {
@@ -17,7 +17,6 @@ export interface RateLimitService {
 
 export function createRateLimitService(
   repository: RateLimitRepository | null,
-  now: () => Date = () => new Date(),
 ): RateLimitService {
   return {
     async consumeDistributedRateLimit(key, windowMs, maxRequests) {
@@ -39,7 +38,7 @@ export function createRateLimitService(
       if (!repository) {
         throw new Error('PostgreSQL is required to delete rate-limit buckets.');
       }
-      return repository.deleteExpiredRateLimitBuckets(now());
+      return repository.deleteExpiredRateLimitBuckets();
     },
   };
 }

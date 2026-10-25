@@ -296,7 +296,7 @@ describeWithDatabase('platform-foundation PostgreSQL lifecycle', () => {
     );
     createdRateLimitKeys.push(expiredKey, activeKey);
     await assertCurrentDatabase();
-    expect(await repository.deleteExpiredRateLimitBuckets(new Date())).toBe(1);
+    expect(await repository.deleteExpiredRateLimitBuckets()).toBe(1);
     const activeBucket = await requirePool().query<{ bucket_key: string }>(
       'SELECT bucket_key FROM rate_limit_buckets WHERE bucket_key = $1',
       [activeKey],

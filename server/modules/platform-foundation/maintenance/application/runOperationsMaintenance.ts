@@ -9,7 +9,7 @@ export type OperationsMaintenanceSummary = {
 };
 
 export interface OperationsMaintenanceRepository {
-  deleteExpiredRateLimitBuckets(now: Date): Promise<number>;
+  deleteExpiredRateLimitBuckets(): Promise<number>;
   deleteCompletedJobs(cutoff: Date): Promise<number>;
   deleteDeadLetterJobs(cutoff: Date): Promise<number>;
   deleteExpiredProductEvents(cutoff: Date): Promise<number>;
@@ -19,7 +19,7 @@ export async function runOperationsMaintenance(
   repository: OperationsMaintenanceRepository,
   now: Date,
 ): Promise<OperationsMaintenanceSummary> {
-  const expiredRateLimitBuckets = await repository.deleteExpiredRateLimitBuckets(now);
+  const expiredRateLimitBuckets = await repository.deleteExpiredRateLimitBuckets();
   const jobCutoff = new Date(now.getTime() - JOB_RETENTION_MS);
   const completedJobs = await repository.deleteCompletedJobs(jobCutoff);
   const deadLetterJobs = await repository.deleteDeadLetterJobs(jobCutoff);

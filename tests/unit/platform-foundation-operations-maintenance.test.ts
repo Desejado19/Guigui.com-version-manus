@@ -50,12 +50,12 @@ describe('platform-foundation operations maintenance', () => {
     );
   });
 
-  it('purges only rate-limit buckets expired at the maintenance time', async () => {
+  it('purges rate-limit buckets using the PostgreSQL clock', async () => {
     const repository = createRepository();
 
     const summary = await runOperationsMaintenance(repository, now);
 
-    expect(repository.deleteExpiredRateLimitBuckets).toHaveBeenCalledWith(now);
+    expect(repository.deleteExpiredRateLimitBuckets).toHaveBeenCalledWith();
     expect(summary).toEqual({
       expiredRateLimitBuckets: 2,
       completedJobs: 3,
@@ -86,11 +86,13 @@ describe('platform-foundation operations maintenance', () => {
     const query = vi.fn().mockResolvedValue({ rowCount: 0, rows: [] });
     const repository = createPostgresOperationsMaintenanceRepository({ query });
 
-    await repository.deleteExpiredRateLimitBuckets(now);
+    await repository.deleteExpiredRateLimitBuckets();
     await repository.deleteCompletedJobs(now);
     await repository.deleteDeadLetterJobs(now);
     await repository.deleteExpiredProductEvents(now);
 
+    expect(query.mock.calls[0][0]).toContain('expires_at <= NOW()');
+    expect(query.mock.calls[0][1]).toBeUndefined();
     expect(query.mock.calls.map(([sql]) => sql).join('\n')).not.toMatch(/request_metrics/i);
   });
 

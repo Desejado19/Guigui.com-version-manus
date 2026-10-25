@@ -2,7 +2,7 @@ const DATABASE_URL_PATTERN = /\bpostgres(?:ql)?:\/\/[^\s"'<>]+/gi;
 const AUTHORIZATION_PATTERN =
   /(["']?\bauthorization\b["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|(?:(?:bearer|basic)\s+)?[^\s,;]+)/gi;
 const SENSITIVE_VALUE_PATTERN =
-  /(["']?\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password|passwd|credential|client[_-]?secret)\b["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi;
+  /(["']?\b[\w-]*(?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password|passwd|credential|client[_-]?secret)[\w-]*\b["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi;
 
 function diagnosticText(error: unknown): string {
   if (error instanceof Error) return error.message;
