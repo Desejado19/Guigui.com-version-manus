@@ -18,6 +18,26 @@ npm run test:unit
 npm run build
 ```
 
+Os testes de integração PostgreSQL são separados por alvo:
+
+- A suíte legada usa `TEST_DATABASE_URL` e a base sintética
+  `guigui_pg18_synthetic_target`.
+- A suíte de operações da fundação usa somente
+  `PLATFORM_FOUNDATION_TEST_DATABASE_URL`, que deve apontar para uma base local,
+  PostgreSQL 18, descartável e vazia chamada
+  `guigui_pg18_platform_foundation_test`.
+
+Execute ambas com:
+
+```text
+npm run test:integration -- --maxWorkers=1 --no-file-parallelism
+```
+
+A suíte da fundação é ignorada antes de criar um pool se a variável não estiver
+configurada ou se o host/nome não forem aprovados; ela não herda nem altera
+`DATABASE_URL` ou `TEST_DATABASE_URL`. Nunca aponte essa variável para uma base
+de produção ou para a base sintética legada.
+
 `GET /api/health` responde com HTTP 200 e distingue o estado do processo do
 estado da persistência:
 
