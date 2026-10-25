@@ -198,7 +198,7 @@
 
 - [ ] **Step 3: Run only checks proven safe by Task 1**
 
-  If test setup is verified not to load an inherited database target, run `npm run lint`, `npm run test:unit`, and `npm run build` with `DATABASE_URL`, `TEST_DATABASE_URL`, `PLATFORM_FOUNDATION_TEST_DATABASE_URL`, and `QA_ADMIN_DATABASE_URL` explicitly blank in the test process. Run `npm run test:integration -- --maxWorkers=1 --no-file-parallelism` only if its guards skip before pool creation when the target URLs are blank. Record exact counts and warnings; do not describe skipped DB tests as passed.
+  If test setup is verified not to load an inherited database target, run `npm run lint`, `npm run test:unit`, and `npm run build` with `DATABASE_URL`, `TEST_DATABASE_URL`, `PLATFORM_FOUNDATION_TEST_DATABASE_URL`, `QA_ADMIN_DATABASE_URL`, and `QA_DATABASE_URL` explicitly blank in the test process. Run `npm run test:integration -- --maxWorkers=1 --no-file-parallelism` only if its guards skip before pool creation when the target URLs are blank. Record exact counts and warnings; do not describe skipped DB tests as passed.
 
 - [ ] **Step 4: Decide runtime QA status without weakening safeguards**
 
