@@ -1,74 +1,49 @@
-import { randomUUID } from 'node:crypto';
 import { databasePool } from './db';
+import { createJobQueueService } from './modules/platform-foundation/jobs/application/jobQueueService';
+import { createInMemoryJobQueueRepository } from './modules/platform-foundation/jobs/adapters/inMemoryJobQueueRepository';
+import { createPostgresJobQueueRepository } from './modules/platform-foundation/jobs/adapters/postgresJobQueueRepository';
+import type { JobType, QueueJob } from './modules/platform-foundation/jobs/domain/jobQueue';
 
-export type JobType = 'notification' | 'webhook' | 'export' | 'backup' | 'reconciliation';
+export type { JobType, QueueJob } from './modules/platform-foundation/jobs/domain/jobQueue';
+export { JOB_TYPES } from './modules/platform-foundation/jobs/domain/jobQueue';
 
-export interface QueueJob<T = Record<string, unknown>> {
-  id: string;
-  type: JobType;
-  payload: T;
-  attempts: number;
-  maxAttempts: number;
-  availableAt: string;
+const service = createJobQueueService(
+  databasePool
+    ? createPostgresJobQueueRepository(databasePool)
+    : createInMemoryJobQueueRepository(),
+);
+
+function requireProductionPostgreSQL(): void {
+  if (!databasePool && process.env.NODE_ENV === 'production') {
+    throw new Error('PostgreSQL is required for production queue operations.');
+  }
 }
-
-const memoryQueue: QueueJob[] = [];
 
 export async function enqueueJob<T extends Record<string, unknown>>(
   type: JobType,
   payload: T,
   options: { idempotencyKey?: string; maxAttempts?: number } = {},
 ): Promise<QueueJob<T>> {
-  const id = randomUUID();
-  const maxAttempts = options.maxAttempts || 5;
-  if (databasePool) {
-    const result = await databasePool.query<QueueJob<T>>(
-      `INSERT INTO async_jobs (id, job_type, payload, idempotency_key, max_attempts)
-       VALUES ($1, $2, $3::jsonb, $4, $5)
-       ON CONFLICT (idempotency_key) DO UPDATE SET id=async_jobs.id
-       RETURNING id, job_type AS type, payload, attempts, max_attempts AS "maxAttempts", available_at AS "availableAt"`,
-      [id, type, JSON.stringify(payload), options.idempotencyKey || null, maxAttempts],
-    );
-    return result.rows[0] as QueueJob<T>;
-  }
-  const job = { id, type, payload, attempts: 0, maxAttempts, availableAt: new Date().toISOString() };
-  memoryQueue.push(job);
-  return job;
+  requireProductionPostgreSQL();
+  return service.enqueueJob(type, payload, options);
 }
 
-export async function claimJob(): Promise<QueueJob | null> {
-  if (!databasePool) return memoryQueue.shift() || null;
-  const result = await databasePool.query<QueueJob>(
-    `UPDATE async_jobs
-     SET status='processing', attempts=attempts+1, locked_at=NOW()
-     WHERE id = (
-       SELECT id FROM async_jobs
-       WHERE status='pending' AND available_at <= NOW()
-       ORDER BY created_at
-       FOR UPDATE SKIP LOCKED LIMIT 1
-     )
-     RETURNING id, job_type AS type, payload, attempts, max_attempts AS "maxAttempts", available_at AS "availableAt"`,
-  );
-  return result.rows[0] || null;
+export async function claimJob(registeredTypes: readonly JobType[]) {
+  requireProductionPostgreSQL();
+  return service.claimJob(registeredTypes);
 }
 
-export async function completeJob(id: string): Promise<void> {
-  if (!databasePool) return;
-  await databasePool.query(`UPDATE async_jobs SET status='completed', completed_at=NOW() WHERE id=$1`, [id]);
+export async function renewJobLease(id: string, leaseToken: string): Promise<boolean> {
+  requireProductionPostgreSQL();
+  return service.renewJobLease(id, leaseToken);
 }
 
-export async function failJob(id: string, error: Error): Promise<'retrying' | 'dead-letter'> {
-  const message = error.message.slice(0, 2000);
-  if (!databasePool) return 'dead-letter';
-  const result = await databasePool.query<{ attempts: number; max_attempts: number }>(
-    `UPDATE async_jobs
-     SET status=CASE WHEN attempts >= max_attempts THEN 'dead_letter' ELSE 'pending' END,
-         available_at=CASE WHEN attempts >= max_attempts THEN available_at ELSE NOW() + (POWER(2, attempts) * INTERVAL '1 minute') END,
-         last_error=$2, locked_at=NULL
-     WHERE id=$1
-     RETURNING attempts, max_attempts`,
-    [id, message],
-  );
-  const row = result.rows[0];
-  return row && row.attempts >= row.max_attempts ? 'dead-letter' : 'retrying';
+export async function completeJob(id: string, leaseToken: string): Promise<boolean> {
+  requireProductionPostgreSQL();
+  return service.completeJob(id, leaseToken);
+}
+
+export async function failJob(id: string, leaseToken: string, error: unknown) {
+  requireProductionPostgreSQL();
+  return service.failJob(id, leaseToken, error);
 }
