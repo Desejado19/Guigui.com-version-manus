@@ -21,6 +21,22 @@ The new service shares the existing PostgreSQL database. Do not enable writes un
 
 These failures block a production release until resolved or an approved, evidence-based alternative build is provided. Do not exclude tests or silence the missing imports to pass this gate.
 
+## Local revalidation on 2026-10-25
+
+All checks below ran at commit `6bbef38`. The startup attempt explicitly unset both database URLs, used an isolated `.local-qa/manual-startup-check/state` directory, loopback host/port, test mode, and an empty dotenv file; it did not connect to the database configured outside that isolated process.
+
+| Check | Result |
+|---|---|
+| `npm run check` | Failed with 24 unresolved imports caused by the five absent modules already listed above. |
+| `npm run test:unit` | 12 files failed, 67 passed, 1 skipped; 495 tests passed and 85 skipped. A rerun with all database URL variables unset reproduced the same result. Failed component/domain test imports reference the absent modules. |
+| `npm run build` | Failed resolving `src/data/adminStaffData` imported by `src/App.tsx`. |
+| `npm run dev` in isolated test mode | Failed before binding because `server/ticketPurchaseDomain.ts` imports absent `src/data/monetizationCatalog`; QA port 4313 remained unavailable. A separate Node process on port 3000 served a Guigui.com page and returned HTTP 200 with database connected, but could not be tied to this checkout; it was left untouched and excluded from testing. |
+| `npm run qa:api:check` | Passed: 98 routes inventoried and 74 Newman requests. |
+| `npm run test:i18n` | Passed: 4 locales and 622 translation keys. |
+| `qa:full -PreflightOnly` | Did not run database provisioning, server, browser/API tests, load test, or ZAP. Campaign report: `test-results/qa/20261025-001148-451/report.json`. |
+
+The campaign preflight found `QA_ADMIN_DATABASE_URL`, the reserved `QA_DATABASE_NAME`, `QA_PORT`, and `QA_ADMIN_FIXTURE_PASSWORD` missing from the local process; `k6` and `psql` were also unavailable. Playwright 1.62.1, Newman 6.2.1, and ZAP 2.17.0 were detected, but none of their live test phases ran. The campaign report's zero test/alert counts are placeholders, not passing results. The application in this checkout cannot currently be started or validated in a browser. A separate Guigui.com process was healthy on port 3000, but its source checkout is unverified and was not used for tests.
+
 ## Build, start, host, and health contract
 
 - `npm run build` runs `vite build`, bundles `server.ts` to `dist/server.mjs`, and bundles the platform entrypoint to `dist/platform-preflight.mjs`.
