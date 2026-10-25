@@ -44,5 +44,19 @@ diagnosticadas pela respetiva resposta ou log.
 `async_jobs` suporta notificações, webhooks, exportações, backups e reconciliação.
 Cada job pode usar `idempotency_key`, tem cinco tentativas por padrão, backoff
 exponencial e estado `dead_letter` após esgotar as tentativas. O worker é
-executado com `npm run worker`; handlers de integração devem ser ativados apenas
-quando o respetivo fornecedor estiver configurado.
+executado continuamente com `npm run worker` e requer `DATABASE_URL` e uma
+ligação PostgreSQL válida em qualquer ambiente. O processo verifica e executa
+retenção operacional na inicialização e, depois, de hora a hora; enquanto não
+houver handlers registados, não reivindica jobs.
+
+O worker processa um job de cada vez, renova o lease a cada minuto e para de
+reivindicar jobs ao receber `SIGINT` ou `SIGTERM`, concluindo o job ativo antes
+de fechar a ligação. Falhas de acesso à base usam espera exponencial até 30
+segundos; se o lease for perdido, o handler recebe um `AbortSignal` e o job não
+é confirmado pelo worker antigo.
+
+A entrega é **at-least-once**: um processo pode cair depois de executar o efeito
+e antes de confirmar o job. Cada handler futuro deve usar `idempotencyKey` para
+evitar efeitos duplicados. Handlers pertencem aos contextos de negócio e só
+devem ser registados quando a integração correspondente estiver implementada e
+configurada. Sem handler, o job permanece na fila para um worker compatível.

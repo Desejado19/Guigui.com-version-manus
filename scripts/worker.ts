@@ -1,37 +1,84 @@
-import { claimJob, completeJob, failJob, JOB_TYPES } from '../server/jobQueueService';
+import {
+  checkDatabaseConnection,
+  databasePool,
+} from '../server/db';
+import {
+  claimJob,
+  completeJob,
+  failJob,
+  renewJobLease,
+} from '../server/jobQueueService';
+import {
+  assertWorkerDatabaseReady,
+  runJobWorker,
+  type JobHandlerRegistry,
+  type JobQueueOperations,
+} from '../server/modules/platform-foundation/jobs/application/runJobWorker';
+import { createPostgresOperationsMaintenanceRepository } from '../server/modules/platform-foundation/maintenance/adapters/postgresOperationsMaintenanceRepository';
+import { runOperationsMaintenance } from '../server/modules/platform-foundation/maintenance/application/runOperationsMaintenance';
+import { sanitizeDiagnostic } from '../server/modules/platform-foundation/diagnostics/sanitizeDiagnostic';
 
-const handlers: Record<string, (payload: Record<string, unknown>) => Promise<void>> = {
-  notification: async () => {},
-  webhook: async () => {},
-  export: async () => {},
-  backup: async () => {},
-  reconciliation: async () => {},
-};
+function sleep(milliseconds: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
 
-const job = await claimJob(JOB_TYPES);
-if (!job) {
-  console.log('worker: no pending jobs');
-  process.exit(0);
+    let timer: ReturnType<typeof setTimeout>;
+    const finish = () => {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', finish);
+      resolve();
+    };
+    timer = setTimeout(finish, milliseconds);
+    signal.addEventListener('abort', finish, { once: true });
+  });
 }
 
-const handler = handlers[job.type];
-if (!handler) throw new Error(`worker: unsupported job type ${job.type}`);
+const controller = new AbortController();
+const stopWorker = () => controller.abort();
+process.on('SIGINT', stopWorker);
+process.on('SIGTERM', stopWorker);
 
-try {
-  await handler(job.payload);
-  const completed = await completeJob(job.id, job.leaseToken);
-  if (!completed) {
-    console.error(`worker: lease lost before completion ${job.id}`);
-    process.exitCode = 1;
-  } else {
-    console.log(`worker: completed ${job.id}`);
+async function startWorker(): Promise<void> {
+  try {
+    const pool = databasePool;
+    if (!pool) {
+      assertWorkerDatabaseReady({ configured: false, connected: false });
+      return;
+    }
+
+    assertWorkerDatabaseReady(await checkDatabaseConnection());
+    const queue: JobQueueOperations = {
+      claimJob,
+      renewJobLease,
+      completeJob,
+      failJob,
+    };
+    const maintenanceRepository = createPostgresOperationsMaintenanceRepository(pool);
+    const handlers: JobHandlerRegistry = {};
+
+    await runJobWorker({
+      queue,
+      handlers,
+      runMaintenance: (now) => runOperationsMaintenance(maintenanceRepository, now),
+      signal: controller.signal,
+      now: () => new Date(),
+      sleep,
+      logger: console,
+    });
+  } finally {
+    process.off('SIGINT', stopWorker);
+    process.off('SIGTERM', stopWorker);
+    await databasePool?.end();
   }
-} catch (error) {
-  const result = await failJob(
-    job.id,
-    job.leaseToken,
-    error instanceof Error ? error : new Error(String(error)),
-  );
-  console.error(`worker: ${result} ${job.id}`);
-  process.exitCode = 1;
 }
+
+void startWorker().catch((error: unknown) => {
+  console.error(JSON.stringify({
+    event: 'worker_start_failed',
+    message: sanitizeDiagnostic(error),
+  }));
+  process.exitCode = 1;
+});
