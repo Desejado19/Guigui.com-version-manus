@@ -1,6 +1,6 @@
 # Especificação: operações duráveis de `platform-foundation`
 
-**Estado:** rascunho para revisão do utilizador
+**Estado:** aprovado pelo utilizador para planeamento
 **Data:** 2026-10-25
 **Contexto:** `platform-foundation` dentro do monólito Guigui.com
 **Limite:** esta especificação não autoriza implementação, execução de migrations em banco real, importação de dados ou alterações no Render.
