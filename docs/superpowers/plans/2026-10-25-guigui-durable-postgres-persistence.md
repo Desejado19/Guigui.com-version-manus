@@ -82,7 +82,7 @@ This is the coordinating implementation plan; Tasks 3–9 are ordered context ga
   Run the focused command from Step 2 and `npm run lint`.
   Expected: tests and type-check pass; local/test mode remains compatible.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
   Commit the gate, health behavior, and tests with `feat: require PostgreSQL in production`.
 
