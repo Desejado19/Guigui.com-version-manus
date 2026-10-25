@@ -92,7 +92,9 @@ describe('HTTP observability adapters', () => {
     const registry = new HttpMetricsRegistry();
     const logger = { error: vi.fn(), log: vi.fn() };
     const repository = createRepository({
-      persistRequestMetric: vi.fn().mockRejectedValue(new Error('database unavailable')),
+      persistRequestMetric: vi.fn().mockRejectedValue(
+        new Error('database unavailable password=private-secret'),
+      ),
     });
     const app = express();
     app.use(createMiddleware(registry, repository, { logger }));
@@ -112,8 +114,48 @@ describe('HTTP observability adapters', () => {
       expect(logger.error).toHaveBeenCalledWith(JSON.stringify({
         event: 'observability_persist_failed',
         requestId: 'request-456',
-        message: 'database unavailable',
+        message: 'database unavailable password=[REDACTED]',
       }));
+      expect(JSON.stringify(logger.error.mock.calls)).not.toContain('private-secret');
+    });
+  });
+
+  it('persists a route template or unmatched while preserving the in-process route', async () => {
+    const registry = new HttpMetricsRegistry();
+    const repository = createRepository();
+    const app = express();
+    app.use(createMiddleware(registry, repository));
+    app.get('/accounts/:id', (_request, response) => response.send('account'));
+    let persistedCount = 0;
+    const bothRequestsPersisted = new Promise<void>((resolve) => {
+      vi.mocked(repository.persistRequestMetric).mockImplementation(async () => {
+        persistedCount += 1;
+        if (persistedCount === 2) resolve();
+      });
+    });
+
+    await withServer(app, async (baseUrl) => {
+      const templatedResponse = await fetch(`${baseUrl}/accounts/person-123`);
+      expect(templatedResponse.status).toBe(200);
+      const unmatchedResponse = await fetch(
+        `${baseUrl}/users/person-123?email=private@example.test`,
+      );
+      expect(unmatchedResponse.status).toBe(404);
+      await bothRequestsPersisted;
+
+      expect(repository.persistRequestMetric).toHaveBeenNthCalledWith(
+        1,
+        '/accounts/:id',
+        200,
+        expect.any(Number),
+      );
+      expect(repository.persistRequestMetric).toHaveBeenNthCalledWith(
+        2,
+        'unmatched',
+        404,
+        expect.any(Number),
+      );
+      expect(registry.snapshot().routes.has('/users/person-123')).toBe(true);
     });
   });
 
