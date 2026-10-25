@@ -90,11 +90,14 @@ This is the coordinating implementation plan; Tasks 3–9 are ordered context ga
 
 **Files:**
 - Create: `server/postgresMigrationRunner.ts`
+- Create: `scripts/migrationTarget.ts`
 - Modify: `scripts/migrate-db.ts`
 - Modify: `scripts/importRunner.ts`
 - Modify: existing `scripts/import-*-postgres.ts` only through the shared importer contract
+- Modify: `README.md`, `README-EXECUCAO-DOWNLOAD.md`
 - Test: `tests/unit/postgresMigrationRunner.test.ts`
 - Test: `tests/unit/importRunner.test.ts`
+- Test: `tests/unit/migrationTarget.test.ts`
 
 **Interfaces:**
 - Produces `applyPendingMigrations(pool: Pool, migrationsDirectory: string): Promise<MigrationSummary[]>`.
@@ -106,33 +109,33 @@ This is the coordinating implementation plan; Tasks 3–9 are ordered context ga
 - `db:migrate` uses explicit `DB_MIGRATION_URL`; importers use explicit `IMPORT_DATABASE_URL`. Neither reads `.env` or falls back to `DATABASE_URL`.
 - Importers default to preview-only; writes require `--apply`, `--confirm-target <database-name>`, and a validated target. During this plan, apply-mode tests and runs are restricted to a disposable, isolated target; no production import is executed. Preview reports counts, conflicts, and rejected records without writing.
 
-- [ ] **Step 1: Add failing migration-runner tests**
+- [x] **Step 1: Add failing migration-runner tests**
 
   Cover `appliesPendingMigrationsInOrder`, `doesNotReapplyMatchingMigration`, `rejectsChangedAppliedMigration`, `rollsBackFailedMigration`, `serializesConcurrentMigrationRuns`, and `rejectsUnknownUntrackedSchema`.
 
-- [ ] **Step 2: Add failing importer-mode tests**
+- [x] **Step 2: Add failing importer-mode tests**
 
   Cover `defaultsToDryRun`, `dryRunDoesNotWrite`, `applyRequiresValidatedTarget`, `applyRequiresExactTargetConfirmation`, `refusesInheritedDatabaseUrl`, `repeatedApplyIsIdempotent`, and `preservesUnownedRows`. Use in-memory fakes or temporary fixtures.
 
-- [ ] **Step 3: Run the focused tests and verify they fail**
+- [x] **Step 3: Run the focused tests and verify they fail**
 
   Run: `npm run test:unit -- tests/unit/postgresMigrationRunner.test.ts tests/unit/importRunner.test.ts --maxWorkers=1 --no-file-parallelism`
   Expected: FAIL because the migration ledger and preview/apply contract do not exist.
 
-- [ ] **Step 4: Implement the migration ledger and transactional runner**
+- [x] **Step 4: Implement the migration ledger and transactional runner**
 
   Apply migrations in deterministic order under a PostgreSQL advisory lock. Store migration identity and SHA-256 checksum; execute each migration and its ledger entry transactionally. Require explicit `DB_MIGRATION_URL` and target confirmation; keep execution in the CLI, not the server entrypoint.
 
-- [ ] **Step 5: Implement importer preview/apply modes**
+- [x] **Step 5: Implement importer preview/apply modes**
 
   Refactor existing importers through the shared runner. Preview validates source shape and target identity without mutation. Apply is explicit, idempotent, transaction-scoped where feasible, and refuses an unverified target. Read only `IMPORT_DATABASE_URL`; do not print source records, credentials, or connection strings.
 
-- [ ] **Step 6: Run focused tests and isolated PostgreSQL migration tests**
+- [x] **Step 6: Run focused tests and isolated PostgreSQL migration tests**
 
   Run the focused unit command, then the PostgreSQL 18 integration tests with only an explicitly created disposable `TEST_DATABASE_URL`.
-  Cover fresh schema, the previous supported schema, repeated migration, and importer replay. Expected: all are safe; tests skip if the isolated target is not configured.
+  Cover fresh schema, the previous supported schema, repeated migration, and importer replay. Expected: all are safe; tests skip if the isolated target is not configured. The isolated PostgreSQL tests were skipped because `TEST_DATABASE_URL` is unset; no database was contacted or changed.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
   Commit the migration/import tooling and tests with `feat: add safe PostgreSQL migration and import runner`.
 

@@ -222,18 +222,21 @@ DATABASE_URL=postgresql://user:password@localhost:5432/guigui
 
 Em desenvolvimento, `ENABLE_DEMO_ACCOUNTS=true` (o default fora de produção) mantém as contas de demonstração ativas. Em produção defina `SESSION_COOKIE_SECRET`, `MFA_SECRET`, `TICKET_SIGNING_SECRET`, `PAYMENT_WEBHOOK_SECRET` e `SCANNER_DOOR_CODE` com valores fortes e privados, e mantenha `ENABLE_DEMO_ACCOUNTS=false`.
 
-### 3.1 Base de dados (opcional mas recomendada)
+### 3.1 Base de dados PostgreSQL
 
-O backend usa PostgreSQL quando `DATABASE_URL` existe e cai explicitamente para os JSON de `data/` quando não existe. Para usar PostgreSQL:
+Em produção, `DATABASE_URL` e uma ligação PostgreSQL funcional são obrigatórias; a aplicação não inicia sem o banco e não usa JSON como fallback de produção. Em desenvolvimento/testes, os adaptadores locais ainda podem ser usados enquanto a migração gradual dos domínios não estiver concluída. A presença de alguns serviços PostgreSQL não significa que todos os dados duráveis já tenham sido migrados.
 
-1. Crie uma base vazia (ex.: `guigui`).
-2. Aplique as migrações de `db/migrations/` (`001_initial_schema.sql`, `002_communication_schema.sql`, `002_marketing_scheduled_items.sql`).
-3. Importe os dados existentes, se necessário: `npm run db:import-users`, `db:import-tickets`, `db:import-payments`, `db:import-audit`, `db:import-moderation`, `db:import-businesses-events`, `db:import-monetization`, `db:import-catalog`.
-4. Confirme no endpoint de saúde: `GET /api/health` devolve `database.configured` e `database.connected`.
+As migrações e importações são operações explícitas, separadas do arranque normal:
+
+1. Crie/seleccione uma base PostgreSQL descartável para validação; não use dados de produção nesta campanha.
+2. Defina `DB_MIGRATION_URL` no ambiente e execute `npm run db:migrate -- --confirm-target <nome-da-base>`. O nome confirmado tem de corresponder à base realmente ligada.
+3. Para pré-visualizar um importador, defina `IMPORT_DATABASE_URL` e execute, por exemplo, `npm run db:import-users -- --dry-run`. A pré-visualização valida a origem e não escreve.
+4. Uma escrita requer `--apply --confirm-target <nome-da-base>`; os registos já existentes ou em conflito são ignorados e contabilizados, sem sobrescrever linhas. Nesta iniciativa, use apenas uma base sintética descartável.
+5. Confirme no endpoint de saúde: `GET /api/health` devolve `database.configured` e `database.connected`.
 
 **Perfis empresariais têm um adaptador próprio.** Com PostgreSQL, os registos e a ordem dos destaques usam a tabela `companies`; sem PostgreSQL, o adaptador grava em `businesses.json` dentro de `GUIGUI_DATA_DIR` (por omissão, `data/`). Esta distinção não representa uma migração global dos restantes dados. O email da conta não é público: só o campo empresarial explicitamente definido como `publicEmail` pode aparecer na ficha pública. A ordem dos destaques da página inicial é guardada separadamente do campo legado `featured` e do escalão; só empresas activas escolhidas pela Administração são apresentadas, antes das campanhas activas.
 
-> **De onde vem o `DATABASE_URL`.** `server.ts` carrega o `.env` com `dotenv/config`; como o `dotenv` não sobrepõe variáveis já definidas, um `DATABASE_URL` presente no ambiente do sistema (ex.: variável de utilizador do Windows) tem prioridade sobre o valor do `.env`. Para verificar a origem sem expor o segredo: PowerShell `[bool][Environment]::GetEnvironmentVariable('DATABASE_URL','User')` e `GET /api/health` → `database.configured` / `database.connected`.
+> **Separação de credenciais:** o runtime usa `DATABASE_URL`; migrations usam somente `DB_MIGRATION_URL`; importadores usam somente `IMPORT_DATABASE_URL`. Os comandos de migration/import não carregam `.env` e não herdam `DATABASE_URL`. Nunca imprima ou registe URLs de ligação.
 
 ### 4. Iniciar Servidor de Desenvolvimento
 ```bash

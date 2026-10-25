@@ -59,17 +59,19 @@ Copie `.env.example` para `.env` e preencha os valores adequados. Nunca utilize 
 
 ## Base de dados (PostgreSQL)
 
-O runtime usa PostgreSQL quando `DATABASE_URL` está definida e mantém um fallback explícito para os repositórios JSON de `data/` quando não está. Estado atual do sistema: domínios principais (utilizadores, sessões, empresas, eventos, bilhetes, pagamentos, auditoria, moderação, comunicações e monetização) já têm serviços PostgreSQL.
+Em produção, `DATABASE_URL` e PostgreSQL acessível são obrigatórios; o serviço falha no arranque/readiness em vez de recorrer a JSON. Em desenvolvimento/testes, podem continuar a existir adaptadores locais enquanto a migração por contexto não estiver concluída. A existência de serviços PostgreSQL para alguns domínios não significa que todos os dados duráveis já estejam migrados.
 
-Para preparar uma base local:
+Migrations e importações não executam no arranque:
 
-1. Crie a base vazia (por exemplo `guigui`).
-2. Defina `DATABASE_URL` no `.env` ou no ambiente.
-3. Aplique as migrações de `db/migrations/` (`001_initial_schema.sql`, `002_communication_schema.sql`, `002_marketing_scheduled_items.sql`) com uma ferramenta de migração controlada.
-4. Opcionalmente, importe os JSON existentes com `npm run db:import-users`, `db:import-tickets`, `db:import-payments`, `db:import-audit`, `db:import-moderation`, `db:import-businesses-events`, `db:import-monetization` e `db:import-catalog`.
+1. Use uma base PostgreSQL sintética e descartável para validar.
+2. Defina `DB_MIGRATION_URL` e execute `npm run db:migrate -- --confirm-target <nome-da-base>`.
+3. Defina `IMPORT_DATABASE_URL` e execute primeiro um preview, por exemplo `npm run db:import-users -- --dry-run`.
+4. Só uma escrita explícita, com `--apply --confirm-target <nome-da-base>`, pode importar registos; conflitos não sobrescrevem linhas existentes. Nesta iniciativa, não execute importações em produção.
 5. Confirme o estado em `GET /api/health` — a resposta indica `database.configured` e `database.connected`.
 
-> **De onde vem o `DATABASE_URL`.** `server.ts` carrega o `.env` com `dotenv/config` na primeira linha; como o `dotenv` não sobrepõe variáveis já existentes, um `DATABASE_URL` definido no ambiente do sistema (por exemplo, variável de utilizador do Windows) tem prioridade sobre o valor do `.env`. Para confirmar a origem sem expor o segredo: PowerShell `[bool][Environment]::GetEnvironmentVariable('DATABASE_URL','User')` (apenas verifica existência) e `GET /api/health` → `database.configured` / `database.connected`.
+Os comandos de migrations/import usam apenas as variáveis específicas acima; não carregam `.env` nem recorrem a `DATABASE_URL`. Nunca imprima ou registe URLs de ligação.
+
+> **Separação de credenciais:** `DATABASE_URL` serve o runtime; `DB_MIGRATION_URL` serve migrations; `IMPORT_DATABASE_URL` serve importadores.
 
 ## Validação local
 
