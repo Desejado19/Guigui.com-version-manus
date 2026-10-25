@@ -48,6 +48,7 @@ This is the coordinating implementation plan; Tasks 3–9 are ordered context ga
 
 **Files:**
 - Create: `server/modules/platform-foundation/application/requireProductionDatabase.ts`
+- Modify: `server/entrypoint.ts`
 - Modify: `server/modules/platform-foundation/config/platformRuntimeConfig.ts`
 - Modify: `server/modules/platform-foundation/hosting/runPlatformEntrypoint.ts`
 - Modify: `server/modules/platform-foundation/application/getPlatformHealth.ts`
@@ -63,20 +64,20 @@ This is the coordinating implementation plan; Tasks 3–9 are ordered context ga
 - Existing local/test behavior may start without PostgreSQL only when explicitly non-production.
 - Production startup must check connectivity before loading the application/listening; health/readiness must distinguish an absent database from a connected one.
 
-- [ ] **Step 1: Write tests for production DB missing, unreachable, and connected cases**
+- [x] **Step 1: Write tests for production DB missing, unreachable, and connected cases**
 
   Cover `failsWhenProductionDatabaseUrlIsMissing`, `failsWhenProductionDatabaseIsUnreachable`, `startsProductionOnlyAfterDatabaseCheck`, and `allowsExplicitLocalModeWithoutDatabase`. Assert no application loader/listener runs on a failed production gate.
 
-- [ ] **Step 2: Run focused tests and verify they fail**
+- [x] **Step 2: Run focused tests and verify they fail**
 
   Run: `npm run test:unit -- tests/unit/platform-foundation-entrypoint.test.ts tests/unit/platform-foundation-health.test.ts tests/unit/platform-foundation-health-handler.test.ts tests/unit/platform-foundation-config.test.ts --maxWorkers=1 --no-file-parallelism`
   Expected: new production-gate cases fail because startup currently does not enforce database readiness.
 
-- [ ] **Step 3: Implement and compose the production database gate**
+- [x] **Step 3: Implement and compose the production database gate**
 
   Use `databaseConfigured` and `checkDatabaseConnection()` from `server/db.ts`; do not log the URL or select a local adapter after a failed production check. Preserve the existing health response fields and return an unhealthy/degraded result when PostgreSQL is unavailable.
 
-- [ ] **Step 4: Run focused tests and type-check**
+- [x] **Step 4: Run focused tests and type-check**
 
   Run the focused command from Step 2 and `npm run lint`.
   Expected: tests and type-check pass; local/test mode remains compatible.

@@ -28,18 +28,25 @@ describe('runPlatformEntrypoint', () => {
     const env: NodeJS.ProcessEnv = {
       VERCEL: '1',
       VERCEL_URL: 'guigui.example',
+      DATABASE_URL: 'postgres://synthetic@127.0.0.1/guigui_test',
       GUIGUI_DATA_DIR: destination,
     };
     const application = { loaded: true };
+    const startupSteps: string[] = [];
 
     const result = await runPlatformEntrypoint(env, source, async () => {
       expect(env.NODE_ENV).toBe('production');
       expect(env.APP_URL).toBe('https://guigui.example');
       expect(fs.readFileSync(path.join(destination, 'seed.json'), 'utf8')).toBe('{"ready":true}');
+      startupSteps.push('application');
       return application;
+    }, async () => {
+      expect(env.NODE_ENV).toBe('production');
+      startupSteps.push('database');
     });
 
     expect(result).toBe(application);
+    expect(startupSteps).toEqual(['database', 'application']);
   });
 
   it('does not load the application when preparation fails', async () => {
@@ -54,5 +61,64 @@ describe('runPlatformEntrypoint', () => {
     }, path.join(root, 'source'), loadApplication)).rejects.toThrow();
 
     expect(loadApplication).not.toHaveBeenCalled();
+  });
+
+  it('failsWhenProductionDatabaseUrlIsMissing', async () => {
+    const root = createTemporaryDirectory();
+    const loadApplication = vi.fn(async () => ({ loaded: true }));
+    const checkConnection = vi.fn(async () => undefined);
+
+    await expect(runPlatformEntrypoint({
+      NODE_ENV: 'production',
+    }, root, loadApplication, checkConnection)).rejects.toThrow('DATABASE_URL');
+
+    expect(checkConnection).not.toHaveBeenCalled();
+    expect(loadApplication).not.toHaveBeenCalled();
+  });
+
+  it('failsWhenProductionDatabaseIsUnreachable', async () => {
+    const root = createTemporaryDirectory();
+    const loadApplication = vi.fn(async () => ({ loaded: true }));
+    const checkConnection = vi.fn(async () => {
+      throw new Error('database unavailable');
+    });
+
+    await expect(runPlatformEntrypoint({
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgres://synthetic@127.0.0.1/guigui_test',
+    }, root, loadApplication, checkConnection)).rejects.toThrow(
+      'Production PostgreSQL connectivity check failed',
+    );
+
+    expect(checkConnection).toHaveBeenCalledOnce();
+    expect(loadApplication).not.toHaveBeenCalled();
+  });
+
+  it('startsProductionOnlyAfterDatabaseCheck', async () => {
+    const root = createTemporaryDirectory();
+    const startupSteps: string[] = [];
+
+    await runPlatformEntrypoint({
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgres://synthetic@127.0.0.1/guigui_test',
+    }, root, async () => {
+      startupSteps.push('application');
+      return { loaded: true };
+    }, async () => {
+      startupSteps.push('database');
+    });
+
+    expect(startupSteps).toEqual(['database', 'application']);
+  });
+
+  it('allowsExplicitLocalModeWithoutDatabase', async () => {
+    const root = createTemporaryDirectory();
+    const checkConnection = vi.fn(async () => undefined);
+
+    await expect(runPlatformEntrypoint({
+      NODE_ENV: 'test',
+    }, root, async () => ({ loaded: true }), checkConnection)).resolves.toEqual({ loaded: true });
+
+    expect(checkConnection).not.toHaveBeenCalled();
   });
 });

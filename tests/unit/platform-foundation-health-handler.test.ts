@@ -70,6 +70,22 @@ describe('createHealthHandler', () => {
     expect(result.body.timestamp).toBe('2026-10-21T12:00:00.000Z');
   });
 
+  it('returns a non-ready HTTP status when PostgreSQL is configured but disconnected', async () => {
+    const result = await requestHealth(createDependencies({
+      databaseConfigured: true,
+      checkDatabaseConnection: vi.fn().mockResolvedValue({
+        configured: true,
+        connected: false,
+      }),
+    }));
+
+    expect(result.status).toBe(503);
+    expect(result.body).toMatchObject({
+      status: 'degraded',
+      database: { configured: true, connected: false },
+    });
+  });
+
   it('forwards unexpected health failures to Express error middleware', async () => {
     const result = await requestHealth(createDependencies({
       geminiActive: () => {

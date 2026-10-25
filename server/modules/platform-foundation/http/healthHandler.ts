@@ -9,7 +9,8 @@ export function createHealthHandler(
 ): RequestHandler {
   return async (_request, response, next) => {
     try {
-      response.json(await getPlatformHealth(dependencies));
+      const health = await getPlatformHealth(dependencies);
+      response.status(health.status === 'degraded' ? 503 : 200).json(health);
     } catch (error) {
       next(error);
     }
