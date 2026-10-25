@@ -21,6 +21,7 @@ O processo HTTP e o worker são processos distintos do mesmo monólito. PostgreS
 - Métricas HTTP agregadas não têm expurgo automático, mas apenas guardam templates de rota normalizados. Caminhos sem template usam uma categoria genérica; caminhos literais, IDs e query strings não são persistidos.
 - Buckets de rate limit expiram no fim da janela correspondente e são removidos por limpeza periódica.
 - `/api/health` mantém o contrato existente e não passa a depender da disponibilidade do worker.
+- Testes de integração desta fatia usam `PLATFORM_FOUNDATION_TEST_DATABASE_URL` apontando para a base PostgreSQL 18 descartável e vazia `guigui_pg18_platform_foundation_test`. Não partilham `TEST_DATABASE_URL`, que a suíte PostgreSQL legada usa para criar tabelas não rastreadas em `public`.
 - Não executar mudanças em Render nem aceder a bases de dados reais nesta fatia.
 - O processo worker sempre exige PostgreSQL: sem banco, uma fila em memória do processo HTTP não seria partilhada e o worker poderia aparentar estar saudável sem consumir os mesmos jobs.
 
@@ -119,7 +120,7 @@ O middleware de observabilidade usa atualmente `request.route?.path || request.p
 2. Testes de retenção para jobs terminais, eventos de produto e buckets expirados; provar que jobs pendentes/em execução e métricas HTTP não são removidos.
 3. Testes de normalização: rota com template persiste o template; rota sem template não persiste caminho literal nem query string.
 4. Testes de falha: ausência/queda de PostgreSQL não seleciona memória em produção e não confirma operação; erros persistidos/logados não expõem payload, credenciais ou URLs.
-5. Integração PostgreSQL 18 com `TEST_DATABASE_URL` explicitamente descartável; validar persistência após desconexão/reconexão e reinício do worker.
+5. Integração PostgreSQL 18 com `PLATFORM_FOUNDATION_TEST_DATABASE_URL` apontando para a base descartável e vazia `guigui_pg18_platform_foundation_test`; validar persistência após desconexão/reconexão e reinício do worker.
 6. `npm run lint`, testes unitários e `npm run build`.
 7. Sem execução contra banco externo, sem migrations automáticas, sem deploy e sem alterações no Render.
 
