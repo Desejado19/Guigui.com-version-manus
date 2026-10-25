@@ -22,6 +22,7 @@ O processo HTTP e o worker são processos distintos do mesmo monólito. PostgreS
 - Buckets de rate limit expiram no fim da janela correspondente e são removidos por limpeza periódica.
 - `/api/health` mantém o contrato existente e não passa a depender da disponibilidade do worker.
 - Não executar mudanças em Render nem aceder a bases de dados reais nesta fatia.
+- O processo worker sempre exige PostgreSQL: sem banco, uma fila em memória do processo HTTP não seria partilhada e o worker poderia aparentar estar saudável sem consumir os mesmos jobs.
 
 ## Contexto observado
 
@@ -54,6 +55,7 @@ O middleware de observabilidade usa atualmente `request.route?.path || request.p
 - O worker verifica PostgreSQL antes de iniciar. Sem banco em produção, termina com erro explícito; não consome a fila em memória.
 - Um worker ocioso aguarda 1 segundo antes de procurar novamente.
 - O claim cria um lease de 5 minutos; o worker renova o lease a cada minuto durante a execução.
+- Cada claim emite um token de lease novo. Heartbeat, conclusão e falha só alteram o job quando `id` e token ainda correspondem; um worker atrasado não pode concluir um job que já foi reivindicado por outra instância.
 - Jobs com lease expirado ficam elegíveis para novo claim. O limite existente de cinco tentativas continua válido, incluindo reclaim após crash.
 - Em `SIGTERM`/`SIGINT`, o worker para de reivindicar jobs, termina o job ativo e então fecha o pool; uma terminação forçada deixa o lease expirar para permitir retry.
 - Falhas de ligação no loop usam espera exponencial limitada a 30 segundos; nenhuma tentativa confirma o job.
@@ -79,6 +81,7 @@ O middleware de observabilidade usa atualmente `request.route?.path || request.p
 - Cada bucket guarda o instante de expiração associado à sua janela atual. Uma janela expirada reinicia a contagem e a expiração.
 - A limpeza horária remove buckets expirados, no máximo uma hora após o fim da janela. A limpeza não é executada por cada requisição.
 - O serviço não regista a chave do bucket nem inclui valores de chave em mensagens de erro.
+- As linhas atuais não guardam a duração da janela; a migration marca esses buckets legados como expirados em vez de inventar uma duração, e a próxima chamada inicia uma janela nova.
 
 ## Telemetria e observabilidade
 
@@ -87,7 +90,9 @@ O middleware de observabilidade usa atualmente `request.route?.path || request.p
 - A lista allowlist atual de eventos continua explícita; eventos desconhecidos não são persistidos.
 - `user_id` pode identificar uma conta autenticada e `session_id` é apenas um identificador analítico não secreto — nunca um token de autenticação.
 - O `context` aceita somente dimensões não sensíveis definidas por evento; contactos, credenciais, dados de pagamento e payloads livres não são persistidos.
+- Como não existem consumidores nem schemas de contexto aprovados hoje, os novos eventos começam com `context = {}`; cada contexto consumidor terá de publicar e testar as próprias dimensões antes de as acrescentar.
 - Eventos são removidos na limpeza horária após 365 dias, com base em `occurred_at`.
+- Na primeira migration, contextos históricos sem schema aprovado são reduzidos a `{}`, preservando evento, origem, data e relações existentes.
 - A falha de persistência é visível em log sanitizado. O caminho de analytics não transforma falha de PostgreSQL em confirmação de persistência.
 
 ### Métricas HTTP
@@ -96,6 +101,7 @@ O middleware de observabilidade usa atualmente `request.route?.path || request.p
 - Só um template estável de rota Express é persistido. Sem template, usar `unmatched`; nunca persistir `request.path` literal.
 - A normalização é aplicada na fronteira de persistência; o registry em processo conserva o comportamento atual nesta fatia.
 - Os agregados não são expurgados automaticamente, conforme aprovado. A normalização impede IDs e valores variáveis de se tornarem dimensões permanentes.
+- Como não é possível distinguir com segurança templates de caminhos literais nas linhas históricas, a migration agrega as métricas atuais por data em `unmatched`, preservando contagens, erros e duração acumulada antes de manter a retenção indefinida.
 - Falha de gravação da telemetria HTTP é registada de forma sanitizada e não altera a resposta já enviada ao cliente; o health/readiness continua a refletir a disponibilidade real do PostgreSQL.
 
 ## Health, readiness e falhas
