@@ -152,7 +152,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
   };
 
   return (
-    <article ref={articleRef} className={`bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden text-slate-800 space-y-3 transition hover:border-slate-300 ${isHighlighted ? 'ring-4 ring-emerald-400 ring-offset-4 ring-offset-slate-50' : ''}`}>
+    <article ref={articleRef} className={`bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-slate-200 rounded-3xl shadow-sm overflow-hidden text-slate-800 space-y-3 transition hover:border-slate-300 ${isHighlighted ? 'ring-4 ring-emerald-400 ring-offset-4 ring-offset-slate-50' : ''}`}>
       {/* Post Author Header */}
       <div className="p-4 sm:p-5 pb-0 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -181,20 +181,20 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
               {(post.isPlanSubscriberPost || post.planBadge || business?.tier) && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-2xs">
                   <Crown className="w-3 h-3 text-amber-100" />
-                  <span>{post.planBadge || `Plano ${business?.tier?.toUpperCase() || 'VIP'}`}</span>
+                  <span>{post.planBadge || business?.tier?.toUpperCase() || 'VIP'}</span>
                 </span>
               )}
             </div>
 
             <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5 mt-0.5">
-              <span>📍 {post.neighborhood || business?.neighborhood || 'Bissau'}</span>
+              <span>📍 {post.neighborhood || business?.neighborhood || t("business.Todos")}</span>
               <span>•</span>
               <span>{post.mediaType === 'video' ? `🎬 ${t('business.VideoComercial')}` : post.mediaType === 'gallery' ? `📸 ${t('business.Galeria')}` : t('business.Publicacao')}</span>
             </div>
           </div>
         </div>
 
-        <button type="button" aria-label="Mais opções da publicação" className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100">
+        <button type="button" aria-label="Mais opções da publicação" className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-[var(--color-bg-surface)] dark:hover:bg-[var(--color-bg-surface-dark)]">
           <MoreHorizontal className="w-5 h-5" />
         </button>
       </div>
@@ -247,7 +247,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
       {post.mediaGallery && post.mediaGallery.length > 0 && !post.videoUrl && (
         <div className="px-3 sm:px-4 space-y-2">
           {/* Main Selected Image */}
-          <div className="w-full bg-slate-100 rounded-2xl overflow-hidden max-h-[400px] border border-slate-200">
+          <div className="w-full bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] rounded-2xl overflow-hidden max-h-[400px] border border-slate-200">
             <img
               src={post.mediaGallery[activeMediaGalleryIndex] || post.imageUrl}
               alt=""
@@ -282,7 +282,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
 
       {/* Single Post Image Banner (if not gallery and not video) */}
       {post.imageUrl && !post.videoUrl && (!post.mediaGallery || post.mediaGallery.length <= 1) && (
-        <div className="w-full bg-slate-100 overflow-hidden max-h-[420px] relative cursor-pointer" onClick={() => business && onSelectBusiness?.(business)}>
+        <div className="w-full bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] overflow-hidden max-h-[420px] relative cursor-pointer" onClick={() => business && onSelectBusiness?.(business)}>
           <img
             src={post.imageUrl}
             alt=""
@@ -314,7 +314,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
       <div className="px-2 sm:px-4 relative flex items-center justify-between text-xs font-bold text-slate-600 border-b border-slate-100 pb-1">
         {/* Reaction Hover Picker Box */}
         {showReactionPicker && (
-          <div className="absolute -top-12 left-2 z-30 bg-white border border-slate-200 rounded-full px-3 py-1.5 shadow-2xl flex items-center gap-2 animate-in zoom-in-95 duration-150">
+          <div className="absolute -top-12 left-2 z-30 bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-slate-200 rounded-full px-3 py-1.5 shadow-2xl flex items-center gap-2 animate-in zoom-in-95 duration-150">
             {reactionsList.map((r) => (
               <button
                 type="button"
@@ -406,7 +406,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
                   ? `Comentar como ${currentUser.name}...`
                   : 'Escreva um comentário (requer início de sessão)...'
               }
-              className="flex-1 bg-white border border-slate-200 rounded-full px-4 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-600"
+              className="flex-1 bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-slate-200 rounded-full px-4 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-600"
             />
             <button
               type="submit"
@@ -426,7 +426,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
                   className="w-7 h-7 rounded-full object-cover border border-slate-200 flex-shrink-0"
                 />
 
-                <div className="bg-white border border-slate-200 p-2.5 rounded-2xl flex-1 shadow-2xs">
+                <div className="bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-slate-200 p-2.5 rounded-2xl flex-1 shadow-2xs">
                   <div className="font-extrabold text-slate-900 text-xs">{c.authorName}</div>
                   <p className="text-slate-700 mt-0.5 text-xs">{c.content}</p>
                   <div className="flex items-center gap-3 text-[10px] text-slate-400 font-bold mt-1">
