@@ -152,7 +152,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
   };
 
   return (
-    <article ref={articleRef} className={`bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-slate-200 rounded-3xl shadow-sm overflow-hidden text-slate-800 space-y-3 transition hover:border-slate-300 ${isHighlighted ? 'ring-4 ring-emerald-400 ring-offset-4 ring-offset-slate-50' : ''}`}>
+    <article ref={articleRef} className={`bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-slate-200 rounded-3xl shadow-sm overflow-hidden text-slate-800 dark:text-slate-300 space-y-3 transition hover:border-slate-300 ${isHighlighted ? 'ring-4 ring-emerald-400 ring-offset-4 ring-offset-slate-50' : ''}`}>
       {/* Post Author Header */}
       <div className="p-4 sm:p-5 pb-0 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -171,7 +171,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
             <div className="flex items-center gap-1.5 flex-wrap">
               <span
                 onClick={() => business && onSelectBusiness?.(business)}
-                className="font-extrabold text-xs sm:text-sm text-slate-900 hover:underline cursor-pointer"
+                className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-white hover:underline cursor-pointer"
               >
                 {post.businessName}
               </span>
@@ -200,8 +200,8 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
       </div>
 
       {/* Post Text Content */}
-      <div className="px-4 sm:px-5 space-y-1.5 text-xs sm:text-sm text-slate-800 leading-relaxed">
-        <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">{translatedTitle}</h3>
+      <div className="px-4 sm:px-5 space-y-1.5 text-xs sm:text-sm text-slate-800 dark:text-slate-300 leading-relaxed">
+        <h3 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-base">{translatedTitle}</h3>
         <p className="whitespace-pre-line text-slate-700">{translatedContent}</p>
         <div className="text-[11px] text-emerald-700 font-bold pt-1 flex items-center gap-2 flex-wrap">
           <span>#Guigui</span>
@@ -406,7 +406,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
                   ? `Comentar como ${currentUser.name}...`
                   : 'Escreva um comentário (requer início de sessão)...'
               }
-              className="flex-1 bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-slate-200 rounded-full px-4 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-600"
+              className="flex-1 bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-slate-200 rounded-full px-4 py-2 text-xs text-slate-900 dark:text-slate-300 focus:outline-none focus:border-blue-600"
             />
             <button
               type="submit"
@@ -427,7 +427,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
                 />
 
                 <div className="bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-slate-200 p-2.5 rounded-2xl flex-1 shadow-2xs">
-                  <div className="font-extrabold text-slate-900 text-xs">{c.authorName}</div>
+                  <div className="font-extrabold text-slate-900 dark:text-slate-300 text-xs">{c.authorName}</div>
                   <p className="text-slate-700 mt-0.5 text-xs">{c.content}</p>
                   <div className="flex items-center gap-3 text-[10px] text-slate-400 font-bold mt-1">
                     <button type="button" className="hover:underline text-[#1877F2]">Gostar</button>

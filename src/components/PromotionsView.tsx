@@ -4,6 +4,9 @@ import { Promotion, Language, UserProfile, PurchaseOrder } from '../types';
 import { getTranslation } from '../utils/i18n';
 import { QRCodeDisplay } from './QRCodeDisplay';
 import { translatePublishedText } from '../utils/contentTranslation';
+import { LocationFilter } from './ui';
+import { useLocationCatalog } from '../hooks/useLocationCatalog';
+import { locationMatches } from '../../shared/bissauLocations';
 
 interface PromotionsViewProps {
   promotions: Promotion[];
@@ -28,6 +31,7 @@ export const PromotionsView: React.FC<PromotionsViewProps> = ({
 
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [selectedNeighborhood, setSelectedNeighborhood] = useState<string | null>(null);
+  const { locations: bissauLocations } = useLocationCatalog();
   const [activeClaimPromo, setActiveClaimPromo] = useState<Promotion | null>(null);
   const [generatedOrder, setGeneratedOrder] = useState<PurchaseOrder | null>(null);
 
@@ -97,7 +101,7 @@ export const PromotionsView: React.FC<PromotionsViewProps> = ({
 
   const filteredPromos = promotions.filter((p) => {
     if (!p.isActive || Date.parse(p.validUntil) <= now.getTime()) return false;
-    if (selectedNeighborhood && p.neighborhood !== selectedNeighborhood) return false;
+    if (!locationMatches(p.neighborhood, selectedNeighborhood)) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const matchTitle = p.title.toLowerCase().includes(q);
@@ -128,6 +132,17 @@ export const PromotionsView: React.FC<PromotionsViewProps> = ({
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#5B6B67] flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-[#C9852A]" />Localização</span>
+        <LocationFilter
+          locations={bissauLocations}
+          selectedLocation={selectedNeighborhood}
+          onSelect={setSelectedNeighborhood}
+          triggerLabel="Todos"
+          allLabel="Ver todos"
+        />
+      </div>
+
       {/* Promotions List Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredPromos.map((promo) => {
@@ -137,6 +152,7 @@ export const PromotionsView: React.FC<PromotionsViewProps> = ({
             <div
               key={promo.id}
               className="guigui-promo-card bg-white p-5 flex flex-col justify-between"
+              onClick={() => onPromotionMessage?.(promo)}
             >
               <div>
                 {/* Header Badge & Business Name */}
@@ -160,7 +176,7 @@ export const PromotionsView: React.FC<PromotionsViewProps> = ({
                   {promo.businessName}
                 </div>
 
-                <h3 className="text-base font-extrabold text-slate-900 mt-1 leading-snug">
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white mt-1 leading-snug">
                   {translatePublishedText(promo.title, currentLang, 'title')}
                 </h3>
 
@@ -180,19 +196,19 @@ export const PromotionsView: React.FC<PromotionsViewProps> = ({
                   ) : (
                     <div className="grid grid-cols-4 gap-1.5 text-center font-mono text-xs">
                       <div className="bg-white p-1.5 rounded-lg border border-slate-200">
-                        <div className="font-extrabold text-slate-900 text-sm">{timer.days}</div>
+                        <div className="font-extrabold text-slate-900 dark:text-slate-300 text-sm">{timer.days}</div>
                         <div className="text-[9px] text-slate-500 font-sans">DIAS</div>
                       </div>
                       <div className="bg-white p-1.5 rounded-lg border border-slate-200">
-                        <div className="font-extrabold text-slate-900 text-sm">{timer.hours}</div>
+                        <div className="font-extrabold text-slate-900 dark:text-slate-300 text-sm">{timer.hours}</div>
                         <div className="text-[9px] text-slate-500 font-sans">HRS</div>
                       </div>
                       <div className="bg-white p-1.5 rounded-lg border border-slate-200">
-                        <div className="font-extrabold text-slate-900 text-sm">{timer.minutes}</div>
+                        <div className="font-extrabold text-slate-900 dark:text-slate-300 text-sm">{timer.minutes}</div>
                         <div className="text-[9px] text-slate-500 font-sans">MIN</div>
                       </div>
                       <div className="bg-white p-1.5 rounded-lg border border-slate-200">
-                        <div className="font-extrabold text-slate-900 text-sm">{timer.seconds}</div>
+                        <div className="font-extrabold text-slate-900 dark:text-slate-300 text-sm">{timer.seconds}</div>
                         <div className="text-[9px] text-slate-500 font-sans">SEG</div>
                       </div>
                     </div>
@@ -205,7 +221,7 @@ export const PromotionsView: React.FC<PromotionsViewProps> = ({
                 {promo.code && (
                   <button type="button"
                     onClick={() => copyToClipboard(promo.code!)}
-                    className="flex-1 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 px-3 py-2.5 rounded-xl text-xs font-mono font-bold flex items-center justify-between transition min-h-[40px]"
+                    className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 border border-slate-200 text-slate-800 dark:text-slate-300 px-3 py-2.5 rounded-xl text-xs font-mono font-bold flex items-center justify-between transition min-h-[40px]"
                   >
                     <span>{promo.code}</span>
                     {copiedCode === promo.code ? (
@@ -248,7 +264,7 @@ export const PromotionsView: React.FC<PromotionsViewProps> = ({
       {/* QR Code Voucher Modal */}
       {activeClaimPromo && generatedOrder && (
         <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 text-slate-900 relative shadow-2xl space-y-4 my-auto">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 text-slate-900 dark:text-slate-300 relative shadow-2xl space-y-4 my-auto">
             <button type="button"
               onClick={() => {
                 setActiveClaimPromo(null);
