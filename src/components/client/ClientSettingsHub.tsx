@@ -144,7 +144,7 @@ export const ClientSettingsHub: React.FC<ClientSettingsHubProps> = ({
   };
 
   const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!email.trim()) {
       setAccountFormErrors((prev) => ({ ...prev, email: 'E-mail é obrigatório.' }));
       return false;
@@ -473,4 +473,4 @@ export const ClientSettingsHub: React.FC<ClientSettingsHubProps> = ({
       )}
     </div>
   );
-};
+};
