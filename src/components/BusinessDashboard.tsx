@@ -54,6 +54,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  LogOut,
   CheckCheck,
   FileDown,
   Crown,
@@ -92,6 +93,7 @@ import { QRCodeDisplay } from './QRCodeDisplay';
 import { ClientBusinessProfile } from './client/ClientBusinessProfile';
 import { ClientEventsManagement } from './client/ClientEventsManagement';
 import { SoldTicketsPanel } from './SoldTicketsPanel';
+import { AdminPagination } from './admin/AdminPagination';
 import { ClientNotificationsHub } from './client/ClientNotificationsHub';
 import { ClientSettingsHub } from './client/ClientSettingsHub';
 import { ClientExportHub } from './client/ClientExportHub';
@@ -127,6 +129,7 @@ import {
   MarketingAudienceSegment,
   MarketingLibraryAsset,
 } from '../types';
+import { StoriesManagementHub } from './StoriesManagementHub';
 import { getLanguageShortLabel, getNextLanguage, getTranslation } from '../utils/i18n';
 import { QUALITATIVE_SCORE_LABELS, calculateBusinessRating, getQualitativeScoreLabel } from '../utils/reviews';
 import { usePersistentState } from '../utils/persistentState';
@@ -135,7 +138,8 @@ import { DEFAULT_MONETIZATION_CATALOG, getCommercialProduct, getPriceRule, norma
 import { addSubscriptionPeriod, getSubscriptionAccessState, getSubscriptionRemainingMs, getSubscriptionTierLabel, shouldBlockBusinessMutation } from '../utils/subscriptions';
 import { BUSINESS_ROLE_PERMISSIONS, BUSINESS_TAB_PERMISSIONS, hasBusinessPermission } from '../utils/businessPermissions';
 import { usePageEntryScroll } from '../utils/navigationBehavior';
-import { Badge, Button, Card, EmptyState, IconButton, Panel, PanelHeader } from './ui';
+import { usePaginatedList } from '../hooks/usePaginatedList';
+import { Badge, Button, Card, EmptyState, IconButton, Panel, PanelHeader, StatCard } from './ui';
 import { ChartFrame } from './charts/ChartFrame';
 import { ChartTooltip } from './charts/ChartTooltip';
 import { chartColors } from './charts/chartTheme';
@@ -159,6 +163,7 @@ const readLocalMediaFile = (file: File): Promise<string> => new Promise((resolve
 
 export type BusinessDashboardTab =
   | 'overview'
+  | 'stories'
   | 'my_business'
   | 'posts'
   | 'promotions'
@@ -180,6 +185,68 @@ export type BusinessDashboardTab =
   | 'redemptions'
   | 'marketing_campaigns'
   | 'marketing_calendar';
+
+const MARKETING_TABS = [
+  { id: 'overview', label: 'Visão geral', icon: LayoutDashboard },
+  { id: 'campaigns', label: 'Campanhas', icon: Megaphone },
+  { id: 'content', label: 'Conteúdos', icon: FileText },
+  { id: 'audience', label: 'Público', icon: Users },
+  { id: 'calendar', label: 'Calendário', icon: Calendar },
+  { id: 'library', label: 'Biblioteca', icon: Layers },
+  { id: 'budget', label: 'Orçamento', icon: DollarSign },
+  { id: 'reports', label: 'Relatórios', icon: BarChart3 },
+] as const;
+
+const MARKETING_CHANNEL_LABELS: Record<MarketingCampaign['channels'][number], string> = {
+  guigui: 'Guigui',
+  social: 'Redes sociais',
+  sms: 'SMS',
+  email: 'Email',
+  banner: 'Banner',
+};
+
+const MARKETING_OBJECTIVE_LABELS: Record<MarketingCampaign['objective'], string> = {
+  awareness: 'Notoriedade',
+  engagement: 'Envolvimento',
+  traffic: 'Tráfego',
+  conversions: 'Conversões',
+  sales: 'Vendas',
+};
+
+const MARKETING_STATUS_LABELS: Record<MarketingCampaign['status'], string> = {
+  draft: 'Rascunho',
+  scheduled: 'Agendada',
+  active: 'Ativa',
+  paused: 'Pausada',
+  ended: 'Encerrada',
+  archived: 'Arquivada',
+};
+
+const MARKETING_STATUS_VARIANTS = {
+  draft: 'neutral',
+  scheduled: 'info',
+  active: 'success',
+  paused: 'warning',
+  ended: 'neutral',
+  archived: 'neutral',
+} as const;
+
+const MARKETING_CAMPAIGN_FILTERS = [
+  { id: 'all', label: 'Todas' },
+  { id: 'draft', label: 'Rascunhos' },
+  { id: 'scheduled', label: 'Agendadas' },
+  { id: 'active', label: 'Ativas' },
+  { id: 'paused', label: 'Pausadas' },
+  { id: 'ended', label: 'Encerradas' },
+] as const;
+
+const MARKETING_ASSET_LABELS: Record<MarketingLibraryAsset['type'], string> = {
+  image: 'Imagens',
+  video: 'Vídeos',
+  banner: 'Banners',
+  logo: 'Logótipos',
+  document: 'Documentos',
+};
 
 interface BusinessDashboardProps {
   business: Business;
@@ -223,6 +290,7 @@ interface BusinessDashboardProps {
   focusConversationId?: string | null;
   focusSupportId?: string | null;
   onActiveTabChange?: (tab: BusinessDashboardTab) => void;
+  onLogout?: () => void;
   sidebarCollapsed?: boolean;
   onSidebarCollapsedChange?: (collapsed: boolean) => void;
 }
@@ -269,6 +337,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
   focusConversationId,
   focusSupportId,
   onActiveTabChange,
+  onLogout,
   sidebarCollapsed: controlledSidebarCollapsed,
   onSidebarCollapsedChange,
 }) => {
@@ -287,6 +356,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
   };
 
   const [activeTab, setActiveTab] = useState<BusinessDashboardTab>('overview');
+  const [billingSection, setBillingSection] = useState<'plans' | 'services' | 'history'>('plans');
   const [selectedBusinessPost, setSelectedBusinessPost] = useState<BusinessPost | null>(null);
   const [marketingSection, setMarketingSection] = useState<
     'overview' | 'campaigns' | 'content' | 'audience' | 'calendar' | 'library' | 'budget' | 'reports'
@@ -301,6 +371,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
   const [campaignContentIds, setCampaignContentIds] = useState<string[]>([]);
   const [campaignStartsAt, setCampaignStartsAt] = useState('');
   const [campaignEndsAt, setCampaignEndsAt] = useState('');
+  const [campaignFilter, setCampaignFilter] = useState<'all' | MarketingCampaign['status']>('all');
   const [contentFilter, setContentFilter] = useState<'all' | 'posts' | 'promotions' | 'scheduled'>('all');
   const [assetFilter, setAssetFilter] = useState<'all' | MarketingLibraryAsset['type']>('all');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -350,7 +421,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
   }, [activeTab, teamMembers, currentUser.id, business.id]);
 
   React.useEffect(() => {
-    if (activeTab === 'marketing' || activeTab === 'marketing_campaigns') setMarketingSection('campaigns');
+    if (activeTab === 'marketing_campaigns') setMarketingSection('campaigns');
     if (activeTab === 'marketing_calendar') setMarketingSection('calendar');
   }, [activeTab]);
 
@@ -371,6 +442,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
       items: [
         { label: t('businessNavOverview'), tab: 'overview', icon: LayoutDashboard, help: t('businessNavOverviewHelp') },
         { label: t('businessNavMyBusiness'), tab: 'my_business', icon: Building2, help: t('businessNavMyBusinessHelp') },
+        { label: 'Stories', tab: 'stories', icon: ImageIcon, help: 'Publicar, arquivar e gerir stories' },
       ],
     },
     {
@@ -406,6 +478,13 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
     || BUSINESS_NAVIGATION[0].items[0].label;
   const isMarketingTab = activeTab === 'marketing' || activeTab === 'marketing_campaigns' || activeTab === 'posts' || activeTab === 'promotions' || activeTab === 'marketing_calendar';
   const businessEvents = events.filter((event) => event.businessId === business.id);
+  const marketingContentItems = [
+    ...business.posts.map((post) => ({ id: post.id, title: post.title, kind: 'post' as const, typeLabel: t('business.Publicacao'), status: String(post.status) })),
+    ...business.promotions.map((promotion) => ({ id: promotion.id, title: promotion.title, kind: 'promotion' as const, typeLabel: t('business.Promocao'), status: String(promotion.status || (promotion.isActive ? 'active' : 'draft')) })),
+  ].filter((item) => contentFilter === 'all'
+    || (contentFilter === 'posts' && item.kind === 'post')
+    || (contentFilter === 'promotions' && item.kind === 'promotion')
+    || (contentFilter === 'scheduled' && ['scheduled', 'publishing'].includes(item.status)));
   const overviewEngagementData = [
     { name: t('business.Visualizacoes'), value: business.metrics.views, fill: '#2563eb' },
     { name: 'WhatsApp', value: business.metrics.whatsappClicks, fill: '#059669' },
@@ -535,6 +614,25 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
     return new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime();
   });
 
+  const orderPagination = usePaginatedList(filteredOrderHistory, {
+    initialPageSize: 20,
+    pageSizeOptions: [20],
+    persist: false,
+    resetKey: [
+      activeTab,
+      orderDateFilter,
+      orderDateFrom,
+      orderDateTo,
+      orderItemTypeFilter,
+      orderStatusFilter,
+      orderPaymentMethodFilter,
+      orderMinAmount,
+      orderMaxAmount,
+      orderSearchQuery,
+      orderSortBy,
+    ].join('|'),
+  });
+
   // KPI calculations for Order History
   const totalOrdersAmount = filteredOrderHistory.reduce(
     (acc, o) => acc + (o.status !== 'cancelled' ? o.totalPriceXOF : 0),
@@ -572,7 +670,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
     setOrderDateFilter('all');
     setOrderDateFrom('');
     setOrderDateTo('');
-    setOrderItemTypeFilter('all');
+    setOrderItemTypeFilter(activeTab === 'tickets' ? 'ticket' : 'all');
     setOrderStatusFilter('all');
     setOrderPaymentMethodFilter('all');
     setOrderMinAmount('');
@@ -798,8 +896,31 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
     includedPostsPerMonth: 3,
     automaticSubscriptionSuspensionEnabled: true,
   });
-  const [monetizationCatalog] = usePersistentState<MonetizationCatalog>('guigui_monetization_catalog', DEFAULT_MONETIZATION_CATALOG);
+  const [monetizationCatalog, setMonetizationCatalog] = usePersistentState<MonetizationCatalog>('guigui_monetization_catalog', DEFAULT_MONETIZATION_CATALOG);
   const resolvedMonetizationCatalog = normaliseMonetizationCatalog(monetizationCatalog, pricingConfig);
+
+  useEffect(() => {
+    let active = true;
+    const query = business.id ? `?companyId=${encodeURIComponent(business.id)}` : '';
+    fetch(`/api/commercial/public-catalog${query}`)
+      .then((response) => response.ok ? response.json() : null)
+      .then((catalog) => {
+        if (!active || !catalog) return;
+        if (Array.isArray(catalog.plans) && catalog.plans.length > 0) setSubscriptionPlans(catalog.plans as SubscriptionPlan[]);
+        if (Array.isArray(catalog.products)) setMonetizationCatalog((previous) => ({ ...previous, products: catalog.products, ...(catalog.ticketFeePolicy ? { ticketFeePolicy: catalog.ticketFeePolicy } : {}) }));
+        setPricingConfig((previous) => ({
+          ...previous,
+          ...(catalog.ticketFeePolicy ? {
+            ticketCommissionPercent: Number(catalog.ticketFeePolicy.commissionPercentage),
+            ticketFixedFeeXOF: Number(catalog.ticketFeePolicy.fixedFee),
+          } : {}),
+          ...(typeof catalog.annualDiscountPercent === 'number' ? { annualDiscountPercent: catalog.annualDiscountPercent } : {}),
+          ...(typeof catalog.monthlyPostRule === 'number' ? { includedPostsPerMonth: catalog.monthlyPostRule } : {}),
+        }));
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [business.id, setMonetizationCatalog, setSubscriptionPlans, setPricingConfig]);
   const postExtraProduct = getCommercialProduct(resolvedMonetizationCatalog, 'POST_EXTRA');
   const promotionExtraProduct = getCommercialProduct(resolvedMonetizationCatalog, 'PROMOTION_EXTRA');
   const postExtraPrice = resolveProductPrice(resolvedMonetizationCatalog, 'POST_EXTRA', extraPostQuantity);
@@ -1545,7 +1666,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
       urls.forEach((url, index) => assets.push({
         id: `asset-${post.id}-${index}`,
         businessId: business.id,
-        name: post.title || `Conte�do ${post.id}`,
+        name: post.title || `Conteúdo ${post.id}`,
         type: post.videoUrl === url ? 'video' : post.mediaType === 'gallery' ? 'banner' : 'image',
         url,
         sourceId: post.id,
@@ -1553,7 +1674,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
         createdAt: post.createdAt,
       }));
     });
-    if (business.logo) assets.push({ id: `asset-logo-${business.id}`, businessId: business.id, name: 'Log�tipo da empresa', type: 'logo', url: business.logo, usedBy: [business.id], createdAt: new Date().toISOString() });
+    if (business.logo) assets.push({ id: `asset-logo-${business.id}`, businessId: business.id, name: 'Logótipo da empresa', type: 'logo', url: business.logo, usedBy: [business.id], createdAt: new Date().toISOString() });
     return assets;
   }, [business, marketingCampaigns]);
 
@@ -1562,15 +1683,15 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
     const startsAt = campaignStartsAt ? new Date(campaignStartsAt) : undefined;
     const endsAt = campaignEndsAt ? new Date(campaignEndsAt) : undefined;
     if (startsAt && Number.isNaN(startsAt.getTime())) {
-      alert('Escolha uma data de in�cio v�lida.');
+      alert('Escolha uma data de início válida.');
       return;
     }
     if (endsAt && Number.isNaN(endsAt.getTime())) {
-      alert('Escolha uma data de fim v�lida.');
+      alert('Escolha uma data de fim válida.');
       return;
     }
     if (startsAt && endsAt && endsAt <= startsAt) {
-      alert('A data de fim deve ser posterior � data de in�cio.');
+      alert('A data de fim deve ser posterior à data de início.');
       return;
     }
     const now = new Date().toISOString();
@@ -1598,9 +1719,9 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
         body: JSON.stringify(campaign),
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || 'N�o foi poss�vel guardar a campanha.');
+      if (!response.ok) throw new Error(result.error || 'Não foi possível guardar a campanha.');
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'N�o foi poss�vel guardar a campanha.');
+      alert(error instanceof Error ? error.message : 'Não foi possível guardar a campanha.');
       return;
     }
     setMarketingCampaigns((previous) => [campaign, ...previous]);
@@ -1624,10 +1745,10 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
         body: JSON.stringify({ status, updatedAt }),
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || 'N�o foi poss�vel atualizar a campanha.');
+      if (!response.ok) throw new Error(result.error || 'Não foi possível atualizar a campanha.');
       setMarketingCampaigns((previous) => previous.map((item) => item.id === campaign.id ? { ...item, status, updatedAt } : item));
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'N�o foi poss�vel atualizar a campanha.');
+      alert(error instanceof Error ? error.message : 'Não foi possível atualizar a campanha.');
     }
   };
 
@@ -1639,66 +1760,95 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
       businessId: business.id,
       name: 'Bissau · clientes interessados',
       location: business.neighborhood,
-      interests: ['conte�do da empresa'],
+      interests: ['conteúdo da empresa'],
       estimatedReach: audienceReach > 0 ? audienceReach : undefined,
       createdAt: now,
     }, ...previous]);
   };
 
   return (
-    <div className="guigui-profile-dashboard guigui-light-dashboard w-full min-h-[calc(100vh-72px)] bg-[var(--color-bg-surface)]">
+    <div className="guigui-profile-dashboard guigui-light-dashboard w-full min-h-[calc(100vh-72px)] bg-[var(--color-bg-surface)] overflow-x: visible">
       <div className="flex min-h-[calc(100vh-72px)] w-full bg-[var(--color-bg-surface)]">
         <div className={`${mobileSidebarOpen ? 'block' : 'hidden'} fixed inset-0 z-40 bg-[var(--color-bg-surface-dark)]/35 backdrop-blur-[1px] md:hidden`} onClick={() => setMobileSidebarOpen(false)} />
 
         <aside
           style={{ width: sidebarCollapsed ? 72 : 248 }}
-          className={`${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed left-0 top-[120px] z-[110] h-[calc(100vh-120px)] max-w-[calc(100vw-16px)] shrink-0 border-r border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] shadow-[inset_-1px_0_0_rgba(15,23,42,0.04)] transition-[transform,box-shadow,width] duration-300 ease-out md:top-[120px] md:h-[calc(100vh-120px)] md:translate-x-0 md:z-50`}
+          className={`${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed left-0 top-[62px] z-[110] h-[calc(100vh-62px)] max-w-[calc(100vw-16px)] shrink-0 border-r border-[#0c3a34] bg-[radial-gradient(135%_85%_at_0%_0%,_#10443d_0%,_#0b332e_45%,_#072420_100%)] text-white shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)] transition-[transform,box-shadow,width] duration-300 ease-out min-[761px]:top-[72px] min-[761px]:h-[calc(100vh-72px)] md:translate-x-0 md:z-50`}
         >
           <div className="flex h-full min-h-0 flex-col">
-            <div className="flex items-center justify-between border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)]/90 px-1.5 py-2.5 backdrop-blur-sm">
-              <div className={`flex items-center ${sidebarCollapsed ? 'w-full justify-center' : 'gap-1.5'} pl-0.5`}>
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--color-bg-surface)] text-[11px] font-black text-[var(--color-text-muted)] shadow-sm">
-                  {business.name.slice(0, 2).toUpperCase()}
+            <div className="flex items-center justify-between px-3 py-4">
+              <div className={`flex items-center ${sidebarCollapsed ? 'w-full justify-center' : 'gap-2.5'}`}>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#3fae80] text-lg font-black text-[#072420] shadow-[0_12px_22px_-12px_rgba(63,174,128,0.85)]">
+                  G
                 </div>
                 {!sidebarCollapsed && (
                   <div className="min-w-0">
-                    <div className="text-[9px] font-black uppercase tracking-[0.22em] text-[var(--color-text-muted)]">{t('merchantRole')}</div>
-                    <div className="text-lg font-black text-[var(--color-text-strong)]">Guigui.com</div>
+                    <div className="text-lg font-black leading-none text-white">Guigui<span className="text-[#e8a23a]">.com</span></div>
+                    <div className="mt-1.5 text-[8.5px] font-black uppercase tracking-[0.2em] text-[#8fb3ac]">{t('merchantRole')}</div>
                   </div>
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              {!sidebarCollapsed && (
                 <IconButton
-                  label={sidebarCollapsed ? t('expandMenu') : t('collapseMenu')}
+                  label={t('collapseMenu')}
                   variant="secondary"
                   size="sm"
-                  className="h-8 w-8 rounded-full"
-                  onClick={() => setSidebarCollapsed((value) => !value)}
-                  title={sidebarCollapsed ? t('expandMenu') : t('collapseMenu')}
+                  className="h-8 w-8 rounded-full border-0 bg-transparent text-[#8fb3ac] shadow-none hover:bg-white/10 hover:text-white"
+                  onClick={() => setSidebarCollapsed(true)}
+                  title={t('collapseMenu')}
                 >
-                  {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                  <ChevronLeft className="h-4 w-4" />
                 </IconButton>
+              )}
+              {sidebarCollapsed && (
                 <IconButton
-                  label={t('closeSidebar')}
+                  label={t('expandMenu')}
                   variant="secondary"
                   size="sm"
-                  className="h-8 w-8 rounded-full md:hidden"
-                  onClick={() => setMobileSidebarOpen(false)}
+                  className="absolute right-1 top-3 h-6 w-6 rounded-full border-0 bg-transparent text-[#8fb3ac] shadow-none hover:bg-white/10 hover:text-white"
+                  onClick={() => setSidebarCollapsed(false)}
+                  title={t('expandMenu')}
                 >
-                  <X className="h-4 w-4" />
+                  <ChevronRight className="h-3.5 w-3.5" />
                 </IconButton>
-              </div>
+              )}
             </div>
 
-            <div className="flex-1 overflow-y-auto overflow-x-hidden p-2">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
+              {!sidebarCollapsed && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('my_business');
+                    setMobileSidebarOpen(false);
+                  }}
+                  className="mb-2 flex w-full items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.045] p-2.5 text-left transition hover:bg-white/[0.08]"
+                >
+                  {business.logo ? (
+                    <img src={business.logo} alt={business.name} className="h-10 w-10 shrink-0 rounded-full border border-white/10 object-cover" />
+                  ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#155048] text-xs font-black text-[#d8e6e2]">
+                      {business.name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[12px] font-black text-white">{business.name}</div>
+                    <div className="mt-0.5 text-[10px] font-semibold text-[#8fb3ac]">{t('merchantRole')}</div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[#6f8f89]" />
+                </button>
+              )}
+
               {businessNavigationGroups.map((group) => (
-                <div key={group.heading} className={`${sidebarCollapsed ? 'space-y-1.5' : 'space-y-2'}`}>
-                  {!sidebarCollapsed && (
-                    <div className="px-2 text-[8px] font-black uppercase tracking-[0.22em] text-[var(--color-text-muted)]">{group.heading}</div>
+                <div key={group.heading} className={sidebarCollapsed ? 'mb-2 space-y-1.5' : 'mb-3 space-y-1'}>
+                  {!sidebarCollapsed && group.heading !== t('businessNavSummary') && (
+                    <div className="px-3 pb-1 pt-1.5 text-[8px] font-black uppercase tracking-[0.22em] text-[#6f8f89]">
+                      {group.heading}
+                    </div>
                   )}
 
-                  <div className={`${sidebarCollapsed ? 'space-y-1.5' : 'space-y-1'}`}>
+                  <div className={sidebarCollapsed ? 'space-y-1.5' : 'space-y-1'}>
                     {group.items.filter((item) => canTab(item.tab)).map((item) => {
                       const Icon = item.icon;
                       const isActive = activeTab === item.tab || (item.tab === 'marketing' && isMarketingTab);
@@ -1712,30 +1862,35 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                             setMobileSidebarOpen(false);
                           }}
                           aria-label={item.label}
+                          aria-current={isActive ? 'page' : undefined}
                           title={item.label}
-                          className={`group relative flex w-full items-center rounded-2xl border text-left transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[var(--color-green-600)] ${
+                          className={`group relative flex w-full items-center rounded-full text-left transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[#3fae80]/50 ${
                             sidebarCollapsed
-                              ? 'justify-center border-transparent p-2.5'
-                              : 'gap-2 border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-2 shadow-[0_8px_18px_-18px_rgba(15,23,42,0.18)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-bg-surface-hover)]'
+                              ? 'justify-center p-2.5'
+                              : 'gap-3 px-3 py-2'
                           } ${
                             isActive
-                              ? 'border-[var(--color-green-600)] bg-[var(--color-green-600)] text-white shadow-[0_18px_28px_-20px_rgba(63,174,128,0.75)]'
-                              : 'text-[var(--color-text-strong)]'
+                              ? 'bg-[#3fae80] text-white shadow-[0_16px_28px_-16px_rgba(63,174,128,0.9)]'
+                              : 'text-[#d8e6e2] hover:bg-white/[0.05]'
                           }`}
                         >
-                          <div className={`flex shrink-0 items-center justify-center rounded-xl ${sidebarCollapsed ? 'h-7 w-7' : 'h-6 w-6'} ${isActive ? 'bg-[var(--color-green-600)]/20 text-white' : 'bg-[var(--color-bg-surface)] text-[var(--color-text-muted)]'}`}>
-                            <Icon className={sidebarCollapsed ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
+                          <div className={`flex shrink-0 items-center justify-center rounded-full ${sidebarCollapsed ? 'h-8 w-8' : 'h-9 w-9'} ${isActive ? 'bg-black/10 text-white' : 'bg-white/[0.06] text-[#a9c4be] group-hover:bg-white/[0.1] group-hover:text-white'}`}>
+                            <Icon className="h-4 w-4" />
                           </div>
 
                           {!sidebarCollapsed && (
                             <div className="min-w-0 flex-1">
-                              <div className="text-[10px] font-black leading-snug">{item.label}</div>
-                              <div className={`mt-0.5 text-[7.8px] leading-relaxed ${isActive ? 'text-[var(--color-blue-100)]' : 'text-[var(--color-text-muted)]'}`}>{item.help}</div>
+                              <div className={`truncate text-[11.5px] font-black leading-snug ${isActive ? 'text-white' : 'text-[#eef6f4]'}`}>{item.label}</div>
+                              <div className={`mt-0.5 truncate text-[9.5px] font-medium leading-relaxed ${isActive ? 'text-white/75' : 'text-[#8fb3ac]'}`}>
+                                {item.help}
+                              </div>
                             </div>
                           )}
 
                           {!sidebarCollapsed && item.count !== undefined && item.count > 0 && (
-                            <Badge variant={isActive ? 'verified' : 'danger'} className="border-0 px-1.5 py-0.5 text-[9px]">{item.count}</Badge>
+                            <span className={`flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-black ${isActive ? 'bg-white/25 text-white' : 'bg-[#f7bcbc] text-[#8a1f1f]'}`}>
+                              {item.count}
+                            </span>
                           )}
                         </button>
                       );
@@ -1745,25 +1900,34 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
               ))}
             </div>
 
-            <div className="border-t border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)]/80 p-2">
-              <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-2">
-                <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-2.5'} rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-2`}>
-                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--color-emerald-100)] text-[var(--color-emerald-700)]">
-                    <CheckCircle2 className="h-4 w-4" />
-                  </div>
-                  {!sidebarCollapsed && (
-                    <div className="min-w-0">
-                      <div className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--color-text-muted)]">{t('activeAccount')}</div>
-                      <div className="truncate text-xs font-black text-[var(--color-text-strong)]">{business.name}</div>
+            <div className="mt-auto border-t border-white/10 px-2 py-2.5">
+              {!sidebarCollapsed && (
+                <div className="flex items-center gap-3 rounded-2xl px-1 py-1.5">
+                  {business.logo ? (
+                    <img src={business.logo} alt={business.name} className="h-9 w-9 shrink-0 rounded-full border border-white/10 object-cover" />
+                  ) : (
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#155048] text-[10px] font-black text-[#d8e6e2]">
+                      {business.name.slice(0, 2).toUpperCase()}
                     </div>
                   )}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[11.5px] font-black text-white">{business.name}</div>
+                    <div className="text-[9.5px] font-semibold text-[#8fb3ac]">{t('merchantRole')}</div>
+                  </div>
                 </div>
-
-              </div>
+              )}
+              <button
+                type="button"
+                onClick={onLogout}
+                title="Terminar sessão"
+                className={`mt-1 flex w-full items-center rounded-2xl py-2.5 text-left text-[#d8e6e2] transition hover:bg-white/[0.07] hover:text-white ${sidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-2'}`}
+              >
+                <LogOut className="h-5 w-5 shrink-0 text-[#a9c4be]" />
+                {!sidebarCollapsed && <span className="text-[12px] font-black">Terminar sessão</span>}
+              </button>
             </div>
           </div>
-        </aside>
-        <main
+        </aside>        <main
           style={{ '--business-sidebar-width': `${sidebarCollapsed ? 72 : 248}px` } as React.CSSProperties}
           className="min-w-0 flex-1 overflow-visible bg-[#f7f5f3] p-3 sm:p-4 md:ml-[var(--business-sidebar-width)]"
         >
@@ -1787,21 +1951,32 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
 
           <div className="space-y-5 text-[var(--color-text-strong)]">
             {isMarketingTab && (
-              <div className="guigui-marketing-tabs" role="tablist" aria-label={t('business.SeccoesMarketing')}>
-                {[
-                  { id: 'marketing_campaigns' as const, label: 'Campanhas', icon: Megaphone, action: () => { setMarketingSection('campaigns'); setActiveTab('marketing_campaigns'); } },
-                  { id: 'posts' as const, label: 'Publica��es', icon: FileText, action: () => setActiveTab('posts') },
-                  { id: 'promotions' as const, label: 'Promo��es', icon: Tag, action: () => setActiveTab('promotions') },
-                  { id: 'marketing_calendar' as const, label: 'Calend�rio', icon: Calendar, action: () => { setMarketingSection('calendar'); setActiveTab('marketing_calendar'); } },
-                ].map(({ id, label, icon: TabIcon, action }) => {
-                  const selected = activeTab === id || (id === 'marketing_campaigns' && activeTab === 'marketing');
-                  return (
-                    <button key={id} type="button" role="tab" aria-selected={selected} className={selected ? 'is-active' : ''} onClick={action}>
-                      <TabIcon className="h-4 w-4" />
-                      <span>{label}</span>
-                    </button>
-                  );
-                })}
+              <div className="sticky top-[70px] z-20 overflow-x-auto rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)]/95 p-1.5 shadow-sm backdrop-blur md:top-[80px]">
+                <div className="flex min-w-max gap-1" role="tablist" aria-label={t('business.SeccoesMarketing')}>
+                  {MARKETING_TABS.map(({ id, label, icon: TabIcon }) => {
+                    const selected = activeTab === 'marketing_calendar'
+                      ? id === 'calendar'
+                      : activeTab === 'marketing_campaigns'
+                        ? id === 'campaigns'
+                        : id === marketingSection || (id === 'content' && (activeTab === 'posts' || activeTab === 'promotions'));
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        role="tab"
+                        aria-selected={selected}
+                        onClick={() => {
+                          setMarketingSection(id);
+                          setActiveTab(id === 'campaigns' ? 'marketing_campaigns' : id === 'calendar' ? 'marketing_calendar' : 'marketing');
+                        }}
+                        className={`inline-flex items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-[11px] font-black transition ${selected ? 'bg-[var(--color-green-700)] text-white shadow-sm' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text-strong)]'} focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]`}
+                      >
+                        <TabIcon className="h-4 w-4" aria-hidden="true" />
+                        <span>{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
             {/* Business Header Banner */}
@@ -1875,75 +2050,51 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
             {/* Tab Contents */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-            <Card className="border-[var(--color-border-subtle)]/80 bg-[var(--color-bg-surface)] p-5 shadow-[0_18px_45px_-30px_rgba(15,23,42,0.55)]">
-              <div className="flex items-center justify-between text-[var(--color-text-muted)] text-xs font-semibold">
-                <span>Seguidores</span>
-                <Users className="w-4 h-4 text-[var(--color-violet-600)]" />
-              </div>
-              <div className="font-mono text-2xl font-black text-[var(--color-violet-700)] mt-2">{followerCount.toLocaleString('pt-PT')}</div>
-              <div className="text-[10px] text-[var(--color-text-muted)] font-semibold mt-1">Pessoas com o sino activo</div>
-            </Card>
-
-            <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5">
-              <div className="flex items-center justify-between text-[var(--color-text-muted)] text-xs font-semibold">
-                <span>{t('business.AlcanceDosAnuncios')}</span>
-                <Megaphone className="w-4 h-4 text-[var(--color-rose-600)]" />
-              </div>
-              <div className="font-mono text-2xl font-black text-[var(--color-rose-700)] mt-2">{audienceReach.toLocaleString('pt-PT')}</div>
-              <div className="text-[10px] text-[var(--color-text-muted)] font-semibold mt-1">{t('business.VisualizacoesDosConteudos')}</div>
-            </Card>
-
-            <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5">
-              <div className="flex items-center justify-between text-[var(--color-text-muted)] text-xs font-semibold">
-                <span>{t('business.Visualizacoes')}</span>
-                <Eye className="w-4 h-4 text-[var(--color-green-600)]" />
-              </div>
-              <div className="font-mono text-2xl font-black tabular-nums text-[var(--color-text-strong)] mt-2">
-                {business.metrics.views.toLocaleString('pt-PT')}
-              </div>
-              <div className="text-[10px] text-[var(--color-green-600)] font-semibold mt-1">{t('business.EsteMes')}</div>
-            </Card>
-
-            <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5">
-              <div className="flex items-center justify-between text-[var(--color-text-muted)] text-xs font-semibold">
-                <span>WhatsApp Leads</span>
-                <MessageCircle className="w-4 h-4 text-[var(--color-green-600)]" />
-              </div>
-              <div className="font-mono text-2xl font-black text-[var(--color-green-600)] mt-2">
-                {business.metrics.whatsappClicks}
-              </div>
-              <div className="text-[10px] text-[var(--color-text-muted)] font-semibold mt-1">
-                Leads diretos
-              </div>
-            </Card>
-
-            <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5">
-              <div className="flex items-center justify-between text-[var(--color-text-muted)] text-xs font-semibold">
-                <span>Chamadas</span>
-                <Phone className="w-4 h-4 text-[var(--color-gold-600)]" />
-              </div>
-              <div className="font-mono text-2xl font-black text-[var(--color-gold-600)] mt-2">
-                {business.metrics.phoneClicks}
-              </div>
-              <div className="text-[10px] text-[var(--color-text-muted)] font-semibold mt-1">
-                Contacto voz
-              </div>
-            </Card>
-
-            <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5">
-              <div className="flex items-center justify-between text-[var(--color-text-muted)] text-xs font-semibold">
-                <span>Mapa</span>
-                <ArrowUpRight className="w-4 h-4 text-[var(--color-green-600)]" />
-              </div>
-              <div className="font-mono text-2xl font-black text-[var(--color-green-600)] mt-2">
-                {business.metrics.directionsClicks}
-              </div>
-              <div className="text-[10px] text-[var(--color-text-muted)] font-semibold mt-1">
-                Visitas presenciais
-              </div>
-            </Card>
-          </div>
+        {/* 6 Indicadores Principais */}
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+          <StatCard
+            label="Receita Total"
+            value={`${filteredOrderHistory.reduce((acc, o) => acc + (o.totalPriceXOF ?? 0), 0).toLocaleString('pt-PT')} XOF`}
+            icon={TrendingUp}
+            tone="success"
+            hint="Faturamento geral"
+          />
+          <StatCard
+            label={t('business.Visualizacoes')}
+            value={business.metrics.views.toLocaleString('pt-PT')}
+            icon={Eye}
+            tone="info"
+            hint="Este mês"
+          />
+          <StatCard
+            label="Seguidores"
+            value={followerCount.toLocaleString('pt-PT')}
+            icon={Users}
+            tone="accent"
+            hint="Pessoas com o sino activo"
+          />
+          <StatCard
+            label="Eventos Ativos"
+            value={businessEvents.length}
+            icon={Calendar}
+            tone="info"
+            hint="Ativos"
+          />
+          <StatCard
+            label="WhatsApp Leads"
+            value={business.metrics.whatsappClicks}
+            icon={MessageCircle}
+            tone="success"
+            hint="Leads diretos"
+          />
+          <StatCard
+            label="Bilhetes Vendidos"
+            value={filteredOrderHistory.length}
+            icon={Ticket}
+            tone="accent"
+            hint="Total de bilhetes"
+          />
+        </div>
 
           <div className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
             <ChartFrame
@@ -2020,6 +2171,10 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
           {/* Bilheteira real: bilhetes vendidos e pedido de reembolso (GUI-3.4.11). */}
           <SoldTicketsPanel currentLang={currentLang} />
         </div>
+      )}
+
+      {activeTab === 'stories' && (
+        <StoriesManagementHub currentUser={currentUser} embedded />
       )}
 
       {/* Posts Tab */}
@@ -2675,154 +2830,272 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
 
       {/* Billing Tab (Section 4) */}
       {activeTab === 'billing' && (
-        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5 max-w-4xl mx-auto">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4 border-[var(--color-border-subtle)]">
-            <div>
-              <h3 className="text-base font-extrabold text-[var(--color-text-strong)] flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-[var(--color-green-600)]" />
-                <span>{t('business.GestaoSubscricaoFacturacao')}</span>
-              </h3>
-              <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-                Os limites de posts e promo��es v�m do plano configurado. Desconto de {pricingConfig.annualDiscountPercent}% em pagamentos anuais.
-              </p>
-            </div>
-
-            {/* Billing Frequency Toggle */}
-            <div className="bg-[var(--color-bg-subtle)] p-1 rounded-2xl flex items-center gap-1 border border-[var(--color-border-subtle)] text-xs font-bold">
-              <button type="button"
-                onClick={() => setIsAnnualBilling(false)}
-                className={`px-3 py-1.5 rounded-xl transition ${
-                  !isAnnualBilling ? 'bg-[var(--color-neutral-0)] text-[var(--color-green-700)] shadow-sm' : 'text-[var(--color-text-muted)]'
-                }`}
-              >
-                Mensal
-              </button>
-              <button type="button"
-                onClick={() => setIsAnnualBilling(true)}
-                className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1 ${
-                  isAnnualBilling ? 'bg-[var(--color-neutral-0)] text-[var(--color-green-700)] shadow-sm' : 'text-[var(--color-text-muted)]'
-                }`}
-              >
-                <span>Anual</span>
-                <Badge variant="success" className="px-1.5 py-0.5 text-[9px]">
-                  -15% OFF
-                </Badge>
-              </button>
-            </div>
-          </div>
-
-          {/* Current Subscription Status */}
-          <div className="bg-[var(--color-bg-subtle)] p-4 rounded-2xl border border-[var(--color-border-subtle)] grid grid-cols-1 md:grid-cols-4 gap-4 text-xs items-center">
-            <div>
-              <span className="text-[var(--color-text-muted)] font-medium">{t('business.EscalaoAtual')}</span>
-              <div className="font-extrabold text-[var(--color-green-700)] text-sm uppercase mt-0.5 flex items-center gap-1.5">
-                <span>{getSubscriptionTierLabel(business.tier)}</span>
-                {business.verified && <CheckCircle className="w-4 h-4 text-[var(--color-green-600)]" aria-label="Verificado" />}
-              </div>
-              <div className={`mt-1 text-[10px] font-black uppercase ${subscriptionAccessState === 'active' ? 'text-[var(--color-emerald-700)]' : 'text-[var(--color-gold-700)]'}`}>
-                {subscriptionAccessState === 'active' ? 'Activo' : subscriptionAccessState === 'expired' ? 'Expirado — consulta' : 'Suspenso'}
-              </div>
-            </div>
-
-            <div>
-              <span className="text-[var(--color-text-muted)] font-medium">{t('business.ProximaRenovacao')}</span>
-              <div className="font-bold text-[var(--color-text-strong)] text-sm mt-0.5">
-                {new Date(business.subscriptionRenewDate).toLocaleDateString('pt-PT')}
-              </div>
-              <div className="text-[10px] font-semibold text-[var(--color-text-muted)] mt-0.5">
-                {subscriptionInterval === 'annual' ? 'Plano anual' : 'Plano mensal'} · alertas: 15d, 10d, 5d e 24h
-              </div>
-            </div>
-
-            <div>
-              <span className="text-[var(--color-text-muted)] font-medium">{t('business.MetodoPagamentoAtivo')}</span>
-              <div className="font-bold text-[var(--color-emerald-700)] text-sm mt-0.5 flex items-center gap-1">
-                <Smartphone className="w-3.5 h-3.5" />
-                <span>Orange Money (+245 955 *** **)</span>
-              </div>
-            </div>
-
-            <div>
-              <button type="button"
-                onClick={() => setShowUpgradeModal(true)}
-                className="w-full px-4 py-2.5 bg-[var(--color-green-600)] hover:bg-[var(--color-green-700)] text-white font-black text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5"
-              >
-                <Zap className="w-4 h-4 text-[var(--color-gold-300)]" />
-                <span>{t('business.AlterarLibertarEscalao')}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Configurable Plan Features Comparison */}
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-end justify-between gap-2">
+        <div className="mx-auto max-w-5xl space-y-4">
+          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 shadow-[var(--shadow-xs)] sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h4 className="text-xs font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider">{t('business.ComparativoPlanosDisponiveis')}</h4>
-                <p className="text-[10px] text-[var(--color-text-muted)]">{t('business.ValoresBeneficiosSincronizados')}</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--color-green-600)]">Assinatura e faturação</p>
+                <h3 className="mt-1 flex items-center gap-2 text-lg font-extrabold text-[var(--color-text-strong)]">
+                  <CreditCard className="h-5 w-5 text-[var(--color-green-600)]" />
+                  <span>{t('business.GestaoSubscricaoFacturacao')}</span>
+                </h3>
+                <p className="mt-1 max-w-2xl text-xs leading-relaxed text-[var(--color-text-muted)]">
+                  Consulte o plano, contrate serviços adicionais ou descarregue recibos. Cada área abre individualmente.
+                </p>
               </div>
-              <span className="rounded-full border border-[var(--color-indigo-200)] bg-[var(--color-indigo-50)] px-2.5 py-1 text-[10px] font-black text-[var(--color-indigo-700)]">{availableSubscriptionPlans.length} plano(s) activo(s)</span>
+              <Badge variant={subscriptionAccessState === 'active' ? 'success' : 'warning'} className="px-3 py-1.5">
+                {subscriptionAccessState === 'active' ? 'Subscrição ativa' : subscriptionAccessState === 'expired' ? 'Subscrição expirada' : 'Subscrição suspensa'}
+              </Badge>
             </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 text-xs">
-              {availableSubscriptionPlans.map((plan) => {
-                const isCurrent = business.planId === plan.id || (!business.planId && business.tier === plan.legacyTier);
+
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              {[
+                {
+                  id: 'plans' as const,
+                  label: t('business.ComparativoPlanosDisponiveis'),
+                  description: `${availableSubscriptionPlans.length} planos disponíveis`,
+                  icon: CreditCard,
+                },
+                {
+                  id: 'services' as const,
+                  label: t('business.PublicidadeServicosAdicionais'),
+                  description: 'Publicidade, destaques e conteúdo',
+                  icon: Megaphone,
+                },
+                {
+                  id: 'history' as const,
+                  label: t('business.HistoricoPagamentosRecibos'),
+                  description: 'Consultar e imprimir recibos',
+                  icon: Receipt,
+                },
+              ].map((area) => {
+                const active = billingSection === area.id;
+                const AreaIcon = area.icon;
                 return (
-                  <div key={plan.id} className={`p-4 rounded-2xl border space-y-3 ${isCurrent ? 'bg-[var(--color-green-50)]/60 border-[var(--color-green-300)] ring-2 ring-[var(--color-green-600)]' : 'bg-[var(--color-neutral-0)] border-[var(--color-border-subtle)]'}`}>
-                    <div className="space-y-1"><div className="flex items-center justify-between gap-2"><div className="font-extrabold text-[var(--color-text-strong)] text-sm">{plan.name}</div>{isCurrent && <span className="rounded-full bg-[var(--color-green-600)] px-2 py-0.5 text-[9px] font-black text-white">{t('business.ActualBadge')}</span>}</div><div className="text-[10px] text-[var(--color-text-muted)]">{plan.price > 0 ? `${plan.price.toLocaleString('pt-PT')} ${plan.currency}${t('business.Mes')}` : t('business.PrecoNegociado')} · v{plan.version}</div></div>
-                    <ul className="space-y-2 text-[11px] text-[var(--color-text-strong)]"><li className="flex items-center gap-1.5 font-bold text-[var(--color-green-700)]"><CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-green-600)] flex-shrink-0" /><span>{limitLabel(plan.postsPerMonth)} {t('business.PostsPorMes')}</span></li><li className="flex items-center gap-1.5 font-bold text-[var(--color-gold-700)]"><CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-gold-600)] flex-shrink-0" /><span>{limitLabel(plan.promotionsPerMonth)} {t('business.PromocoesPorMes')}</span></li><li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-green-600)] flex-shrink-0" /><span>{limitLabel(plan.maxCategories)} {t('business.CategoriasCount')}</span></li>{plan.featureSlugs.slice(0, 3).map((feature) => <li key={feature} className="flex items-center gap-1.5 text-[10px]"><CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-green-600)] flex-shrink-0" /><span>{feature.replaceAll('_', ' ')}</span></li>)}</ul>
-                  </div>
+                  <button
+                    key={area.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setBillingSection(area.id)}
+                    className={`flex items-start gap-3 rounded-2xl border p-3 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] ${active ? 'border-[var(--color-green-700)] bg-[var(--color-green-700)] text-white shadow-sm' : 'border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] text-[var(--color-text-strong)] hover:border-[var(--color-green-300)] hover:bg-[var(--color-green-50)]'}`}
+                  >
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${active ? 'bg-white/15 text-white' : 'bg-[var(--color-bg-surface)] text-[var(--color-green-700)]'}`}>
+                      <AreaIcon className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs font-black leading-snug">{area.label}</span>
+                      <span className={`mt-0.5 block text-[10px] font-semibold ${active ? 'text-white/75' : 'text-[var(--color-text-muted)]'}`}>{area.description}</span>
+                    </span>
+                    <ChevronRight className={`mt-1 h-4 w-4 shrink-0 ${active ? 'text-white/70' : 'text-[var(--color-text-muted)]'}`} aria-hidden="true" />
+                  </button>
                 );
               })}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[var(--color-indigo-200)] bg-[var(--color-indigo-50)]/50 p-4 space-y-4">
-            <div><h4 className="text-xs font-extrabold uppercase tracking-wider text-[var(--color-indigo-950)]">{t('business.PublicidadeServicosAdicionais')}</h4><p className="mt-1 text-[10px] text-[var(--color-indigo-800)]">{t('business.ProdutosAbaixoVem')}</p></div>
-            {monetizationNotice && <div className="rounded-xl border border-[var(--color-green-200)] bg-[var(--color-green-50)] px-3 py-2 text-xs font-bold text-[var(--color-emerald-800)]">{monetizationNotice}</div>}
-            <div className="grid gap-3 md:grid-cols-2">
-              {resolvedMonetizationCatalog.products.filter((product) => product.isActive && ['advertising', 'push_campaign'].includes(product.type)).map((product) => <div key={product.id} className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-3 shadow-sm"><div className="flex items-start justify-between gap-2"><div><div className="font-black text-[var(--color-text-strong)]">{product.name}</div><div className="mt-1 text-[10px] text-[var(--color-text-muted)]">{product.description}</div></div><Megaphone className="h-4 w-4 shrink-0 text-[var(--color-indigo-600)]" /></div><div className="mt-3 flex items-center justify-between gap-2"><span className="text-xs font-black text-[var(--color-indigo-700)]">{product.requiresQuote ? t('business.PrecoNegociado') : `${resolveProductPrice(resolvedMonetizationCatalog, product.code, 1, product.periodDays).toLocaleString('pt-PT')} ${product.currency}`}</span><button type="button" onClick={() => handleBuyAdvertising(product.code)} className="rounded-xl bg-[var(--color-indigo-600)] px-3 py-2 text-[10px] font-black text-white hover:bg-[var(--color-indigo-700)]">{product.requiresQuote ? t('business.SolicitarOrcamento') : t('business.Comprar')}</button></div></div>)}
-            </div>
-            <div className="grid gap-3 md:grid-cols-[1fr_1.5fr_auto] md:items-end"><label className="text-[10px] font-black uppercase text-[var(--color-text-muted)]">{t('business.ServicoConteudo')}<select className="mt-1 w-full rounded-xl border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-3 py-2 text-xs font-bold text-[var(--color-text-strong)]" value={selectedContentServiceId} onChange={(e) => setSelectedContentServiceId(e.target.value)}><option value="">{t('business.EscolherServico')}</option>{resolvedMonetizationCatalog.contentServices.filter((service) => service.isActive).map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label><label className="text-[10px] font-black uppercase text-[var(--color-text-muted)]">{t('business.NotasDoPedido')}<textarea className="mt-1 min-h-10 w-full rounded-xl border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-3 py-2 text-xs font-medium text-[var(--color-text-strong)]" value={contentServiceRequestNote} onChange={(e) => setContentServiceRequestNote(e.target.value)} placeholder={t('business.IndiqueOQuePrecisa')} /></label><button type="button" disabled={!selectedContentServiceId} onClick={() => { const service = resolvedMonetizationCatalog.contentServices.find((item) => item.id === selectedContentServiceId); if (service) void handleRequestContentService(service); }} className="rounded-xl bg-[var(--color-gold-500)] px-3 py-2 text-[10px] font-black text-white disabled:cursor-not-allowed disabled:opacity-50">{t('business.SolicitarOrcamento')}</button></div>
-          </div>
+          {billingSection === 'plans' && (
+            <div className="space-y-4">
+              <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 shadow-[var(--shadow-xs)] sm:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border-subtle)] pb-4">
+                  <div>
+                    <h4 className="text-sm font-extrabold text-[var(--color-text-strong)]">Subscrição atual</h4>
+                    <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">Estado do plano, renovação e método de pagamento.</p>
+                  </div>
+                  <div className="flex items-center gap-1 rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-1 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setIsAnnualBilling(false)}
+                      className={`rounded-xl px-3 py-1.5 transition ${!isAnnualBilling ? 'bg-[var(--color-neutral-0)] text-[var(--color-green-700)] shadow-sm' : 'text-[var(--color-text-muted)]'}`}
+                    >
+                      Mensal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsAnnualBilling(true)}
+                      className={`flex items-center gap-1 rounded-xl px-3 py-1.5 transition ${isAnnualBilling ? 'bg-[var(--color-neutral-0)] text-[var(--color-green-700)] shadow-sm' : 'text-[var(--color-text-muted)]'}`}
+                    >
+                      <span>Anual</span>
+                      <Badge variant="success" className="px-1.5 py-0.5 text-[9px]">-{pricingConfig.annualDiscountPercent}% OFF</Badge>
+                    </button>
+                  </div>
+                </div>
 
-          <div className="rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border-subtle)] pb-3">
-              <div>
-                <h4 className="text-xs font-extrabold uppercase tracking-wider text-[var(--color-text-strong)]">{t('business.HistoricoPagamentosRecibos')}</h4>
-                <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">{t('business.ConsulteTransacoesSubscricao')}</p>
+                <div className="mt-4 grid grid-cols-1 items-center gap-4 rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-4 text-xs md:grid-cols-4">
+                  <div>
+                    <span className="font-medium text-[var(--color-text-muted)]">{t('business.EscalaoAtual')}</span>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-sm font-extrabold uppercase text-[var(--color-green-700)]">
+                      <span>{getSubscriptionTierLabel(business.tier)}</span>
+                      {business.verified && <CheckCircle className="h-4 w-4 text-[var(--color-green-600)]" aria-label="Verificado" />}
+                    </div>
+                    <div className={`mt-1 text-[10px] font-black uppercase ${subscriptionAccessState === 'active' ? 'text-[var(--color-emerald-700)]' : 'text-[var(--color-gold-700)]'}`}>
+                      {subscriptionAccessState === 'active' ? 'Ativo' : subscriptionAccessState === 'expired' ? 'Expirado — consulta' : 'Suspenso'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="font-medium text-[var(--color-text-muted)]">{t('business.ProximaRenovacao')}</span>
+                    <div className="mt-0.5 text-sm font-bold text-[var(--color-text-strong)]">
+                      {new Date(business.subscriptionRenewDate).toLocaleDateString('pt-PT')}
+                    </div>
+                    <div className="mt-0.5 text-[10px] font-semibold text-[var(--color-text-muted)]">
+                      {subscriptionInterval === 'annual' ? 'Plano anual' : 'Plano mensal'} · alertas: 15d, 10d, 5d e 24h
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="font-medium text-[var(--color-text-muted)]">{t('business.MetodoPagamentoAtivo')}</span>
+                    <div className="mt-0.5 flex items-center gap-1 text-sm font-bold text-[var(--color-emerald-700)]">
+                      <Smartphone className="h-3.5 w-3.5" />
+                      <span>Orange Money (+245 955 *** **)</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setShowUpgradeModal(true)}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--color-green-600)] px-4 py-2.5 text-xs font-black text-white shadow-md transition hover:bg-[var(--color-green-700)]"
+                    >
+                      <Zap className="h-4 w-4 text-[var(--color-gold-300)]" />
+                      <span>{t('business.AlterarLibertarEscalao')}</span>
+                    </button>
+                  </div>
+                </div>
               </div>
-              <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-1.5 rounded-xl border-[var(--color-border-subtle)] px-3 py-2 text-[10px] font-black text-[var(--color-text-strong)] hover:bg-[var(--color-bg-subtle)]">
-                <FileDown className="h-3.5 w-3.5" /> Imprimir recibos
-              </button>
+
+              <div className="space-y-3 rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 shadow-[var(--shadow-xs)] sm:p-5">
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-[var(--color-text-strong)]">{t('business.ComparativoPlanosDisponiveis')}</h4>
+                    <p className="text-[10px] text-[var(--color-text-muted)]">{t('business.ValoresBeneficiosSincronizados')}</p>
+                  </div>
+                  <span className="rounded-full border border-[var(--color-indigo-200)] bg-[var(--color-indigo-50)] px-2.5 py-1 text-[10px] font-black text-[var(--color-indigo-700)]">{availableSubscriptionPlans.length} plano(s) ativo(s)</span>
+                </div>
+                <div className="grid grid-cols-1 gap-4 text-xs md:grid-cols-2 xl:grid-cols-4">
+                  {availableSubscriptionPlans.map((plan) => {
+                    const isCurrent = business.planId === plan.id || (!business.planId && business.tier === plan.legacyTier);
+                    return (
+                      <div key={plan.id} className={`space-y-3 rounded-2xl border p-4 ${isCurrent ? 'border-[var(--color-green-300)] bg-[var(--color-green-50)]/60 ring-2 ring-[var(--color-green-600)]' : 'border-[var(--color-border-subtle)] bg-[var(--color-neutral-0)]'}`}>
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-sm font-extrabold text-[var(--color-text-strong)]">{plan.name}</div>
+                            {isCurrent && <span className="rounded-full bg-[var(--color-green-600)] px-2 py-0.5 text-[9px] font-black text-white">{t('business.ActualBadge')}</span>}
+                          </div>
+                          <div className="text-[10px] text-[var(--color-text-muted)]">{plan.price > 0 ? `${plan.price.toLocaleString('pt-PT')} ${plan.currency}${t('business.Mes')}` : t('business.PrecoNegociado')} · v{plan.version}</div>
+                        </div>
+                        <ul className="space-y-2 text-[11px] text-[var(--color-text-strong)]">
+                          <li className="flex items-center gap-1.5 font-bold text-[var(--color-green-700)]"><CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--color-green-600)]" /><span>{limitLabel(plan.postsPerMonth)} {t('business.PostsPorMes')}</span></li>
+                          <li className="flex items-center gap-1.5 font-bold text-[var(--color-gold-700)]"><CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--color-gold-600)]" /><span>{limitLabel(plan.promotionsPerMonth)} {t('business.PromocoesPorMes')}</span></li>
+                          <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--color-green-600)]" /><span>{limitLabel(plan.maxCategories)} {t('business.CategoriasCount')}</span></li>
+                          {plan.featureSlugs.filter((feature) => !['posts', 'promotions', 'categories'].includes(feature)).slice(0, 3).map((feature) => <li key={feature} className="flex items-center gap-1.5 text-[10px]"><CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--color-green-600)]" /><span>{feature.replaceAll('_', ' ')}</span></li>)}
+                        </ul>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[560px] text-left text-[11px]">
-                <thead className="border-b border-[var(--color-border-subtle)] text-[10px] uppercase text-[var(--color-text-muted)]">
-                  <tr><th className="px-2 py-2">Data</th><th className="px-2 py-2">{t('description')}</th><th className="px-2 py-2">{t('business.Referencia')}</th><th className="px-2 py-2 text-right">Valor</th><th className="px-2 py-2 text-right">Estado</th></tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--color-border-subtle)]">
-                  {business.subscriptionPaymentId && (
-                    <tr>
-                      <td className="px-2 py-2 font-mono text-[var(--color-text-muted)]">{new Date(business.subscriptionStartedAt || business.subscriptionRenewDate).toLocaleDateString('pt-PT')}</td>
-                      <td className="px-2 py-2 font-bold text-[var(--color-text-strong)]">Subscri��o {getSubscriptionTierLabel(business.tier)}</td>
-                      <td className="px-2 py-2 font-mono text-[var(--color-text-muted)]">{business.subscriptionPaymentId}</td>
-                      <td className="px-2 py-2 text-right font-mono font-bold text-[var(--color-text-strong)]">{(currentPlan.price || 0).toLocaleString('pt-PT')} XOF</td>
-                      <td className="px-2 py-2 text-right font-bold text-[var(--color-emerald-700)]">Confirmado</td>
-                    </tr>
-                  )}
-                  {myBusinessOrders.slice(0, 8).map((order) => (
-                    <tr key={order.id}>
-                      <td className="px-2 py-2 font-mono text-[var(--color-text-muted)]">{new Date(order.purchasedAt).toLocaleDateString('pt-PT')}</td>
-                      <td className="px-2 py-2 font-bold text-[var(--color-text-strong)]">{order.itemTitle}</td>
-                      <td className="px-2 py-2 font-mono text-[var(--color-text-muted)]">{order.orderCode}</td>
-                      <td className="px-2 py-2 text-right font-mono font-bold text-[var(--color-text-strong)]">{order.totalPriceXOF.toLocaleString('pt-PT')} XOF</td>
-                      <td className={`px-2 py-2 text-right font-bold ${order.status === 'cancelled' ? 'text-[var(--color-red-700)]' : 'text-[var(--color-emerald-700)]'}`}>{order.status === 'cancelled' ? 'Cancelado' : 'Pago'}</td>
-                    </tr>
-                  ))}
-                  {!business.subscriptionPaymentId && myBusinessOrders.length === 0 && <tr><td colSpan={5} className="px-2 py-6 text-center text-[var(--color-text-muted)]">{t('business.AindaNaoExistem2')}</td></tr>}
-                </tbody>
-              </table>
+          )}
+
+          {billingSection === 'services' && (
+            <div className="space-y-4 rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 shadow-[var(--shadow-xs)] sm:p-5">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-indigo-700)]">Divulgação</p>
+                <h4 className="mt-1 text-base font-extrabold text-[var(--color-text-strong)]">{t('business.PublicidadeServicosAdicionais')}</h4>
+                <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">{t('business.ProdutosAbaixoVem')}</p>
+              </div>
+
+              {monetizationNotice && <div className="rounded-xl border border-[var(--color-green-200)] bg-[var(--color-green-50)] px-3 py-2 text-xs font-bold text-[var(--color-emerald-800)]">{monetizationNotice}</div>}
+
+              <div className="grid gap-3 md:grid-cols-2">
+                {resolvedMonetizationCatalog.products.filter((product) => product.isActive && ['advertising', 'push_campaign'].includes(product.type)).map((product) => (
+                  <div key={product.id} className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-3 shadow-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="font-black text-[var(--color-text-strong)]">{product.name}</div>
+                        <div className="mt-1 text-[10px] text-[var(--color-text-muted)]">{product.description}</div>
+                      </div>
+                      <Megaphone className="h-4 w-4 shrink-0 text-[var(--color-indigo-600)]" />
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <span className="text-xs font-black text-[var(--color-indigo-700)]">{product.requiresQuote ? t('business.PrecoNegociado') : `${resolveProductPrice(resolvedMonetizationCatalog, product.code, 1, product.periodDays).toLocaleString('pt-PT')} ${product.currency}`}</span>
+                      <button type="button" onClick={() => handleBuyAdvertising(product.code)} className="rounded-xl bg-[var(--color-indigo-600)] px-3 py-2 text-[10px] font-black text-white hover:bg-[var(--color-indigo-700)]">{product.requiresQuote ? t('business.SolicitarOrcamento') : t('business.Comprar')}</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-3">
+                <div className="grid gap-3 md:grid-cols-[1fr_1.5fr_auto] md:items-end">
+                  <label className="text-[10px] font-black uppercase text-[var(--color-text-muted)]">
+                    {t('business.ServicoConteudo')}
+                    <select className="mt-1 w-full rounded-xl border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-3 py-2 text-xs font-bold text-[var(--color-text-strong)]" value={selectedContentServiceId} onChange={(e) => setSelectedContentServiceId(e.target.value)}>
+                      <option value="">{t('business.EscolherServico')}</option>
+                      {resolvedMonetizationCatalog.contentServices.filter((service) => service.isActive).map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="text-[10px] font-black uppercase text-[var(--color-text-muted)]">
+                    {t('business.NotasDoPedido')}
+                    <textarea className="mt-1 min-h-10 w-full rounded-xl border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-3 py-2 text-xs font-medium text-[var(--color-text-strong)]" value={contentServiceRequestNote} onChange={(e) => setContentServiceRequestNote(e.target.value)} placeholder={t('business.IndiqueOQuePrecisa')} />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={!selectedContentServiceId}
+                    onClick={() => {
+                      const service = resolvedMonetizationCatalog.contentServices.find((item) => item.id === selectedContentServiceId);
+                      if (service) void handleRequestContentService(service);
+                    }}
+                    className="rounded-xl bg-[var(--color-gold-500)] px-3 py-2 text-[10px] font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {t('business.SolicitarOrcamento')}
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {billingSection === 'history' && (
+            <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 shadow-[var(--shadow-xs)] sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border-subtle)] pb-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-green-700)]">Comprovativos</p>
+                  <h4 className="mt-1 text-xs font-extrabold uppercase tracking-wider text-[var(--color-text-strong)]">{t('business.HistoricoPagamentosRecibos')}</h4>
+                  <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">{t('business.ConsulteTransacoesSubscricao')}</p>
+                </div>
+                <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-1.5 rounded-xl border-[var(--color-border-subtle)] px-3 py-2 text-[10px] font-black text-[var(--color-text-strong)] hover:bg-[var(--color-bg-subtle)]">
+                  <FileDown className="h-3.5 w-3.5" /> Imprimir recibos
+                </button>
+              </div>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full min-w-[560px] text-left text-[11px]">
+                  <thead className="border-b border-[var(--color-border-subtle)] text-[10px] uppercase text-[var(--color-text-muted)]">
+                    <tr><th className="px-2 py-2">Data</th><th className="px-2 py-2">{t('description')}</th><th className="px-2 py-2">{t('business.Referencia')}</th><th className="px-2 py-2 text-right">Valor</th><th className="px-2 py-2 text-right">Estado</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--color-border-subtle)]">
+                    {business.subscriptionPaymentId && (
+                      <tr>
+                        <td className="px-2 py-2 font-mono text-[var(--color-text-muted)]">{new Date(business.subscriptionStartedAt || business.subscriptionRenewDate).toLocaleDateString('pt-PT')}</td>
+                        <td className="px-2 py-2 font-bold text-[var(--color-text-strong)]">Subscrição {getSubscriptionTierLabel(business.tier)}</td>
+                        <td className="px-2 py-2 font-mono text-[var(--color-text-muted)]">{business.subscriptionPaymentId}</td>
+                        <td className="px-2 py-2 text-right font-mono font-bold text-[var(--color-text-strong)]">{(currentPlan.price || 0).toLocaleString('pt-PT')} XOF</td>
+                        <td className="px-2 py-2 text-right font-bold text-[var(--color-emerald-700)]">Confirmado</td>
+                      </tr>
+                    )}
+                    {myBusinessOrders.slice(0, 8).map((order) => (
+                      <tr key={order.id}>
+                        <td className="px-2 py-2 font-mono text-[var(--color-text-muted)]">{new Date(order.purchasedAt).toLocaleDateString('pt-PT')}</td>
+                        <td className="px-2 py-2 font-bold text-[var(--color-text-strong)]">{order.itemTitle}</td>
+                        <td className="px-2 py-2 font-mono text-[var(--color-text-muted)]">{order.orderCode}</td>
+                        <td className="px-2 py-2 text-right font-mono font-bold text-[var(--color-text-strong)]">{order.totalPriceXOF.toLocaleString('pt-PT')} XOF</td>
+                        <td className={`px-2 py-2 text-right font-bold ${order.status === 'cancelled' ? 'text-[var(--color-red-700)]' : 'text-[var(--color-emerald-700)]'}`}>{order.status === 'cancelled' ? 'Cancelado' : 'Pago'}</td>
+                      </tr>
+                    ))}
+                    {!business.subscriptionPaymentId && myBusinessOrders.length === 0 && <tr><td colSpan={5} className="px-2 py-6 text-center text-[var(--color-text-muted)]">{t('business.AindaNaoExistem2')}</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -3012,27 +3285,6 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                   <p className="text-[10px] text-[var(--color-text-muted)]">Percentagem da venda de cada bilhete retida pela plataforma Guigui.com.</p>
                 </div>
 
-                <div className="bg-[var(--color-bg-subtle)] p-3.5 rounded-2xl border border-[var(--color-border-subtle)] space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="font-bold text-[var(--color-text-strong)] text-xs">{t('business.TaxaFixaPor')}</label>
-                    <span className="font-mono font-black text-[var(--color-green-700)] bg-[var(--color-green-50)] px-2 py-0.5 rounded border-[var(--color-green-200)]">
-                      {pricingConfig.ticketFixedFeeXOF} XOF
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      step={50}
-                      min={0}
-                      max={1000}
-                      value={pricingConfig.ticketFixedFeeXOF}
-                      onChange={(e) => handleUpdateConfigParam('ticketFixedFeeXOF', Number(e.target.value))}
-                      className="w-full bg-[var(--color-bg-surface)] border border-[var(--color-border-subtle)] rounded-xl p-2 font-mono text-[var(--color-text-strong)] text-xs font-bold"
-                    />
-                  </div>
-                  <p className="text-[10px] text-[var(--color-text-muted)]">{t('business.CustoFixoPor')}</p>
-                </div>
-
                 {/* Simulation Example */}
                 <div className="p-3.5 bg-[var(--color-green-50)]/80 rounded-2xl border border-[var(--color-green-200)] text-[11px] text-emerald-950 space-y-1">
                   <div className="font-bold text-xs flex items-center gap-1.5 text-emerald-900">
@@ -3168,7 +3420,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                 <p className="text-xs text-[var(--color-text-muted)] mt-1">
                   {activeTab === 'tickets'
                     ? `Acompanhe bilhetes vendidos, pagamentos e levantamentos de ${business.name}.`
-                    : `Filtre e exporte o hist�rico completo de pedidos da empresa ${business.name}.`}
+                    : `Filtre e exporte o histórico completo de pedidos da empresa ${business.name}.`}
                 </p>
               </div>
             </div>
@@ -3205,7 +3457,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                 {filteredOrderHistory.length}
               </div>
               <div className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
-                {filteredOrderHistory.length === myBusinessOrders.length ? 'Todos os registos' : 'Ap�s filtros aplicados'}
+                {activeTab === 'tickets' ? 'Bilhetes e levantamentos' : filteredOrderHistory.length === myBusinessOrders.length ? 'Todos os registos' : 'Após filtros aplicados'}
               </div>
             </div>
 
@@ -3218,7 +3470,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                 {totalOrdersAmount.toLocaleString('pt-PT')} <span className="text-xs">XOF</span>
               </div>
               <div className="text-[10px] text-[var(--color-green-600)] font-medium mt-0.5">
-                Ticket M�dio: {averageTicketValue.toLocaleString('pt-PT')} XOF
+                Ticket Médio: {averageTicketValue.toLocaleString('pt-PT')} XOF
               </div>
             </div>
 
@@ -3259,14 +3511,14 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
           </div>
 
           {/* Advanced Multi-Filter Control Panel */}
-          {activeTab === 'order_history' && (
+          {(activeTab === 'tickets' || activeTab === 'order_history') && (
           <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
             <div className="flex items-center justify-between border-b border-[var(--color-border-subtle)] pb-3">
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-[var(--color-green-600)]" />
                 <span className="text-xs font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider">{t('business.FiltrosPesquisaSegmentacao')}</span>
               </div>
-              {(orderDateFilter !== 'all' || orderItemTypeFilter !== 'all' || orderStatusFilter !== 'all' || orderPaymentMethodFilter !== 'all' || orderMinAmount !== '' || orderMaxAmount !== '' || orderSearchQuery) && (
+              {(orderDateFilter !== 'all' || (activeTab === 'order_history' && orderItemTypeFilter !== 'all') || orderStatusFilter !== 'all' || orderPaymentMethodFilter !== 'all' || orderMinAmount !== '' || orderMaxAmount !== '' || orderSearchQuery) && (
                 <button type="button"
                   onClick={handleResetOrderFilters}
                   className="text-[11px] font-bold text-[var(--color-emerald-700)] hover:text-emerald-900 flex items-center gap-1"
@@ -3286,7 +3538,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                 </div>
                 {(orderMinAmount !== '' || orderMaxAmount !== '') && (
                   <span className="text-[11px] font-mono text-[var(--color-emerald-800)] bg-[var(--color-emerald-100)] font-bold px-2 py-0.5 rounded-md">
-                    Filtro Ativo: {orderMinAmount !== '' ? `${Number(orderMinAmount).toLocaleString('pt-PT')} XOF` : '0 XOF'} at� {orderMaxAmount !== '' ? `${Number(orderMaxAmount).toLocaleString('pt-PT')} XOF` : 'Sem Limite'}
+                    Filtro Ativo: {orderMinAmount !== '' ? `${Number(orderMinAmount).toLocaleString('pt-PT')} XOF` : '0 XOF'} até {orderMaxAmount !== '' ? `${Number(orderMaxAmount).toLocaleString('pt-PT')} XOF` : 'Sem Limite'}
                   </span>
                 )}
               </div>
@@ -3399,7 +3651,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+            <div className={`grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 ${activeTab === 'tickets' ? 'lg:grid-cols-3' : 'lg:grid-cols-4'}`}>
               
               {/* 1. FILTRO POR DATA */}
               <div className="space-y-1.5">
@@ -3444,24 +3696,26 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                 )}
               </div>
 
-              {/* 2. FILTRO POR TIPO DE ITEM */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-extrabold text-[var(--color-text-strong)] flex items-center gap-1.5">
-                  <Package className="w-3.5 h-3.5 text-[var(--color-green-600)]" />
-                  <span>Tipo de Item</span>
-                </label>
-                <select
-                  value={orderItemTypeFilter}
-                  onChange={(e) => setOrderItemTypeFilter(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-[var(--color-bg-subtle)] border border-[var(--color-border-subtle)] rounded-xl text-xs font-bold text-[var(--color-text-strong)] focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <option value="all">Todos os Tipos de Item</option>
-                  <option value="product">{t('business.ProdutosFisicosLoja')}</option>
-                  <option value="promotion">{t('business.PromocoesCupoes')}</option>
-                  <option value="ticket">Bilhetes de Eventos</option>
-                  <option value="service">{t('business.ServicosEntregas')}</option>
-                </select>
-              </div>
+              {/* 2. FILTRO POR TIPO DE ITEM (apenas histórico completo) */}
+              {activeTab === 'order_history' && (
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-extrabold text-[var(--color-text-strong)] flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5 text-[var(--color-green-600)]" />
+                    <span>Tipo de Item</span>
+                  </label>
+                  <select
+                    value={orderItemTypeFilter}
+                    onChange={(e) => setOrderItemTypeFilter(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-[var(--color-bg-subtle)] border border-[var(--color-border-subtle)] rounded-xl text-xs font-bold text-[var(--color-text-strong)] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="all">Todos os Tipos de Item</option>
+                    <option value="product">{t('business.ProdutosFisicosLoja')}</option>
+                    <option value="promotion">{t('business.PromocoesCupoes')}</option>
+                    <option value="ticket">Bilhetes de Eventos</option>
+                    <option value="service">{t('business.ServicosEntregas')}</option>
+                  </select>
+                </div>
+              )}
 
               {/* 3. FILTRO POR STATUS DE PAGAMENTO / LEVANTAMENTO */}
               <div className="space-y-1.5">
@@ -3481,7 +3735,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                 </select>
               </div>
 
-              {/* 4. FILTRO POR M�TODO DE PAGAMENTO */}
+              {/* 4. FILTRO POR MÉTODO DE PAGAMENTO */}
               <div className="space-y-1.5">
                 <label className="text-[11px] font-extrabold text-[var(--color-text-strong)] flex items-center gap-1.5">
                   <CreditCard className="w-3.5 h-3.5 text-[var(--color-violet-600)]" />
@@ -3544,18 +3798,18 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
               <h3 className="text-xs font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider flex items-center gap-2">
                 <Receipt className="w-4 h-4 text-[var(--color-green-600)]" />
                 <span>
-                  {activeTab === 'tickets' ? 'Bilhetes e levantamentos' : 'Resultados do hist�rico'} ({filteredOrderHistory.length} registos)
+                  {activeTab === 'tickets' ? 'Bilhetes e levantamentos' : 'Resultados do histórico'} ({filteredOrderHistory.length} registos)
                 </span>
               </h3>
               <div className="text-[11px] text-[var(--color-text-muted)] font-medium">
-                {business.name} • Sistema de Bilh�tica e Checkout Guigui.com
+                {business.name} • Sistema de Bilhética e Checkout Guigui.com
               </div>
             </div>
 
             {filteredOrderHistory.length === 0 ? (
               <EmptyState
                 title={t('business.noOrders')}
-                description="Tente alterar o per�odo de datas, o tipo de item selecionado ou limpe a barra de pesquisa para visualizar todos os pedidos."
+                description="Tente alterar o período de datas, o tipo de item selecionado ou limpe a barra de pesquisa para visualizar todos os pedidos."
                 actionLabel="Limpar Todos os Filtros"
                 onAction={handleResetOrderFilters}
                 actionVariant="primary"
@@ -3576,7 +3830,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--color-border-subtle)] text-[var(--color-text-strong)]">
-                    {filteredOrderHistory.map((order) => {
+                    {orderPagination.pageItems.map((order) => {
                       const isPending = order.status === 'pending';
                       const isRedeemed = order.status === 'redeemed';
                       const isCancelled = order.status === 'cancelled';
@@ -3584,7 +3838,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                       return (
                         <tr key={order.id} className="hover:bg-[var(--color-bg-subtle)]/80 transition">
                           
-                          {/* C�digo & QR Token */}
+                          {/* Código & QR Token */}
                           <td className="p-3.5">
                             <div className="flex items-center gap-1.5">
                               <span className="font-mono font-black text-[var(--color-text-strong)] bg-[var(--color-bg-subtle)] px-2 py-0.5 rounded-md border border-[var(--color-border-subtle)]">
@@ -3637,7 +3891,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                                 <span>{order.customerPhone}</span>
                               </a>
                               <a
-                                href={`https://wa.me/${order.customerPhone.replace(/[^0-9]/g, '')}?text=Ol�%20${encodeURIComponent(order.customerName)},%20contacto%20do%20${encodeURIComponent(business.name)}%20sobre%20o%20pedido%20${order.orderCode}`}
+                                href={`https://wa.me/${order.customerPhone.replace(/[^0-9]/g, '')}?text=Olá%20${encodeURIComponent(order.customerName)},%20contacto%20do%20${encodeURIComponent(business.name)}%20sobre%20o%20pedido%20${order.orderCode}`}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="text-[10px] text-[var(--color-green-600)] hover:underline flex items-center gap-0.5 font-medium"
@@ -3670,7 +3924,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                                   ? 'Voucher / Desconto'
                                   : order.itemType === 'ticket'
                                   ? 'Bilhete'
-                                  : 'Servi�o'}
+                                  : 'Serviço'}
                               </span>
                               <span className="text-[10px] text-[var(--color-text-muted)] font-bold">
                                 Qtd: {order.quantity}x
@@ -3732,7 +3986,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                             )}
                           </td>
 
-                          {/* A��es */}
+                          {/* Ações */}
                           <td className="p-3.5 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1.5">
                               <button type="button"
@@ -3763,9 +4017,21 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                 </table>
               </div>
             )}
+            {filteredOrderHistory.length > 0 && (
+              <AdminPagination
+                className="mt-4"
+                currentLang={currentLang}
+                currentPage={orderPagination.page}
+                pageSize={orderPagination.pageSize}
+                totalItems={orderPagination.totalItems}
+                onPageChange={orderPagination.setPage}
+                onPageSizeChange={orderPagination.setPageSize}
+                pageSizeOptions={orderPagination.pageSizeOptions}
+              />
+            )}
           </div>
 
-          {/* Modal de Detalhes do Pedido & Recibo Imprim�vel */}
+          {/* Modal de Detalhes do Pedido & Recibo Imprimível */}
           {selectedOrderDetails && (
             <div
               className="fixed inset-0 z-50 bg-[var(--color-bg-surface-dark)]/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in"
@@ -4293,58 +4559,35 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
             </div>
 
             {/* KPI Metric Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-4">
-                <div className="flex items-center justify-between text-[var(--color-text-muted)] text-xs font-semibold">
-                  <span>{t('business.VisualizacoesPerfil')}</span>
-                  <Eye className="w-4 h-4 text-[var(--color-green-600)]" />
-                </div>
-                <div className="mt-2 font-mono font-black text-2xl text-[var(--color-text-strong)]">
-                  {totalPeriodViews.toLocaleString('pt-PT')}
-                </div>
-                <span className="text-[10px] text-[var(--color-green-600)] font-bold mt-1 inline-flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3" /> {viewsTrend >= 0 ? '+' : ''}{viewsTrend.toFixed(1)}% desde o in�cio
-                </span>
-              </div>
-
-              <div className="rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-4">
-                <div className="flex items-center justify-between text-[var(--color-text-muted)] text-xs font-semibold">
-                  <span>Total Leads Directos</span>
-                  <MessageCircle className="w-4 h-4 text-[var(--color-green-600)]" />
-                </div>
-                <div className="mt-2 font-mono font-black text-2xl text-[var(--color-green-600)]">
-                  {totalLeads.toLocaleString('pt-PT')}
-                </div>
-                <span className="text-[10px] text-[var(--color-emerald-700)] font-bold mt-1 block">
-                  Taxa de Convers�o: {leadConversionRate}%
-                </span>
-              </div>
-
-              <div className="rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-4">
-                <div className="flex items-center justify-between text-[var(--color-text-muted)] text-xs font-semibold">
-                  <span>{t('business.ResgatesPromocoes')}</span>
-                  <Tag className="w-4 h-4 text-[var(--color-gold-500)]" />
-                </div>
-                <div className="mt-2 font-mono font-black text-2xl text-[var(--color-gold-600)]">
-                  {promoPerformanceData.reduce((acc, p) => acc + p.resgates, 0)} <span className="text-xs font-normal text-[var(--color-text-muted)]">vouchers</span>
-                </div>
-                <span className="text-[10px] text-[var(--color-gold-600)] font-bold mt-1 block">
-                  {promoPerformanceData.length} campanhas ativas · melhor: {topPromotion.titulo}
-                </span>
-              </div>
-
-              <div className="rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-4">
-                <div className="flex items-center justify-between text-[var(--color-text-muted)] text-xs font-semibold">
-                  <span>{t('business.VolumeBilhetica')}</span>
-                  <DollarSign className="w-4 h-4 text-[var(--color-violet-600)]" />
-                </div>
-                <div className="mt-2 font-mono font-black text-xl text-[var(--color-text-strong)]">
-                  {totalRevenue.toLocaleString('pt-PT')} XOF
-                </div>
-                <span className="text-[10px] text-[var(--color-violet-600)] font-bold mt-1 block">
-                  {totalTickets} bilhetes emitidos · {salesTrend >= 0 ? '+' : ''}{salesTrend.toFixed(1)}% desde o in�cio
-                </span>
-              </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard
+                label={t('business.VisualizacoesPerfil')}
+                value={totalPeriodViews.toLocaleString('pt-PT')}
+                icon={Eye}
+                tone="info"
+                hint={`${viewsTrend >= 0 ? '+' : ''}${viewsTrend.toFixed(1)}% desde o início`}
+              />
+              <StatCard
+                label="Total Leads Directos"
+                value={totalLeads.toLocaleString('pt-PT')}
+                icon={MessageCircle}
+                tone="success"
+                hint={`Taxa de Conversão: ${leadConversionRate}%`}
+              />
+              <StatCard
+                label={t('business.ResgatesPromocoes')}
+                value={`${promoPerformanceData.reduce((acc, p) => acc + p.resgates, 0)} vouchers`}
+                icon={Tag}
+                tone="accent"
+                hint={`${promoPerformanceData.length} campanhas ativas · melhor: ${topPromotion.titulo}`}
+              />
+              <StatCard
+                label={t('business.VolumeBilhetica')}
+                value={`${totalRevenue.toLocaleString('pt-PT')} XOF`}
+                icon={DollarSign}
+                tone="primary"
+                hint={`${totalTickets} bilhetes emitidos · ${salesTrend >= 0 ? '+' : ''}${salesTrend.toFixed(1)}% desde o início`}
+              />
             </div>
 
             {/* SECTION 1: GR�FICO DE VISUALIZA�ÕES E CLIQUES (Recharts Area & Line Chart) */}
@@ -4830,23 +5073,10 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
       {(activeTab === 'marketing' || activeTab === 'marketing_campaigns' || activeTab === 'marketing_calendar') && (
         <div className="space-y-5">
           {marketingSection === 'overview' && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {[
-              { label: t('business.Alcance'), value: business.metrics.views, suffix: t('business.suffixVisualizacoes'), color: 'text-[var(--color-green-700)]', bg: 'bg-[var(--color-green-50)]', icon: Eye },
-              { label: t('business.Contactos'), value: business.metrics.whatsappClicks + business.metrics.phoneClicks, suffix: t('business.suffixInteracoes'), color: 'text-[var(--color-emerald-700)]', bg: 'bg-[var(--color-green-50)]', icon: MessageCircle },
-              { label: t('content'), value: business.posts.length, suffix: t('business.suffixPublicacoes'), color: 'text-[var(--color-violet-700)]', bg: 'bg-[var(--color-violet-50)]', icon: FileText },
-              { label: t('business.Conversao'), value: business.promotions.length + businessEvents.length, suffix: t('business.suffixCampanhasEventos'), color: 'text-[var(--color-gold-700)]', bg: 'bg-[var(--color-gold-50)]', icon: TrendingUp },
-            ].map(({ label, value, suffix, color, bg, icon: MetricIcon }) => (
-              <Card key={label} className="border-[var(--color-border-subtle)] bg-[var(--color-neutral-0)] p-4 shadow-sm">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-text-muted)]">{label}</p>
-                    <p className={`mt-2 text-2xl font-black ${color}`}>{value.toLocaleString('pt-PT')}</p>
-                    <p className="mt-1 text-[10px] font-semibold text-[var(--color-text-muted)]">{suffix}</p>
-                  </div>
-                  <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${bg} ${color}`}><MetricIcon className="h-4 w-4" /></span>
-                </div>
-              </Card>
-            ))}
+            <StatCard icon={Eye} tone="primary" label={t('business.Alcance')} value={business.metrics.views.toLocaleString('pt-PT')} hint="Visualizações do perfil" />
+            <StatCard icon={MessageCircle} tone="success" label={t('business.Contactos')} value={(business.metrics.whatsappClicks + business.metrics.phoneClicks).toLocaleString('pt-PT')} hint="Contactos diretos" />
+            <StatCard icon={FileText} tone="info" label="Conteúdos" value={business.posts.length.toLocaleString('pt-PT')} hint="Publicações no perfil" />
+            <StatCard icon={TrendingUp} tone="warning" label="Conversões" value={(business.promotions.length + businessEvents.length).toLocaleString('pt-PT')} hint="Campanhas e eventos" />
           </div>}
 
           {marketingSection === 'overview' && <div className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
@@ -4890,11 +5120,12 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
               <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">{t('business.TudoFicaAgrupado')}</p>
               <div className="mt-4 grid gap-2">
                 {[
-                  { label: 'Publica��es', description: `${business.posts.length} conte�dos`, tab: 'posts' as const, icon: FileText },
-                  { label: 'Promo��es', description: `${business.promotions.length} ofertas`, tab: 'promotions' as const, icon: Tag },
-                  { label: 'Estat�sticas', description: 'An�lise detalhada', tab: 'analytics' as const, icon: BarChart3 },
-                ].map(({ label, description, tab, icon: ToolIcon }) => (
-                  <button key={tab} type="button" onClick={() => setActiveTab(tab)} className="flex items-center gap-3 rounded-2xl border border-[var(--color-border-subtle)] p-3 text-left transition hover:-translate-y-0.5 hover:border-[var(--color-green-300)] hover:bg-[var(--color-green-50)]">
+                  { label: 'Conteúdos', description: `${business.posts.length} publicações`, icon: FileText, onClick: () => { setMarketingSection('content'); setActiveTab('marketing'); } },
+                  { label: 'Promoções', description: `${business.promotions.length} ofertas`, icon: Tag, onClick: () => { setContentFilter('promotions'); setMarketingSection('content'); setActiveTab('marketing'); } },
+                  { label: 'Calendário', description: `${scheduledItems.length} agendamentos`, icon: Calendar, onClick: () => { setMarketingSection('calendar'); setActiveTab('marketing_calendar'); } },
+                  { label: 'Estatísticas', description: 'Análise detalhada', icon: BarChart3, onClick: () => setActiveTab('analytics') },
+                ].map(({ label, description, icon: ToolIcon, onClick }) => (
+                  <button key={label} type="button" onClick={onClick} className="flex items-center gap-3 rounded-2xl border border-[var(--color-border-subtle)] p-3 text-left transition hover:-translate-y-0.5 hover:border-[var(--color-green-300)] hover:bg-[var(--color-green-50)]">
                     <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-bg-subtle)] text-[var(--color-green-700)]"><ToolIcon className="h-4 w-4" /></span>
                     <span className="min-w-0 flex-1"><span className="block text-xs font-black text-[var(--color-text-strong)]">{label}</span><span className="block text-[10px] text-[var(--color-text-muted)]">{description}</span></span>
                     <ArrowUpRight className="h-4 w-4 text-[var(--color-text-muted)]" />
@@ -4909,39 +5140,39 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
               {(() => {
                 const sectionContent = {
                   campaigns: {
-                    eyebrow: 'Planeamento e divulga��o',
+                    eyebrow: 'Planeamento e divulgação',
                     title: 'Campanhas',
-                    description: 'Crie campanhas para promover publica��es, eventos ou ofertas e acompanhe o resultado de cada iniciativa.',
+                    description: 'Planeie, agende e acompanhe campanhas para promover publicações, eventos e ofertas.',
                   },
                   content: {
-                    eyebrow: 'Produ��o e distribui��o',
-                    title: 'Conte�dos',
-                    description: 'Crie publica��es, v�deos e galerias para manter o perfil activo e comunicar com os seus clientes.',
+                    eyebrow: 'Produção e distribuição',
+                    title: 'Conteúdos',
+                    description: 'Organize publicações e promoções e mantenha o perfil ativo junto dos seus clientes.',
                   },
                   audience: {
                     eyebrow: 'Pessoas e relacionamento',
-                    title: 'P�blico-alvo',
-                    description: 'Conhe�a quem encontra a empresa, acompanha os seus conte�dos e entra em contacto.',
+                    title: 'Público-alvo',
+                    description: 'Defina segmentos e conheça quem encontra a empresa e interage com os seus conteúdos.',
                   },
                   calendar: {
                     eyebrow: 'Planeamento editorial',
-                    title: 'Calend�rio de Conte�do e Campanhas',
-                    description: 'Organize publica��es, promo��es e campanhas para manter uma presen�a consistente.',
+                    title: 'Calendário de conteúdo e campanhas',
+                    description: 'Organize publicações, promoções e campanhas para manter uma presença consistente.',
                   },
                   library: {
                     eyebrow: 'Materiais de campanha',
                     title: 'Biblioteca',
-                    description: 'Consulte os materiais j� usados nas publica��es e mantenha os conte�dos prontos para reutiliza��o.',
+                    description: 'Reutilize imagens, vídeos e materiais já usados nas publicações da empresa.',
                   },
                   budget: {
                     eyebrow: 'Investimento e retorno',
-                    title: 'Or�amento',
-                    description: 'Acompanhe o investimento comercial, os pedidos gerados e os recursos dispon�veis para divulga��o.',
+                    title: 'Orçamento',
+                    description: 'Acompanhe o investimento planeado, o valor gasto e o saldo disponível para divulgação.',
                   },
                   reports: {
-                    eyebrow: 'Decis�es baseadas em dados',
-                    title: 'Relat�rios',
-                    description: 'Analise o desempenho das campanhas, conte�dos, contactos e vendas num s� lugar.',
+                    eyebrow: 'Decisões baseadas em dados',
+                    title: 'Relatórios',
+                    description: 'Analise o desempenho das campanhas, conteúdos, contactos e vendas num só lugar.',
                   },
                 }[marketingSection];
 
@@ -4956,90 +5187,389 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                       <Badge variant="info" className="w-fit px-3 py-1.5">Marketing</Badge>
                     </div>
                     {marketingSection === 'campaigns' && (
-                      <div className="mt-6 grid gap-4 border-t border-[var(--color-border-subtle)] pt-5 lg:grid-cols-[0.8fr_1.2fr]">
-                        <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-4">
-                          <h4 className="text-sm font-black text-[var(--color-text-strong)]">Nova campanha</h4>
-                          <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">{t('business.CriePrimeiroComo')}</p>
-                          <input value={campaignName} onChange={(event) => setCampaignName(event.target.value)} placeholder="Nome da campanha" className="mt-3 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-neutral-0)] p-3 text-xs" />
-                          <select value={campaignObjective} onChange={(event) => setCampaignObjective(event.target.value as MarketingCampaign['objective'])} className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-neutral-0)] p-3 text-xs text-[var(--color-text-strong)]">
-                            <option value="awareness">Objetivo: notoriedade</option>
-                            <option value="engagement">Objetivo: envolvimento</option>
-                            <option value="traffic">{t('business.ObjetivoTrafego')}</option>
-                            <option value="conversions">{t('business.ObjetivoConversoes')}</option>
-                            <option value="sales">Objetivo: vendas</option>
-                          </select>
-                          <input value={campaignBudget} onChange={(event) => setCampaignBudget(event.target.value.replace(/[^\d]/g, ''))} inputMode="numeric" placeholder={t('business.OrcamentoMaximoXof')} className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-neutral-0)] p-3 text-xs" />
-                          <select value={campaignAudienceId} onChange={(event) => setCampaignAudienceId(event.target.value)} className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-neutral-0)] p-3 text-xs text-[var(--color-text-strong)]">
-                            <option value="">{t('business.PublicoAlvoOpcional')}</option>
-                            {marketingSegments.map((segment) => <option key={segment.id} value={segment.id}>{segment.name}</option>)}
-                          </select>
-                          <div className="mt-2 grid grid-cols-2 gap-2">
-                            <input type="datetime-local" value={campaignStartsAt} onChange={(event) => setCampaignStartsAt(event.target.value)} aria-label={t('business.InicioCampanha')} className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-2 text-[10px]" />
-                            <input type="datetime-local" value={campaignEndsAt} onChange={(event) => setCampaignEndsAt(event.target.value)} aria-label="Fim da campanha" className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-2 text-[10px]" />
-                          </div>
-                          <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">As datas usam o fuso Africa/Bissau.</p>
-                          <div className="mt-2 max-h-24 space-y-1 overflow-auto rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-2">
-                            <p className="text-[10px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">{t('business.ConteudosAssociados')}</p>
-                            {[...business.posts.slice(0, 8).map((post) => ({ id: post.id, title: post.title })), ...business.promotions.slice(0, 8).map((promotion) => ({ id: promotion.id, title: promotion.title }))].map((content) => <label key={content.id} className="flex items-center gap-2 text-[10px] text-[var(--color-text-muted)]"><input type="checkbox" checked={campaignContentIds.includes(content.id)} onChange={() => setCampaignContentIds((previous) => previous.includes(content.id) ? previous.filter((id) => id !== content.id) : [...previous, content.id])} /> <span className="truncate">{content.title}</span></label>)}
-                          </div>
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            {(['guigui', 'social', 'sms', 'email', 'banner'] as const).map((channel) => (
-                              <button key={channel} type="button" onClick={() => setCampaignChannels((previous) => previous.includes(channel) ? previous.filter((item) => item !== channel) : [...previous, channel])} className={`rounded-full px-2.5 py-1 text-[10px] font-black ${campaignChannels.includes(channel) ? 'bg-[var(--color-green-700)] text-[var(--color-neutral-0)]' : 'bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)]'}`}>{channel}</button>
-                            ))}
-                          </div>
-                          <Button type="button" size="sm" className="mt-3 w-full" onClick={createMarketingCampaign}>Guardar rascunho</Button>
+                      <div className="mt-5 space-y-5">
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                          <StatCard
+                            icon={Megaphone}
+                            tone="primary"
+                            label="Campanhas"
+                            value={marketingCampaigns.length}
+                            hint="Total criadas"
+                          />
+                          <StatCard
+                            icon={Play}
+                            tone="success"
+                            label="Ativas"
+                            value={marketingCampaigns.filter((campaign) => campaign.status === 'active').length}
+                            hint="Em circulação"
+                          />
+                          <StatCard
+                            icon={Clock}
+                            tone="info"
+                            label="Agendadas"
+                            value={marketingCampaigns.filter((campaign) => campaign.status === 'scheduled').length}
+                            hint="Por iniciar"
+                          />
+                          <StatCard
+                            icon={DollarSign}
+                            tone="warning"
+                            label="Orçamento"
+                            value={`${marketingCampaigns.reduce((total, campaign) => total + (campaign.budgetXOF || 0), 0).toLocaleString('pt-PT')} XOF`}
+                            hint="Planeado"
+                          />
                         </div>
-                        <div className="space-y-2">
-                          {marketingCampaigns.length === 0 && <EmptyState title="Sem campanhas" description="As campanhas criadas aparecer�o aqui." />}
-                          {marketingCampaigns.map((campaign) => (
-                            <div key={campaign.id} className="rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-4">
-                              <div className="flex flex-wrap items-start justify-between gap-2">
-                                <div><h4 className="text-sm font-black text-[var(--color-text-strong)]">{campaign.name}</h4><p className="mt-1 text-[10px] text-[var(--color-text-muted)]">{campaign.channels.join(' · ')}{campaign.budgetXOF ? ` · ${campaign.budgetXOF.toLocaleString('pt-PT')} XOF` : ''}</p></div>
-                                <Badge variant={campaign.status === 'active' ? 'success' : campaign.status === 'paused' ? 'warning' : 'info'}>{({ draft: 'Rascunho', scheduled: 'Agendada', active: 'Ativa', paused: 'Pausada', ended: 'Encerrada', archived: 'Arquivada' } as Record<MarketingCampaign['status'], string>)[campaign.status]}</Badge>
+
+                        <div className="grid gap-5 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+                          <form
+                            className="self-start rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-4"
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              void createMarketingCampaign();
+                            }}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-green-700)]">Nova campanha</p>
+                                <h4 className="mt-1 text-base font-black text-[var(--color-text-strong)]">Configurar campanha</h4>
                               </div>
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                {campaign.status === 'draft' && <Button type="button" size="sm" variant="primary" onClick={() => updateCampaignStatus(campaign, 'scheduled')}>Agendar</Button>}
-                                {campaign.status === 'scheduled' && <Button type="button" size="sm" variant="ghost" onClick={() => updateCampaignStatus(campaign, 'active')}>Ativar</Button>}
-                                {campaign.status === 'active' && <Button type="button" size="sm" variant="ghost" onClick={() => updateCampaignStatus(campaign, 'paused')}>Pausar</Button>}
-                                {campaign.status === 'paused' && <Button type="button" size="sm" variant="ghost" onClick={() => updateCampaignStatus(campaign, 'active')}>Retomar</Button>}
-                                {!['ended', 'archived'].includes(campaign.status) && <Button type="button" size="sm" variant="ghost" onClick={() => updateCampaignStatus(campaign, 'ended')}>Encerrar</Button>}
-                                <Button type="button" size="sm" variant="ghost" onClick={() => setMarketingCampaigns((previous) => [{ ...campaign, id: `campaign-${Date.now()}`, name: `${campaign.name} (c�pia)`, status: 'draft', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, ...previous])}>Duplicar</Button>
+                              <Badge variant="neutral">Rascunho</Badge>
+                            </div>
+                            <p className="mt-1 text-[11px] leading-relaxed text-[var(--color-text-muted)]">{t('business.CriePrimeiroComo')}</p>
+
+                            <div className="mt-4 space-y-3">
+                              <label className="block">
+                                <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">Nome da campanha</span>
+                                <input
+                                  value={campaignName}
+                                  onChange={(event) => setCampaignName(event.target.value)}
+                                  placeholder="Ex.: Fim de semana no restaurante"
+                                  className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-neutral-0)] p-3 text-xs text-[var(--color-text-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]"
+                                  required
+                                />
+                              </label>
+
+                              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                                <label className="block">
+                                  <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">Objetivo</span>
+                                  <select
+                                    value={campaignObjective}
+                                    onChange={(event) => setCampaignObjective(event.target.value as MarketingCampaign['objective'])}
+                                    className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-neutral-0)] p-3 text-xs text-[var(--color-text-strong)]"
+                                  >
+                                    <option value="awareness">Notoriedade</option>
+                                    <option value="engagement">Envolvimento</option>
+                                    <option value="traffic">Tráfego</option>
+                                    <option value="conversions">Conversões</option>
+                                    <option value="sales">Vendas</option>
+                                  </select>
+                                </label>
+
+                                <label className="block">
+                                  <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">Orçamento máximo (XOF)</span>
+                                  <input
+                                    value={campaignBudget}
+                                    onChange={(event) => setCampaignBudget(event.target.value.replace(/[^\d]/g, ''))}
+                                    inputMode="numeric"
+                                    placeholder="0"
+                                    className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-neutral-0)] p-3 text-xs text-[var(--color-text-strong)]"
+                                  />
+                                </label>
+                              </div>
+
+                              <label className="block">
+                                <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">Público-alvo</span>
+                                <select
+                                  value={campaignAudienceId}
+                                  onChange={(event) => setCampaignAudienceId(event.target.value)}
+                                  className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-neutral-0)] p-3 text-xs text-[var(--color-text-strong)]"
+                                >
+                                  <option value="">Todos os seguidores</option>
+                                  {marketingSegments.map((segment) => <option key={segment.id} value={segment.id}>{segment.name}</option>)}
+                                </select>
+                              </label>
+
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <label className="block">
+                                  <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">Início</span>
+                                  <input
+                                    type="datetime-local"
+                                    value={campaignStartsAt}
+                                    onChange={(event) => setCampaignStartsAt(event.target.value)}
+                                    aria-label={t('business.InicioCampanha')}
+                                    className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-2.5 text-[10px]"
+                                  />
+                                </label>
+                                <label className="block">
+                                  <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">Fim</span>
+                                  <input
+                                    type="datetime-local"
+                                    value={campaignEndsAt}
+                                    onChange={(event) => setCampaignEndsAt(event.target.value)}
+                                    aria-label="Fim da campanha"
+                                    className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-2.5 text-[10px]"
+                                  />
+                                </label>
+                              </div>
+                              <p className="text-[10px] text-[var(--color-text-muted)]">As datas usam o fuso Africa/Bissau.</p>
+                            </div>
+
+                            <fieldset className="mt-4">
+                              <legend className="text-[10px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">Canais</legend>
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {(['guigui', 'social', 'sms', 'email', 'banner'] as const).map((channel) => {
+                                  const channelSelected = campaignChannels.includes(channel);
+                                  return (
+                                    <button
+                                      key={channel}
+                                      type="button"
+                                      aria-pressed={channelSelected}
+                                      onClick={() => setCampaignChannels((previous) => previous.includes(channel) ? previous.filter((item) => item !== channel) : [...previous, channel])}
+                                      className={`rounded-full px-2.5 py-1.5 text-[10px] font-black transition ${channelSelected ? 'bg-[var(--color-green-700)] text-white' : 'bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)] hover:text-[var(--color-text-strong)]'}`}
+                                    >
+                                      {MARKETING_CHANNEL_LABELS[channel]}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </fieldset>
+
+                            <fieldset className="mt-4">
+                              <legend className="text-[10px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">{t('business.ConteudosAssociados')}</legend>
+                              <div className="mt-2 max-h-36 space-y-1 overflow-auto rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-2.5">
+                                {business.posts.length + business.promotions.length === 0 ? (
+                                  <p className="text-[10px] text-[var(--color-text-muted)]">Ainda não há publicações ou promoções para associar.</p>
+                                ) : (
+                                  [...business.posts.slice(0, 8).map((post) => ({ id: post.id, title: post.title, type: 'Publicação' })), ...business.promotions.slice(0, 8).map((promotion) => ({ id: promotion.id, title: promotion.title, type: 'Promoção' }))].map((content) => (
+                                    <label key={content.id} className="flex items-center gap-2 text-[10px] text-[var(--color-text-muted)]">
+                                      <input
+                                        type="checkbox"
+                                        checked={campaignContentIds.includes(content.id)}
+                                        onChange={() => setCampaignContentIds((previous) => previous.includes(content.id) ? previous.filter((id) => id !== content.id) : [...previous, content.id])}
+                                        className="shrink-0"
+                                      />
+                                      <span className="min-w-0 flex-1 truncate">{content.title}</span>
+                                      <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide">{content.type}</span>
+                                    </label>
+                                  ))
+                                )}
+                              </div>
+                            </fieldset>
+
+                            <Button type="submit" size="sm" className="mt-4 w-full" disabled={!campaignName.trim()}>
+                              Guardar rascunho
+                            </Button>
+                          </form>
+
+                          <div className="min-w-0">
+                            <div className="border-b border-[var(--color-border-subtle)] pb-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-green-700)]">Planeamento</p>
+                                  <h4 className="mt-1 text-base font-black text-[var(--color-text-strong)]">As suas campanhas</h4>
+                                </div>
+                                <Badge variant="info">
+                                  {marketingCampaigns.filter((campaign) => campaignFilter === 'all' || campaign.status === campaignFilter).length} de {marketingCampaigns.length}
+                                </Badge>
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-1.5">
+                                {MARKETING_CAMPAIGN_FILTERS.map((filter) => (
+                                  <button
+                                    key={filter.id}
+                                    type="button"
+                                    aria-pressed={campaignFilter === filter.id}
+                                    onClick={() => setCampaignFilter(filter.id)}
+                                    className={`rounded-full px-2.5 py-1.5 text-[10px] font-black transition ${campaignFilter === filter.id ? 'bg-[var(--color-bg-surface-dark)] text-white' : 'bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] hover:text-[var(--color-text-strong)]'}`}
+                                  >
+                                    {filter.label}
+                                  </button>
+                                ))}
                               </div>
                             </div>
-                          ))}
+
+                            <div className="mt-3 space-y-2">
+                              {marketingCampaigns.filter((campaign) => campaignFilter === 'all' || campaign.status === campaignFilter).length === 0 ? (
+                                <EmptyState
+                                  icon={<Megaphone className="h-6 w-6" />}
+                                  title={marketingCampaigns.length === 0 ? 'Sem campanhas' : 'Nenhuma campanha neste estado'}
+                                  description={marketingCampaigns.length === 0 ? 'Preencha o formulário ao lado para criar a primeira campanha.' : 'Escolha outro filtro para ver as restantes campanhas.'}
+                                />
+                              ) : (
+                                marketingCampaigns
+                                  .filter((campaign) => campaignFilter === 'all' || campaign.status === campaignFilter)
+                                  .map((campaign) => (
+                                    <div key={campaign.id} className="rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 shadow-[var(--shadow-xs)]">
+                                      <div className="flex flex-wrap items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <h4 className="text-sm font-black text-[var(--color-text-strong)]">{campaign.name}</h4>
+                                            <Badge variant={MARKETING_STATUS_VARIANTS[campaign.status]}>{MARKETING_STATUS_LABELS[campaign.status]}</Badge>
+                                          </div>
+                                          <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">
+                                            {campaign.channels.map((channel) => MARKETING_CHANNEL_LABELS[channel]).join(' · ')}
+                                          </p>
+                                        </div>
+                                        {campaign.budgetXOF ? (
+                                          <div className="rounded-xl bg-[var(--color-bg-subtle)] px-2.5 py-1.5 text-right">
+                                            <p className="text-[9px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">Orçamento</p>
+                                            <p className="text-xs font-black tabular-nums text-[var(--color-text-strong)]">{campaign.budgetXOF.toLocaleString('pt-PT')} XOF</p>
+                                          </div>
+                                        ) : null}
+                                      </div>
+
+                                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-semibold text-[var(--color-text-muted)]">
+                                        <span>{MARKETING_OBJECTIVE_LABELS[campaign.objective]}</span>
+                                        <span>{campaign.contentIds.length} conteúdos</span>
+                                        <span>
+                                          {campaign.startsAt ? new Date(campaign.startsAt).toLocaleDateString('pt-PT') : 'Sem início'}
+                                          {' — '}
+                                          {campaign.endsAt ? new Date(campaign.endsAt).toLocaleDateString('pt-PT') : 'Sem fim'}
+                                        </span>
+                                      </div>
+
+                                      <div className="mt-3 flex flex-wrap gap-2">
+                                        {campaign.status === 'draft' && <Button type="button" size="sm" variant="primary" onClick={() => updateCampaignStatus(campaign, 'scheduled')}>Agendar</Button>}
+                                        {campaign.status === 'scheduled' && <Button type="button" size="sm" variant="primary" onClick={() => updateCampaignStatus(campaign, 'active')}>Ativar</Button>}
+                                        {campaign.status === 'active' && <Button type="button" size="sm" variant="ghost" onClick={() => updateCampaignStatus(campaign, 'paused')}>Pausar</Button>}
+                                        {campaign.status === 'paused' && <Button type="button" size="sm" variant="primary" onClick={() => updateCampaignStatus(campaign, 'active')}>Retomar</Button>}
+                                        {!['ended', 'archived'].includes(campaign.status) && <Button type="button" size="sm" variant="ghost" onClick={() => updateCampaignStatus(campaign, 'ended')}>Encerrar</Button>}
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => setMarketingCampaigns((previous) => [{ ...campaign, id: `campaign-${Date.now()}`, name: `${campaign.name} (cópia)`, status: 'draft', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, ...previous])}
+                                        >
+                                          Duplicar
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}
                     {marketingSection === 'content' && (
                       <div className="mt-6 border-t border-[var(--color-border-subtle)] pt-5">
-                        <div className="flex flex-wrap gap-2">
-                          {(['all', 'posts', 'promotions', 'scheduled'] as const).map((filter) => <button key={filter} type="button" onClick={() => setContentFilter(filter)} className={`rounded-full px-3 py-1.5 text-[10px] font-black ${contentFilter === filter ? 'bg-[var(--color-bg-surface-dark)] text-white' : 'bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)]'}`}>{filter === 'all' ? t('business.Todos') : filter === 'posts' ? t('posts') : filter === 'promotions' ? t('promotions') : t('business.Agendados')}</button>)}
+                        <div className="flex flex-wrap items-end justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-green-700)]">Inventário editorial</p>
+                            <h4 className="mt-1 text-base font-black text-[var(--color-text-strong)]">Publicações e promoções</h4>
+                            <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">Filtre o conteúdo que pode ser associado a campanhas.</p>
+                          </div>
+                          <Badge variant="info">{marketingContentItems.length} itens</Badge>
                         </div>
-                        <div className="mt-3 grid gap-2 md:grid-cols-2">
-                          {(contentFilter !== 'promotions' ? business.posts.map((post) => ({ id: post.id, title: post.title, type: t('business.Publicacao'), status: String(post.status) })) : []).concat(contentFilter !== 'posts' ? business.promotions.map((promotion) => ({ id: promotion.id, title: promotion.title, type: t('business.Promocao'), status: String(promotion.status || (promotion.isActive ? 'active' : 'draft')) })) : []).filter((item) => contentFilter !== 'scheduled' || ['scheduled', 'publishing'].includes(item.status)).map((item) => <div key={item.id} className="flex items-center justify-between rounded-xl border border-[var(--color-border-subtle)] p-3"><span className="min-w-0"><strong className="block truncate text-xs text-[var(--color-text-strong)]">{item.title}</strong><small className="text-[10px] text-[var(--color-text-muted)]">{item.type}</small></span><Badge variant="info">{item.status}</Badge></div>)}
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {(['all', 'posts', 'promotions', 'scheduled'] as const).map((filter) => (
+                            <button
+                              key={filter}
+                              type="button"
+                              aria-pressed={contentFilter === filter}
+                              onClick={() => setContentFilter(filter)}
+                              className={`rounded-full px-3 py-1.5 text-[10px] font-black transition ${contentFilter === filter ? 'bg-[var(--color-bg-surface-dark)] text-white' : 'bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] hover:text-[var(--color-text-strong)]'}`}
+                            >
+                              {filter === 'all' ? t('business.Todos') : filter === 'posts' ? t('posts') : filter === 'promotions' ? t('promotions') : t('business.Agendados')}
+                            </button>
+                          ))}
                         </div>
+                        {marketingContentItems.length === 0 ? (
+                          <div className="mt-3">
+                            <EmptyState icon={<FileText className="h-6 w-6" />} title="Sem conteúdos neste filtro" description="Crie uma publicação ou promoção, ou escolha outro filtro." />
+                          </div>
+                        ) : (
+                          <div className="mt-3 grid gap-2 md:grid-cols-2">
+                            {marketingContentItems.map((item) => (
+                              <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-3">
+                                <span className="min-w-0">
+                                  <strong className="block truncate text-xs text-[var(--color-text-strong)]">{item.title}</strong>
+                                  <small className="text-[10px] text-[var(--color-text-muted)]">{item.typeLabel}</small>
+                                </span>
+                                <Badge variant={['published', 'active'].includes(item.status) ? 'success' : ['scheduled', 'publishing'].includes(item.status) ? 'info' : 'neutral'}>{item.status}</Badge>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                     {marketingSection === 'audience' && (
                       <div className="mt-6 border-t border-[var(--color-border-subtle)] pt-5">
                         <div className="flex items-center justify-between gap-3"><div><h4 className="text-sm font-black text-[var(--color-text-strong)]">Segmentos por regras</h4><p className="mt-1 text-[11px] text-[var(--color-text-muted)]">{t('business.EstimativasAparecemQuando')}</p></div><Button type="button" size="sm" onClick={createAudienceSegment}>Criar segmento</Button></div>
-                        <div className="mt-3 grid gap-2 md:grid-cols-2">{marketingSegments.map((segment) => <div key={segment.id} className="rounded-2xl border border-[var(--color-border-subtle)] p-4"><h4 className="text-xs font-black text-[var(--color-text-strong)]">{segment.name}</h4><p className="mt-1 text-[10px] text-[var(--color-text-muted)]">{segment.location} · {segment.interests.join(', ')}</p><p className="mt-3 text-sm font-black text-[var(--color-green-700)]">{segment.estimatedReach === undefined ? 'Estimativa indispon�vel' : `${segment.estimatedReach.toLocaleString('pt-PT')} pessoas estimadas`}</p></div>)}</div>
+                        <div className="mt-3 grid gap-2 md:grid-cols-2">{marketingSegments.length === 0 ? <div className="md:col-span-2"><EmptyState icon={<Users className="h-6 w-6" />} title="Sem segmentos" description="Crie um segmento para organizar o público das campanhas." /></div> : marketingSegments.map((segment) => <div key={segment.id} className="rounded-2xl border border-[var(--color-border-subtle)] p-4"><h4 className="text-xs font-black text-[var(--color-text-strong)]">{segment.name}</h4><p className="mt-1 text-[10px] text-[var(--color-text-muted)]">{segment.location} · {segment.interests.join(', ')}</p><p className="mt-3 text-sm font-black text-[var(--color-green-700)]">{segment.estimatedReach === undefined ? 'Estimativa indisponível' : `${segment.estimatedReach.toLocaleString('pt-PT')} pessoas estimadas`}</p></div>)}</div>
                       </div>
                     )}
                     {marketingSection === 'library' && (
                       <div className="mt-6 border-t border-[var(--color-border-subtle)] pt-5">
-                        <div className="flex flex-wrap gap-2">{(['all', 'image', 'video', 'banner', 'logo'] as const).map((filter) => <button key={filter} type="button" onClick={() => setAssetFilter(filter)} className={`rounded-full px-3 py-1.5 text-[10px] font-black ${assetFilter === filter ? 'bg-[var(--color-bg-surface-dark)] text-white' : 'bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)]'}`}>{filter === 'all' ? 'Todos' : filter}</button>)}</div>
-                        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{marketingAssets.filter((asset) => assetFilter === 'all' || asset.type === assetFilter).map((asset) => <div key={asset.id} className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)]">{asset.type === 'video' ? <video src={asset.url} className="h-28 w-full object-cover" muted /> : <img src={asset.url} alt={asset.name} className="h-28 w-full object-cover" /> }<div className="p-3"><p className="truncate text-xs font-black text-[var(--color-text-strong)]">{asset.name}</p><p className="mt-1 text-[10px] text-[var(--color-text-muted)]">{asset.type} · {asset.usedBy.length} utiliza��o(�es)</p><button type="button" disabled={asset.usedBy.length > 0} className="mt-2 text-[10px] font-black text-[var(--color-rose-600)] disabled:cursor-not-allowed disabled:text-[var(--color-text-muted)]">Arquivar</button></div></div>)}</div>
+                        <div className="flex flex-wrap items-end justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-green-700)]">Materiais reutilizáveis</p>
+                            <h4 className="mt-1 text-base font-black text-[var(--color-text-strong)]">Biblioteca de campanha</h4>
+                            <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">Imagens, vídeos e logótipos disponíveis para novas campanhas.</p>
+                          </div>
+                          <Badge variant="info">{marketingAssets.length} materiais</Badge>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {(['all', 'image', 'video', 'banner', 'logo'] as const).map((filter) => (
+                            <button
+                              key={filter}
+                              type="button"
+                              aria-pressed={assetFilter === filter}
+                              onClick={() => setAssetFilter(filter)}
+                              className={`rounded-full px-3 py-1.5 text-[10px] font-black transition ${assetFilter === filter ? 'bg-[var(--color-bg-surface-dark)] text-white' : 'bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] hover:text-[var(--color-text-strong)]'}`}
+                            >
+                              {filter === 'all' ? 'Todos' : MARKETING_ASSET_LABELS[filter]}
+                            </button>
+                          ))}
+                        </div>
+                        {marketingAssets.filter((asset) => assetFilter === 'all' || asset.type === assetFilter).length === 0 ? (
+                          <div className="mt-3">
+                            <EmptyState icon={<Layers className="h-6 w-6" />} title="Sem materiais neste filtro" description="Adicione imagens ou vídeos às publicações para os reutilizar aqui." />
+                          </div>
+                        ) : (
+                          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            {marketingAssets.filter((asset) => assetFilter === 'all' || asset.type === assetFilter).map((asset) => (
+                              <div key={asset.id} className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)]">
+                                {asset.type === 'video' ? <video src={asset.url} className="h-28 w-full object-cover" muted /> : <img src={asset.url} alt={asset.name} className="h-28 w-full object-cover" />}
+                                <div className="p-3">
+                                  <p className="truncate text-xs font-black text-[var(--color-text-strong)]">{asset.name}</p>
+                                  <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">{MARKETING_ASSET_LABELS[asset.type]} · {asset.usedBy.length} utilização(ões)</p>
+                                  <button type="button" disabled={asset.usedBy.length > 0} className="mt-2 text-[10px] font-black text-[var(--color-rose-600)] disabled:cursor-not-allowed disabled:text-[var(--color-text-muted)]">Arquivar</button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                     {marketingSection === 'budget' && (
-                      <div className="mt-6 grid gap-3 border-t border-[var(--color-border-subtle)] pt-5 sm:grid-cols-4">
-                        {[
-                          ['Total planeado', marketingCampaigns.reduce((total, campaign) => total + (campaign.budgetXOF || 0), 0)],
-                          ['Gasto registado', marketingCampaigns.reduce((total, campaign) => total + (campaign.spentXOF || 0), 0)],
-                          ['Dispon�vel', marketingCampaigns.reduce((total, campaign) => total + Math.max(0, (campaign.budgetXOF || 0) - (campaign.spentXOF || 0)), 0)],
-                          ['Campanhas', marketingCampaigns.length],
-                        ].map(([label, value]) => <div key={String(label)} className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-4"><p className="text-[10px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">{label}</p><p className="mt-2 text-lg font-black text-[var(--color-text-strong)]">{Number(value).toLocaleString('pt-PT')}{label !== 'Campanhas' ? ' XOF' : ''}</p></div>)}
+                      <div className="mt-6 grid gap-3 border-t border-[var(--color-border-subtle)] pt-5 sm:grid-cols-2 xl:grid-cols-4">
+                        <StatCard
+                          icon={DollarSign}
+                          tone="primary"
+                          label="Total planeado"
+                          value={`${marketingCampaigns.reduce((total, campaign) => total + (campaign.budgetXOF || 0), 0).toLocaleString('pt-PT')} XOF`}
+                          hint="Orçamento das campanhas"
+                        />
+                        <StatCard
+                          icon={TrendingUp}
+                          tone="warning"
+                          label="Gasto registado"
+                          value={`${marketingCampaigns.reduce((total, campaign) => total + (campaign.spentXOF || 0), 0).toLocaleString('pt-PT')} XOF`}
+                          hint="Investimento realizado"
+                        />
+                        <StatCard
+                          icon={CheckCircle2}
+                          tone="success"
+                          label="Disponível"
+                          value={`${marketingCampaigns.reduce((total, campaign) => total + Math.max(0, (campaign.budgetXOF || 0) - (campaign.spentXOF || 0)), 0).toLocaleString('pt-PT')} XOF`}
+                          hint="Saldo por utilizar"
+                        />
+                        <StatCard
+                          icon={Megaphone}
+                          tone="info"
+                          label="Campanhas"
+                          value={marketingCampaigns.length}
+                          hint="Com orçamento associado"
+                        />
                       </div>
                     )}
                     {marketingSection === 'reports' && (
@@ -5064,15 +5594,23 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                     )}
                     {marketingSection === 'calendar' && (
                       <div className="mt-6 border-t border-[var(--color-border-subtle)] pt-5">
-                        <div className="flex items-center justify-between gap-3">
+                        <div className="flex flex-wrap items-end justify-between gap-3">
                           <div>
-                            <h4 className="text-sm font-black text-[var(--color-text-strong)]">Agendamentos</h4>
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-green-700)]">Próximas publicações</p>
+                            <h4 className="mt-1 text-base font-black text-[var(--color-text-strong)]">Agendamentos</h4>
                             <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">{t('business.FusoHorarioPadrao')}</p>
                           </div>
-                          <Badge variant="info">{scheduledItems.length}</Badge>
+                          <Badge variant="info">{scheduledItems.length} agendados</Badge>
                         </div>
                         <div className="mt-3 space-y-2">
-                          {scheduledItems.length === 0 && <p className="rounded-xl bg-[var(--color-bg-subtle)] p-3 text-xs text-[var(--color-text-muted)]">{t('business.AindaNaoExistem3')}</p>}
+                          {scheduledItems.length === 0 && (
+                            <EmptyState
+                              icon={<Calendar className="h-6 w-6" />}
+                              title="Sem agendamentos"
+                              description={t('business.AindaNaoExistem3')}
+                              actions={<Button type="button" size="sm" variant="primary" onClick={() => setActiveTab('posts')}>Criar publicação</Button>}
+                            />
+                          )}
                           {scheduledItems.map((item) => (
                             <div key={item.id} className="flex flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-3 sm:flex-row sm:items-center sm:justify-between">
                               <div>
@@ -5133,7 +5671,24 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
 
       {/* Export Hub Tab */}
       {activeTab === 'export' && (
-        <ClientExportHub business={business} currentLang={currentLang} purchaseOrders={purchaseOrders} />
+        <ClientExportHub
+          business={business}
+          currentLang={currentLang}
+          purchaseOrders={purchaseOrders}
+          events={events}
+          teamMembers={teamMembers}
+          teamAudit={teamAudit}
+          conversations={conversations}
+          conversationMessages={conversationMessages}
+          supportRequests={supportRequests}
+          marketingCampaigns={marketingCampaigns}
+          marketingSegments={marketingSegments}
+          marketingAssets={marketingAssets}
+          scheduledItems={scheduledItems}
+          notifications={notifications}
+          followerCount={followerCount}
+          audienceReach={audienceReach}
+        />
       )}
 
       {selectedBusinessPost && (

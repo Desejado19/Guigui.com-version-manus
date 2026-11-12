@@ -402,8 +402,25 @@ export interface BusinessPost {
   neighborhood?: string;
 }
 
+export interface StoryElement {
+  id: string;
+  type: 'text' | 'emoji' | 'sticker' | 'poll' | 'question' | 'quiz' | 'countdown'
+    | 'link' | 'mention' | 'hashtag' | 'location' | 'music' | 'cta';
+  content: Record<string, any>;
+  positionX: number;
+  positionY: number;
+  scale: number;
+  rotation: number;
+  zIndex: number;
+  pollCounts?: number[];
+  viewerOptionIndex?: number | null;
+  responseCount?: number;
+}
+
 export interface Story {
   id: string;
+  ownerUserId?: string;
+  ownerRole?: 'business' | 'admin';
   businessId: string;
   businessName: string;
   businessLogo: string;
@@ -411,6 +428,9 @@ export interface Story {
   mediaUrl?: string;
   storyType?: 'image' | 'video' | 'text';
   caption?: string;
+  /** Botão de ação opcional dentro do visualizador (ex.: "Ver oferta"). */
+  actionLabel?: string;
+  actionUrl?: string;
   createdAt: string;
   isUnread?: boolean;
   /** IDs dos utilizadores que já viram esta story (estado visto por pessoa). */
@@ -422,6 +442,29 @@ export interface Story {
     text: string;
     createdAt: string;
   }>;
+  durationMs?: number;
+  backgroundColor?: string;
+  visibility?: 'public' | 'limited';
+  status?: 'draft' | 'active' | 'expired' | 'removed' | 'suspended';
+  moderationStatus?: 'pending' | 'approved' | 'rejected';
+  moderationReason?: string | null;
+  locationId?: string | null;
+  locationName?: string | null;
+  shareToken?: string;
+  publishedAt?: string | null;
+  expiresAt?: string | null;
+  archivedAt?: string | null;
+  elements?: StoryElement[];
+  counts?: {
+    views: number; uniqueViews: number; likes: number; reactions: number; replies: number;
+    pollVotes: number; questionResponses: number; shares: number; engagementRate: number;
+  };
+  viewer?: {
+    viewed: boolean;
+    liked: boolean;
+    reaction?: string | null;
+    pollVotes: Record<string, number>;
+  };
 }
 
 export interface Promotion {
@@ -559,6 +602,8 @@ export interface Business {
   priceRange: '$' | '$$' | '$$$' | '$$$$';
   status: 'active' | 'pending' | 'suspended' | 'rejected';
   ownerName?: string;
+  /** Data de registo na plataforma (ISO), fornecida pela base de dados. */
+  createdAt?: string;
   features?: string[];
   products?: Array<{ id: string; name: string; category: string; priceXOF: number; isAvailable: boolean }>;
   verified: boolean;
@@ -710,7 +755,7 @@ export interface PurchaseOrder {
   totalPriceXOF: number;
   paymentMethod: string;
   purchasedAt: string;
-  status: 'pending' | 'redeemed' | 'cancelled';
+  status: 'pending' | 'valid' | 'redeemed' | 'cancelled';
   redeemedAt?: string;
   redeemedBy?: string;
   /** Credenciais individuais quando quantity > 1; o primeiro mantém qrToken/ticketPin por compatibilidade. */
@@ -761,6 +806,21 @@ export interface ModerationSettings {
 // Section 10: Integração de Pagamentos Interfaces
 export type PaymentMethod = 'orange_money' | 'telecel';
 export type HistoricalPaymentMethod = PaymentMethod | 'manual_transfer';
+
+/** Pedido de levantamento (payout) criado pela empresa e decidido na administração. */
+export interface PayoutRequest {
+  id: string;
+  businessId: string;
+  amountXOF: number;
+  method: 'orange_money' | 'manual_transfer';
+  accountRef?: string;
+  status: 'pending' | 'approved' | 'paid' | 'rejected';
+  createdAt: string;
+  decidedAt?: string;
+  decidedBy?: string;
+  note?: string;
+}
+
 export type PaymentUseCase =
   | 'subscription_initial'
   | 'subscription_renewal'
@@ -874,6 +934,7 @@ export type NotificationEventType =
   | 'NEW_SUPPORT_REQUEST'
   | 'NEW_REVIEW'
   | 'NEW_MESSAGE'
+  | 'STORY_COMMENT'
   | 'SUPPORT_REPLY'
   | 'BACKUP_COMPLETED'
   | 'BACKUP_FAILED'
