@@ -737,6 +737,47 @@ const ptBR = {
   'business.exportTicketTypesDescription': 'Preço, quantidade disponível, quantidade vendida e receita estimada por tipo de bilhete.',
   'business.exportTeamTitle': 'Equipa e permissões',
   'business.exportTeamDescription': 'Membros, funções, estado, permissões e última atividade da equipa.',
+
+
+  // Section 9 — settings hub
+  'settings.hub': 'Definições do Hub',
+  'settings.hub.dataAccount': 'Dados e Conta',
+  'settings.hub.profilePreferences': 'Perfil e Preferências',
+  'settings.hub.systemSettings': 'Configurações',
+  'settings.hub.securityPrivacy': 'Segurança e Privacidade',
+  'settings.hub.dataAccountFullName': 'Nome completo',
+  'settings.hub.dataAccountEmail': 'E-mail',
+  'settings.hub.dataAccountPhone': 'Telefone',
+  'settings.hub.dataAccountDateOfBirth': 'Data de nascimento',
+  'settings.hub.dataAccountAccountType': 'Tipo de conta',
+  'settings.hub.saveChanges': 'Salvar',
+  'settings.hub.cancel': 'Cancelar',
+  'settings.profile.language': 'Idioma',
+  'settings.profile.preferredLanguage': 'Idioma preferencial',
+  'settings.profile.theme': 'Tema',
+  'settings.profile.changePassword': 'Alterar senha',
+  'settings.security.changePassword': 'Alterar senha',
+  'settings.security.passwordChangeSuccess': 'Senha alterada com sucesso',
+  'settings.security.twoFactor': 'Autenticação em dois fatores',
+  'settings.security.sessionManagement': 'Gestão de sessões',
+  'settings.security.endSession': 'Terminar sessão',
+  'settings.security.sessionEnded': 'Sessão terminada com sucesso',
+  'settings security.title': 'Segurança e privacidade',
+  'settings.security.privacySettings': 'Definições de privacidade',
+  'settings.security.visibility': 'Visibilidade',
+  'settings.security.dataControl': 'Controlo de dados',
+  'settings.accessibility.title': 'Acessibilidade',
+  'settings.accessibility.darkMode': 'Modo escuro',
+  'settings.accessibility.highContrast': 'Contraste elevado',
+  'settings.notifications.title': 'Notificações',
+  'settings.notifications.enabled': 'Notificações ativadas',
+  'settings.notifications.email': 'Notificações por e-mail',
+  'settings.notifications.sms': 'Notificações SMS',
+  'settings.notifications.push': 'Notificações push',
+  'settings.notifications.frequency': 'Frequência de notificações',
+  'settings.notifications.defaultFrequency': 'Frequência padrão',
+
 } as const;
+
 
 export default ptBR;

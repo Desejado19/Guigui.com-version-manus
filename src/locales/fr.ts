@@ -736,6 +736,47 @@ const fr = {
   'business.exportTicketTypesDescription': 'Prix, quantité disponible, quantité vendue et recette estimée par type de billet.',
   'business.exportTeamTitle': 'Équipe et permissions',
   'business.exportTeamDescription': 'Membres, rôles, statut, permissions et dernière activité de l’équipe.',
+
+
+  // Section 9 — settings hub
+  'settings.hub': 'Configuration du Hub',
+  'settings.hub.dataAccount': 'Données et Compte',
+  'settings.hub.profilePreferences': 'Profil et Préférences',
+  'settings.hub.systemSettings': 'Configurations',
+  'settings.hub.securityPrivacy': 'Sécurité et Confidentialité',
+  'settings.hub.dataAccountFullName': 'Nom complet',
+  'settings.hub.dataAccountEmail': 'E-mail',
+  'settings.hub.dataAccountPhone': 'Téléphone',
+  'settings.hub.dataAccountDateOfBirth': 'Date de naissance',
+  'settings.hub.dataAccountAccountType': 'Type de compte',
+  'settings.hub.saveChanges': 'Enregistrer',
+  'settings.hub.cancel': 'Annuler',
+  'settings.profile.language': 'Langue',
+  'settings.profile.preferredLanguage': 'Langue préférée',
+  'settings.profile.theme': 'Thème',
+  'settings.profile.changePassword': 'Changer le mot de passe',
+  'settings.security.changePassword': 'Changer le mot de passe',
+  'settings.security.passwordChangeSuccess': 'Mot de passe changé avec succès',
+  'settings.security.twoFactor': 'Authentification à deux facteurs',
+  'settings.security.sessionManagement': 'Gestion de session',
+  'settings.security.endSession': 'Terminer la session',
+  'settings.security.sessionEnded': 'Session terminée avec succès',
+  'settings security.title': 'Sécurité et confidentialité',
+  'settings.security.privacySettings': 'Paramètres de confidentialité',
+  'settings.security.visibility': 'Visibilité',
+  'settings.security.dataControl': 'Contrôle des données',
+  'settings.accessibility.title': 'Accessibilité',
+  'settings.accessibility.darkMode': 'Mode sombre',
+  'settings.accessibility.highContrast': 'Contraste élevé',
+  'settings.notifications.title': 'Notifications',
+  'settings.notifications.enabled': 'Notifications activées',
+  'settings.notifications.email': 'Notifications par e-mail',
+  'settings.notifications.sms': 'Notifications SMS',
+  'settings.notifications.push': 'Notifications push',
+  'settings.notifications.frequency': 'Fréquence de notification',
+  'settings.notifications.defaultFrequency': 'Fréquence par défaut',
+
 } as const;
+
 
 export default fr;

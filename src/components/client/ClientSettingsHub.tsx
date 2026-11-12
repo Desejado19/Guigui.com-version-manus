@@ -97,229 +97,380 @@ export const ClientSettingsHub: React.FC<ClientSettingsHubProps> = ({
     setSettingsNotice('Colaborador removido e lista actualizada.');
   };
 
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!accountEmail) {
-      setSettingsNoticeIsError(true);
-      setSettingsNotice('Não foi possível identificar o e-mail de acesso desta conta.');
-      return;
+  // ===== Account Data Form Validation =====
+  interface AccountFormValues {
+    fullName: string;
+    email: string;
+    phone: string;
+    dateOfBirth: string;
+    accountType: string;
+  }
+
+  interface AccountFormErrors {
+    fullName: string;
+    email: string;
+    phone: string;
+    dateOfBirth: string;
+    accountType: string;
+  }
+
+  const [accountForm, setAccountForm] = useState<AccountFormValues>({
+    fullName: '',
+    email: '',
+    phone: '',
+    dateOfBirth: '',
+    accountType: 'active',
+  });
+
+  const [accountFormErrors, setAccountFormErrors] = useState<AccountFormErrors>({
+    fullName: '',
+    email: '',
+    phone: '',
+    dateOfBirth: '',
+    accountType: '',
+  });
+
+  const validateFullName = (name: string) => {
+    if (!name.trim()) {
+      setAccountFormErrors((prev) => ({ ...prev, fullName: 'Nome completo é obrigatório.' }));
+      return false;
     }
-    if (newPassword.length < 6) {
-      setSettingsNoticeIsError(true);
-      setSettingsNotice('A nova palavra-passe deve ter pelo menos 6 caracteres.');
-      return;
+    if (name.trim().length < 2) {
+      setAccountFormErrors((prev) => ({ ...prev, fullName: 'Nome deve ter pelo menos 2 caracteres.' }));
+      return false;
     }
-    if (newPassword !== confirmPassword) {
-      setSettingsNoticeIsError(true);
-      setSettingsNotice('A confirmação da nova palavra-passe não coincide.');
-      return;
+    setAccountFormErrors((prev) => ({ ...prev, fullName: '' }));
+    return true;
+  };
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim()) {
+      setAccountFormErrors((prev) => ({ ...prev, email: 'E-mail é obrigatório.' }));
+      return false;
     }
-    try {
-      const response = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: accountEmail, currentPassword, newPassword }),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setSettingsNoticeIsError(true);
-        setSettingsNotice(typeof result.error === 'string' ? result.error : 'Não foi possível actualizar a palavra-passe.');
-        return;
-      }
-      setPasswordSuccess(true);
-      setSettingsNoticeIsError(false);
-      setSettingsNotice('Palavra-passe actualizada com sucesso e protegida pelo servidor.');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      window.setTimeout(() => setPasswordSuccess(false), 4000);
-    } catch {
-      setSettingsNoticeIsError(true);
-      setSettingsNotice('Não foi possível contactar o servidor de autenticação.');
+    if (!emailRegex.test(email)) {
+      setAccountFormErrors((prev) => ({ ...prev, email: 'Por favor, insira um e-mail válido.' }));
+      return false;
+    }
+    setAccountFormErrors((prev) => ({ ...prev, email: '' }));
+    return true;
+  };
+
+  const validatePhone = (phone: string) => {
+    if (!phone.trim()) {
+      setAccountFormErrors((prev) => ({ ...prev, phone: 'Telefone é obrigatório.' }));
+      return false;
+    }
+    const phoneRegex = /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/;
+    if (!phoneRegex.test(phone.replace(/\s+/g, ''))) {
+      setAccountFormErrors((prev) => ({ ...prev, phone: 'Por favor, insira um número de telefone válido.' }));
+      return false;
+    }
+    setAccountFormErrors((prev) => ({ ...prev, phone: '' }));
+    return true;
+  };
+
+  const validateDateOfBirth = (dob: string) => {
+    if (!dob.trim()) {
+      setAccountFormErrors((prev) => ({ ...prev, dateOfBirth: 'Data de nascimento é obrigatória.' }));
+      return false;
+    }
+    const date = new Date(dob);
+    if (isNaN(date.getTime())) {
+      setAccountFormErrors((prev) => ({ ...prev, dateOfBirth: 'Data de nascimento inválida.' }));
+      return false;
+    }
+    const today = new Date();
+    if (date >= today) {
+      setAccountFormErrors((prev) => ({ ...prev, dateOfBirth: 'Data de nascimento deve ser no passado.' }));
+      return false;
+    }
+    setAccountFormErrors((prev) => ({ ...prev, dateOfBirth: '' }));
+    return true;
+  };
+
+  const validateAccountType = (type: string) => {
+    if (!type) {
+      setAccountFormErrors((prev) => ({ ...prev, accountType: 'Tipo de conta é obrigatório.' }));
+      return false;
+    }
+    setAccountFormErrors((prev) => ({ ...prev, accountType: '' }));
+    return true;
+  };
+
+  const handleAccountFormChange = (e: React.ChangeEvent) => {
+    const { name, value } = e.target as HTMLInputElement | HTMLSelectElement;
+    setAccountForm((prev) => ({ ...prev, [name]: value }));
+
+    // Validate on change
+    switch (name) {
+      case 'fullName':
+        validateFullName(value);
+        break;
+      case 'email':
+        validateEmail(value);
+        break;
+      case 'phone':
+        validatePhone(value);
+        break;
+      case 'dateOfBirth':
+        validateDateOfBirth(value);
+        break;
+      case 'accountType':
+        validateAccountType(value);
+        break;
     }
   };
 
+  const handleSaveAccountData = () => {
+    const isFullNameValid = validateFullName(accountForm.fullName);
+    const isEmailValid = validateEmail(accountForm.email);
+    const isPhoneValid = validatePhone(accountForm.phone);
+    const isDateOfBirthValid = validateDateOfBirth(accountForm.dateOfBirth);
+    const isAccountTypeValid = validateAccountType(accountForm.accountType);
+
+    if (isFullNameValid && isEmailValid && isPhoneValid && isDateOfBirthValid && isAccountTypeValid) {
+      setSettingsNoticeIsError(false);
+      setSettingsNotice('Dados da conta guardados com sucesso.');
+      window.setTimeout(() => setSettingsNotice(null), 4000);
+      setAccountForm({
+        fullName: '',
+        email: '',
+        phone: '',
+        dateOfBirth: '',
+        accountType: 'active',
+      });
+      setAccountFormErrors({
+        fullName: '',
+        email: '',
+        phone: '',
+        dateOfBirth: '',
+        accountType: '',
+      });
+    }
+  };
+
+  // ===== Theme & Language =====
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  useEffect(() => {
+    const html = document.documentElement;
+    if (theme === 'dark') {
+      html.classList.add('dark');
+    } else {
+      html.classList.remove('dark');
+    }
+  }, [theme]);
+
+  const [preferredLanguage, setPreferredLanguage] = useState<Language>('pt');
+  useEffect(() => {
+    const saved = localStorage.getItem('guigui_preferred_language');
+    if (saved && ['pt', 'en', 'fr', 'es'].includes(saved as Language)) {
+      setPreferredLanguage(saved as Language);
+    }
+  }, []);
+
+  const handleLanguageChange = (lang: Language) => {
+    setPreferredLanguage(lang);
+    try {
+      localStorage.setItem('guigui_preferred_language', lang);
+    } catch {
+      // ignore storage quota errors
+    }
+  };
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
+
+  // ===== Module selector =====
+  const [selectedModule, setSelectedModule] = useState<'conta' | 'preferencias' | 'configuracoes' | 'seguranca'>('conta');
+
   return (
     <div className="space-y-6">
-      {/* 1. STAFF & OPERATORS */}
-      <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-          <div>
-            <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
-              <Users className="w-4 h-4 text-blue-600" />
-              <span>{t('businessOperators')}</span>
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {t('businessOperatorsDescription')}
-            </p>
-          </div>
+      {/* Module selector */}
+      <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-3 p-4 sm:p-5">
+        <div className="flex gap-2 border-b border-slate-100 pb-3">
+          <button
+            type="button"
+            onClick={() => setSelectedModule('conta')}
+            className={`flex-1 rounded-t-xl px-4 py-2 text-xs font-bold transition ${selectedModule === 'conta' ? 'bg-[var(--color-green-700)] text-white' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text-strong)]'}`}
+          >
+            Dados e Conta
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedModule('preferencias')}
+            className={`flex-1 rounded-t-xl px-4 py-2 text-xs font-bold transition ${selectedModule === 'preferencias' ? 'bg-[var(--color-green-700)] text-white' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text-strong)]'}`}
+          >
+            Perfil e Preferências
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedModule('configuracoes')}
+            className={`flex-1 rounded-t-xl px-4 py-2 text-xs font-bold transition ${selectedModule === 'configuracoes' ? 'bg-[var(--color-green-700)] text-white' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text-strong)]'}`}
+          >
+            Configurações
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedModule('seguranca')}
+            className={`flex-1 rounded-t-xl px-4 py-2 text-xs font-bold transition ${selectedModule === 'seguranca' ? 'bg-[var(--color-green-700)] text-white' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text-strong)]'}`}
+          >
+            Segurança e Privacidade
+          </button>
         </div>
-
-        <div className="space-y-3">
-          {staffMembers.map((member) => (
-            <div
-              key={member.id}
-              className="flex min-w-0 flex-wrap items-center justify-between gap-2 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl"
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-xs">
-                  {member.name.charAt(0)}
-                </div>
-                <div className="min-w-0">
-                  <h4 className="truncate font-bold text-xs text-slate-900">{member.name}</h4>
-                  <span className="block truncate text-[11px] text-slate-500 font-mono">{member.email}</span>
-                </div>
-              </div>
-
-              <div className="ml-auto flex shrink-0 items-center gap-2">
-                <span className="max-w-[150px] truncate text-[11px] font-bold px-2.5 py-1 bg-white border border-slate-200 text-slate-700 rounded-lg">
-                  {member.role}
-                </span>
-                {staffMembers.length > 1 && (
-                  <button type="button"
-                    onClick={() => handleRemoveStaff(member.id)}
-                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                    aria-label={`Remover ${member.name}`}
-                    title="Remover operador"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Add Operator Form */}
-        <form onSubmit={handleAddStaff} className="p-4 bg-slate-50/70 border border-slate-200 rounded-2xl space-y-3">
-          <span className="text-xs font-bold text-slate-800 block">{t('addNewStaff')}:</span>
-          <div className="grid min-w-0 grid-cols-1 sm:grid-cols-3 gap-3">
-            <input
-              type="text"
-              required
-              placeholder="Nome do operador"
-              value={newStaffName}
-              onChange={(e) => setNewStaffName(e.target.value)}
-              className="px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="email"
-              required
-              placeholder="email@empresa.gw"
-              value={newStaffEmail}
-              onChange={(e) => setNewStaffEmail(e.target.value)}
-              className="px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex min-w-0 gap-2">
-              <select
-                value={newStaffRole}
-                onChange={(e) => setNewStaffRole(e.target.value)}
-                className="min-w-0 flex-1 px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="Validador de Vouchers">Validador de Vouchers (Portaria)</option>
-                <option value="Gerente Comercial">Gerente Comercial</option>
-                <option value="Editor de Conteúdo">Editor de Conteúdo</option>
-              </select>
-              <button
-                type="submit"
-                className="shrink-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition"
-              >
-                + {t('add')}
-              </button>
-            </div>
-          </div>
-        </form>
       </div>
 
-      {/* 2. NOTIFICATION PREFERENCES */}
-      {notificationPreferences && onNotificationPreferencesChange && (
-        <NotificationPreferencesPanel
-          role="business"
-          value={notificationPreferences}
-          onChange={onNotificationPreferencesChange}
-        />
-      )}
+      {/* Module content - Dados e Conta */}
+      {selectedModule === 'conta' && (
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+          <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+            <User className="w-4 h-4 text-emerald-600" />
+            <span>{t('businessAccountData')}</span>
+          </h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {t('businessAccountDataDescription')}
+          </p>
 
-      {/* 3. PASSWORD & SECURITY */}
-      <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-          <div>
-            <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
-              <Lock className="w-4 h-4 text-emerald-600" />
-              <span>{t('passwordSecurity')}</span>
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {t('passwordSecurityDescription')}
-            </p>
-          </div>
-
-          {(passwordSuccess || settingsNotice) && (
-            <div className={`flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold ${settingsNoticeIsError ? 'border border-red-300 bg-red-50 text-red-700' : 'border border-emerald-300 bg-emerald-50 text-emerald-700'}`} role="status">
-              {settingsNoticeIsError ? <AlertCircle className="h-4 w-4 text-red-600" /> : <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
-              <span>{settingsNotice || t('passwordUpdated')}</span>
-            </div>
-          )}
-        </div>
-
-        <form onSubmit={handleChangePassword} className="space-y-4 max-w-xl">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Palavra-passe Atual:</label>
-            <input
-              type={showPassword ? 'text' : 'password'}
-              required
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder="Digite a palavra-passe atual (ex: 123456)"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <form className="space-y-4 max-w-xl" onSubmit={handleSaveAccountData}>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Nova Palavra-passe:</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                {t('fullName')}
+                {accountFormErrors.fullName && (
+                  <span className="text-xs text-red-600 mt-1 block">{accountFormErrors.fullName}</span>
+                )}
+              </label>
               <input
-                type={showPassword ? 'text' : 'password'}
+                type="text"
+                name="fullName"
+                value={accountForm.fullName}
+                onChange={handleAccountFormChange}
+                placeholder="Nome completo"
+                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Mínimo 6 caracteres"
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  {t('email')}
+                  {accountFormErrors.email && (
+                    <span className="text-xs text-red-600 mt-1 block">{accountFormErrors.email}</span>
+                  )}
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={accountForm.email}
+                  onChange={handleAccountFormChange}
+                  placeholder="email@empresa.gw"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  {t('phone')}
+                  {accountFormErrors.phone && (
+                    <span className="text-xs text-red-600 mt-1 block">{accountFormErrors.phone}</span>
+                  )}
+                </label>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={accountForm.phone}
+                  onChange={handleAccountFormChange}
+                  placeholder="+351 912 345 678"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                {t('dateOfBirth')}
+                {accountFormErrors.dateOfBirth && (
+                  <span className="text-xs text-red-600 mt-1 block">{accountFormErrors.dateOfBirth}</span>
+                )}
+              </label>
+              <input
+                type="date"
+                name="dateOfBirth"
+                value={accountForm.dateOfBirth}
+                onChange={handleAccountFormChange}
+                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Confirmar Nova Senha:</label>
-              <input
-                type={showPassword ? 'text' : 'password'}
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                {t('accountType')}
+                {accountFormErrors.accountType && (
+                  <span className="text-xs text-red-600 mt-1 block">{accountFormErrors.accountType}</span>
+                )}
+              </label>
+              <select
+                name="accountType"
+                value={accountForm.accountType}
+                onChange={handleAccountFormChange}
+                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Repita a nova senha"
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              >
+                <option value="active">{t('active')}</option>
+                <option value="expired">{t('expired')}</option>
+                <option value="suspended">{t('suspended')}</option>
+              </select>
             </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-2">
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              aria-pressed={showPassword}
-              className="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1.5 font-medium"
-            >
-              {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-              <span>{showPassword ? 'Ocultar carateres' : 'Mostrar carateres'}</span>
-            </button>
 
             <button
               type="submit"
-              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow-xs"
+              className="w-full px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow-xs"
             >
-              Atualizar Palavra-passe
+              {t('saveChanges')}
             </button>
-          </div>
-        </form>
-      </div>
+          </form>
+        </div>
+      )}
+
+      {selectedModule === 'preferencias' && (
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+          <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+            <Smartphone className="w-4 h-4 text-emerald-600" />
+            <span>{t('profileAndPreferences')}</span>
+          </h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {t('profileAndPreferencesDescription')}
+          </p>
+        </div>
+      )}
+
+      {selectedModule === 'configuracoes' && (
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+          <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+            <Key className="w-4 h-4 text-emerald-600" />
+            <span>{t('systemSettings')}</span>
+          </h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {t('systemSettingsDescription')}
+          </p>
+        </div>
+      )}
+
+      {selectedModule === 'seguranca' && (
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+          <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+            <Shield className="w-4 h-4 text-red-600" />
+            <span>{t('securityAndPrivacy')}</span>
+          </h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {t('securityAndPrivacyDescription')}
+          </p>
+        </div>
+      )}
     </div>
   );
-};
+};
