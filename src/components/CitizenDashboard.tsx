@@ -140,6 +140,21 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
   const [passwordMessage, setPasswordMessage] = useState('');
   const [passwordChanged, setPasswordChanged] = useState(Boolean(currentUser.passwordChangedAt));
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
+
+  // CSRF token from double-submit cookie pattern
+  const [csrfToken, setCsrfToken] = useState<string>('');
+  useEffect(() => {
+    const cookieHeader = document.cookie || '';
+    const csrfMatch = cookieHeader.match(/(?:^|;\s*)csrf=([^;]+)/);
+    if (csrfMatch) {
+      setCsrfToken(csrfMatch[1]);
+    }
+  }, []);
+
+  // Helper to get CSRF headers for state-changing requests
+  const getCsrfHeaders = () => {
+    return { 'X-CSRF-Token': csrfToken };
+  };
   const [ticketPreference, setTicketPreference] = useState<'digital' | 'both'>(currentUser.ticketPreference || 'digital');
   const [communicationPreference, setCommunicationPreference] = useState<'email' | 'sms' | 'both'>(currentUser.communicationPreference || 'both');
 
@@ -290,20 +305,20 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
   }, [sidebarCollapsed]);
 
   const citizenNavigationGroups: Array<{ heading: string; items: Array<{ id: CitizenSection; label: string; icon: React.ElementType; count?: number }> }> = [
-    { heading: 'Geral', items: [
-      { id: 'overview', label: 'Minha Conta', icon: WalletCards },
-      { id: 'tickets', label: 'Meus bilhetes', icon: Ticket, count: ticketOrders.length },
+    { heading: 'Menu principal', items: [
+      { id: 'overview', label: 'Visão geral', icon: WalletCards },
+      { id: 'tickets', label: 'Bilhetes e compras', icon: Ticket, count: ticketOrders.length },
       { id: 'purchases', label: 'Compras', icon: WalletCards, count: nonTicketOrders.length },
     ] },
-    { heading: 'Atendimento', items: [
+    { heading: 'Comunicação', items: [
       { id: 'notifications', label: 'Notificações', icon: Bell, count: unreadNotifications },
       { id: 'support', label: 'Suporte', icon: LifeBuoy },
     ] },
-    { heading: 'Gestão da conta', items: [
+    { heading: 'Conta', items: [
       { id: 'account-data', label: 'Dados e conta', icon: UserX },
       { id: 'system-settings', label: 'Definições do sistema', icon: Palette },
-      { id: 'personal-settings', label: 'Configurações pessoais', icon: UserRound },
-      { id: 'privacy-settings', label: 'Privacidade', icon: ShieldCheck },
+      { id: 'personal-settings', label: 'Perfil e preferências', icon: UserRound },
+      { id: 'privacy-settings', label: 'Segurança e privacidade', icon: ShieldCheck },
     ] },
   ];
 
@@ -323,92 +338,128 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
 
         <aside
           style={{ width: sidebarCollapsed ? 72 : 248 }}
-          className={`${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed left-0 top-[120px] z-50 h-[calc(100vh-120px)] max-w-[calc(100vw-16px)] shrink-0 border-r border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] shadow-[inset_-1px_0_0_rgba(15,23,42,0.04)] transition-[transform,box-shadow,width] duration-300 ease-out md:top-[120px] md:h-[calc(100vh-120px)] md:translate-x-0`}
+          className={`${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed left-0 top-[62px] z-50 h-[calc(100vh-62px)] max-w-[calc(100vw-16px)] shrink-0 border-r border-[#0c3a34] bg-[radial-gradient(135%_85%_at_0%_0%,_#10443d_0%,_#0b332e_45%,_#072420_100%)] text-white shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)] transition-[transform,box-shadow,width] duration-300 ease-out min-[761px]:top-[72px] min-[761px]:h-[calc(100vh-72px)] md:translate-x-0`}
         >
           <div className="flex h-full min-h-0 flex-col">
-            <div className="flex items-center justify-between border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)]/90 px-1.5 py-2.5 backdrop-blur-sm">
-              <div className={`flex items-center ${sidebarCollapsed ? 'w-full justify-center' : 'gap-1.5'} pl-0.5`}>
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--color-bg-surface)] text-[11px] font-black text-[var(--color-text-muted)] shadow-sm">
-                  {currentUser.name.slice(0, 2).toUpperCase()}
+            <div className="flex items-center justify-between px-3 py-4">
+              <div className={`flex items-center ${sidebarCollapsed ? 'w-full justify-center' : 'gap-2.5'}`}>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#3fae80] text-lg font-black text-[#072420] shadow-[0_12px_22px_-12px_rgba(63,174,128,0.85)]">
+                  G
                 </div>
                 {!sidebarCollapsed && (
                   <div className="min-w-0">
-                    <div className="text-[9px] font-black uppercase tracking-[0.22em] text-[var(--color-text-muted)]">{t('personalArea')}</div>
-                    <div className="text-lg font-black text-[var(--color-text-strong)]">Guigui.com</div>
+                    <div className="text-lg font-black leading-none text-white">Guigui<span className="text-[#e8a23a]">.com</span></div>
+                    <div className="mt-1.5 text-[8.5px] font-black uppercase tracking-[0.2em] text-[#8fb3ac]">{t('personalArea')}</div>
                   </div>
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              {!sidebarCollapsed && (
+                <div className="flex items-center gap-1">
+                  <IconButton
+                    label={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 w-8 rounded-full border-0 bg-transparent text-[#8fb3ac] shadow-none hover:bg-white/10 hover:text-white"
+                    onClick={() => setSidebarCollapsed((value) => !value)}
+                    title={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </IconButton>
+                  <IconButton
+                    label={`${t('close')} menu lateral`}
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 w-8 rounded-full border-0 bg-transparent text-[#8fb3ac] shadow-none hover:bg-white/10 hover:text-white md:hidden"
+                    onClick={() => setMobileSidebarOpen(false)}
+                  >
+                    <X className="h-4 w-4" />
+                  </IconButton>
+                </div>
+              )}
+              {sidebarCollapsed && (
                 <IconButton
-                  label={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}
+                  label="Expandir menu"
                   variant="secondary"
                   size="sm"
-                  className="h-8 w-8 rounded-full"
-                  onClick={() => setSidebarCollapsed((value) => !value)}
-                  title={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}
+                  className="absolute right-1 top-3 h-6 w-6 rounded-full border-0 bg-transparent text-[#8fb3ac] shadow-none hover:bg-white/10 hover:text-white"
+                  onClick={() => setSidebarCollapsed(false)}
+                  title="Expandir menu"
                 >
-                  {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                  <ChevronRight className="h-3.5 w-3.5" />
                 </IconButton>
-                <IconButton
-                  label={`${t('close')} menu lateral`}
-                  variant="secondary"
-                  size="sm"
-                  className="h-8 w-8 rounded-full md:hidden"
-                  onClick={() => setMobileSidebarOpen(false)}
-                >
-                  <X className="h-4 w-4" />
-                </IconButton>
-              </div>
+              )}
             </div>
 
-            <div className="flex-1 overflow-y-auto overflow-x-hidden p-2">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
+              {!sidebarCollapsed && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSection('personal-settings');
+                    setMobileSidebarOpen(false);
+                  }}
+                  className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.045] p-2.5 text-left transition hover:bg-white/[0.08]"
+                >
+                  {currentUser.avatarUrl ? (
+                    <img src={currentUser.avatarUrl} alt={currentUser.name} className="h-10 w-10 shrink-0 rounded-full border border-white/10 object-cover" />
+                  ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#155048] text-xs font-black text-[#d8e6e2]">
+                      {currentUser.name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[12px] font-black text-white">{currentUser.name}</div>
+                    <div className="mt-0.5 truncate text-[10px] font-semibold text-[#8fb3ac]">{currentUser.email}</div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[#6f8f89]" />
+                </button>
+              )}
+
               {citizenNavigationGroups.map((group) => (
-                <div key={group.heading} className={`${sidebarCollapsed ? 'space-y-1.5' : 'space-y-2'}`}>
+                <div key={group.heading} className={sidebarCollapsed ? 'mb-2 space-y-1.5' : 'mb-3 space-y-1'}>
                   {!sidebarCollapsed && (
-                    <div className="px-2 text-[8px] font-black uppercase tracking-[0.22em] text-[var(--color-text-muted)]">{group.heading}</div>
+                    <div className="px-3 pb-1 pt-1.5 text-[8px] font-black uppercase tracking-[0.22em] text-[#6f8f89]">{group.heading}</div>
                   )}
 
-                  <div className={`${sidebarCollapsed ? 'space-y-1.5' : 'space-y-1'}`}>
+                  <div className={sidebarCollapsed ? 'space-y-1.5' : 'space-y-1'}>
                     {group.items.map((item) => {
                       const Icon = item.icon;
                       const isActive = section === item.id;
 
                       return (
-                        <React.Fragment key={item.id}>
                         <button
-                            type="button"
-                            onClick={() => {
-                              setSection(item.id);
-                              setMobileSidebarOpen(false);
-                            }}
-                            aria-label={item.label}
-                            title={item.label}
-                            className={`group relative flex w-full items-center rounded-2xl border text-left transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[var(--color-green-600)] ${
-                              sidebarCollapsed
-                                ? 'justify-center border-transparent p-2.5'
-                                : 'gap-2 border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-2 shadow-[0_8px_18px_-18px_rgba(15,23,42,0.18)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-bg-surface-hover)]'
-                            } ${
-                              isActive
-                                ? 'border-[var(--color-green-600)] bg-[var(--color-green-600)] text-white shadow-[0_18px_28px_-20px_rgba(63,174,128,0.75)]'
-                                : 'text-[var(--color-text-strong)]'
-                            }`}
-                          >
-                          <div className={`flex shrink-0 items-center justify-center rounded-xl ${sidebarCollapsed ? 'h-7 w-7' : 'h-6 w-6'} ${isActive ? 'bg-[var(--color-green-600)]/20 text-white' : 'bg-[var(--color-bg-surface)] text-[var(--color-text-muted)]'}`}>
-                            <Icon className={sidebarCollapsed ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            setSection(item.id);
+                            setMobileSidebarOpen(false);
+                          }}
+                          aria-label={item.label}
+                          aria-current={isActive ? 'page' : undefined}
+                          title={item.label}
+                          className={`group relative flex w-full items-center rounded-full text-left transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[#3fae80]/50 ${
+                            sidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2'
+                          } ${
+                            isActive
+                              ? 'bg-[#3fae80] text-white shadow-[0_16px_28px_-16px_rgba(63,174,128,0.9)]'
+                              : 'text-[#d8e6e2] hover:bg-white/[0.05]'
+                          }`}
+                        >
+                          <div className={`flex shrink-0 items-center justify-center rounded-full ${sidebarCollapsed ? 'h-8 w-8' : 'h-9 w-9'} ${isActive ? 'bg-black/10 text-white' : 'bg-white/[0.06] text-[#a9c4be] group-hover:bg-white/[0.1] group-hover:text-white'}`}>
+                            <Icon className="h-4 w-4" />
                           </div>
 
                           {!sidebarCollapsed && (
                             <div className="min-w-0 flex-1">
-                              <div className="text-[10px] font-black leading-snug">{item.label}</div>
+                              <div className="truncate text-[11.5px] font-black leading-snug">{item.label}</div>
                             </div>
                           )}
 
-                          {!sidebarCollapsed && typeof item.count === 'number' && (
-                            <Badge variant={isActive ? 'verified' : 'neutral'} className={`border-0 px-1.5 py-0.5 text-[9px] ${isActive ? 'bg-[var(--color-green-600)]/20 text-white' : ''}`}>{item.count}</Badge>
+                          {!sidebarCollapsed && typeof item.count === 'number' && item.count > 0 && (
+                            <span className={`flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-black ${isActive ? 'bg-white/25 text-white' : 'bg-[#f7bcbc] text-[#8a1f1f]'}`}>{item.count}</span>
                           )}
                         </button>
-                        </React.Fragment>
                       );
                     })}
                   </div>
@@ -416,20 +467,17 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
               ))}
             </div>
 
-            <div className="border-t border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)]/80 p-2">
-              <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-2">
-                <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-2.5'} rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-2`}>
-                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--color-green-100)] text-[var(--color-green-700)]">
-                    <CheckCircle2 className="h-4 w-4" />
-                  </div>
-                  {!sidebarCollapsed && (
-                    <div className="min-w-0">
-                      <div className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--color-text-muted)]">{t('activeAccountLabel')}</div>
-                      <div className="truncate text-xs font-black text-[var(--color-text-strong)]">{currentUser.name}</div>
-                    </div>
-                  )}
+            <div className="mt-auto border-t border-white/10 px-2 py-2.5">
+              <div className={`flex items-center rounded-2xl border border-white/10 bg-white/[0.04] p-2 ${sidebarCollapsed ? 'justify-center' : 'gap-2.5'}`}>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#3fae80]/15 text-[#7fd8b4]">
+                  <CheckCircle2 className="h-4 w-4" />
                 </div>
-
+                {!sidebarCollapsed && (
+                  <div className="min-w-0">
+                    <div className="text-[9px] font-black uppercase tracking-[0.18em] text-[#8fb3ac]">{t('activeAccountLabel')}</div>
+                    <div className="truncate text-[11.5px] font-black text-white">{currentUser.name}</div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -481,12 +529,12 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
-              { label: 'Bilhetes', value: ticketOrders.length, icon: Ticket, tone: 'info' as const },
-              { label: 'Compras pendentes', value: pendingOrders.length, icon: WalletCards, tone: 'warning' as const },
-              { label: 'Lembretes', value: reminders.length, icon: CalendarDays, tone: 'accent' as const },
-              { label: 'Por ler', value: unreadNotifications, icon: Bell, tone: 'danger' as const },
+              { label: 'Bilhetes', value: ticketOrders.length, icon: Ticket, tone: 'info' as const, hint: 'Bilhetes emitidos' },
+              { label: 'Compras pendentes', value: pendingOrders.length, icon: WalletCards, tone: 'warning' as const, hint: 'Aguardam confirmação' },
+              { label: 'Lembretes', value: reminders.length, icon: CalendarDays, tone: 'accent' as const, hint: 'Eventos guardados' },
+              { label: 'Por ler', value: unreadNotifications, icon: Bell, tone: 'danger' as const, hint: 'Notificações novas' },
             ].map((stat) => (
-              <StatCard key={stat.label} icon={stat.icon} tone={stat.tone} label={stat.label} value={stat.value} />
+              <StatCard key={stat.label} icon={stat.icon} tone={stat.tone} label={stat.label} value={stat.value} hint={stat.hint} />
             ))}
           </div>
 
@@ -535,7 +583,63 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
 
       {section === 'system-settings' && <div className="space-y-5">
         <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5 sm:p-6"><div className="flex items-start gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-violet-100)] text-[var(--color-violet-700)] dark:bg-[var(--color-violet-950)]/40 dark:text-[var(--color-violet-300)]"><ShieldCheck className="h-5 w-5" /></div><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-violet-600)]">Funcionamento da plataforma</p><h2 className="mt-1 text-base sm:text-lg font-black text-[var(--color-text-strong)]">{t('citizen.systemSettings')}</h2><p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">{t('citizen.securityChangesSaved')}</p></div></div></Card>
-        <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5 sm:p-6"><div className="mb-4 flex items-center gap-2"><LockKeyhole className="h-5 w-5 text-[var(--color-emerald-600)]" /><h2 className="text-base font-black text-[var(--color-text-strong)]">{t('account.security')}</h2></div><div className="grid gap-4 sm:grid-cols-3"><input type="password" placeholder="Palavra-passe atual" value={passwordForm.current} onChange={(event) => setPasswordForm((current) => ({ ...current, current: event.target.value }))} className={fieldClass} /><input type="password" placeholder="Nova palavra-passe" value={passwordForm.next} onChange={(event) => setPasswordForm((current) => ({ ...current, next: event.target.value }))} className={fieldClass} /><input type="password" placeholder="Confirmar nova palavra-passe" value={passwordForm.confirmation} onChange={(event) => setPasswordForm((current) => ({ ...current, confirmation: event.target.value }))} className={fieldClass} /></div><Button type="button" variant="primary" size="sm" loading={passwordSubmitting} onClick={async () => { if (!passwordForm.current) { setPasswordMessage('Informe a palavra-passe atual.'); return; } if (passwordForm.next.length < 8) { setPasswordMessage('A nova palavra-passe deve ter pelo menos 8 caracteres.'); return; } if (passwordForm.next !== passwordForm.confirmation) { setPasswordMessage('A confirmação da nova palavra-passe não coincide.'); return; } if (!onPasswordChange) { setPasswordMessage('A alteração de palavra-passe não está disponível.'); return; } setPasswordSubmitting(true); setPasswordMessage(''); try { await onPasswordChange(passwordForm.current, passwordForm.next); setPasswordChanged(true); setPasswordForm({ current: '', next: '', confirmation: '' }); setPasswordMessage('Palavra-passe atualizada com sucesso.'); } catch (error) { setPasswordMessage(error instanceof Error ? error.message : 'Não foi possível atualizar a palavra-passe.'); } finally { setPasswordSubmitting(false); } }} className="mt-4 bg-[var(--color-green-600)] hover:bg-[var(--color-green-700)]">{passwordSubmitting ? 'A atualizar...' : 'Atualizar palavra-passe'}</Button>{passwordMessage && <p className={`mt-2 text-xs font-bold ${passwordMessage.includes('sucesso') ? 'text-[var(--color-emerald-600)]' : 'text-[var(--color-rose-600)]'}`}>{passwordMessage}</p>}{passwordChanged && !passwordMessage.includes('sucesso') && <p className="mt-2 text-xs font-bold text-[var(--color-emerald-600)]">{t('citizen.passwordUpdated')}</p>}</Card>
+        <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5 sm:p-6"><div className="mb-4 flex items-center gap-2"><LockKeyhole className="h-5 w-5 text-[var(--color-emerald-600)]" /><h2 className="text-base font-black text-[var(--color-text-strong)]">{t('account.security')}</h2></div><div className="grid gap-4 sm:grid-cols-3"><input type="password" placeholder="Palavra-passe atual" value={passwordForm.current} onChange={(event) => setPasswordForm((current) => ({ ...current, current: event.target.value }))} className={fieldClass} /><input type="password" placeholder="Nova palavra-passe" value={passwordForm.next} onChange={(event) => setPasswordForm((current) => ({ ...current, next: event.target.value }))} className={fieldClass} /><input type="password" placeholder="Confirmar nova palavra-passe" value={passwordForm.confirmation} onChange={(event) => setPasswordForm((current) => ({ ...current, confirmation: event.target.value }))} className={fieldClass} /></div><Button type="button" variant="primary" size="sm" loading={passwordSubmitting} onClick={async () => { if (!passwordForm.current) { setPasswordMessage('Informe a palavra-passe atual.'); return; } // Password policy validation
+  const newPassword = passwordForm.next;
+  const confirmation = passwordForm.confirmation;
+
+  // Check minimum length (8 characters)
+  if (newPassword.length < 8) {
+    setPasswordMessage('A nova palavra-passe deve ter pelo menos 8 caracteres.');
+    return;
+  }
+
+  // Check password complexity: must contain at least 3 of 4: lowercase, uppercase, number, symbol
+  const hasLowercase = /[a-z]/.test(newPassword);
+  const hasUppercase = /[A-Z]/.test(newPassword);
+  const hasNumber = /[0-9]/.test(newPassword);
+  const hasSymbol = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
+  const complexPassword: number = (hasLowercase ? 1 : 0) + (hasUppercase ? 1 : 0) + (hasNumber ? 1 : 0) + (hasSymbol ? 1 : 0);
+
+  if (complexPassword < 3) {
+    setPasswordMessage('A palavra-passe deve conter pelo menos 3 dos seguintes: minúsculas, maiúsculas, números, caracteres especiais.');
+    return;
+  }
+
+  // Check confirmation matches
+  if (newPassword !== confirmation) {
+    setPasswordMessage('A confirmação da nova palavra-passe não coincide.');
+    return;
+  }
+  if (!passwordForm.current) {
+    setPasswordMessage('Informe a palavra-passe atual.');
+    return;
+  } if (!onPasswordChange) { setPasswordMessage('A alteração de palavra-passe não está disponível.'); return; }
+  setPasswordSubmitting(true); setPasswordMessage('');
+  try {
+    const response = await fetch('/api/auth/change-password', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'X-CSRF-Token': csrfToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ currentPassword: passwordForm.current, newPassword: passwordForm.next }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      setPasswordMessage(errorData.detail || `Erro ${response.status}: Não foi possível atualizar a palavra-passe.`);
+      setPasswordSubmitting(false);
+      return;
+    }
+    setPasswordChanged(true);
+    setPasswordForm({ current: '', next: '', confirmation: '' });
+    setPasswordMessage('Palavra-passe atualizada com sucesso.');
+    setPasswordSubmitting(false);
+    await onPasswordChange(passwordForm.current, passwordForm.next);
+  } catch (error) {
+    setPasswordMessage(error instanceof Error ? error.message : 'Não foi possível atualizar a palavra-passe.');
+    setPasswordSubmitting(false);
+  }}} className="mt-4 bg-[var(--color-green-600)] hover:bg-[var(--color-green-700)]">{passwordSubmitting ? 'A atualizar...' : 'Atualizar palavra-passe'}</Button>{passwordMessage && <p className={`mt-2 text-xs font-bold ${passwordMessage.includes('sucesso') ? 'text-[var(--color-emerald-600)]' : 'text-[var(--color-rose-600)]'}`}>{passwordMessage}</p>}{passwordChanged && !passwordMessage.includes('sucesso') && <p className="mt-2 text-xs font-bold text-[var(--color-emerald-600)]">{t('citizen.passwordUpdated')}</p>}</Card>
         <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-4 sm:p-5"><div className="mb-4 flex items-center gap-2"><MessageCircle className="h-5 w-5 text-[var(--color-green-600)]" /><h2 className="text-base font-black text-[var(--color-text-strong)]">{t('citizen.communicationPreferences')}</h2></div><div className="flex flex-wrap gap-2">{(['email', 'sms', 'both'] as const).map((option) =>         <button key={option} type="button" onClick={() => { setCommunicationPreference(option); updateProfile({ communicationPreference: option }); }} className={`rounded-xl px-3 py-2 text-xs font-black ${communicationPreference === option ? 'bg-[var(--color-green-600)] text-white' : 'bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] dark:bg-[var(--color-bg-surface-dark)] dark:text-[var(--color-text-muted-dark)]'}`}>{option === 'both' ? 'E-mail e telefone' : option === 'email' ? 'E-mail' : 'Telefone'}</button>)}</div></div>
       </div>}
 
