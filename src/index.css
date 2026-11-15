@@ -1087,7 +1087,9 @@ html:not(.dark) .guigui-app-shell .text-emerald-600, html:not(.dark) .guigui-app
 }
 @media (max-width: 760px) {
   .guigui-modebar { top: 123px; }
-  .guigui-backbar { top: 165px; }
+  /* Em ecrã estreito a backbar deixa de ser sticky: sobrepunha o cabeçalho
+     dos painéis e interceptava o botão que abre o menu lateral. */
+  .guigui-backbar { position: relative; top: 0; }
   .guigui-backbar,
   .guigui-profile-footer {
     margin-left: 0 !important;
@@ -1141,7 +1143,7 @@ html:not(.dark) .guigui-app-shell .text-emerald-600, html:not(.dark) .guigui-app
 }
 @media (max-width: 340px) {
   .guigui-modebar { top: 123px; }
-  .guigui-backbar { top: 190px; }
+  .guigui-backbar { position: relative; top: 0; }
   .guigui-panel-sidebar {
     top: 190px !important;
     height: calc(100vh - 190px) !important;

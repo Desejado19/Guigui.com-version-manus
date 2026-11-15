@@ -76,18 +76,21 @@ export async function syncUserNotifications(userId: string, role: UserRole = 'us
 }
 
 export async function syncCommunicationData(role: UserRole): Promise<CommunicationSyncResult> {
-  // Todos os perfis, incluindo a administração, pedem os dados reais: antes o
-  // admin recebia listas vazias fixas e por isso nunca via os pedidos de suporte
-  // dos cidadãos nem as conversas da plataforma.
-  let conversationResponse: Response;
-  try {
-    conversationResponse = await fetch('/api/conversations');
-  } catch (error) {
-    const next = (error as { status?: number })?.status;
-    if (next === 401 || next === 403) return { kind: 'unauthorized' };
-    // Preservar a causa: quem faz polling precisa da mensagem original
-    // (ex.: 'network offline') para decidir se volta a tentar.
-    throw new Error(`Não foi possível sincronizar a comunicação: ${(error as Error)?.message ?? String(error)}`);
+  // Todos os perfis pedem os dados reais: antes o admin recebia listas vazias
+  // fixas e por isso nunca via os pedidos de suporte dos cidadãos. As conversas
+  // comerciais são só de cidadãos e empresas — o servidor responde 403 ao
+  // admin —, por isso a administração não pede um recurso que lhe é negado.
+  let conversationResponse: Response | null = null;
+  if (role !== 'admin') {
+    try {
+      conversationResponse = await fetch('/api/conversations');
+    } catch (error) {
+      const next = (error as { status?: number })?.status;
+      if (next === 401 || next === 403) return { kind: 'unauthorized' };
+      // Preservar a causa: quem faz polling precisa da mensagem original
+      // (ex.: 'network offline') para decidir se volta a tentar.
+      throw new Error(`Não foi possível sincronizar a comunicação: ${(error as Error)?.message ?? String(error)}`);
+    }
   }
   let supportResponse: Response;
   try {
@@ -99,9 +102,11 @@ export async function syncCommunicationData(role: UserRole): Promise<Communicati
     // (ex.: 'network offline') para decidir se volta a tentar.
     throw new Error(`Não foi possível sincronizar a comunicação: ${(error as Error)?.message ?? String(error)}`);
   }
-  if (conversationResponse.status === 401 || supportResponse.status === 401) return { kind: 'unauthorized' };
-  if (!conversationResponse.ok || !supportResponse.ok) throw new Error('Não foi possível sincronizar a comunicação.');
-  const conversationPayload = await conversationResponse.json() as { conversations?: Array<Record<string, unknown>>; messages?: Array<Record<string, unknown>> };
+  if (conversationResponse?.status === 401 || supportResponse.status === 401) return { kind: 'unauthorized' };
+  if ((conversationResponse && !conversationResponse.ok) || !supportResponse.ok) throw new Error('Não foi possível sincronizar a comunicação.');
+  const conversationPayload = conversationResponse
+    ? await conversationResponse.json() as { conversations?: Array<Record<string, unknown>>; messages?: Array<Record<string, unknown>> }
+    : { conversations: [], messages: [] };
   const supportPayload = await supportResponse.json() as { tickets?: Array<Record<string, unknown>> };
   return {
     kind: 'updated',

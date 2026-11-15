@@ -40,10 +40,10 @@ const ASSET_DIRECTORY = path.join(process.cwd(), 'public', 'uploads', 'stories')
 type MediaRule = { kind: 'image' | 'video'; extension: string; maxBytes: number };
 
 const MEDIA_TYPES: Record<string, MediaRule> = {
-  'image/jpeg': { kind: 'image', extension: 'jpg', maxBytes: 10 * 1024 * 1024 },
-  'image/png': { kind: 'image', extension: 'png', maxBytes: 10 * 1024 * 1024 },
-  'image/webp': { kind: 'image', extension: 'webp', maxBytes: 10 * 1024 * 1024 },
-  'image/gif': { kind: 'image', extension: 'gif', maxBytes: 10 * 1024 * 1024 },
+  'image/jpeg': { kind: 'image', extension: 'jpg', maxBytes: 8 * 1024 * 1024 },
+  'image/png': { kind: 'image', extension: 'png', maxBytes: 8 * 1024 * 1024 },
+  'image/webp': { kind: 'image', extension: 'webp', maxBytes: 8 * 1024 * 1024 },
+  'image/gif': { kind: 'image', extension: 'gif', maxBytes: 8 * 1024 * 1024 },
   'video/mp4': { kind: 'video', extension: 'mp4', maxBytes: 48 * 1024 * 1024 },
   'video/quicktime': { kind: 'video', extension: 'mov', maxBytes: 48 * 1024 * 1024 },
   'video/webm': { kind: 'video', extension: 'webm', maxBytes: 48 * 1024 * 1024 },
@@ -156,7 +156,7 @@ export function createStoryRouter(dependencies: StoryRouteDependencies): Router 
         throw new StoryError(
           413,
           'STORY_ASSET_TOO_LARGE',
-          rule.kind === 'image' ? 'A fotografia não pode exceder 10 MB.' : 'O vídeo não pode exceder 48 MB.',
+          rule.kind === 'image' ? 'A fotografia não pode exceder 8 MB.' : 'O vídeo não pode exceder 48 MB.',
         );
       }
       if (!hasMagicBytes(contentType, body)) {

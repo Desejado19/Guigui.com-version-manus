@@ -364,9 +364,30 @@ export async function getCommercialOverview() {
     dbc.query(planConfigsQuery()),
     dbc.query(`SELECT plan_id, COUNT(*)::int AS n FROM subscriptions GROUP BY plan_id`),
     dbc.query(`SELECT id, version, old_values, new_values, changed_by, reason, created_at FROM ticket_fee_history ORDER BY version DESC LIMIT 100`),
-    dbc.query(`SELECT COUNT(*)::int AS ticket_count, COALESCE(SUM(gross_amount_xof),0)::bigint AS gross_xof,
-                      COALESCE(SUM(fee_amount_xof),0)::bigint AS revenue_xof
-                 FROM orders WHERE status = 'paid'`),
+    // A receita de taxas tem de refletir o que é efetivamente cobrado. A coluna
+    // orders.fee_amount_xof nunca é preenchida no checkout (fica a zero), pelo que
+    // somá-la devolvia sempre zero. Cada ordem é um bilhete, logo a taxa aplicada é
+    // a mesma fórmula do checkout: percentagem sobre o valor bruto + taxa fixa por
+    // unidade, conforme o modelo em vigor. Valores já registados na ordem prevalecem.
+    dbc.query(`WITH policy AS (
+                 SELECT commission_percentage, fixed_fee_xof, billing_model, is_active
+                   FROM ticket_fee_settings WHERE id = 'default'
+               )
+               SELECT COUNT(*)::int AS ticket_count,
+                      COALESCE(SUM(o.gross_amount_xof),0)::bigint AS gross_xof,
+                      COALESCE(SUM(
+                        CASE
+                          WHEN o.fee_amount_xof > 0 THEN o.fee_amount_xof
+                          WHEN p.is_active IS NOT TRUE THEN 0
+                          WHEN p.billing_model = 'percentage_only'
+                            THEN ROUND(o.gross_amount_xof * p.commission_percentage / 100.0)
+                          WHEN p.billing_model = 'fixed_only' THEN p.fixed_fee_xof
+                          ELSE ROUND(o.gross_amount_xof * p.commission_percentage / 100.0) + p.fixed_fee_xof
+                        END
+                      ),0)::bigint AS revenue_xof
+                 FROM orders o
+                 LEFT JOIN policy p ON TRUE
+                WHERE o.status = 'paid'`),
   ]);
   const statusMap = Object.fromEntries(subscriptions.rows.map((row: any) => [String(row.status), asInt(row.count)]));
   const activePlans = plans.rows.filter((row: any) => row.is_active).length;

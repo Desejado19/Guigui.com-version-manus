@@ -43,7 +43,6 @@ describe('communication synchronization', () => {
 
   it('a administração pede os pedidos de suporte reais em vez de listas vazias', async () => {
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ conversations: [], messages: [] }) })
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ tickets: [{
         id: 'SUP-1',
         requester_user_id: 'u-1',
@@ -59,7 +58,9 @@ describe('communication synchronization', () => {
 
     const result = await syncCommunicationData('admin');
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/conversations');
+    // A administração não tem acesso às conversas comerciais: pedir esse
+    // recurso só produzia um 403 e o erro communication-sync-failed.
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/conversations');
     expect(fetchMock).toHaveBeenCalledWith('/api/support/tickets/mine');
     expect(result).toMatchObject({
       kind: 'updated',
@@ -69,7 +70,6 @@ describe('communication synchronization', () => {
 
   it('marca o requerente empresa quando o pedido tem empresa associada', async () => {
     vi.stubGlobal('fetch', vi.fn()
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ conversations: [], messages: [] }) })
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ tickets: [{
         id: 'SUP-2', requester_user_id: 'u-2', business_id: 'biz-1', category: 'other', subject: 'Conta da empresa',
         status: 'open', created_at: '2026-01-01T10:00:00.000Z', updated_at: '2026-01-01T10:00:00.000Z', replies: [],

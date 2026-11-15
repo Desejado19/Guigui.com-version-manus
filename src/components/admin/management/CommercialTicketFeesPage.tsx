@@ -26,12 +26,15 @@ export const CommercialTicketFeesPage: React.FC<{ onBack: () => void }> = ({ onB
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ commissionPercentage: 10, fixedFeeXOF: 200, currency: 'XOF', feePayer: 'organizer', billingModel: 'percentage_plus_fixed', conditions: '', isActive: true, reason: '' });
 
-  const load = async (resetForm = false) => {
+  const load = async () => {
     setLoading(true);
     try {
       const data = await commercialRequest<CommercialOverview>('/api/admin/commercial/overview');
       setOverview(data);
-      if (data.ticketFees) setForm((current) => resetForm || !current ? { commissionPercentage: data.ticketFees!.commissionPercentage, fixedFeeXOF: data.ticketFees!.fixedFeeXOF, currency: data.ticketFees!.currency, feePayer: data.ticketFees!.feePayer, billingModel: data.ticketFees!.billingModel, conditions: data.ticketFees!.conditions, isActive: data.ticketFees!.isActive, reason: '' } : current);
+      // O formulário tem de refletir sempre o valor persistido. Antes só era
+      // preenchido quando ainda não havia estado, pelo que depois de recarregar
+      // mostrava os valores por omissão e um novo guardar repunha as taxas.
+      if (data.ticketFees) setForm({ commissionPercentage: data.ticketFees.commissionPercentage, fixedFeeXOF: data.ticketFees.fixedFeeXOF, currency: data.ticketFees.currency, feePayer: data.ticketFees.feePayer, billingModel: data.ticketFees.billingModel, conditions: data.ticketFees.conditions, isActive: data.ticketFees.isActive, reason: '' });
       setError('');
     } catch (loadError) {
       setError((loadError as Error).message);
@@ -56,7 +59,7 @@ export const CommercialTicketFeesPage: React.FC<{ onBack: () => void }> = ({ onB
     try {
       await commercialRequest('/api/admin/commercial/ticket-fees', { method: 'PATCH', body: JSON.stringify(form) });
       setNotice('Taxas de bilheteira atualizadas e registadas no histórico.');
-      await load(true);
+      await load();
     } catch (saveError) {
       setError((saveError as Error).message);
     } finally {
