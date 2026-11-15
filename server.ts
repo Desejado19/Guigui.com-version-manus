@@ -75,6 +75,34 @@ import {
   updateOperatorConfig,
   updateReconciliation,
 } from './server/financeAdminService';
+import {
+  CommercialError,
+  changeSubscriptionStatus,
+  createCommercialPlan,
+  createFeature,
+  createPackage,
+  createPriceGroup,
+  createProduct,
+  duplicateCommercialPlan,
+  getCommercialOverview,
+  getCommercialPlanConfiguration,
+  getCommercialSubscriptionDetail,
+  getLegacyTicketFeePolicy,
+  getProductSales,
+  getPublicCommercialCatalog,
+  listCommercialAudit,
+  listCommercialSubscriptions,
+  renewSubscription,
+  resolveDatabaseCommercialPrice,
+  toggleCommercialPlan,
+  updateCommercialPlan,
+  updateCommercialRules,
+  updateFeature,
+  updatePlanConfiguration,
+  updatePriceMatrix,
+  updateProduct,
+  updateTicketFees,
+} from './server/commercialAdminService';
 import { createCategoryRouter } from './server/categoryRoutes';
 import { createStoryRouter } from './server/storyRoutes';
 import { createHealthHandler } from './server/modules/platform-foundation/http/healthHandler';
@@ -443,12 +471,26 @@ function getCommercialCodeForUseCase(useCase: unknown, productCode?: unknown): s
   return typeof useCase === 'string' ? map[useCase] : undefined;
 }
 
-function resolveCommercialPayment(body: Record<string, unknown>) {
+async function resolveCommercialPayment(body: Record<string, unknown>) {
   const useCase = String(body.useCase || '');
   const code = getCommercialCodeForUseCase(useCase, body.productCode);
   const commercialUseCase = ['extra_posts', 'extra_promotions', 'advertising_purchase', 'content_service_request', 'extra_credit_purchase'].includes(useCase);
   if (!commercialUseCase || !code) return { ok: true as const, code: undefined, quantity: 1, price: Number(body.amountXOF || 0) };
   const quantity = Number.isInteger(Number(body.quantity)) ? Math.min(1000, Math.max(1, Number(body.quantity))) : 1;
+  try {
+    const databaseProduct = await resolveDatabaseCommercialPrice(code, quantity, typeof body.durationDays === 'number' ? body.durationDays : undefined);
+    if (databaseProduct) {
+      if (Number(body.amountXOF) !== databaseProduct.price) {
+        return { ok: false as const, status: 409, error: 'O valor não corresponde ao preço actual do produto.', code: 'PRODUCT_PRICE_MISMATCH', expectedAmountXOF: databaseProduct.price };
+      }
+      return { ok: true as const, code: databaseProduct.code, quantity, price: databaseProduct.price, productId: databaseProduct.productId };
+    }
+  } catch (error) {
+    if (error instanceof CommercialError && error.code !== 'DATABASE_REQUIRED') {
+      return { ok: false as const, status: error.status, error: error.message, code: error.code };
+    }
+    console.error('[Guigui.com] Falha ao consultar o catálogo comercial na base de dados:', error);
+  }
   const catalog = normaliseMonetizationCatalog(monetizationCatalogStore);
   const commercialProduct = getCommercialProduct(catalog, code);
   if (!commercialProduct || !commercialProduct.isActive) return { ok: false as const, status: 409, error: 'O produto comercial não está activo no catálogo.', code: 'PRODUCT_NOT_ACTIVE' };
@@ -1898,6 +1940,219 @@ app.get('/api/admin/finance/statements', requireRole('admin'), async (req, res) 
     res.json(await getFinanceStatements(req.query as Record<string, unknown>));
   } catch (error) {
     sendFinanceError(res, error, 'GET /api/admin/finance/statements');
+  }
+});
+
+function sendCommercialError(res: express.Response, error: unknown, context: string) {
+  if (error instanceof CommercialError) {
+    return res.status(error.status).json({ error: error.message, code: error.code });
+  }
+  console.error(`[Guigui.com] ${context}:`, error);
+  return res.status(500).json({ error: 'Não foi possível concluir a operação comercial.', code: 'COMMERCIAL_OPERATION_FAILED' });
+}
+
+async function commercialActor(req: express.Request) {
+  const context = await sessionContext(req);
+  return { id: context?.userId || '', name: 'Administração Guigui' };
+}
+
+app.get('/api/commercial/public-catalog', async (req, res) => {
+  try {
+    res.json(await getPublicCommercialCatalog(String(req.query.companyId || '')));
+  } catch (error) {
+    sendCommercialError(res, error, 'GET /api/commercial/public-catalog');
+  }
+});
+
+app.get('/api/admin/commercial/overview', requireRole('admin'), async (_req, res) => {
+  try {
+    res.json(await getCommercialOverview());
+  } catch (error) {
+    sendCommercialError(res, error, 'GET /api/admin/commercial/overview');
+  }
+});
+
+app.get('/api/admin/commercial/plans/:planId/config', requireRole('admin'), async (req, res) => {
+  try {
+    res.json(await getCommercialPlanConfiguration(req.params.planId));
+  } catch (error) {
+    sendCommercialError(res, error, 'GET /api/admin/commercial/plans/:planId/config');
+  }
+});
+
+app.post('/api/admin/commercial/plans', requireRole('admin'), async (req, res) => {
+  try {
+    const actor = await commercialActor(req);
+    res.status(201).json(await createCommercialPlan(req.body || {}, actor, String(req.body?.reason || '')));
+  } catch (error) {
+    sendCommercialError(res, error, 'POST /api/admin/commercial/plans');
+  }
+});
+
+app.patch('/api/admin/commercial/plans/:planId', requireRole('admin'), async (req, res) => {
+  try {
+    const actor = await commercialActor(req);
+    res.json(await updateCommercialPlan(req.params.planId, req.body || {}, actor, String(req.body?.reason || '')));
+  } catch (error) {
+    sendCommercialError(res, error, 'PATCH /api/admin/commercial/plans/:planId');
+  }
+});
+
+app.post('/api/admin/commercial/plans/:planId/duplicate', requireRole('admin'), async (req, res) => {
+  try {
+    const actor = await commercialActor(req);
+    res.status(201).json(await duplicateCommercialPlan(req.params.planId, req.body || {}, actor, String(req.body?.reason || '')));
+  } catch (error) {
+    sendCommercialError(res, error, 'POST /api/admin/commercial/plans/:planId/duplicate');
+  }
+});
+
+app.post('/api/admin/commercial/plans/:planId/toggle', requireRole('admin'), async (req, res) => {
+  try {
+    const actor = await commercialActor(req);
+    res.json(await toggleCommercialPlan(req.params.planId, Boolean(req.body?.active), actor, String(req.body?.reason || '')));
+  } catch (error) {
+    sendCommercialError(res, error, 'POST /api/admin/commercial/plans/:planId/toggle');
+  }
+});
+
+app.put('/api/admin/commercial/plans/:planId/configuration', requireRole('admin'), async (req, res) => {
+  try {
+    const actor = await commercialActor(req);
+    res.json(await updatePlanConfiguration(req.params.planId, req.body?.features, actor, String(req.body?.reason || '')));
+  } catch (error) {
+    sendCommercialError(res, error, 'PUT /api/admin/commercial/plans/:planId/configuration');
+  }
+});
+
+app.put('/api/admin/commercial/matrix/:groupId/:planId', requireRole('admin'), async (req, res) => {
+  try {
+    const actor = await commercialActor(req);
+    res.json(await updatePriceMatrix(req.params.groupId, req.params.planId, req.body || {}, actor, String(req.body?.reason || '')));
+  } catch (error) {
+    sendCommercialError(res, error, 'PATCH /api/admin/commercial/matrix/:groupId/:planId');
+  }
+});
+
+app.post('/api/admin/commercial/price-groups', requireRole('admin'), async (req, res) => {
+  try {
+    const actor = await commercialActor(req);
+    res.status(201).json(await createPriceGroup(req.body || {}, actor, String(req.body?.reason || '')));
+  } catch (error) {
+    sendCommercialError(res, error, 'POST /api/admin/commercial/price-groups');
+  }
+});
+
+app.post('/api/admin/commercial/features', requireRole('admin'), async (req, res) => {
+  try {
+    const actor = await commercialActor(req);
+    res.status(201).json(await createFeature(req.body || {}, actor, String(req.body?.reason || '')));
+  } catch (error) {
+    sendCommercialError(res, error, 'POST /api/admin/commercial/features');
+  }
+});
+
+app.patch('/api/admin/commercial/features/:featureId', requireRole('admin'), async (req, res) => {
+  try {
+    const actor = await commercialActor(req);
+    res.json(await updateFeature(req.params.featureId, req.body || {}, actor, String(req.body?.reason || '')));
+  } catch (error) {
+    sendCommercialError(res, error, 'PATCH /api/admin/commercial/features/:featureId');
+  }
+});
+
+app.post('/api/admin/commercial/products', requireRole('admin'), async (req, res) => {
+  try {
+    const actor = await commercialActor(req);
+    res.status(201).json(await createProduct(req.body || {}, actor, String(req.body?.reason || '')));
+  } catch (error) {
+    sendCommercialError(res, error, 'POST /api/admin/commercial/products');
+  }
+});
+
+app.patch('/api/admin/commercial/products/:productId', requireRole('admin'), async (req, res) => {
+  try {
+    const actor = await commercialActor(req);
+    res.json(await updateProduct(req.params.productId, req.body || {}, actor, String(req.body?.reason || '')));
+  } catch (error) {
+    sendCommercialError(res, error, 'PATCH /api/admin/commercial/products/:productId');
+  }
+});
+
+app.post('/api/admin/commercial/packages', requireRole('admin'), async (req, res) => {
+  try {
+    const actor = await commercialActor(req);
+    res.status(201).json(await createPackage(req.body || {}, actor, String(req.body?.reason || '')));
+  } catch (error) {
+    sendCommercialError(res, error, 'POST /api/admin/commercial/packages');
+  }
+});
+
+app.patch('/api/admin/commercial/ticket-fees', requireRole('admin'), async (req, res) => {
+  try {
+    const actor = await commercialActor(req);
+    res.json(await updateTicketFees(req.body || {}, actor, String(req.body?.reason || '')));
+  } catch (error) {
+    sendCommercialError(res, error, 'PATCH /api/admin/commercial/ticket-fees');
+  }
+});
+
+app.put('/api/admin/commercial/rules', requireRole('admin'), async (req, res) => {
+  try {
+    const actor = await commercialActor(req);
+    res.json(await updateCommercialRules(req.body || {}, actor, String(req.body?.reason || '')));
+  } catch (error) {
+    sendCommercialError(res, error, 'PUT /api/admin/commercial/rules');
+  }
+});
+
+app.get('/api/admin/commercial/subscriptions', requireRole('admin'), async (req, res) => {
+  try {
+    res.json(await listCommercialSubscriptions(req.query || {}));
+  } catch (error) {
+    sendCommercialError(res, error, 'GET /api/admin/commercial/subscriptions');
+  }
+});
+
+app.get('/api/admin/commercial/subscriptions/:subscriptionId', requireRole('admin'), async (req, res) => {
+  try {
+    res.json(await getCommercialSubscriptionDetail(req.params.subscriptionId));
+  } catch (error) {
+    sendCommercialError(res, error, 'GET /api/admin/commercial/subscriptions/:subscriptionId');
+  }
+});
+
+app.patch('/api/admin/commercial/subscriptions/:subscriptionId', requireRole('admin'), async (req, res) => {
+  try {
+    const actor = await commercialActor(req);
+    res.json(await changeSubscriptionStatus(req.params.subscriptionId, req.body || {}, actor, String(req.body?.reason || '')));
+  } catch (error) {
+    sendCommercialError(res, error, 'PATCH /api/admin/commercial/subscriptions/:subscriptionId');
+  }
+});
+
+app.post('/api/admin/commercial/subscriptions/:subscriptionId/renew', requireRole('admin'), async (req, res) => {
+  try {
+    const actor = await commercialActor(req);
+    res.json(await renewSubscription(req.params.subscriptionId, req.body || {}, actor, String(req.body?.reason || '')));
+  } catch (error) {
+    sendCommercialError(res, error, 'POST /api/admin/commercial/subscriptions/:subscriptionId/renew');
+  }
+});
+
+app.get('/api/admin/commercial/audit', requireRole('admin'), async (req, res) => {
+  try {
+    res.json(await listCommercialAudit(req.query || {}));
+  } catch (error) {
+    sendCommercialError(res, error, 'GET /api/admin/commercial/audit');
+  }
+});
+
+app.get('/api/admin/commercial/product-sales', requireRole('admin'), async (_req, res) => {
+  try {
+    res.json({ items: await getProductSales() });
+  } catch (error) {
+    sendCommercialError(res, error, 'GET /api/admin/commercial/product-sales');
   }
 });
 
@@ -4576,7 +4831,23 @@ app.post('/api/tickets/purchase', async (req, res) => {
       return res.status(404).json({ error: 'O evento ou tipo de bilhete já não está disponível.', code: 'TICKET_OFFER_NOT_FOUND', requestId });
     }
 
-    const monetizationCatalog = normaliseMonetizationCatalog(monetizationCatalogStore);
+    let monetizationCatalog = normaliseMonetizationCatalog(monetizationCatalogStore);
+    try {
+      const databaseTicketPolicy = await getLegacyTicketFeePolicy();
+      if (databaseTicketPolicy) {
+        monetizationCatalog = {
+          ...monetizationCatalog,
+          ticketFeePolicy: {
+            ...monetizationCatalog.ticketFeePolicy,
+            ...databaseTicketPolicy,
+            feePayer: databaseTicketPolicy.feePayer as typeof monetizationCatalog.ticketFeePolicy.feePayer,
+            billingModel: databaseTicketPolicy.billingModel as typeof monetizationCatalog.ticketFeePolicy.billingModel,
+          },
+        };
+      }
+    } catch (error) {
+      console.error('[Guigui.com] Falha ao carregar a política de taxas de bilheteira:', error);
+    }
     const quoteResult = quoteTicketPurchase({ offer, quantity: ticketQuantity, catalog: monetizationCatalog });
     if ('reason' in quoteResult) {
       const unavailable = quoteResult.reason === 'sold_out' || quoteResult.reason === 'insufficient_inventory';
@@ -4604,7 +4875,7 @@ app.post('/api/tickets/purchase', async (req, res) => {
       return res.status(409).json({ error: 'O total do checkout não corresponde à política de taxas actual.', code: 'TICKET_TOTAL_MISMATCH', expectedAmountXOF: chargedAmountXOF, requestId });
     }
 
-    const catalogSettings = normaliseMonetizationCatalog(monetizationCatalogStore);
+    const catalogSettings = monetizationCatalog;
     const result = await executeTicketPurchase({
       buyer: {
         userId: purchaseSession.userId,
@@ -5400,7 +5671,7 @@ app.post('/api/payments/create', async (req, res) => {
       provider,
     } = req.body;
 
-    const commercialValidation = resolveCommercialPayment(req.body as Record<string, unknown>);
+    const commercialValidation = await resolveCommercialPayment(req.body as Record<string, unknown>);
     if (!commercialValidation.ok) {
       recordAudit({ action: 'commercial_payment_rejected', resource: 'payment', actorRole: 'citizen', requestId: requestIdFrom(req), success: false, metadata: { code: commercialValidation.code, expectedAmountXOF: commercialValidation.expectedAmountXOF } });
       return res.status(commercialValidation.status).json({ error: commercialValidation.error, code: commercialValidation.code, ...(commercialValidation.expectedAmountXOF ? { expectedAmountXOF: commercialValidation.expectedAmountXOF } : {}) });

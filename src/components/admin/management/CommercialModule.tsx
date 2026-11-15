@@ -73,6 +73,25 @@ export const CommercialModule: React.FC<CommercialModuleProps> = ({ onOpenSectio
         ariaLabel="Submódulos comerciais"
       />
 
+      <div className="flex flex-wrap gap-1.5">
+        {[
+          { key: 'features', label: 'Configurar funcionalidades', icon: <SlidersHorizontal className="h-3.5 w-3.5" /> },
+          { key: 'products', label: 'Gerir produtos e pacotes', icon: <Boxes className="h-3.5 w-3.5" /> },
+          { key: 'ticket-fees', label: 'Configurar taxas', icon: <Ticket className="h-3.5 w-3.5" /> },
+          { key: 'audit', label: 'Consultar auditoria', icon: <History className="h-3.5 w-3.5" /> },
+        ].map((action) => (
+          <button
+            key={action.key}
+            type="button"
+            onClick={() => onOpenSection(action.key as CommercialSection)}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[#e6dac8] bg-white px-3 py-1.5 text-[10px] font-black text-[#123e3b] shadow-sm transition hover:bg-[#f7f2ec]"
+          >
+            {action.icon}
+            {action.label}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <CommercialLoading />
       ) : (
