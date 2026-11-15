@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile, UserRole, SubscriptionTier, CategoryGroupId, SubscriptionPlan, BusinessModelConfig, Language } from '../types';
 import type { Business } from '../types';
 import {
@@ -28,6 +28,7 @@ import { getBusinessProfileCompletion } from '../utils/businessProfile';
 import { useLocationCatalog } from '../hooks/useLocationCatalog';
 import { DEFAULT_SUBSCRIPTION_PLANS, getAnnualPlanPrice, getPlanById, limitLabel, normaliseSubscriptionPlans } from '../data/subscriptionCatalog';
 import { getTranslation } from '../utils/i18n';
+import { isGoogleSignInConfigured, mountGoogleSignInButton } from '../services/googleIdentity';
 import { Button } from './ui';
 
 interface LoginModalProps {
@@ -107,6 +108,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   // Modal flow states: 'choice' (Step 0) -> 'login' (Step 1 Login) | 'register' (Step 1 Register)
   const [modalView, setModalView] = useState<'choice' | 'login' | 'register' | 'forgot' | 'team_invite'>('choice');
   const [chosenOption, setChosenOption] = useState<'login' | 'register'>('login');
+  const [googleConfigured, setGoogleConfigured] = useState(isGoogleSignInConfigured());
+  const buttonContainer = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -273,6 +276,46 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       setModalView('register');
       setRegStep(1);
     }
+  };
+
+  const handleGoogleCredential = (credential: string) => {
+    setError(null);
+    // Send Google ID token to backend /api/auth/login
+    fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ googleIdToken: credential })
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const err = await res.json();
+          setError(err.error || 'Falha ao fazer login com Google');
+          return;
+        }
+        const { user } = await res.json();
+        onLogin(user, user.business || undefined);
+      })
+      .catch(() => setError('Erro de conexão com o servidor'));
+  };
+
+  const renderUnconfiguredGoogleButton = () => {
+    if (!isGoogleSignInConfigured()) {
+      return <div className="text-center text-sm text-slate-500">Continuar com Google ainda não está configurado. Configure VITE_GOOGLE_CLIENT_ID.</div>;
+    }
+    return (
+      <div className="pt-3 border-t border-slate-200/80 flex items-center gap-3">
+        <span className="text-xs font-semibold text-slate-500">ou&nbsp;Continuar com Google</span>
+        <button
+          onClick={() => {
+            setError(null);
+            mountGoogleSignInButton(buttonContainer.current, { locale: 'pt-PT', onCredential: handleGoogleCredential })
+          }}
+          className="rounded-xl border border-slate-300 hover:border-slate-400 bg-white dark:bg-slate-900 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-50 transition"
+        >
+          Continuar com Google
+        </button>
+      </div>
+    );
   };
 
   const handleNextToStep2 = (e: React.FormEvent) => {
@@ -569,6 +612,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   </span>
                 </div>
               </div>
+
+              {renderUnconfiguredGoogleButton()}
 
               {/* Next Step Primary Button */}
               <div className="pt-3 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3">
