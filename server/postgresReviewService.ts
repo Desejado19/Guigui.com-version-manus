@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { databasePool } from './db';
+import { databasePool, withDbIdentity } from './db';
 import { loadJson, saveJson } from './runtimeStore';
 import {
   QUALITATIVE_SCORE_WEIGHTS,
@@ -157,18 +157,25 @@ export async function isReviewAllowed(
   const phoneHash = hashPhone(authorPhone);
   const bucket = windowBucket(now);
   if (databasePool) {
-    const result = await databasePool.query(
-      `SELECT 1 FROM review_antiabuse
-        WHERE business_id = $1 AND author_phone_hash = $2 AND window_bucket = $3
-        LIMIT 1`,
-      [businessId, phoneHash, bucket],
-    );
+    // Anti-abuso por hash de telemóvel (infraestrutura, sem dono): corre
+    // como sistema, no padrão da auditoria (fase 1).
+    const result = await withDbIdentity({ userId: '', role: 'anon', system: true }, async () => {
+      const result = await databasePool!.query(
+        `SELECT 1 FROM review_antiabuse
+          WHERE business_id = $1 AND author_phone_hash = $2 AND window_bucket = $3
+          LIMIT 1`,
+        [businessId, phoneHash, bucket],
+      );
+      if (!result.rowCount) {
+        await databasePool!.query(
+          `INSERT INTO review_antiabuse (business_id, author_phone_hash, window_bucket)
+           VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+          [businessId, phoneHash, bucket],
+        );
+      }
+      return result;
+    });
     if (result.rowCount) return { allowed: false, reason: 'REVIEW_ALREADY_EXISTS' };
-    await databasePool.query(
-      `INSERT INTO review_antiabuse (business_id, author_phone_hash, window_bucket)
-       VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-      [businessId, phoneHash, bucket],
-    );
     return { allowed: true };
   }
   const blocked = memoryReviews.some((review) => {
@@ -219,13 +226,17 @@ export async function flagPostgresReview(reviewId: string, reason: string): Prom
   const cleanReason = normaliseReviewComment(reason);
   const target = memoryReviews.find((item) => item.id === reviewId);
   if (databasePool) {
-    const result = await databasePool.query(
-      `UPDATE reviews SET status = 'flagged', moderation_reason = $2, updated_at = NOW()
-        WHERE id = $1 RETURNING business_id`,
-      [reviewId, cleanReason],
-    );
-    if (!result.rowCount) return null;
-    return (await listPostgresReviews(result.rows[0].business_id)).find((item) => item.id === reviewId) || null;
+    // Relato de moderação (qualquer utilizador com sessão): trilha de
+    // sistema, no padrão da auditoria (fase 1).
+    return withDbIdentity({ userId: '', role: 'anon', system: true }, async () => {
+      const result = await databasePool!.query(
+        `UPDATE reviews SET status = 'flagged', moderation_reason = $2, updated_at = NOW()
+          WHERE id = $1 RETURNING business_id`,
+        [reviewId, cleanReason],
+      );
+      if (!result.rowCount) return null;
+      return (await listPostgresReviews(result.rows[0].business_id)).find((item) => item.id === reviewId) || null;
+    });
   }
   if (!target) return null;
   target.status = 'flagged';
@@ -235,10 +246,19 @@ export async function flagPostgresReview(reviewId: string, reason: string): Prom
   return target;
 }
 
-export async function replyPostgresReview(reviewId: string, ownerReply: string): Promise<ReviewRecord | null> {
+export async function replyPostgresReview(reviewId: string, ownerReply: string, expectedBusinessId?: string): Promise<ReviewRecord | null> {
   const reply = String(ownerReply || '').replace(/\s+/g, ' ').trim().slice(0, 500);
   const target = memoryReviews.find((item) => item.id === reviewId);
+  // Prova de posse: respostas da empresa só tocam às suas avaliações
+  // (a administração chama sem expectedBusinessId e supervisiona tudo).
+  // A avaliação existe mas não é do interlocutor da sessão -> 403;
+  // não existe -> null (404 no handler).
   if (databasePool) {
+    const ownership = await databasePool.query(`SELECT business_id FROM reviews WHERE id = $1`, [reviewId]);
+    if (!ownership.rowCount) return null;
+    if (expectedBusinessId && String(ownership.rows[0].business_id) !== expectedBusinessId) {
+      throw new Error('REVIEW_ACCESS_DENIED');
+    }
     const result = await databasePool.query(
       `UPDATE reviews SET owner_reply = $2, updated_at = NOW() WHERE id = $1 RETURNING business_id`,
       [reviewId, reply],
@@ -247,6 +267,7 @@ export async function replyPostgresReview(reviewId: string, ownerReply: string):
     return (await listPostgresReviews(result.rows[0].business_id)).find((item) => item.id === reviewId) || null;
   }
   if (!target) return null;
+  if (expectedBusinessId && target.businessId !== expectedBusinessId) throw new Error('REVIEW_ACCESS_DENIED');
   target.ownerReply = reply;
   persistLocal();
   return target;

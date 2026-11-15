@@ -75,6 +75,10 @@ export interface TicketForValidation {
   pinCode?: string;
   eventId?: string;
   eventTitle?: string;
+  /** Data do evento no formato AAAA-MM-DD (usada para agrupar em "Meus bilhetes"). */
+  eventDate?: string;
+  eventTime?: string;
+  eventLocation?: string;
   ticketTypeName?: string;
   priceXOF: number;
   buyerName: string;
@@ -89,6 +93,10 @@ export interface TicketForValidation {
   reservedUntil?: string;
   signature?: string;
   paymentMethod?: PaymentMethod;
+  /** Cancelamento operacional — preenchido pelo /api/tickets/cancel. */
+  cancelledAt?: string;
+  cancelReason?: string;
+  cancelledBy?: string;
 }
 
 export interface TicketValidationContext {
@@ -103,6 +111,8 @@ export interface AuditEntry {
   resourceId?: string;
   actorRole?: GuiguiRole | 'system';
   actorName?: string;
+  /** ID do utilizador autenticado responsável pela ação, quando aplicável. */
+  actorId?: string;
   requestId: string;
   success: boolean;
   metadata?: Record<string, unknown>;

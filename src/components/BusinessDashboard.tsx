@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { usePostEngagement } from './PostEngagementProvider';
 import {
   LayoutDashboard,
   FileText,
@@ -97,6 +98,9 @@ import { AdminPagination } from './admin/AdminPagination';
 import { ClientNotificationsHub } from './client/ClientNotificationsHub';
 import { ClientSettingsHub } from './client/ClientSettingsHub';
 import { ClientExportHub } from './client/ClientExportHub';
+import { ClientSecurityHub } from './client/ClientSecurityHub';
+import { ClientReportsHub } from './client/ClientReportsHub';
+import { TeamAccessHub } from './client/TeamAccessHub';
 import { CommunicationHub } from './CommunicationHub';
 import {
   Business,
@@ -110,6 +114,7 @@ import {
   PriceAuditLogItem,
   SubscriptionTier,
   PurchaseOrder,
+  TeamModuleAccess,
   EventItem,
   AppNotification,
   Conversation,
@@ -128,6 +133,7 @@ import {
   MarketingCampaign,
   MarketingAudienceSegment,
   MarketingLibraryAsset,
+  Story,
 } from '../types';
 import { StoriesManagementHub } from './StoriesManagementHub';
 import { getLanguageShortLabel, getNextLanguage, getTranslation } from '../utils/i18n';
@@ -136,10 +142,18 @@ import { usePersistentState } from '../utils/persistentState';
 import { DEFAULT_SUBSCRIPTION_PLANS, getAnnualPlanPrice, getBusinessPlan, getBusinessUsage, getPlanById, limitLabel, normaliseSubscriptionPlans } from '../data/subscriptionCatalog';
 import { DEFAULT_MONETIZATION_CATALOG, getCommercialProduct, getPriceRule, normaliseMonetizationCatalog, resolveProductPrice } from '../data/monetizationCatalog';
 import { addSubscriptionPeriod, getSubscriptionAccessState, getSubscriptionRemainingMs, getSubscriptionTierLabel, shouldBlockBusinessMutation } from '../utils/subscriptions';
-import { BUSINESS_ROLE_PERMISSIONS, BUSINESS_TAB_PERMISSIONS, hasBusinessPermission } from '../utils/businessPermissions';
+import {
+  BUSINESS_ROLE_PERMISSIONS,
+  BUSINESS_TAB_ACCESS_MODULE,
+  BUSINESS_TAB_PERMISSIONS,
+  effectiveBusinessAccess,
+  hasBusinessPermission,
+} from '../utils/businessPermissions';
+import { hasModuleAccess } from '../config/teamAccess';
 import { usePageEntryScroll } from '../utils/navigationBehavior';
 import { usePaginatedList } from '../hooks/usePaginatedList';
 import { Badge, Button, Card, EmptyState, IconButton, Panel, PanelHeader, StatCard } from './ui';
+import { GlassBottomNav } from './navigation/GlassBottomNav';
 import { ChartFrame } from './charts/ChartFrame';
 import { ChartTooltip } from './charts/ChartTooltip';
 import { chartColors } from './charts/chartTheme';
@@ -178,6 +192,8 @@ export type BusinessDashboardTab =
   | 'clients'
   | 'marketing'
   | 'support'
+  | 'security'
+  | 'reports'
   | 'settings'
   | 'export'
   | 'reviews'
@@ -269,6 +285,7 @@ interface BusinessDashboardProps {
   onValidatePurchaseOrder?: (orderId: string, redeemedBy: string) => void;
   onUpdateBusiness?: (updatedBiz: Business) => void;
   onSaveBusinessProfile?: (updatedBiz: Business) => Promise<void>;
+  onStoryPublished?: (story: Story) => void;
   onEventSubmitted?: (event: EventItem) => void;
   onEventCancelled?: (event: EventItem) => void;
   notifications?: AppNotification[];
@@ -316,6 +333,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
   onValidatePurchaseOrder,
   onUpdateBusiness,
   onSaveBusinessProfile,
+  onStoryPublished,
   onEventSubmitted,
   onEventCancelled,
   notifications = [],
@@ -356,8 +374,9 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
   };
 
   const [activeTab, setActiveTab] = useState<BusinessDashboardTab>('overview');
-  const [billingSection, setBillingSection] = useState<'plans' | 'services' | 'history'>('plans');
+const [billingSection, setBillingSection] = usePersistentState<'plans' | 'services' | 'history'>('guigui_billing_section', 'plans');
   const [selectedBusinessPost, setSelectedBusinessPost] = useState<BusinessPost | null>(null);
+  const selectedPostEngagement = usePostEngagement(selectedBusinessPost?.id ?? null);
   const [marketingSection, setMarketingSection] = useState<
     'overview' | 'campaigns' | 'content' | 'audience' | 'calendar' | 'library' | 'budget' | 'reports'
   >('campaigns');
@@ -388,16 +407,49 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
   const [teamEmail, setTeamEmail] = useState('');
   const [teamRole, setTeamRole] = useState<BusinessTeamRole>('editor');
   const [teamNotice, setTeamNotice] = useState<string | null>(null);
+  // Acesso efectivo vindos do servidor (fonte de verdade); o login também já
+  // transporta `teamAccess`, usado como valor inicial antes da resposta.
+  const [liveAccess, setLiveAccess] = useState<{ loaded: boolean; full: boolean; access: TeamModuleAccess | null; status: string }>({
+    loaded: false,
+    full: true,
+    access: null,
+    status: 'active',
+  });
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch('/api/me/access', { credentials: 'include', cache: 'no-store' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { scope?: string; fullAccess?: boolean; access?: TeamModuleAccess | null; status?: string } | null) => {
+        if (cancelled || !payload || payload.scope !== 'business') return;
+        setLiveAccess({ loaded: true, full: payload.fullAccess === true, access: payload.access || {}, status: payload.status || 'active' });
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [business.id, currentUser.id]);
+
+  const activeAccess: TeamModuleAccess | null = liveAccess.loaded
+    ? (liveAccess.full ? null : liveAccess.access)
+    : effectiveBusinessAccess(currentUser, business.id, teamMembers);
   const can = (permission: keyof BusinessTeamMember['permissions']) => hasBusinessPermission(currentUser, business.id, teamMembers, permission);
   const canTab = (tab: BusinessDashboardTab) => {
-    const permission = BUSINESS_TAB_PERMISSIONS[tab];
-    return !permission || can(permission);
+    const moduleId = BUSINESS_TAB_ACCESS_MODULE[tab];
+    if (!moduleId) return true;
+    if (activeAccess === null) return true;
+    return hasModuleAccess(activeAccess, moduleId);
   };
   const denyPermission = (permission: keyof BusinessTeamMember['permissions']) => {
     if (can(permission)) return true;
     setTeamNotice('N�o tem permiss�o para executar esta opera��o.');
     return false;
   };
+  // Item destacado na barra inferior móvel (o marketing agrega os separadores
+  // de conteúdos, campanhas e calendário).
+  const businessBottomNavActive = (() => {
+    const tab = String(activeTab);
+    if (['overview', 'my_business', 'communications', 'settings'].includes(tab)) return tab;
+    if (['marketing', 'posts', 'promotions', 'marketing_campaigns', 'marketing_calendar'].includes(tab)) return 'marketing';
+    return '';
+  })();
   const [internalSidebarCollapsed, setInternalSidebarCollapsed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     try {
@@ -432,6 +484,13 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
       // Ignore storage issues in restricted contexts.
     }
   }, [sidebarCollapsed]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('guigui-billing-section', String(billingSection));
+    } catch {
+      // Ignore storage issues in restricted contexts.
+    }
+  }, [billingSection]);
   useEffect(() => {
     onSidebarCollapsedChange?.(sidebarCollapsed);
   }, [onSidebarCollapsedChange, sidebarCollapsed]);
@@ -468,12 +527,18 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
       heading: t('businessNavSupport'),
       items: [
         { label: t('support'), tab: 'support', icon: LifeBuoy, help: t('businessNavSupportHelp') },
-        { label: t('businessNavSecurity'), tab: 'settings', icon: KeyRound, help: t('businessNavSecurityHelp') },
+        { label: t('businessNavReports'), tab: 'reports', icon: BarChart3, help: t('businessNavReportsHelp') },
+        { label: t('businessNavSecurity'), tab: 'security', icon: ShieldCheck, help: t('businessNavSecurityHelp') },
         { label: t('businessNavExport'), tab: 'export', icon: Download, help: t('businessNavExportHelp') },
+        { label: t('businessNavAccountSettings'), tab: 'settings', icon: KeyRound, help: t('businessNavAccountSettingsHelp') },
       ],
     },
   ];
 
+  const visibleBusinessNavigationGroups = businessNavigationGroups
+    .map((group) => ({ ...group, items: group.items.filter((item) => canTab(item.tab)) }))
+    .filter((group) => group.items.length > 0);
+  const activeTabAllowed = canTab(activeTab);
   const currentBusinessSection = businessNavigationGroups.flatMap((group) => group.items).find((item) => item.tab === activeTab)?.label
     || BUSINESS_NAVIGATION[0].items[0].label;
   const isMarketingTab = activeTab === 'marketing' || activeTab === 'marketing_campaigns' || activeTab === 'posts' || activeTab === 'promotions' || activeTab === 'marketing_calendar';
@@ -1478,8 +1543,8 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
           createdAt: new Date().toISOString(),
           status: postPublishMode === 'scheduled' ? 'scheduled' : data.result.status === 'verde' ? 'approved' : 'pending_moderation',
           scheduledAt: postPublishMode === 'scheduled' ? new Date(postScheduledAt).toISOString() : undefined,
-          likesCount: 1,
-          reactions: { like: 1 },
+          likesCount: 0,
+          reactions: {},
           comments: [],
           sharesCount: 0,
           neighborhood: business.neighborhood,
@@ -1768,6 +1833,19 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
 
   return (
     <div className="guigui-profile-dashboard guigui-light-dashboard w-full min-h-[calc(100vh-72px)] bg-[var(--color-bg-surface)] overflow-x: visible">
+      <GlassBottomNav
+        ariaLabel="Navegação principal da empresa"
+        testId="business-bottom-nav"
+        activeId={businessBottomNavActive}
+        onSelect={(id) => { if (canTab(id as BusinessDashboardTab)) setActiveTab(id as BusinessDashboardTab); }}
+        items={[
+          { id: 'overview', label: 'Visão Geral', icon: LayoutDashboard },
+          { id: 'my_business', label: 'Perfil', icon: Building2 },
+          { id: 'marketing', label: 'Marketing', icon: Megaphone },
+          { id: 'communications', label: 'Mensagens', icon: MessageCircle },
+          { id: 'settings', label: 'Definições', icon: Settings },
+        ].filter((item) => canTab(item.id as BusinessDashboardTab))}
+      />
       <div className="flex min-h-[calc(100vh-72px)] w-full bg-[var(--color-bg-surface)]">
         <div className={`${mobileSidebarOpen ? 'block' : 'hidden'} fixed inset-0 z-40 bg-[var(--color-bg-surface-dark)]/35 backdrop-blur-[1px] md:hidden`} onClick={() => setMobileSidebarOpen(false)} />
 
@@ -1840,7 +1918,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                 </button>
               )}
 
-              {businessNavigationGroups.map((group) => (
+              {visibleBusinessNavigationGroups.map((group) => (
                 <div key={group.heading} className={sidebarCollapsed ? 'mb-2 space-y-1.5' : 'mb-3 space-y-1'}>
                   {!sidebarCollapsed && group.heading !== t('businessNavSummary') && (
                     <div className="px-3 pb-1 pt-1.5 text-[8px] font-black uppercase tracking-[0.22em] text-[#6f8f89]">
@@ -1929,7 +2007,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
           </div>
         </aside>        <main
           style={{ '--business-sidebar-width': `${sidebarCollapsed ? 72 : 248}px` } as React.CSSProperties}
-          className="min-w-0 flex-1 overflow-visible bg-[#f7f5f3] p-3 sm:p-4 md:ml-[var(--business-sidebar-width)]"
+          className="min-w-0 flex-1 overflow-visible bg-[#f7f5f3] p-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))] sm:p-4 sm:pb-[calc(4.75rem+env(safe-area-inset-bottom))] md:ml-[var(--business-sidebar-width)] lg:pb-4"
         >
           <div className="mb-3">
             <div className="flex items-center gap-2">
@@ -1949,7 +2027,19 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
             </div>
           </div>
 
-          <div className="space-y-5 text-[var(--color-text-strong)]">
+          {!activeTabAllowed && (
+            <div role="alert" className="rounded-[var(--radius-xl)] border border-rose-200 bg-rose-50 p-5 text-rose-900 shadow-[var(--shadow-xs)] dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
+              <h2 className="flex items-center gap-2 text-base font-black"><ShieldCheck className="h-5 w-5" /> Acesso não autorizado</h2>
+              <p className="mt-1 text-xs leading-relaxed">
+                A sua conta não tem autorização para este módulo. Se precisar de acesso, peça ao responsável da empresa para actualizar as suas permissões.
+              </p>
+              <button type="button" onClick={() => setActiveTab('overview')} className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-1.5 text-[11px] font-black text-white">
+                Voltar à Visão Geral
+              </button>
+            </div>
+          )}
+
+          <div className={`space-y-5 text-[var(--color-text-strong)] ${activeTabAllowed ? '' : 'hidden'}`}>
             {isMarketingTab && (
               <div className="sticky top-[70px] z-20 overflow-x-auto rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)]/95 p-1.5 shadow-sm backdrop-blur md:top-[80px]">
                 <div className="flex min-w-max gap-1" role="tablist" aria-label={t('business.SeccoesMarketing')}>
@@ -2049,7 +2139,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
 
             {/* Tab Contents */}
       {activeTab === 'overview' && (
-        <div className="space-y-6">
+        <div className="space-y-4">
         {/* 6 Indicadores Principais */}
         <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
           <StatCard
@@ -2155,7 +2245,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
 
       {/* Events Tab */}
       {activeTab === 'events' && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           <ClientEventsManagement
             business={business}
             currentLang={currentLang}
@@ -2174,13 +2264,13 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
       )}
 
       {activeTab === 'stories' && (
-        <StoriesManagementHub currentUser={currentUser} embedded />
+        <StoriesManagementHub currentUser={currentUser} embedded onStoryPublished={onStoryPublished} />
       )}
 
       {/* Posts Tab */}
       {activeTab === 'posts' && (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-          <Card className="space-y-5 border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5 shadow-sm sm:p-6 xl:col-span-7">
+          <Card className="space-y-5 border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5 shadow-sm sm:p-6 xl:col-span-7 dark:bg-[var(--color-bg-surface-dark)]">
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--color-border-subtle)] pb-4">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--color-green-600)]">{t('business.ProducaoConteudo')}</p>
@@ -2418,7 +2508,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
           </Card>
 
           <div className="space-y-4 xl:col-span-5">
-            <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5">
+            <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5 dark:bg-[var(--color-bg-surface-dark)]">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--color-text-muted)]">Biblioteca</p>
               <h3 className="mt-1 text-lg font-black text-[var(--color-text-strong)]">{t('business.PublicacoesActivas')}</h3>
               <p className="mt-1 text-xs text-[var(--color-text-muted)]">{business.posts.length} publica��o(�es) vis�vel(eis) no perfil.</p>
@@ -2454,7 +2544,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
 
       {/* Promotions Tab */}
       {activeTab === 'promotions' && (
-        <Card className="mx-auto w-full max-w-3xl overflow-hidden border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] shadow-[0_22px_60px_-38px_rgba(15,23,42,0.35)]">
+        <Card className="mx-auto w-full max-w-3xl overflow-hidden border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] shadow-[0_22px_60px_-38px_rgba(15,23,42,0.35)] dark:bg-[var(--color-bg-surface-dark)]">
           <div className="border-b border-[var(--color-border-subtle)] bg-gradient-to-br from-[var(--color-bg-surface)] via-[var(--color-bg-surface)] to-[var(--color-gold-50)]/60 px-5 py-5 sm:px-7">
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--color-gold-100)] text-[var(--color-gold-700)]">
@@ -2572,7 +2662,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
 
       {/* Reviews & Replies Tab (Section 8) */}
       {activeTab === 'reviews' && (
-        <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-6 rounded-3xl space-y-6 shadow-sm max-w-4xl mx-auto">
+        <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-6 rounded-2xl space-y-4 shadow-sm max-w-4xl mx-auto dark:bg-[var(--color-bg-surface-dark)]">
           {/* Header */}
           <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4 border-[var(--color-border-subtle)]">
             <div>
@@ -2788,44 +2878,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
       )}
 
       {activeTab === 'team' && (
-        <div className="space-y-5">
-          <Card className="rounded-3xl border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 shadow-sm sm:p-6">
-            <div className="flex items-start justify-between gap-3 border-b border-[var(--color-border-subtle)] pb-4">
-              <div>
-                <h2 className="flex items-center gap-2 text-base font-black text-[var(--color-text-strong)]"><Users className="h-5 w-5 text-[var(--color-green-600)]" /> {t('business.teamPermissions')}</h2>
-                <p className="mt-1 text-xs text-[var(--color-text-muted)]">{t('business.ConvideColaboradoresControle')}</p>
-              </div>
-              <Badge variant="success" className="px-3 py-1 text-[10px]">{teamMembers.filter((member) => member.status === 'active').length} activos</Badge>
-            </div>
-            {teamNotice && <div className="mt-4 rounded-xl border border-[var(--color-green-200)] bg-[var(--color-green-50)] px-3 py-2 text-xs font-bold text-[var(--color-emerald-800)]" role="status">{teamNotice}</div>}
-            <form onSubmit={handleInviteTeamMember} className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_180px_auto] sm:items-end">
-              <label className="text-[10px] font-black uppercase text-[var(--color-text-muted)]">Nome<input required value={teamName} onChange={(event) => setTeamName(event.target.value)} className="mt-1 w-full rounded-xl border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] px-3 py-2.5 text-xs font-bold text-[var(--color-text-strong)]" placeholder="Nome do colaborador" /></label>
-              <label className="text-[10px] font-black uppercase text-[var(--color-text-muted)]">E-mail<input required type="email" value={teamEmail} onChange={(event) => setTeamEmail(event.target.value)} className="mt-1 w-full rounded-xl border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] px-3 py-2.5 text-xs font-bold text-[var(--color-text-strong)]" placeholder="colaborador@empresa.gw" /></label>
-              <label className="text-[10px] font-black uppercase text-[var(--color-text-muted)]">{t('business.Funcao')}<select value={teamRole} onChange={(event) => setTeamRole(event.target.value as BusinessTeamRole)} className="mt-1 w-full rounded-xl border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] px-3 py-2.5 text-xs font-bold text-[var(--color-text-strong)]">{Object.entries(teamRoleLabels).map(([role, label]) => <option key={role} value={role}>{label}</option>)}</select></label>
-              <Button type="submit" variant="primary" size="sm" className="min-h-10 rounded-xl bg-[var(--color-green-600)] px-4 py-2 text-xs font-black text-white hover:bg-[var(--color-emerald-700)]"><Plus className="h-4 w-4" />Convidar</Button>
-            </form>
-          </Card>
-          <div className="grid gap-3 lg:grid-cols-2">
-            {teamMembers.map((member) => (
-              <div key={member.id} className="rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div><div className="text-sm font-black text-[var(--color-text-strong)]">{member.name}</div><div className="text-[11px] text-[var(--color-text-muted)]">{member.email}</div><Badge variant={member.status === 'suspended' ? 'danger' : member.status === 'invited' ? 'warning' : 'success'} className="mt-2 px-2 py-1 text-[10px]">{member.status === 'invited' ? 'Convite pendente' : member.status === 'suspended' ? 'Suspenso' : 'Activo'}</Badge></div>
-                  <div className="flex gap-2"><Button type="button" variant="secondary" size="sm" onClick={() => handleTeamStatus(member)} className="rounded-xl border border-[var(--color-border-subtle)] px-2.5 py-2 text-[10px] font-black text-[var(--color-text-strong)] hover:bg-[var(--color-bg-subtle)]">{member.status === 'suspended' ? 'Reactivar' : 'Suspender'}</Button><Button type="button" variant="danger" size="sm" onClick={() => handleRemoveTeamMember(member)} className="rounded-xl border border-[var(--color-red-200)] px-2.5 py-2 text-[10px] font-black text-[var(--color-red-700)] hover:bg-[var(--color-red-50)]">Remover</Button></div>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-1.5">{Object.entries(member.permissions).map(([permission, enabled]) => <span key={permission} className={`rounded-lg px-2 py-1 text-[10px] font-bold ${enabled ? 'bg-[var(--color-green-50)] text-[var(--color-green-700)]' : 'bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] line-through'}`}>{permission === 'profile' ? 'Perfil' : permission === 'content' ? 'Conte�do' : permission === 'events' ? 'Eventos' : permission === 'tickets' ? 'Bilhetes' : 'Factura��o'}</span>)}</div>
-              </div>
-            ))}
-            {teamMembers.length === 0 && (
-              <div className="lg:col-span-2">
-                <EmptyState
-                  title={t('business.AindaNaoExistem')}
-                  description="Envie o primeiro convite acima."
-                />
-              </div>
-            )}
-          </div>
-          {teamAudit.length > 0 && <div className="rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-4"><h3 className="text-xs font-black uppercase tracking-wider text-[var(--color-text-strong)]">{t('business.HistoricoEquipa')}</h3><div className="mt-3 space-y-2">{teamAudit.slice(0, 8).map((entry) => <div key={entry.id} className="flex flex-wrap justify-between gap-2 border-b border-[var(--color-border-subtle)] pb-2 text-[11px]"><span><strong>{entry.memberName}</strong> · {entry.action}</span><time className="text-[var(--color-text-muted)]">{new Date(entry.createdAt).toLocaleString('pt-PT')}</time></div>)}</div></div>}
-        </div>
+        <TeamAccessHub business={business} currentUser={currentUser} currentLang={currentLang} />
       )}
 
       {/* Billing Tab (Section 4) */}
@@ -3081,7 +3134,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                         <td className="px-2 py-2 text-right font-bold text-[var(--color-emerald-700)]">Confirmado</td>
                       </tr>
                     )}
-                    {myBusinessOrders.slice(0, 8).map((order) => (
+                    {orderPagination.pageItems.map((order) => (
                       <tr key={order.id}>
                         <td className="px-2 py-2 font-mono text-[var(--color-text-muted)]">{new Date(order.purchasedAt).toLocaleDateString('pt-PT')}</td>
                         <td className="px-2 py-2 font-bold text-[var(--color-text-strong)]">{order.itemTitle}</td>
@@ -3101,7 +3154,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
 
       {/* TAB: Pricing Matrix & Tarifas Config (4.1, 4.2, 4.3) */}
       {activeTab === 'pricing' && (
-        <div className="space-y-6 text-xs">
+        <div className="space-y-4 text-xs">
           {/* Notification Toast */}
           {saveToast && (
             <div className="bg-[var(--color-green-600)] text-white p-4 rounded-2xl shadow-md flex items-center justify-between font-bold animate-in fade-in slide-in-from-top-2 duration-200">
@@ -3116,7 +3169,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
           )}
 
           {/* Banner: Rule of 3 Posts & Business Model */}
-          <div className="bg-gradient-to-r from-[var(--color-green-900)] via-[var(--color-green-800)] to-[var(--color-green-950)] text-white p-6 rounded-3xl border border-[var(--color-border-strong)] shadow-md space-y-3">
+          <div className="bg-gradient-to-r from-[var(--color-green-900)] via-[var(--color-green-800)] to-[var(--color-green-950)] text-white p-6 rounded-2xl border border-[var(--color-border-strong)] shadow-md space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <span className="bg-[var(--color-gold-400)] text-[var(--color-text-strong)] px-2.5 py-0.5 rounded-lg font-black text-[10px] uppercase tracking-wider">{t('business.ConfiguracaoGestaoComercial')}</span>
@@ -3147,7 +3200,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
           </div>
 
           {/* Matrix Configuration Card */}
-          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4 border-[var(--color-border-subtle)]">
               <div>
                 <h3 className="text-sm font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider flex items-center gap-2">
@@ -3262,7 +3315,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
           {/* Global Fees and Additional Revenues Parameters */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Ticket Fees Config */}
-            <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+            <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
               <h3 className="text-sm font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider flex items-center gap-2">
                 <Ticket className="w-4.5 h-4.5 text-[var(--color-green-600)]" />{t('business.ConfiguracaoTaxasBilheteira')}</h3>
 
@@ -3310,7 +3363,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
             </div>
 
             {/* Additional Revenues Config */}
-            <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+            <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
               <h3 className="text-sm font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider flex items-center gap-2">
                 <Tag className="w-4.5 h-4.5 text-[var(--color-gold-600)]" />{t('business.ConfiguracaoReceitasAdicionais')}</h3>
 
@@ -3356,7 +3409,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
           </div>
 
           {/* Audit Log / Hist�rico de Altera��es de Pre�o (4.2.c) */}
-          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
             <div className="flex items-center justify-between border-b pb-3 border-[var(--color-border-subtle)]">
               <h3 className="text-sm font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider flex items-center gap-2">
                 <History className="w-4.5 h-4.5 text-[var(--color-green-600)]" />{t('business.HistoricoAlteracoesPreco')}</h3>
@@ -3401,9 +3454,9 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
 
       {/* TAB: BILHETES E HISTÓRICO DE PEDIDOS */}
       {(activeTab === 'tickets' || activeTab === 'order_history') && (
-        <div className="space-y-6 animate-in fade-in">
+        <div className="space-y-4 animate-in fade-in">
           {/* Header Banner */}
-          <div className="bg-[var(--color-bg-surface-dark)] border border-[var(--color-border-strong)] rounded-3xl p-6 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-md">
+          <div className="bg-[var(--color-bg-surface-dark)] border border-[var(--color-border-strong)] rounded-2xl p-6 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-md">
             <div className="flex items-center gap-3">
               <span className="p-3 bg-[var(--color-green-50)]0/20 text-emerald-400 rounded-2xl shrink-0">
                 <ShoppingBag className="w-6 h-6" />
@@ -3512,7 +3565,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
 
           {/* Advanced Multi-Filter Control Panel */}
           {(activeTab === 'tickets' || activeTab === 'order_history') && (
-          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
             <div className="flex items-center justify-between border-b border-[var(--color-border-subtle)] pb-3">
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-[var(--color-green-600)]" />
@@ -3793,7 +3846,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
           )}
 
           {/* Orders List Table */}
-          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider flex items-center gap-2">
                 <Receipt className="w-4 h-4 text-[var(--color-green-600)]" />
@@ -4039,7 +4092,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                 if (e.target === e.currentTarget) setSelectedOrderDetails(null);
               }}
             >
-              <div className="bg-[var(--color-bg-surface)] rounded-3xl max-w-lg w-full shadow-2xl border border-[var(--color-border-subtle)] p-6 space-y-6 text-[var(--color-text-strong)] my-auto animate-in zoom-in-95 duration-150">
+              <div className="bg-[var(--color-bg-surface)] rounded-2xl max-w-lg w-full shadow-2xl border border-[var(--color-border-subtle)] p-6 space-y-4 text-[var(--color-text-strong)] my-auto animate-in zoom-in-95 duration-150">
                 {/* Modal Top Header */}
                 <div className="flex items-center justify-between border-b border-[var(--color-border-subtle)] pb-4">
                   <div className="flex items-center gap-2.5">
@@ -4172,8 +4225,8 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
 
       {/* TAB: REDEMPTIONS / LEVANTAMENTOS */}
       {activeTab === 'redemptions' && (
-        <div className="space-y-6">
-          <div className="bg-[var(--color-bg-surface-dark)] border border-[var(--color-border-strong)] rounded-3xl p-6 text-white space-y-3">
+        <div className="space-y-4">
+          <div className="bg-[var(--color-bg-surface-dark)] border border-[var(--color-border-strong)] rounded-2xl p-6 text-white space-y-3">
             <div className="flex items-center gap-2">
               <span className="p-2 bg-[var(--color-green-50)]0/20 text-emerald-400 rounded-xl">
                 <QrCode className="w-5 h-5" />
@@ -4188,7 +4241,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
           </div>
 
           {/* Code Validation Input Form */}
-          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
             <h3 className="text-sm font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider flex items-center gap-2">
               <Search className="w-4.5 h-4.5 text-[var(--color-green-600)]" />
               <span>{t('business.ValidarCodigoLevantamento')}</span>
@@ -4236,7 +4289,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
           </div>
 
           {/* List of Orders for this Business */}
-          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider flex items-center gap-2">
                 <Package className="w-4.5 h-4.5 text-[var(--color-green-600)]" />
@@ -4464,9 +4517,9 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
         ];
 
         return (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Header & Controls */}
-            <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+            <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <h3 className="font-extrabold text-base text-[var(--color-text-strong)] flex items-center gap-2">
@@ -4592,7 +4645,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
 
             {/* SECTION 1: GR�FICO DE VISUALIZA�ÕES E CLIQUES (Recharts Area & Line Chart) */}
             {(analyticsSubSection === 'all' || analyticsSubSection === 'views_clicks') && (
-              <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+              <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
                 <div className="flex flex-wrap items-center justify-between border-b border-[var(--color-border-subtle)] pb-3 gap-3">
                   <div>
                     <h4 className="font-extrabold text-sm text-[var(--color-text-strong)] flex items-center gap-2">
@@ -4731,7 +4784,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
 
             {/* SECTION 2: GR�FICO DE DESEMPENHO DAS PROMO�ÕES (Recharts BarChart) */}
             {(analyticsSubSection === 'all' || analyticsSubSection === 'promotions') && (
-              <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+              <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
                 <div className="flex flex-wrap items-center justify-between border-b border-[var(--color-border-subtle)] pb-3 gap-3">
                   <div>
                     <h4 className="font-extrabold text-sm text-[var(--color-text-strong)] flex items-center gap-2">
@@ -4823,10 +4876,10 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
 
             {/* SECTION 3: VENDAS DE BILHETES & PRODUTOS (Recharts Bar & Area & Pie) */}
             {(analyticsSubSection === 'all' || analyticsSubSection === 'sales') && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Bar Chart: Comparison Bilhetes vs Produtos */}
-                  <div className="lg:col-span-2 rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+                  <div className="lg:col-span-2 rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
                     <div className="flex items-center justify-between border-b border-[var(--color-border-subtle)] pb-3">
                       <div>
                         <h4 className="font-extrabold text-sm text-[var(--color-text-strong)] flex items-center gap-2">
@@ -4903,7 +4956,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                   </div>
 
                   {/* Pie Chart: Distribution by Category */}
-                  <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+                  <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
                     <div className="border-b border-[var(--color-border-subtle)] pb-3">
                       <h4 className="font-extrabold text-sm text-[var(--color-text-strong)] flex items-center gap-2">
                         <PieChartIcon className="w-4 h-4 text-[var(--color-violet-600)]" />
@@ -4948,7 +5001,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                 </div>
 
                 {/* Area Chart: Receita Acumulada */}
-                <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+                <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
                   <div className="border-b border-[var(--color-border-subtle)] pb-3 flex items-center justify-between">
                     <div>
                       <h4 className="font-extrabold text-sm text-[var(--color-text-strong)]">{t('business.EvolucaoReceitaBruta')}</h4>
@@ -4994,7 +5047,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                 </div>
 
                 {/* Detailed Data Table */}
-                <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+                <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
                   <div className="flex items-center justify-between border-b border-[var(--color-border-subtle)] pb-3">
                     <h4 className="font-extrabold text-sm text-[var(--color-text-strong)]">{t('business.TabelaDetalhadaVendas')}</h4>
                     <button
@@ -5115,7 +5168,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
               </ResponsiveContainer>
             </ChartFrame>
 
-            <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5 shadow-sm">
+            <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5 shadow-sm dark:bg-[var(--color-bg-surface-dark)]">
               <h3 className="text-base font-black text-[var(--color-text-strong)]">Ferramentas de Marketing</h3>
               <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">{t('business.TudoFicaAgrupado')}</p>
               <div className="mt-4 grid gap-2">
@@ -5136,7 +5189,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
           </div>}
 
           {marketingSection !== 'overview' && (
-            <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5 shadow-sm">
+            <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5 shadow-sm dark:bg-[var(--color-bg-surface-dark)]">
               {(() => {
                 const sectionContent = {
                   campaigns: {
@@ -5659,6 +5712,24 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
         <CommunicationHub currentLang={currentLang} mode="business" currentUser={currentUser} businesses={businesses} conversations={conversations} messages={conversationMessages} supportRequests={supportRequests} onCreateConversation={onCreateConversation} onSendMessage={onSendMessage} onCreateSupport={onCreateSupport} onReplySupport={onReplySupport} onMarkConversationRead={onMarkConversationRead} initialChannel="support" channelOnly focusSupportId={focusSupportId} />
       )}
 
+      {activeTab === 'security' && (
+        <ClientSecurityHub business={business} currentUser={currentUser} currentLang={currentLang} />
+      )}
+
+      {activeTab === 'reports' && (
+        <ClientReportsHub
+          business={business}
+          currentUser={currentUser}
+          currentLang={currentLang}
+          purchaseOrders={purchaseOrders}
+          events={events}
+          posts={business.posts}
+          marketingCampaigns={marketingCampaigns}
+          teamAudit={teamAudit}
+          onOpenExport={() => setActiveTab('export')}
+        />
+      )}
+
       {activeTab === 'settings' && (
         <ClientSettingsHub
           business={business}
@@ -5686,6 +5757,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
           marketingAssets={marketingAssets}
           scheduledItems={scheduledItems}
           notifications={notifications}
+          currentUser={currentUser}
           followerCount={followerCount}
           audienceReach={audienceReach}
         />
@@ -5726,7 +5798,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
               )}
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-text-strong)]">{selectedBusinessPost.content}</p>
               <div className="flex flex-wrap gap-2 text-[11px] font-bold text-[var(--color-text-muted)]">
-                <span className="rounded-full bg-[var(--color-bg-subtle)] px-3 py-1">Gostos: {selectedBusinessPost.likesCount}</span>
+                <span className="rounded-full bg-[var(--color-bg-subtle)] px-3 py-1">Gostos: {selectedPostEngagement?.likes ?? 0} · Comentários: {selectedPostEngagement?.comments.length ?? 0} · Partilhas: {selectedPostEngagement?.shares ?? 0}</span>
                 <span className="rounded-full bg-[var(--color-green-50)] px-3 py-1 text-[var(--color-emerald-700)]">Estado: {selectedBusinessPost.status}</span>
               </div>
             </div>
@@ -5737,7 +5809,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
       {/* Buy Extra Post Modal (4.3) */}
       {showBuyPostModal && activeTab === 'my_business' && (
         <div className="fixed inset-0 bg-[var(--color-bg-surface-dark)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overscroll-contain">
-          <div className="bg-[var(--color-neutral-0)] rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 overscroll-contain">
+          <div className="bg-[var(--color-neutral-0)] rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 overscroll-contain">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="font-extrabold text-[var(--color-text-strong)] text-base flex items-center gap-2">
                 <PlusCircle className="w-5 h-5 text-[var(--color-green-600)]" />
@@ -5824,7 +5896,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
       {/* Buy Extra Promotion Modal */}
       {showBuyPromoModal && (
         <div className="fixed inset-0 bg-[var(--color-bg-surface-dark)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overscroll-contain">
-          <div className="bg-[var(--color-neutral-0)] rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 overscroll-contain">
+          <div className="bg-[var(--color-neutral-0)] rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 overscroll-contain">
             <div className="flex items-center justify-between border-b pb-3"><h3 className="font-extrabold text-[var(--color-text-strong)] text-base flex items-center gap-2"><Tag className="w-5 h-5 text-[var(--color-gold-600)]" /><span>{t('business.ComprarPromocaoExtra')}</span></h3><button type="button" onClick={() => setShowBuyPromoModal(false)} className="guigui-close-button" aria-label={t('business.FecharCompraPromocao')} title="Fechar"><X className="w-4 h-4" /></button></div>
             <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">{t('business.EscolhaPacotePromocoes')}</p>
             <div className="bg-[var(--color-gold-50)] p-4 rounded-2xl border-[var(--color-gold-200)] space-y-3 font-mono"><div className="flex items-center justify-between gap-3"><div><div className="text-[10px] text-[var(--color-gold-800)] uppercase font-bold">Destaques promocionais</div><div className="text-xs text-[var(--color-gold-700)]">{t('business.PrecoQuantidadeDefinidos')}</div></div><select value={extraPromotionQuantity} onChange={(e) => setExtraPromotionQuantity(Number(e.target.value) || 1)} className="rounded-xl border-[var(--color-gold-200)] bg-[var(--color-bg-surface)] px-2 py-2 text-xs font-black text-[var(--color-gold-900)]" aria-label={t('business.PacotePromocoesExtra')}>{(promotionExtraProduct?.priceRules || [{ id: 'promotion-extra-default', quantity: 1, label: '+1 promo��o', price: pricingConfig.extraPromotionPriceXOF }]).map((rule) => <option key={rule.id} value={rule.quantity}>{rule.label}</option>)}</select></div><div className="text-right text-base font-black text-[var(--color-gold-700)]">{promotionExtraPrice.toLocaleString('pt-PT')} XOF</div></div>
@@ -5836,7 +5908,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
       {/* Upgrade Plan Modal */}
       {showUpgradeModal && (
         <div className="fixed inset-0 bg-[var(--color-bg-surface-dark)]/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overscroll-contain">
-          <div className="bg-[var(--color-bg-surface)] rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 overscroll-contain">
+          <div className="bg-[var(--color-bg-surface)] rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 overscroll-contain">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="font-extrabold text-[var(--color-text-strong)] text-base flex items-center gap-2">
                 <Zap className="w-5 h-5 text-[var(--color-gold-500)]" />
@@ -5931,7 +6003,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
       {/* QR Code Modal for Purchase Order */}
       {selectedOrderForQr && (
         <div className="fixed inset-0 z-50 bg-[var(--color-bg-surface-dark)]/70 backdrop-blur-sm flex items-center justify-center p-4 overscroll-contain">
-          <div className="bg-[var(--color-bg-surface)] rounded-3xl max-w-md w-full p-6 text-[var(--color-text-strong)] relative shadow-2xl space-y-4 overscroll-contain">
+          <div className="bg-[var(--color-bg-surface)] rounded-2xl max-w-md w-full p-6 text-[var(--color-text-strong)] relative shadow-2xl space-y-4 overscroll-contain">
             <IconButton label="Fechar QR Code" variant="secondary"
               onClick={() => setSelectedOrderForQr(null)}
               className="absolute top-4 right-4 bg-[var(--color-bg-subtle)] hover:bg-[var(--color-bg-subtle-dark)] text-[var(--color-text-muted)] p-2 rounded-full transition z-10"

@@ -14,5 +14,10 @@ export {
   type IdentityAccessOptions,
   type PublicIdentitySession,
 } from './composition';
+export {
+  listUserSessions,
+  revokeUserSessionById,
+  type UserSessionSummary,
+} from './infrastructure/sessionRepository';
 export { resolveSessionContext } from './application/resolveSessionContext';
 export { createSessionAccessMiddleware } from './http/sessionAccessMiddleware';

@@ -20,7 +20,7 @@ export interface AuthenticationInput {
 
 export type AuthenticationResult =
   | { kind: 'authenticated'; user: PublicIdentity; sessionToken: string }
-  | { kind: 'rejected'; reason: 'invalid_credentials' | 'deactivated' | 'mfa_required' | 'mfa_invalid' };
+  | { kind: 'rejected'; reason: 'invalid_credentials' | 'deactivated' | 'suspended' | 'disabled' | 'mfa_required' | 'mfa_invalid' };
 
 export interface BusinessRegistrationProfile {
   name: string;
@@ -83,6 +83,12 @@ export async function authenticateUser(
 
   if (account?.accountStatus === 'deactivated') {
     return { kind: 'rejected', reason: 'deactivated' };
+  }
+  if (account?.accessStatus === 'suspended') {
+    return { kind: 'rejected', reason: 'suspended' };
+  }
+  if (account?.accessStatus === 'disabled') {
+    return { kind: 'rejected', reason: 'disabled' };
   }
 
   if (account && dependencies.verifyPassword(input.password, account.passwordHash)) {

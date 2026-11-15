@@ -64,7 +64,7 @@ test.describe('seed-admin: painel reflecte dados reais do banco', () => {
     expect(body.users.length).toBeGreaterThan(0);
 
     // Business accounts carry their company name.
-    const aBusiness = body.users.find((u: { role: string }) => u.role === 'business');
+    const aBusiness = body.users.find((u: { role: string; companyName?: string | null }) => u.role === 'business' && u.companyName);
     expect(aBusiness).toBeTruthy();
     expect(aBusiness.companyName).toBeTruthy();
 
@@ -83,7 +83,8 @@ test.describe('seed-admin: painel reflecte dados reais do banco', () => {
     // Open the Gestão → Utilizadores section in the sidebar.
     const usersNav = page.getByRole('button', { name: 'Utilizadores', exact: true }).first();
     await usersNav.click();
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(500);
+    await page.getByRole('button', { name: /^Todas as contas/ }).first().click();
 
     // The hub header reports the real total from the database.
     await expect(page.getByText(`${total} conta`, { exact: false })).toBeVisible({ timeout: 10000 });

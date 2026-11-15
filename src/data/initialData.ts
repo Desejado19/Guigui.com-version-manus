@@ -1258,7 +1258,51 @@ export const INITIAL_STORIES = [
   },
 ];
 
-const GENERATED_NEIGHBORHOODS = ['Bissau Velho', 'Bandim', 'Santa Luzia', 'Caracol', 'Cuntum', 'Praça'];
+// Bairros do Sector Autónomo de Bissau apresentados no filtro de localização.
+// O filtro mostra sempre a cidade completa (e não apenas as zonas que já têm
+// empresas publicadas); zonas sem conteúdo mostram o estado vazio habitual.
+export const BISSAU_NEIGHBORHOODS: readonly string[] = [
+  'Bissau Velho',
+  'Bandim',
+  'Antula',
+  'Cuntum',
+  'Cuntum Madina',
+  'Chapa',
+  'Santa Luzia',
+  'Praça dos Heróis',
+  'Alto Crim',
+  'Mindará',
+  'Missira',
+  'Belém',
+  'Bairro Militar',
+  'Bairro de Ajuda',
+  'Bairro de Có',
+  'Bairro de Luanda',
+  'Bairro de Encarnação',
+  'Bairro de Cumura',
+  'Bairro da Várzea',
+  'Bairro do Farim',
+  'Bairro do Minadouro',
+  'Bairro da Ladeira',
+  'Bairro do Galpão',
+  'Bairro de Sol',
+  'Bairro da Lagoa',
+  'Bairro do Inácio',
+  'Bairro da Mota',
+  'Bairro da Coração de Jesus',
+  'Bairro dos Estados',
+  'Caracol',
+  'Porto de Bissau',
+  'Centro',
+  'Hafia',
+  'Quinel',
+  'Cupilom',
+  'Largo do Aparelho',
+  'Morrinho',
+  'Ensino',
+];
+
+const GENERATED_NEIGHBORHOODS = ['Bissau Velho', 'Bandim', 'Praça dos Heróis', 'Santa Luzia', 'Chapa', 'Cuntum', 'Caracol', 'Porto de Bissau', 'Praça', 'Centro', 'Bairro dos Estados', 'Bairro de Encarnação', 'Bairro de Borburata', 'Bairro de Cumura', 'Bairro da Várzea', 'Bairro do Farim', 'Bairro do Minadouro', 'Bairro da Ladeira', 'Bairro do Galpão', 'Ensino', 'Farim', 'Morrinho', 'Largo do Aparelho', 'Bairro de Sol', 'Bairro da Lagoa', 'Bairro do Inácio', 'Bairro da Mota', 'Bairro do Bugalle', 'Bairro de Jau', 'Bairro de Rafai', 'Bairro da Coração de Jesus'];
 const GENERATED_BUSINESS_NAMES = [
   'Mercado Central de Bissau', 'Ateliê Bijagós', 'Casa do Caju', 'Tech Bissau Solutions',
   'Clínica Vida Nova', 'Hotel Amura Garden', 'Moda Nô Pintcha', 'TransGuiné Logística',

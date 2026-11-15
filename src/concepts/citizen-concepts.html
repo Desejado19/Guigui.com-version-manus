@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Guigui.com — Concepts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#f6f8fc;
+    --surface:#ffffff;
+    --surface-2:#f1f5fb;
+    --ink:#0b1a26;
+    --ink-2:#3a4d5c;
+    --muted:#6b7c8c;
+    --line:#e3eaf3;
+    --green:#0d8a6e;
+    --green-2:#0a6b56;
+    --green-soft:#e3f6f1;
+    --gold:#b08500;
+    --gold-soft:#fbf2d9;
+    --blue:#1d5fa8;
+    --blue-soft:#e6f0fc;
+    --rose:#b0342c;
+    --rose-soft:#fbe9e7;
+    --violet:#5b44b3;
+    --violet-soft:#efecfb;
+    --shadow-sm:0 1px 2px rgba(11,26,38,.04);
+    --shadow-md:0 8px 22px -14px rgba(11,26,38,.28);
+    --shadow-lg:0 18px 32px -22px rgba(11,26,38,.42);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(29,95,168,.10), transparent 60%),
+      radial-gradient(900px 500px at 0% 110%, rgba(13,138,110,.10), transparent 60%),
+      var(--bg);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  .docs{padding:40px 24px 80px;max-width:980px;margin:0 auto}
+  .docs h1{font-size:34px;font-weight:900;letter-spacing:-.02em;margin:0 0 6px}
+  .docs .kicker{font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--green);margin-bottom:18px}
+  .docs p.lead{max-width:68ch;color:var(--ink-2);line-height:1.6;margin:0 0 28px;font-size:15px}
+  .docs h2{font-size:15px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:36px 0 14px}
+  .docs .concept{margin-top:34px;border-radius:22px;background:var(--surface);padding:18px;border:1px solid var(--line);box-shadow:var(--shadow-sm)}
+  .docs .concept .label{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--green);background:var(--green-soft);padding:5px 10px;border-radius:999px;margin-bottom:12px}
+  .phoneFrame{
+    position:relative;
+    width:360px;
+    max-width:100%;
+    margin:0 auto;
+    aspect-ratio:9/19;
+    border-radius:42px;
+    background:linear-gradient(160deg,#0b1a26,#12263a);
+    box-shadow:0 30px 60px -20px rgba(11,26,38,.6), inset 0 0 0 1px rgba(255,255,255,.06);
+    overflow:hidden;
+  }
+  .phoneFrame .notch{
+    position:absolute;top:0;left:50%;transform:translateX(-50%);
+    width:120px;height:26px;border-radius:0 0 18px 18px;
+    background:linear-gradient(180deg,#070f18,#0b1a26);
+    z-index:6;
+  }
+  .phoneFrame .screen{position:absolute;inset:0;border-radius:inherit;overflow:hidden}
+  .mock{white-space:normal}
+  .shimmer{
+    background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.05) 50%,transparent 100%);
+    background-size:200% 100%;
+    animation:sh 1.6s ease-in-out infinite;
+  }
+  @keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  .row{display:flex;align-items:center;gap:10px}
+  .dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.55}
+  .pill{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:999px}
+  .badge-pill{font-size:9px;font-weight:800;letter-spacing:.1em;padding:3px 7px;border-radius:999px;border:1px solid}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;background:rgba(255,255,255,.06);padding:1px 6px;border-radius:6px}
+  .footnote{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+  @media (max-width:880px){.grid2{grid-template-columns:1fr}.docs{padding:28px 16px 60px}}
+</style>
+</head>
+<body>
+<div class="docs">
+  <div class="kicker">Conceitos visuais — Módulo Cidadão</div>
+  <h1>Do painel comum ao centro de conta premium</h1>
+  <p class="lead">
+    Duas direções para a área pessoal de Guigui.com. Ambas partem do mesmo relatório de análise — o módulo cidadão já funciona bem na demo, mas a interface tem caráter de painel administrativo genérico. O objetivo é transformar a conta num produto com hierarquia clara, ritmo visual, prestígio visual e diferentes níveis de envolvimento.
+  </p>
+
+  <div class="grid2">
+    <!-- ===================== CONCEITO 1 ===================== -->
+    <div class="concept">
+      <span class="label">Conceito 1 · Residência verde</span>
+      <h2 style="margin-top:6px">Uma conta que se abre como um espaço, não como um painel</h2>
+      <p style="margin:0 0 14px;color:var(--ink-2);font-size:14px;line-height:1.55">
+        Hierarquia por zonas de presença: destaque humano no topo, KPIs gritados só quando dizem algo, e o resto em segundo plano. O cidadão não entra numa lista de itens — entra no seu perfil, com os bilhetes e compras como detalhes de exploração. A cor de marca verde fala de confiança e accesso, não de “configurações”.
+      </p>
+      <div class="phoneFrame" aria-hidden="true">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="mock" style="position:absolute;inset:0;padding:46px 18px 22px;color:#e7eef7">
+
+            <!-- header -->
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div>
+                <div style="font-size:9px;font-weight:700;letter-spacing:.2em;color:#9fb4cc">Minha Conta</div>
+                <div style="font-size:22px;font-weight:800;letter-spacing:-.01em;margin-top:4px">Olá, Mamadu</div>
+                <div style="font-size:11px;color:#b9c8da;margin-top:2px"><span style="opacity:.7">●</span> Bissau Velho · Conta cidadã</div>
+              </div>
+              <div style="width:30px;height:30px;border-radius:50%;background:#0d8a6e;display:grid;place-items:center">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </div>
+            </div>
+
+            <!-- hero card -->
+            <div style="margin-top:20px;border-radius:20px;background:linear-gradient(135deg,#0a6b56,#0d8a6e 60%,#119c7d);padding:16px 16px 14px;box-shadow:var(--shadow-lg);position:relative;overflow:hidden">
+              <div style="position:absolute;right:-30px;top:-30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.08)"></div>
+              <div style="position:absolute;right:-10px;bottom:-40px;width:100px;height:100px;border-radius:50%;background:rgba(255,255,255,.06)"></div>
+              <div style="display:flex;gap:14px;align-items:center">
+                <div style="position:relative;flex:0 0 auto">
+                  <div style="width:56px;height:56px;border-radius:16px;background:#fff;overflow:hidden;box-shadow:0 8px 18px -10px rgba(0,0,0,.4)">
+                    <img src="https://i.pravatar.cc/120?img=11" alt="" style="width:100%;height:100%;object-fit:cover" />
+                  </div>
+                  <span style="position:absolute;bottom:-3px;right:-3px;width:16px;height:16px;border-radius:50%;background:#0d8a6e;border:2px solid #0a1712;display:grid;place-items:center">
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                  </span>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:700;letter-spacing:.16em;color:#bfe8da">Ativo · 1 sem há</div>
+                  <div style="font-size:15px;font-weight:700;color:#fff;margin-top:1px">11 bilhetes activos</div>
+                  <div style="font-size:11px;color:#cde9df;margin-top:2px">3 eventos esta semana</div>
+                </div>
+              </div>
+              <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+                <span style="font-size:10px;font-weight:700;padding:5px 9px;border-radius:999px;background:rgba(255,255,255,.16);color:#e7f6ef">25,900 XOF em valor</span>
+                <span style="font-size:10px;font-weight:700;padding:5px 9px;border-radius:999px;background:rgba(255,255,255,.10);color:#d6ece4">6 compras</span>
+              </div>
+              <div style="margin-top:12px;display:flex;gap:8px">
+                <span style="font-size:11px;font-weight:600;color:#e7f6ef">Explorar a cidade</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e7f6ef" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              </div>
+            </div>
+
+            <!-- KPIs de impacto -->
+            <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:9px">
+              <div style="border-radius:14px;background:#f1f5fb;padding:11px 12px;border:1px solid #e3eaf3">
+                <div style="font-size:9px;font-weight:800;letter-spacing:.16em;color:#0d8a6e">LOUCES ESTA SEMANA</div>
+                <div style="font-size:22px;font-weight:900;letter-spacing:-.02em;margin-top:2px;color:#0b1a26">3</div>
+                <div style="font-size:10px;color:#6b7c8c;margin-top:1px">Fogação da Praça · Ter · 19h</div>
+              </div>
+              <div style="border-radius:14px;background:#f1f5fb;padding:11px 12px;border:1px solid #e3eaf3">
+                <div style="font-size:9px;font-weight:800;letter-spacing:.16em;color:#b08500">COMPRAS PENDENTES</div>
+                <div style="font-size:22px;font-weight:900;letter-spacing:-.02em;margin-top:2px;color:#0b1a26">1</div>
+                <div style="font-size:10px;color:#6b7c8c;margin-top:1px">Passe VIP · Pagamento confirmado</div>
+              </div>
+              <div style="border-radius:14px;background:#f1f5fb;padding:11px 12px;border:1px solid #e3eaf3">
+                <div style="font-size:9px;font-weight:800;letter-spacing:.16em;color:#1d5fa8">PONTOS DO MÊS</div>
+                <div style="font-size:22px;font-weight:900;letter-spacing:-.02em;margin-top:2px;color:#0b1a26">1.200</div>
+                <div style="font-size:10px;color:#6b7c8c;margin-top:1px">Próximo nível em 800 pontos</div>
+              </div>
+              <div style="border-radius:14px;background:#f1f5fb;padding:11px 12px;border:1px solid #e3eaf3">
+                <div style="font-size:9px;font-weight:800;letter-spacing:.16em;color:#5b44b3">EM SEGUIDA</div>
+                <div style="font-size:22px;font-weight:900;letter-spacing:-.02em;margin-top:2px;color:#0b1a26">4</div>
+                <div style="font-size:10px;color:#6b7c8c;margin-top:1px">Empresas da sua zona</div>
+              </div>
+            </div>
+
+            <!-- secções -->
+            <div style="margin-top:14px;display:flex;flex-direction:column;gap:11px">
+
+              <div style="border-radius:18px;background:#f6f8fc;border:1px solid #e3eaf3;padding:13px 14px">
+                <div style="font-size:9px;font-weight:800;letter-spacing:.18em;color:#0d8a6e">OS MEUS BILHETES</div>
+                <div style="font-size:13px;font-weight:800;color:#0b1a26;margin-top:4px">Próximo a apresentar</div>
+                <div style="margin-top:9px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                  <div style="flex:1;min-width:0;background:#fff;border-radius:12px;padding:9px 11px;border:1px solid #e3eaf3">
+                    <div style="font-size:11px;font-weight:700;color:#0b1a26;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Fogação da Praça</div>
+                    <div style="font-size:9px;color:#6b7c8c;margin-top:2px">GUI-4421 · 19 set · 19h00</div>
+                    <span class="badge-pill" style="margin-top:5px;display:inline-block;background:#e3f6f1;border-color:#7fd0b6;color:#0a6b56">Válido</span>
+                  </div>
+                  <div style="flex:1;min-width:0;background:#d8f1eb;border-radius:12px;padding:9px 11px;border:1px solid #b7e6d9">
+                    <div style="font-size:11px;font-weight:700;color:#0b1a26;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Concerts na Praça</div>
+                    <div style="font-size:9px;color:#6b7c8c;margin-top:2px">GUI-3318 · 26 set</div>
+                    <span class="badge-pill" style="margin-top:5px;display:inline-block;background:#fbf2d9;border-color:#e6cf8a;color:#7a5c00">Pendente</span>
+                  </div>
+                </div>
+                <div style="margin-top:9px;font-size:11px;font-weight:700;color:#0d8a6e">Ver todos os bilhetes →</div>
+              </div>
+
+              <div style="border-radius:18px;background:#f6f8fc;border:1px solid #e3eaf3;padding:13px 14px">
+                <div style="display:flex;align-items:center;gap:9px">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0d8a6e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5A5 5 0 0 0 16 4c-1.5 0-2.75.85-3 1.98V5c0-1.1.9-2 2-2h2"/><circle cx="9" cy="12" r="2"/><path d="M17 17c0 2.15-.75 4-2 5"/></svg>
+                  <span style="font-size:9px;font-weight:800;letter-spacing:.18em;color:#0d8a6e">EM SEGUIDA</span>
+                </div>
+                <div style="margin-top:5px;display:flex;flex-direction:column;gap:6px">
+                  <div style="display:flex;align-items:center;gap:9px">
+                    <div style="width:30px;height:30px;border-radius:10px;background:#0d8a6e;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:800">SP</div>
+                    <div>
+                      <div style="font-size:12px;font-weight:700;color:#0b1a26">Supermercado Papagaio</div>
+                      <div style="font-size:9px;color:#6b7c8c">2 novidades esta semana</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:9px">
+                    <div style="width:30px;height:30px;border-radius:10px;background:#f1ced9;display:grid;place-items:center;color:#8a2a24;font-size:11px;font-weight:800">HP</div>
+                    <div>
+                      <div style="font-size:12px;font-weight:700;color:#0b1a26">Hortelã de Peixe</div>
+                      <div style="font-size:9px;color:#6b7c8c">Restaurante · Nova promoção</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- navegação inferior -->
+            <div style="position:absolute;left:10px;right:10px;bottom:10px;display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.04);padding:8px 4px;border-radius:30px;border:1px solid rgba(255,255,255,.06)">
+              <div style="text-align:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6f8aa3" stroke-width="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><div style="font-size:8px;color:#6f8aa3;font-weight:700;margin-top:2px">INÍCIO</div></div>
+              <div style="text-align:center;color:#9ec7e0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9ec7e0" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><div style="font-size:8px;color:#9ec7e0;font-weight:700;margin-top:2px">CONTA</div></div>
+              <div style="text-align:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6f8aa3" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><div style="font-size:8px;color:#6f8aa3;font-weight:700;margin-top:2px">MENSAGENS</div></div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+      <p class="footnote">
+        <strong>Porquê este caminho:</strong> reforça o cidadão como pessoa, não como “utilizador com um ticket”. O topo ganha textura humana; os números ganham contexto verbal. Ideal se o foco é retenção, frequência e perceção de valor do produto.
+      </p>
+    </div>
+
+    <!-- ===================== CONCEITO 2 ===================== -->
+    <div class="concept">
+      <span class="label">Conceito 2 · Bilhete como centro</span>
+      <h2 style="margin-top:6px">A conta organizada em torno do bilhete, com hierarquia de participação</h2>
+      <p style="margin:0 0 14px;color:var(--ink-2);font-size:14px;line-height:1.55">
+        O módulo cidadão fica estruturado por níveis: diagnóstico de entrada (o que já aconteceu), bilhetes como produto-estrela, e depois o resto. O cidadão consegue ler a vida duma exposição só pelo formato do bilhete — código, QR, holder, validade, total. O ticket compra carácter de cartão de visita oficial, com papel de emissão, bordas e selo de validade. É o conceito mais “premium” em termos de prestígio visual.
+      </p>
+      <div class="phoneFrame" aria-hidden="true">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="mock" style="position:absolute;inset:0;padding:46px 18px 22px;color:#eef2f8">
+
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div>
+                <div style="font-size:9px;font-weight:700;letter-spacing:.2em;color:#9fb4cc">Meus bilhetes</div>
+                <div style="font-size:20px;font-weight:800;letter-spacing:-.01em;margin-top:4px">Bilhetes e entradas</div>
+              </div>
+              <div style="font-size:9px;font-weight:800;letter-spacing:.1em;padding:5px 9px;border-radius:999px;background:#2a3c4f;color:#cfdcec">6 válidos</div>
+            </div>
+
+            <div style="margin-top:16px">
+              <div style="position:relative;border-radius:22px;background:linear-gradient(160deg,#0d1c26,#132432);border:1px solid #26394b;padding:15px 14px;overflow:hidden;box-shadow:var(--shadow-md)">
+                <div style="position:absolute;top:-30px;right:-20px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,#1ff4c6 0%,rgba(31,244,198,0) 70%)"></div>
+
+                <div style="position:relative;color:#e7eef7">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                    <div>
+                      <div style="font-size:9px;font-weight:800;letter-spacing:.2em;color:#6ee0b3">GUIGUI.COM · BILHETE DIGITAL</div>
+                      <div style="font-size:19px;font-weight:900;letter-spacing:-.01em;margin-top:6px;color:#fff;line-height:1.15">Fogação da Praça</div>
+                      <div style="font-size:12px;color:#b3cddd;margin-top:4px;font-weight:600">Concerts na Praça · Bissau Velho, Praça da Liberdade</div>
+                    </div>
+                    <div style="position:absolute;right:14px;top:14px;background:#0d8a6e;padding:4px 7px;border-radius:999px;font-size:9px;font-weight:800;letter-spacing:.1em;color:#fff">VÁLIDO</div>
+                  </div>
+
+                  <div style="display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;margin-top:14px">
+                    <div>
+                      <div style="display:flex;align-items:center;gap:8px">
+                        <div style="width:44px;height:44px;border-radius:12px;background:#fff;padding:2px;display:grid;place-items:center;box-shadow:0 4px 10px -4px rgba(0,0,0,.5)">
+                          <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23ffffff'/%3E%3Cpath d='M78 50c0-15-12-28-28-28S22 35 22 50s12 28 28 28 28-12 28-28z' fill='%23000' opacity='.82'/%3E%3Cpath d='M78 50c0-15-12-28-28-28S22 35 22 50 34 78 62 78 78 62 78 50z' fill='%23fff'/%3E%3C/svg%3E" alt="" style="width:100%;height:100%;object-fit:contain" />
+                        </div>
+                        <div>
+                          <div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:#6ee0b3">CÓDIGO DE ACESSO</div>
+                          <div style="font-size:13px;font-weight:700;color:#fff;margin-top:1px;font-family:ui-monospace,monospace;letter-spacing:.12em">GUI-4421</div>
+                          <div style="font-size:9px;color:#7e96ad;margin-top:3px">QR · GUI-QR-99310-BSS</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div style="text-align:right">
+                      <div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:#6ee0b3">VALOR</div>
+                      <div style="font-size:20px;font-weight:900;color:#fff;margin-top:1px">25.000 XOF</div>
+                      <div style="font-size:9px;color:#7e96ad;margin-top:3px">Emitido em 17 set</div>
+                    </div>
+                  </div>
+
+                  <div style="margin-top:14px;display:flex;gap:10px">
+                    <div style="flex:1;background:#112632;border-radius:11px;padding:8px 9px;border:1px solid #26394b">
+                      <div style="font-size:9px;color:#7e96ad;font-weight:700;letter-spacing:.1em">TITULAR</div>
+                      <div style="font-size:12px;font-weight:700;color:#fff;margin-top:1px">Mamadu Saliu Djaló</div>
+                    </div>
+                    <div style="flex:1;background:#112632;border-radius:11px;padding:8px 9px;border:1px solid #26394b">
+                      <div style="font-size:9px;color:#7e96ad;font-weight:700;letter-spacing:.1em">TELEFONE</div>
+                      <div style="font-size:12px;font-weight:700;color:#fff;margin-top:1px">+245 966 88 77 66</div>
+                    </div>
+                  </div>
+
+                  <div style="margin-top:12px;border-top:1px dashed #26394b;padding-top:10px;display:flex;justify-content:space-between;align-items:center">
+                    <div style="font-size:10px;font-weight:700;color:#95adc9">Valido até <span style="color:#e7eef7">20 set · 23h59</span></div>
+                    <div style="font-size:10px;font-weight:800;color:#6ee0b3">Presente de bens e serviços guigui</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top:13px;display:flex;flex-direction:column;gap:10px">
+              <div style="background:#f1f5fb;border-radius:14px;padding:11px 12px;border:1px solid #e3eaf3">
+                <div style="font-size:9px;font-weight:800;letter-spacing:.18em;color:#0d8a6e">EM ANTECIPAÇÃO</div>
+                <div style="font-size:13px;font-weight:800;color:#0b1a26;margin-top:4px">Próximos em que pode apresentar</div>
+                <div style="margin-top:9px;display:flex;flex-direction:column;gap:7px">
+                  <div style="display:flex;gap:9px;align-items:center">
+                    <span style="font-size:9px;font-weight:800;padding:4px 7px;border-radius:999px;background:#e3f6f1;color:#0a6b56;width:54px;text-align:center;flex:0 0 auto">25/09</span>
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:12px;font-weight:800;color:#0b1a26;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Concerts na Praça</div>
+                      <div style="font-size:9px;color:#6b7c8c">GUI-3318 · 1 bilhete · 22:00</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:9px;align-items:center">
+                    <span style="font-size:9px;font-weight:800;padding:4px 7px;border-radius:999px;background:#fbf2d9;color:#7a5c00;width:54px;text-align:center;flex:0 0 auto">02/10</span>
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:12px;font-weight:800;color:#0b1a26">Noite de Rua</div>
+                      <div style="font-size:9px;color:#6b7c8c">GUI-2204 · Pendente de pagamento</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div style="border-radius:14px;background:#0a1721;border:1px solid #26394b;padding:11px 12px;display:flex;justify-content:space-between;align-items:center">
+                <div>
+                  <div style="font-size:9px;font-weight:800;letter-spacing:.16em;color:#6ee0b3">COMPROVANTE DE EMISSÃO</div>
+                  <div style="font-size:11px;color:#b3cddd;margin-top:2px">Exportar PDF de apresentação</div>
+                </div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6ee0b3" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              </div>
+            </div>
+
+            <div style="position:absolute;left:10px;right:10px;bottom:10px;display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.28);padding:8px 4px;border-radius:30px">
+              <div style="text-align:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6f8aa3" stroke-width="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><div style="font-size:8px;color:#6f8aa3;font-weight:700;margin-top:2px">INÍCIO</div></div>
+              <div style="text-align:center;color:#9ec7e0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9ec7e0" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><div style="font-size:8px;color:#9ec7e0;font-weight:700;margin-top:2px">BILHETES</div></div>
+              <div style="text-align:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6f8aa3" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><div style="font-size:8px;color:#6f8aa3;font-weight:700;margin-top:2px">PERFIL</div></div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+      <p class="footnote">
+        <strong>Porquê este caminho:</strong> eleva o bilhete a experiência de marca, com papel de emissão, código gritado e QR integrado. Ideal se o diferencial é a validação em porta, a impressão/exibição e a perceção de “passagem oficial”.
+      </p>
+    </div>
+  </div>
+
+  <div class="concept" style="margin-top:26px;background:var(--bg)">
+    <span class="label" style="background:#eef2fd;color:#1d5fa8">Leitura rápida de hierarquia</span>
+    <p style="margin:0 0 10px;color:var(--ink-2);font-size:14px;line-height:1.6">
+      Ambos os conceitos usam a mesma lógica de leitura: <strong>o que estou aqui para fazer</strong> no topo, <strong>o que tenho agora</strong> na primeira linha depois, e <strong>o que ainda não decidi</strong> em segundo plano. A diferença é a linguagem: o Conceito 1 conversa com a pessoa; o Conceito 2 mostra o produto.
+    </p>
+    <p style="margin:0;color:var(--muted);font-size:12px">
+      Se quiser, a próxima etapa é escolher um dos dois para a aplicação, ou misturar: por exemplo, entrada humana no topo com bilhete oficial nas secções de detalhe.
+    </p>
+  </div>
+
+  <div class="footnote" style="margin-top:30px;border-top:1px solid var(--line);padding-top:20px">Nota interna: os mockups são esboços visuais para aprovação, não screens finais. Não foram gerados com o sistema de imagens do projeto; se preferir ficheiros de imagem reais, posso regenerá-los como PNG/HTML visualizável.</div>
+</div>
+</body>
+</html>

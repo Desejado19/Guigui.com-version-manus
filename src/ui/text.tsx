@@ -1,11 +1,15 @@
 import React from 'react';
 
 export type TextSize = 'xs' | 'sm' | 'md' | 'lg';
-export type TextTone = 'default' | 'muted' | 'strong' | 'link' | 'brand' | 'success' | 'warning' | 'danger';
-
-export interface TextProps extends Omit<React.HTMLAttributes<HTMLElement>, keyof TextOwnProps>, TextOwnProps {
-  as?: keyof JSX.IntrinsicElements;
-}
+export type TextTone =
+  | 'default'
+  | 'muted'
+  | 'strong'
+  | 'link'
+  | 'brand'
+  | 'success'
+  | 'warning'
+  | 'danger';
 
 export interface TextOwnProps {
   size?: TextSize;
@@ -13,6 +17,12 @@ export interface TextOwnProps {
   weight?: 'normal' | 'medium' | 'semibold' | 'bold';
   truncate?: boolean;
   children?: React.ReactNode;
+}
+
+export interface TextProps
+  extends Omit<React.HTMLAttributes<HTMLElement>, keyof TextOwnProps>,
+    TextOwnProps {
+  as?: React.ElementType;
 }
 
 const sizeClasses: Record<TextSize, string> = {
@@ -54,19 +64,7 @@ export const Text = React.forwardRef<HTMLElement, TextProps>(function Text(
     .filter(Boolean)
     .join(' ');
 
-  if (Tag === 'p' || Tag === 'div') {
-    return (
-      <Tag ref={ref as React.Ref<HTMLParagraphElement | HTMLDivElement>} className={classes} {...props}>
-        {children}
-      </Tag>
-    );
-  }
-
-  return (
-    <Tag ref={ref} className={classes} {...props}>
-      {children}
-    </Tag>
-  );
+  return React.createElement(Tag, { ...props, ref, className: classes }, children);
 });
 
 Text.displayName = 'Text';

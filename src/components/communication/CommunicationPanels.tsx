@@ -1,11 +1,16 @@
 import React from "react";
 import {
+  ArrowLeft,
   Building2,
   CheckCircle2,
   Copy,
+  Info,
   LifeBuoy,
   MessageCircle,
+  Paperclip,
   Send,
+  UserRound,
+  X,
 } from "lucide-react";
 import { Panel, PanelHeader } from "../../components/ui";
 import type {
@@ -21,6 +26,50 @@ import {
   supportCategoryLabel,
   supportStatusLabel,
 } from "./CommunicationSections";
+import {
+  ATTACHMENT_ACCEPT,
+  ATTACHMENT_MAX_BYTES,
+  formatAttachmentSize,
+  isImageAttachment,
+  uploadConversationAttachment,
+  type UploadedAttachment,
+} from "../../services/messageAttachment";
+
+/** Campos que merecem destaque dentro do corpo de uma mensagem. */
+const MESSAGE_FIELD = /^(oferta|promoção|promocao|localização|localizacao|validade|válida até|valida ate|válido até|valido ate|código|codigo|preço|preco|horário|horario|contacto|telefone)\s*:\s*(.+)$/i;
+
+/**
+ * Apresenta o texto de uma mensagem em linhas legíveis: quebra também as
+ * sequências literais "\\n" que chegam dentro dos dados e destaca os campos
+ * importantes da promoção (oferta, localização, validade, código).
+ */
+function MessageText({ text }: { text: string }) {
+  const lines = text
+    .replace(/\\n/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) return null;
+
+  return (
+    <div className="guigui-message-content">
+      {lines.map((line, index) => {
+        const field = line.match(MESSAGE_FIELD);
+        if (field) {
+          return (
+            <p key={`${index}-${field[1]}`} className="guigui-message-field">
+              <strong>{field[1]}:</strong> {field[2]}
+            </p>
+          );
+        }
+        return (
+          <p key={index} className="guigui-message-line">{line}</p>
+        );
+      })}
+    </div>
+  );
+}
 
 interface ConversationThreadProps {
   mode: "user" | "business";
@@ -41,7 +90,12 @@ interface ConversationThreadProps {
   setEmojiOpen: React.Dispatch<React.SetStateAction<boolean>>;
   messageText: string;
   setMessageText: React.Dispatch<React.SetStateAction<string>>;
-  submitMessage: (event: React.FormEvent) => void | Promise<void>;
+  submitMessage: (
+    event: React.FormEvent,
+    attachment?: UploadedAttachment,
+  ) => void | boolean | Promise<void | boolean>;
+  sendError?: string | null;
+  onRetryMessage?: (message: ConversationMessage) => void;
   threadEndRef: React.RefObject<HTMLDivElement | null>;
   onBackToList?: () => void;
   children?: React.ReactNode;
@@ -67,12 +121,18 @@ export function ConversationThread({
   messageText,
   setMessageText,
   submitMessage,
+  sendError,
+  onRetryMessage,
   threadEndRef,
   onBackToList,
   children,
 }: ConversationThreadProps) {
   const messagesRef = React.useRef<HTMLDivElement | null>(null);
   const stickToBottomRef = React.useRef(true);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [attachment, setAttachment] = React.useState<UploadedAttachment | null>(null);
+  const [attachmentError, setAttachmentError] = React.useState<string | null>(null);
+  const [uploading, setUploading] = React.useState(false);
 
   const isNearBottom = (element: HTMLDivElement): boolean =>
     element.scrollHeight - element.scrollTop - element.clientHeight <= 80;
@@ -97,64 +157,107 @@ export function ConversationThread({
     if (stickToBottomRef.current) scrollToBottom("smooth");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMessages.length]);
+  const conversationTitle = selectedConversation
+    ? mode === "user"
+      ? selectedConversation.businessName ||
+        businessNameFor(selectedConversation.businessId)
+      : selectedConversation.userName ||
+        participantNameFor(selectedConversation.userId, "Cliente Guigui")
+    : "";
+  const conversationInitials =
+    conversationTitle
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase() || "G";
+
+  const handleAttachmentChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !selectedConversation) return;
+    setAttachmentError(null);
+    if (file.size > ATTACHMENT_MAX_BYTES) {
+      setAttachmentError("O ficheiro excede o limite de 5 MB.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const uploaded = await uploadConversationAttachment(
+        selectedConversation.id,
+        file,
+      );
+      setAttachment(uploaded);
+    } catch (error) {
+      setAttachmentError((error as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (uploading) return;
+    if (!messageText.trim() && !attachment) return;
+    // Só limpa o rascunho e o anexo depois de o servidor confirmar o envio.
+    const result = await submitMessage(event, attachment ?? undefined);
+    if (result === false) return;
+    setAttachment(null);
+    setAttachmentError(null);
+  };
+
   return (
     <div className="guigui-communication-thread guigui-dpanel">
       {selectedConversation ? (
         <>
-          <PanelHeader
-            className="guigui-thread-header"
-            eyebrow="Conversa"
-            title={selectedConversation.subject}
-            description={
-              (mode === "user"
-                ? selectedConversation.businessName ||
-                  businessNameFor(selectedConversation.businessId)
-                : selectedConversation.userName ||
-                  participantNameFor(
-                    selectedConversation.userId,
-                    "Cliente Guigui",
-                  )) +
-              " · " +
-              (selectedConversation.participantOnline
-                ? "Online"
-                : "Ativo recentemente")
-            }
-            icon={Building2}
-            tone="success"
-            actions={
-              <>
-                {onBackToList && (
-                  <button
-                    type="button"
-                    className="guigui-thread-back"
-                    onClick={onBackToList}
-                    aria-label="Voltar às conversas"
-                    title="Voltar às conversas"
-                  >
-                    Voltar às conversas
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="guigui-thread-info flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] hover:bg-[var(--color-border-default)]"
-                  onClick={() => setSelectedProfile(true)}
-                  aria-label="Abrir perfil do participante"
-                  title="Abrir perfil do participante"
-                >
-                  <Building2 className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  className="guigui-thread-info flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] hover:bg-[var(--color-border-default)]"
-                  onClick={() => setConversationInfoOpen(true)}
-                  aria-label="Informações da conversa"
-                  title="Informações da conversa"
-                >
-                  i
-                </button>
-              </>
-            }
-          />
+          <header className="guigui-thread-header">
+            {onBackToList && (
+              <button
+                type="button"
+                className="guigui-thread-back"
+                onClick={onBackToList}
+                aria-label="Voltar às conversas"
+                title="Voltar às conversas"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+            )}
+            <span className="guigui-thread-avatar" aria-hidden="true">
+              {conversationInitials}
+            </span>
+            <div className="guigui-thread-identity">
+              <strong>{conversationTitle}</strong>
+              <span className="guigui-thread-status">
+                <i className={selectedConversation.participantOnline ? "is-online" : ""} />
+                {selectedConversation.participantOnline
+                  ? "Online"
+                  : "Ativo recentemente"}
+              </span>
+            </div>
+            <div className="guigui-thread-actions">
+              <button
+                type="button"
+                className="guigui-thread-info"
+                onClick={() => setConversationInfoOpen(true)}
+                aria-label="Detalhes da conversa"
+                title="Detalhes da conversa"
+              >
+                <Info className="h-4 w-4" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="guigui-thread-info"
+                onClick={() => setSelectedProfile(true)}
+                aria-label="Ver perfil do participante"
+                title="Ver perfil do participante"
+              >
+                <UserRound className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          </header>
 
           <div
             className="guigui-thread-messages"
@@ -173,23 +276,21 @@ export function ConversationThread({
                       selectedMessages[index - 1].createdAt,
                     )) && (
                   <div className="guigui-message-date">
-                    {messageDateLabel(message.createdAt)}
+                    <span>{messageDateLabel(message.createdAt)}</span>
                   </div>
                 )}
                 <div
-                  id={`message-${message.id}`}
-                  className={`guigui-message-bubble ${message.senderId === currentUser.id ? "is-own" : ""}`}
+                  className={`guigui-message-row ${message.senderId === currentUser.id ? "is-own" : ""}`}
                 >
-                  <p>
-                    {message.senderName ||
-                      (message.senderRole === "business"
-                        ? selectedConversation.businessName || "Empresa"
-                        : selectedConversation.userName ||
-                          participantNameFor(
-                            selectedConversation.userId,
-                            "Cidadão",
-                          ))}
-                  </p>
+                  {message.senderId !== currentUser.id && (
+                    <span className="guigui-message-avatar" aria-hidden="true">
+                      {conversationInitials}
+                    </span>
+                  )}
+                  <div
+                    id={`message-${message.id}`}
+                    className={`guigui-message-bubble ${message.senderId === currentUser.id ? "is-own" : ""}`}
+                  >
                   {message.replyToId && (
                     <button
                       type="button"
@@ -206,20 +307,64 @@ export function ConversationThread({
                       Resposta a uma mensagem
                     </button>
                   )}
-                  <span>{message.text}</span>
-                  <small>
-                    {new Date(message.createdAt).toLocaleTimeString("pt-PT", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}{" "}
-                    {message.senderId === currentUser.id && (
-                      <b aria-label="Enviada">✓</b>
-                    )}{" "}
-                    {message.senderId !== currentUser.id && (
-                      <span aria-label="Mensagem recebida">•</span>
+                  {message.attachmentUrl &&
+                    (isImageAttachment({
+                      url: message.attachmentUrl,
+                      mimeType: message.type === "image" ? "image/*" : undefined,
+                    }) ? (
+                      <a
+                        className="guigui-message-attachment is-image"
+                        href={message.attachmentUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <img
+                          src={message.attachmentUrl}
+                          alt={message.attachmentName || "Anexo da mensagem"}
+                          loading="lazy"
+                        />
+                      </a>
+                    ) : (
+                      <a
+                        className="guigui-message-attachment is-file"
+                        href={message.attachmentUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        download={message.attachmentName || undefined}
+                      >
+                        <Paperclip className="h-4 w-4" aria-hidden="true" />
+                        <span>{message.attachmentName || "Anexo"}</span>
+                      </a>
+                    ))}
+                  <MessageText text={message.text} />
+                  <div className="guigui-message-meta">
+                    <small>
+                      {new Date(message.createdAt).toLocaleTimeString("pt-PT", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                      {message.senderId === currentUser.id && (
+                        message.status === "sending" ? (
+                          <b className="guigui-message-state is-sending" aria-label="A enviar">A enviar…</b>
+                        ) : message.status === "failed" ? (
+                          <b className="guigui-message-state is-failed" aria-label="Falhou">Falhou</b>
+                        ) : message.status === "read" || message.readByBusiness || message.readByUser ? (
+                          <b aria-label="Lida">✓✓</b>
+                        ) : (
+                          <b aria-label="Enviada">✓</b>
+                        )
+                      )}
+                    </small>
+                    {message.senderId === currentUser.id && message.status === "failed" && onRetryMessage && (
+                      <button
+                        type="button"
+                        className="guigui-message-retry"
+                        onClick={() => onRetryMessage(message)}
+                      >
+                        Tentar novamente
+                      </button>
                     )}
-                  </small>
-                  <div className="guigui-message-actions">
+                    <div className="guigui-message-actions">
                     {[
                       ["👍", "Gostar"],
                       ["❤️", "Amar"],
@@ -259,6 +404,7 @@ export function ConversationThread({
                     >
                       <Copy className="h-3 w-3" />
                     </button>
+                    </div>
                   </div>
                   {openMessageMenuId === message.id && (
                     <div className="guigui-message-reactions">
@@ -282,12 +428,54 @@ export function ConversationThread({
                       </button>
                     </div>
                   )}
+                  </div>
                 </div>
               </React.Fragment>
             ))}
             <div ref={threadEndRef} />
           </div>
-          <form onSubmit={submitMessage} className="guigui-message-reply">
+          <p className="guigui-thread-notice">
+            As mensagens comerciais ficam limitadas aos participantes desta conversa.
+          </p>
+          <form onSubmit={handleSubmit} className="guigui-message-reply">
+            {sendError && (
+              <p className="guigui-composer-status is-error" role="alert">{sendError}</p>
+            )}
+            {attachment && (
+              <div className="guigui-composer-attachment">
+                {isImageAttachment(attachment) ? (
+                  <img src={attachment.url} alt="" aria-hidden="true" />
+                ) : (
+                  <span className="guigui-composer-attachment-icon" aria-hidden="true">
+                    <Paperclip className="h-4 w-4" />
+                  </span>
+                )}
+                <div className="guigui-composer-attachment-meta">
+                  <strong>{attachment.name}</strong>
+                  <small>{formatAttachmentSize(attachment.size)} · pronto a enviar</small>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAttachment(null)}
+                  aria-label="Remover anexo"
+                  title="Remover anexo"
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </div>
+            )}
+            {uploading && <p className="guigui-composer-status">A carregar anexo…</p>}
+            {attachmentError && (
+              <p className="guigui-composer-status is-error">{attachmentError}</p>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="sr-only"
+              accept={ATTACHMENT_ACCEPT}
+              onChange={handleAttachmentChange}
+              tabIndex={-1}
+            />
             {emojiOpen && (
               <div className="guigui-emoji-picker">
                 {["👍", "❤️", "😂", "😮", "😢"].map((emoji) => (
@@ -319,6 +507,16 @@ export function ConversationThread({
             <button
               type="button"
               className="guigui-composer-action"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Anexar ficheiro"
+              title="Anexar ficheiro"
+              disabled={uploading || !selectedConversation}
+            >
+              <Paperclip className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="guigui-composer-action"
               onClick={() => setEmojiOpen((value) => !value)}
               aria-label="Adicionar emoji"
             >
@@ -330,15 +528,21 @@ export function ConversationThread({
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
-                  void submitMessage(event);
+                  handleSubmit(event);
                 }
               }}
               placeholder="Escrever mensagem..."
               aria-label="Escrever mensagem"
               rows={1}
             />
-            <button type="submit" aria-label={t("sendMessage")}>
-              <Send className="h-4 w-4" />
+            <button
+              type="submit"
+              className="guigui-composer-send"
+              aria-label={t("sendMessage")}
+              disabled={uploading}
+            >
+              <Send className="h-4 w-4" aria-hidden="true" />
+              <span>Enviar</span>
             </button>
           </form>
         </>
@@ -361,6 +565,7 @@ interface NewConversationFormProps {
   submitNewConversation: (event: React.FormEvent) => void | Promise<void>;
   businessNameFor: (businessId: string) => string;
   t: (key: string) => string;
+  error?: string | null;
 }
 
 export function NewConversationForm({
@@ -375,6 +580,7 @@ export function NewConversationForm({
   submitNewConversation,
   businessNameFor,
   t,
+  error,
 }: NewConversationFormProps) {
   return (
     <form
@@ -422,6 +628,9 @@ export function NewConversationForm({
         rows={5}
         aria-label="Mensagem da nova conversa"
       />
+      {error && (
+        <p className="guigui-new-conversation-error" role="alert">{error}</p>
+      )}
       <button type="submit">Iniciar conversa</button>
     </form>
   );
@@ -518,6 +727,7 @@ export function SupportThread({
   submitSupportReply,
   children,
 }: SupportThreadProps) {
+  const [supportEmojiOpen, setSupportEmojiOpen] = React.useState(false);
   const messagesRef = React.useRef<HTMLDivElement | null>(null);
   const stickToBottomRef = React.useRef(true);
 
@@ -570,29 +780,30 @@ export function SupportThread({
 
   return (
     <div className="guigui-communication-thread guigui-dpanel">
-      <PanelHeader
-        className="guigui-thread-header"
-        eyebrow="Suporte"
-        title={request.subject}
-        description={
-          supportCategoryLabel(request.category) +
-          " · " +
-          supportStatusLabel(request.status)
-        }
-        icon={LifeBuoy}
-        tone="success"
-        actions={
+      <header className="guigui-thread-header">
+        <span className="guigui-thread-avatar is-support" aria-hidden="true">
+          <LifeBuoy className="h-5 w-5" />
+        </span>
+        <div className="guigui-thread-identity">
+          <strong>{request.subject}</strong>
+          <span className="guigui-thread-status">
+            <i className={request.status === "open" ? "is-online" : ""} />
+            {supportCategoryLabel(request.category)} ·{" "}
+            {supportStatusLabel(request.status)}
+          </span>
+        </div>
+        <div className="guigui-thread-actions">
           <button
             type="button"
-            className="guigui-thread-info flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] hover:bg-[var(--color-border-default)]"
+            className="guigui-thread-info"
             onClick={() => setSupportInfoOpen(true)}
             aria-label="Informações do pedido"
             title="Informações do pedido"
           >
             i
           </button>
-        }
-      />
+        </div>
+      </header>
       <div
         className="guigui-thread-messages"
         ref={messagesRef}
@@ -608,50 +819,93 @@ export function SupportThread({
               messageDateLabel(entry.createdAt) !==
                 messageDateLabel(entries[index - 1].createdAt)) && (
               <div className="guigui-message-date">
-                {messageDateLabel(entry.createdAt)}
+                <span>{messageDateLabel(entry.createdAt)}</span>
               </div>
             )}
             <div
-              id={"support-entry-" + entry.id}
               className={
-                "guigui-message-bubble " +
+                "guigui-message-row " +
                 (entry.senderId === currentUser.id ? "is-own" : "")
               }
             >
-              <p>{senderLabel(entry.senderRole)}</p>
-              <span>{entry.text}</span>
-              <small>
-                {new Date(entry.createdAt).toLocaleTimeString("pt-PT", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-                {entry.senderId === currentUser.id && (
-                  <b aria-label="Enviada">✓</b>
-                )}
-              </small>
+              {entry.senderId !== currentUser.id && (
+                <span className="guigui-message-avatar is-support" aria-hidden="true">
+                  <LifeBuoy className="h-3.5 w-3.5" />
+                </span>
+              )}
+              <div
+                id={"support-entry-" + entry.id}
+                className={
+                  "guigui-message-bubble " +
+                  (entry.senderId === currentUser.id ? "is-own" : "")
+                }
+              >
+              <p className="guigui-message-author">{senderLabel(entry.senderRole)}</p>
+              <MessageText text={entry.text} />
+              <div className="guigui-message-meta">
+                <small>
+                  {new Date(entry.createdAt).toLocaleTimeString("pt-PT", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                  {entry.senderId === currentUser.id && (
+                    <b aria-label="Enviada">✓✓</b>
+                  )}
+                </small>
+              </div>
+              </div>
             </div>
           </React.Fragment>
         ))}
       </div>
       {request.status !== "resolved" ? (
-        <form onSubmit={submitSupportReply} className="guigui-message-reply">
-          <textarea
-            value={supportReply}
-            onChange={(event) => setSupportReply(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                void submitSupportReply(event);
-              }
-            }}
-            placeholder="Escrever resposta..."
-            aria-label="Responder ao pedido"
-            rows={1}
-          />
-          <button type="submit" aria-label="Enviar resposta">
-            <Send className="h-4 w-4" />
-          </button>
-        </form>
+        <>
+          <p className="guigui-thread-notice">
+            Pedido de suporte visível a si e à Administração do Guigui.com.
+          </p>
+          <form onSubmit={submitSupportReply} className="guigui-message-reply">
+            {supportEmojiOpen && (
+              <div className="guigui-emoji-picker">
+                {["👍", "❤️", "😂", "😮", "😢"].map((emoji) => (
+                  <button
+                    type="button"
+                    key={emoji}
+                    onClick={() => {
+                      setSupportReply((value) => `${value}${emoji}`);
+                      setSupportEmojiOpen(false);
+                    }}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              className="guigui-composer-action"
+              onClick={() => setSupportEmojiOpen((value) => !value)}
+              aria-label="Adicionar emoji"
+            >
+              ☺
+            </button>
+            <textarea
+              value={supportReply}
+              onChange={(event) => setSupportReply(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void submitSupportReply(event);
+                }
+              }}
+              placeholder="Escrever resposta..."
+              aria-label="Responder ao pedido"
+              rows={1}
+            />
+            <button type="submit" aria-label="Enviar resposta">
+              <Send className="h-4 w-4" />
+            </button>
+          </form>
+        </>
       ) : (
         <div className="guigui-support-resolved-note">
           <CheckCircle2 className="h-4 w-4" />
@@ -729,6 +983,9 @@ export function CommunicationOverlays({
               ×
             </button>
             <h3>Informações da conversa</h3>
+            <p className="guigui-message-panel-subject">
+              {selectedConversation.subject}
+            </p>
             <p>
               Iniciada em{" "}
               {new Date(selectedConversation.createdAt).toLocaleDateString(

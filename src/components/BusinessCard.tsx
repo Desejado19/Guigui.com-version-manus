@@ -17,6 +17,7 @@ import {
 import { Business, BusinessCategory, Language } from '../types';
 import { getTranslation } from '../utils/i18n';
 import { useTranslatedText } from '../utils/contentTranslation';
+import { getBusinessDescriptionPreview } from '../utils/businessProfile';
 import { Badge, Card } from './ui';
 
 interface BusinessCardProps {
@@ -52,15 +53,25 @@ export const BusinessCard: React.FC<BusinessCardProps> = ({
 }) => {
   const t = (key: string) => getTranslation(currentLang, key);
   const { translated: description } = useTranslatedText(business.description, currentLang, 'description');
+  const descriptionPreview = getBusinessDescriptionPreview(description);
   const [failedCoverSource, setFailedCoverSource] = useState<string | null>(null);
   const [failedLogoSource, setFailedLogoSource] = useState<string | null>(null);
 
   const isEnterprise = business.tier === 'enterprise';
   const isPremium = business.tier === 'premium';
   const hasActivePromo = business.promotions.some((p) => p.isActive);
-  const priceDots = business.priceRange?.repeat(1) ?? '';
+  const isPriceRangeJustCurrencySymbol = Boolean(business.priceRange && business.priceRange.trim() === '$');
+  const priceDots = (!isPriceRangeJustCurrencySymbol && business.priceRange?.repeat(1)) ?? '';
   const categoryName = business.category || categories.find((category) => category.id === business.categoryId)?.name;
-  const initials = business.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || '?';
+  const initials =
+    business.name
+      .trim()
+      .split(/\s+/)
+      .filter((part) => /^[\p{L}\p{N}]/u.test(part))
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase() || '?';
   const hasReviews = business.reviews.length > 0;
   const hasCoverImage = Boolean(business.coverImage.trim()) && failedCoverSource !== business.coverImage;
   const hasLogoImage = Boolean(business.logo.trim()) && failedLogoSource !== business.logo;
@@ -86,7 +97,7 @@ export const BusinessCard: React.FC<BusinessCardProps> = ({
             {initials}
           </div>
         )}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0d2924]/70 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-green-950)]/70 via-transparent to-transparent" />
 
           {/* Tier / Highlight Badge — topo esquerdo */}
           {(isEnterprise || isPremium) && (
@@ -142,39 +153,33 @@ export const BusinessCard: React.FC<BusinessCardProps> = ({
           )}
         </div>
 
-        {/* Logo overlay sobre a capa — canto inferior esquerdo */}
-        <div className="absolute -bottom-6 left-4 z-10 w-14 h-14 rounded-[var(--radius-2xl)] border-2 border-white bg-white overflow-hidden shadow-lg">
-          {hasLogoImage ? (
-            <img
-              src={business.logo}
-              alt={`Logótipo de ${business.name}`}
-              onError={() => setFailedLogoSource(business.logo)}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div
-              role="img"
-              aria-label={`Logótipo de ${business.name}`}
-              className="flex h-full w-full items-center justify-center bg-emerald-800 text-sm font-black text-white"
-            >
-              {initials}
-            </div>
-          )}
-        </div>
-
-
-
-
-
       </div>
 
       {/* Card Content */}
       <div className="guigui-business-content flex-1 flex flex-col space-y-4 p-5">
         {/* Business Title & Verified Check */}
         <div className="flex items-start justify-between gap-2 cursor-pointer group" onClick={() => onSelect(business)}>
-          <h3 className="font-black text-lg text-[var(--color-text-strong)] leading-tight group-hover:text-[var(--color-green-600)] transition-colors line-clamp-1">
-            {business.name}
-          </h3>
+          <div className="flex min-w-0 items-center gap-2.5">
+            {hasLogoImage ? (
+              <img
+                src={business.logo}
+                alt={`Logótipo de ${business.name}`}
+                onError={() => setFailedLogoSource(business.logo)}
+                className="w-9 h-9 shrink-0 rounded-xl object-cover border border-[var(--color-border-subtle)]"
+              />
+            ) : (
+              <div
+                role="img"
+                aria-label={`Logótipo de ${business.name}`}
+                className="w-9 h-9 shrink-0 rounded-xl bg-[var(--color-green-950)] text-[11px] font-black tracking-wide text-white/90 flex items-center justify-center"
+              >
+                {initials}
+              </div>
+            )}
+            <h3 className="font-black text-lg text-[var(--color-text-strong)] leading-tight group-hover:text-[var(--color-green-600)] transition-colors line-clamp-1">
+              {business.name}
+            </h3>
+          </div>
           {business.verified && (
             <CheckCircle2
               className="w-4 h-4 text-[var(--color-green-600)] fill-[var(--color-green-600)] shrink-0 mt-0.5"
@@ -197,38 +202,42 @@ export const BusinessCard: React.FC<BusinessCardProps> = ({
           </div>
         )}
 
-        {/* Description */}
-        {business.description.trim() && (
-          <p className="mt-1 text-sm text-[var(--color-text-default)] line-clamp-3 leading-relaxed">
-            {description}
-          </p>
-        )}
+        {/* Description — recorte fixo de caracteres com "Ler mais" */}
+        <p className="mt-1 text-sm leading-relaxed text-[var(--color-text-default)]">
+          {descriptionPreview.preview || 'Sem descrição disponível.'}
+          {descriptionPreview.truncated && (
+            <>
+              {' '}
+              <button
+                type="button"
+                onClick={() => onSelect(business)}
+                aria-label={`Ler mais sobre ${business.name}`}
+                className="font-black text-[var(--color-green-700)] underline-offset-2 hover:underline"
+              >
+                Ler mais
+              </button>
+            </>
+          )}
+        </p>
 
-        {/* Rating, Price & Reviews */}
-        {(hasReviews || priceDots) && (
+        {/* Rating & Reviews (preço isolado "$" não aparece no card) */}
+        {hasReviews && (
           <div className="mt-2 flex items-center justify-between gap-3 px-2 py-2 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)]">
-            {hasReviews && business.ratingLabel.trim() && (
+            {business.ratingLabel.trim() && (
               <div className="flex items-center gap-1.5">
                 <Award className="w-3.5 h-3.5 text-[var(--color-blue-600)]" />
                 <span className="font-extrabold text-[var(--color-text-strong)]">{business.ratingLabel}</span>
               </div>
             )}
-            {priceDots && (
-              <span className="text-xs font-medium text-[var(--color-text-muted)] tracking-wide">
-                {priceDots}
-              </span>
-            )}
-            {hasReviews && (
-              <span className="text-[var(--color-text-muted)] text-[11px] font-medium">
-                {business.reviews.length} {t('reviewsCount')}
-              </span>
-            )}
+            <span className="text-[var(--color-text-muted)] text-[11px] font-medium">
+              {business.reviews.length} {t('reviewsCount')}
+            </span>
           </div>
         )}
       </div>
 
       {/* Card Action Buttons */}
-      <div className="guigui-business-actions flex items-center gap-2 p-4 border-t border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)]">
+      <div className="guigui-business-actions flex items-center gap-2 p-4 border-t border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800">
           {/* Follow + notification bell */}
           {onToggleFollow && (
             <button

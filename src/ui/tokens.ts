@@ -109,7 +109,7 @@ export const colors = {
 } as const;
 
 export type ColorTokenFamily = keyof typeof colors;
-export type ColorTokenLevel = typeof colors.green[number];
+export type ColorTokenLevel = (typeof colors)['green'][keyof (typeof colors)['green']];
 
 export const tokens = {
   colors,

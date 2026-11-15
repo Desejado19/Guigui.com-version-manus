@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { GuiguiStar } from './GuiguiStar';
 import {
   Search,
   Home,
@@ -283,18 +284,25 @@ export const Navbar: React.FC<NavbarProps> = ({
     }
   };
 
+  const languageLabels = {
+    pt: t('language.portuguese'),
+    fr: t('language.french'),
+    en: t('language.english'),
+    es: t('language.spanish'),
+  };
   const languages: { code: Language; name: string; flag: string }[] = [
-    { code: 'pt', name: t('language.portuguese'), flag: 'PT-BR' },
-    { code: 'fr', name: t('language.french'), flag: 'FR' },
-    { code: 'en', name: t('language.english'), flag: 'EN' },
-    { code: 'es', name: t('language.spanish'), flag: 'ES' },
+    { code: 'pt', name: languageLabels.pt, flag: '🇧🇷' },
+    { code: 'fr', name: languageLabels.fr, flag: '🇫🇷' },
+    { code: 'en', name: languageLabels.en, flag: '🇬🇧' },
+    { code: 'es', name: languageLabels.es, flag: '🇪🇸' },
   ];
-  const languageCode = (language: Language) => language === 'pt' ? 'PT-BR' : language.toUpperCase();
+  const formatLanguageCode = (code: Language) => (code === 'pt' ? 'PT-BR' : code.toUpperCase());
+  const formatLanguageLabel = (code: Language) => `${formatLanguageCode(code)} · ${languageLabels[code]}`;
 
   const themeOptions: Array<{ value: 'light' | 'dark' | 'auto'; label: string; description: string }> = [
-    { value: 'light', label: 'Claro', description: 'Tema claro para o dia a dia' },
-    { value: 'dark', label: 'Escuro', description: 'Tema escuro para baixa luminosidade' },
-    { value: 'auto', label: 'Automático', description: 'Segue a preferência do sistema' },
+    { value: 'light', label: t('theme.light'), description: t('theme.lightDesc') },
+    { value: 'dark', label: t('theme.dark'), description: t('theme.darkDesc') },
+    { value: 'auto', label: t('theme.auto'), description: t('theme.autoDesc') },
   ];
 
   const closeCurrentModule = () => {
@@ -320,12 +328,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     setActiveSettingsPanel(null);
   };
 
-  const cycleLanguageDirectly = () => {
-    const currentIndex = languages.findIndex((language) => language.code === currentLang);
-    const nextLanguage = languages[(currentIndex + 1) % languages.length];
-    onLanguageChange(nextLanguage.code);
-  };
-
   const toggleSetting = (key: string) => {
     setSettingsToggles((previous) => ({
       ...previous,
@@ -345,23 +347,23 @@ export const Navbar: React.FC<NavbarProps> = ({
     }>
   > = {
     user: [
-      { id: 'account', label: 'Minha conta', description: 'Área pessoal · Guigui.com', icon: UserRound, accentClass: 'bg-slate-900 text-white', action: 'detail' },
-      { id: 'support', label: 'Suporte', description: 'Ajuda e contacto', icon: LifeBuoy, accentClass: 'bg-sky-500 text-white', action: 'detail' },
+      { id: 'account', label: t('settings.user.account'), description: t('settings.user.accountDesc'), icon: UserRound, accentClass: 'bg-slate-900 text-white', action: 'detail' },
+      { id: 'support', label: t('settings.user.support'), description: t('settings.user.supportDesc'), icon: LifeBuoy, accentClass: 'bg-sky-500 text-white', action: 'detail' },
     ],
     business: [
-      { id: 'company', label: 'Minha empresa', description: 'Perfil e dados da loja', icon: Building2, accentClass: 'bg-slate-900 text-white', action: 'detail' },
-      { id: 'billing', label: 'Plano e faturação', description: 'Assinatura e pagamentos', icon: CreditCard, accentClass: 'bg-emerald-500 text-white', action: 'detail' },
-      { id: 'events', label: 'Eventos', description: 'Agenda e vendas de bilhetes', icon: CalendarDays, accentClass: 'bg-violet-500 text-white', action: 'detail' },
-      { id: 'promotions', label: 'Promoções', description: 'Ofertas e campanhas', icon: Megaphone, accentClass: 'bg-amber-500 text-white', action: 'detail' },
-      { id: 'notifications', label: 'Notificações', description: 'Alertas e automações', icon: Bell, accentClass: 'bg-sky-500 text-white', action: 'detail' },
-      { id: 'security', label: 'Segurança', description: 'Sessões e permissões', icon: KeyRound, accentClass: 'bg-rose-500 text-white', action: 'detail' },
+      { id: 'company', label: t('settings.business.company'), description: t('settings.business.companyDesc'), icon: Building2, accentClass: 'bg-slate-900 text-white', action: 'detail' },
+      { id: 'billing', label: t('settings.business.billing'), description: t('settings.business.billingDesc'), icon: CreditCard, accentClass: 'bg-emerald-500 text-white', action: 'detail' },
+      { id: 'events', label: t('settings.business.events'), description: t('settings.business.eventsDesc'), icon: CalendarDays, accentClass: 'bg-violet-500 text-white', action: 'detail' },
+      { id: 'promotions', label: t('settings.business.promotions'), description: t('settings.business.promotionsDesc'), icon: Megaphone, accentClass: 'bg-amber-500 text-white', action: 'detail' },
+      { id: 'notifications', label: t('settings.business.notifications'), description: t('settings.business.notificationsDesc'), icon: Bell, accentClass: 'bg-sky-500 text-white', action: 'detail' },
+      { id: 'security', label: t('settings.business.security'), description: t('settings.business.securityDesc'), icon: KeyRound, accentClass: 'bg-rose-500 text-white', action: 'detail' },
     ],
     admin: [
-      { id: 'governance', label: 'Governança', description: 'Utilizadores, regras e permissões', icon: ShieldCheck, accentClass: 'bg-emerald-500 text-white', action: 'detail' },
-      { id: 'platform', label: 'Plataforma', description: 'Configuração do sistema', icon: SlidersHorizontal, accentClass: 'bg-violet-500 text-white', action: 'detail' },
-      { id: 'analytics', label: 'Análises', description: 'KPI, relatórios e auditoria', icon: BarChart3, accentClass: 'bg-cyan-500 text-white', action: 'detail' },
-      { id: 'security', label: 'Segurança', description: 'Autenticação e logs', icon: KeyRound, accentClass: 'bg-rose-500 text-white', action: 'detail' },
-      { id: 'support', label: 'Suporte', description: 'Apoio e intervenções', icon: LifeBuoy, accentClass: 'bg-amber-500 text-white', action: 'detail' },
+      { id: 'governance', label: t('settings.admin.governance'), description: t('settings.admin.governanceDesc'), icon: ShieldCheck, accentClass: 'bg-emerald-500 text-white', action: 'detail' },
+      { id: 'platform', label: t('settings.admin.platform'), description: t('settings.admin.platformDesc'), icon: SlidersHorizontal, accentClass: 'bg-violet-500 text-white', action: 'detail' },
+      { id: 'analytics', label: t('settings.admin.analytics'), description: t('settings.admin.analyticsDesc'), icon: BarChart3, accentClass: 'bg-cyan-500 text-white', action: 'detail' },
+      { id: 'security', label: t('settings.admin.security'), description: t('settings.admin.securityDesc'), icon: KeyRound, accentClass: 'bg-rose-500 text-white', action: 'detail' },
+      { id: 'support', label: t('settings.admin.support'), description: t('settings.admin.supportDesc'), icon: LifeBuoy, accentClass: 'bg-amber-500 text-white', action: 'detail' },
     ],
   };
 
@@ -390,7 +392,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="text-[11px] text-slate-500 dark:text-slate-400">{helper}</div>
         </div>
         <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${settingsToggles[key] ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
-          <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition ${settingsToggles[key] ? 'translate-x-6' : 'translate-x-1'}`} />
+          <span className={`inline-block h-4 w-4 rounded-full bg-white dark:bg-slate-900 shadow-sm transition ${settingsToggles[key] ? 'translate-x-6' : 'translate-x-1'}`} />
         </div>
       </button>
     );
@@ -401,28 +403,28 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="space-y-4">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60">
               <div className="flex items-center gap-3">
-                <img src={currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80'} alt={currentUser?.name || 'Usuário'} className="h-12 w-12 rounded-full object-cover" />
+                <img src={currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80'} alt={currentUser?.name || t('user.placeholder')} className="h-12 w-12 rounded-full object-cover" />
                 <div>
-                  <div className="text-base font-black text-slate-900 dark:text-white">{currentUser?.name || 'Utilizador Guigui'}</div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400">{currentRole === 'admin' ? 'Administrador' : currentRole === 'business' ? 'Conta comercial' : 'Cidadão'}</div>
+                  <div className="text-base font-black text-slate-900 dark:text-white">{currentUser?.name || t('user.placeholder')}</div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">{t('settings.user.role.' + (currentRole === 'admin' ? 'admin' : currentRole === 'business' ? 'business' : 'citizen'))}</div>
                 </div>
               </div>
             </div>
             {currentRole === 'user' && (
               <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-                <div className="text-sm font-black text-slate-900 dark:text-white">Definições do sistema</div>
-                <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Configurações pessoais</div>
+                <div className="text-sm font-black text-slate-900 dark:text-white">{t('settings.user.systemSettings')}</div>
+                <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{t('settings.user.personalSettings')}</div>
               </div>
             )}
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Email</div>
-                <div className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{currentUser?.email || 'conta@guigui.com'}</div>
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{t('settings.user.email')}</div>
+                <div className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{currentUser?.email || t('settings.user.emailFallback')}</div>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Região</div>
-                <div className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{currentUser?.neighborhood || 'Bissau'}</div>
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{t('settings.user.region')}</div>
+                <div className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{currentUser?.neighborhood || t('settings.user.regionFallback')}</div>
               </div>
             </div>
 
@@ -474,7 +476,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60">
               <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Negócio principal</div>
               <div className="mt-2 text-base font-black text-slate-900 dark:text-white">{currentUser?.businessName || 'Guigui Business'}</div>
-              <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">Categoria: Restauração e eventos</div>
+              <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">{t('settings.business.mainCategory')}</div>
             </div>
             {renderToggleRow('Perfil público visível', 'publicProfile', 'A loja aparece no diretório e na pesquisa')} 
             {renderToggleRow('Sincronização automática', 'autoBackup', 'Sincroniza promoções e eventos com a plataforma')}
@@ -492,7 +494,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
                 <div className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">Ativo</div>
               </div>
-              <div className="mt-3 text-sm text-slate-600 dark:text-slate-300">Próximo pagamento: 05 de Agosto ⬢ 18.000 XOF</div>
+              <div className="mt-3 text-sm text-slate-600 dark:text-slate-300">{t('settings.business.nextPayment')}</div>
             </div>
             {renderToggleRow('Cobrança automática', 'autoBackup', 'Renova o plano no vencimento')}
             {renderToggleRow('Faturas por email', 'emailAlerts', 'Recebe recibos e relatórios')}
@@ -550,14 +552,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button key={option.code} type="button" onClick={() => handleLanguageApply(option.code)} className={`w-full rounded-2xl border p-3 text-left transition ${selected ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/30' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-700/60'}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <span className="text-xl">{option.flag.split(' ')[0]}</span>
+                      <span className="text-xl">{option.flag}</span>
                       <div>
                         <div className="text-sm font-black text-slate-900 dark:text-white">{option.name}</div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400">{option.flag}</div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400">{formatLanguageCode(option.code)}</div>
                       </div>
                     </div>
                     <div className={`flex h-5 w-5 items-center justify-center rounded-full border ${selected ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 dark:border-slate-600'}`}>
-                      {selected && <span className="h-2 w-2 rounded-full bg-white" />}
+                      {selected && <span className="h-2 w-2 rounded-full bg-white dark:bg-slate-900" />}
                     </div>
                   </div>
                 </button>
@@ -608,14 +610,14 @@ export const Navbar: React.FC<NavbarProps> = ({
       icon: Tags,
       label: t('navPromotions'),
       subtitle: t('navPromotionsDescription'),
-      badge: 'Descontos',
+      badge: null,
     },
     {
       id: 'events' as const,
       icon: CalendarDays,
       label: t('navEvents'),
       subtitle: t('navEventsDescription'),
-      badge: 'Eventos',
+      badge: null,
     },
   ];
 
@@ -628,7 +630,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <>
       {/* Clean Minimalist Top Header with Facebook-Style Navigation */}
-      <header className="guigui-navbar">
+      <header className="guigui-navbar glass-navbar">
         <div className="guigui-navbar-inner">
           
           {/* Left: 3 Tracinhos + Botão {t('back')} + Logo + Search Bar */}
@@ -652,7 +654,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               title="Guigui.com Portal Bissau"
             >
               <div className="guigui-brand-mark group-hover:scale-105 transition-transform" aria-hidden="true">
-                <svg viewBox="0 0 40 40" width="34" height="34"><path d="M20 2 L26 14 L38 16 L29 24 L31 37 L20 30.5 L9 37 L11 24 L2 16 L14 14 Z" fill="#0B3B37"/><path d="M20 2 L26 14 L38 16 L29 24 L31 37 L20 30.5 L9 37 L11 24 L2 16 L14 14 Z" fill="none" stroke="#E8A23A" strokeWidth="1.4"/><circle cx="20" cy="19" r="4.2" fill="#E8A23A"/></svg>
+                <GuiguiStar className="h-full w-full" title="Guigui.com" />
               </div>
               <span className="guigui-brand-word hidden sm:inline">Guigui<span className="dot">.com</span></span>
             </button>
@@ -729,7 +731,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                       ? 'text-emerald-600 dark:text-emerald-400 font-extrabold'
                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100/50 dark:hover:bg-slate-800/50'
                   }`}
-                  title={`${tabItem.label} - ${tabItem.subtitle}`}
                   aria-label={tabItem.label}
                 >
                   <div className="guigui-icon-slot relative flex h-8 w-full items-center justify-center pt-1">
@@ -805,11 +806,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="guigui-pref-button h-9 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center gap-1.5 px-2 sm:px-2.5 text-slate-700 dark:text-slate-200 transition border border-slate-200 dark:border-slate-700"
                   aria-haspopup="menu"
                   aria-expanded={topLanguageMenuOpen}
-                  aria-label={`${t('language.select')}: ${languageCode(currentLang)}`}
-                  title={`${t('language.select')}: ${languageCode(currentLang)}`}
+                  aria-label={`${t('language.select')}: ${formatLanguageCode(currentLang)}`}
+                  title={`${t('language.select')}: ${formatLanguageCode(currentLang)}`}
                 >
                   <Globe className="w-4 h-4 shrink-0" aria-hidden="true" />
-                  <span className="hidden sm:inline text-xs font-bold">{languageCode(currentLang)}</span>
+                  <span className="hidden sm:inline text-xs font-bold">{formatLanguageCode(currentLang)}</span>
                   <ChevronDown className={`w-3 h-3 shrink-0 transition ${topLanguageMenuOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
                 </button>
 
@@ -836,7 +837,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div
                   role="menu"
                   aria-label={t('language.select')}
-                  className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-2 z-[110] text-xs space-y-1"
+                  className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 dark:border-slate-800 rounded-2xl shadow-2xl p-2 z-[110] text-xs space-y-1"
                 >
                   {languages.map((option) => {
                     const selected = currentLang === option.code;
@@ -852,7 +853,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         }}
                         className={`w-full text-left px-3 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-between gap-2 font-bold text-slate-700 dark:text-slate-200 ${selected ? 'bg-slate-100 dark:bg-slate-800' : ''}`}
                       >
-                        <span className="truncate">{languageCode(option.code)} · {option.name}</span>
+                        <span className="truncate">{formatLanguageCode(option.code)} · {option.name}</span>
                         {selected && <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" aria-hidden="true" />}
                       </button>
                     );
@@ -863,7 +864,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               {topThemeMenuOpen && (
                 <div
                   role="menu"
-                  className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-2 z-[110] text-xs space-y-1"
+                  className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 dark:border-slate-800 rounded-2xl shadow-2xl p-2 z-[110] text-xs space-y-1"
                 >
                   {themeOptions.map((option) => {
                     const selected = themeMode === option.value;
@@ -907,7 +908,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   title="Sessão Iniciada"
                 >
                   <img
-                    src={currentUser.avatarUrl}
+                    src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80'}
                     alt={currentUser.name}
                     className="w-6 h-6 rounded-full object-cover border border-white/40"
                   />
@@ -928,7 +929,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               {/* User Dropdown */}
               {roleMenuOpen && currentUser && (
-                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-2 z-[110] text-xs space-y-1">
+                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 dark:border-slate-800 rounded-2xl shadow-2xl p-2 z-[110] text-xs space-y-1">
                   {currentRole === 'user' && (
                     <button type="button"
                       onClick={() => {
@@ -977,12 +978,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       aria-haspopup="menu"
                       aria-expanded={profileLanguageOpen}
-                      aria-label={`${t('language.select')}: ${languageCode(currentLang)}`}
+                      aria-label={`${t('language.select')}: ${formatLanguageCode(currentLang)}`}
                       className="w-full text-left p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition flex items-center gap-2 font-extrabold text-xs"
                     >
                       <Globe className="w-4 h-4 shrink-0" aria-hidden="true" />
                       <span className="min-w-0 flex-1 truncate">{t('language.select')}</span>
-                      <span className="shrink-0 text-[11px] font-bold text-slate-500 dark:text-slate-400">{languageCode(currentLang)}</span>
+                      <span className="shrink-0 text-[11px] font-bold text-slate-500 dark:text-slate-400">{formatLanguageCode(currentLang)}</span>
                       <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition ${profileLanguageOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
                     </button>
                     {profileLanguageOpen && (
@@ -1001,7 +1002,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                               }}
                               className={`w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-between gap-2 font-bold text-slate-700 dark:text-slate-200 ${selected ? 'bg-slate-100 dark:bg-slate-800' : ''}`}
                             >
-                              <span className="truncate">{languageCode(option.code)} · {option.name}</span>
+                              <span className="truncate">{formatLanguageCode(option.code)} · {option.name}</span>
                               {selected && <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" aria-hidden="true" />}
                             </button>
                           );
@@ -1059,36 +1060,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Mobile & Tablet Secondary Header Bar: cobre tudo abaixo do desktop
-            (a navegação de tabs do cabeçalho só cabe em ≥1101px, ver CSS). */}
-        <div className="hidden max-[1100px]:flex items-center justify-around border-t border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-1 py-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 overflow-x-hidden">
-          {mainHeaderTabs.map((tabItem) => {
-            const Icon = tabItem.icon;
-            const isActive = currentTab === tabItem.id;
-            return (
-              <button type="button"
-                key={tabItem.id}
-                onClick={() => tabItem.id === 'feed' && onFeedRefresh ? onFeedRefresh() : onTabChange(tabItem.id)}
-                className={`min-w-0 flex-1 flex flex-col items-center justify-center rounded-xl px-1 py-1.5 transition ${
-                  isActive
-                    ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/40 font-black'
-                    : 'hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-                title={`${tabItem.label} - ${tabItem.subtitle}`}
-              >
-                <div className="guigui-icon-slot relative flex h-7 w-full items-center justify-center pt-1">
-                  <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'stroke-[2px] text-emerald-600 dark:text-emerald-400' : 'stroke-[1.8px]'}`} aria-hidden="true" />
-                  {tabItem.badge && (
-                    <span className="guigui-status-badge absolute right-0 top-0 z-10 min-w-max -translate-y-1/2 whitespace-nowrap rounded-full bg-emerald-600 px-1 py-0.5 text-[8px] font-extrabold leading-none text-white shadow-xs">
-                      {tabItem.badge}
-                    </span>
-                  )}
-                </div>
-                <span className="block max-w-full truncate whitespace-nowrap text-[10px] leading-[1.15]">{tabItem.label.split(' ')[0]}</span>
-              </button>
-            );
-          })}
-        </div>
       </header>
 
       {/* Facebook-Style Left Navigation Menu Drawer (Lista dos 3 Tracinhos) */}
@@ -1101,13 +1072,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           />
 
           {/* Sliding Menu Panel */}
-          <div className="relative w-full max-w-sm sm:w-96 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 h-full shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-200">
+          <div className="relative w-full max-w-sm sm:w-96 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 dark:border-slate-800 h-full shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-200">
              
             {/* Drawer Header */}
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-900/80">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-900/80">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-slate-900 via-emerald-800 to-emerald-600 text-amber-400 font-black text-xl flex items-center justify-center shadow-xs">
-                  g
+                <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-slate-900 via-emerald-800 to-emerald-600 text-amber-400 flex items-center justify-center shadow-xs">
+                  <GuiguiStar className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} />
                 </div>
                 <div>
                   <h2 className="font-black text-base text-slate-900 dark:text-white leading-none">
@@ -1136,7 +1107,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div className="p-3 bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/40 rounded-2xl flex items-center justify-between">
                   <div className="flex items-center gap-2.5 overflow-hidden">
                     <img
-                      src={currentUser.avatarUrl}
+                      src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80'}
                       alt={currentUser.name}
                       className="w-10 h-10 rounded-full object-cover border-2 border-white dark:border-slate-800 shrink-0"
                     />
@@ -1154,7 +1125,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       setLeftMenuOpen(false);
                       if (onOpenLoginModal) onOpenLoginModal();
                     }}
-                    className="px-2.5 py-1 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-[10px] rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 transition shrink-0"
+                    className="px-2.5 py-1 bg-white dark:bg-slate-900 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-[10px] rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 transition shrink-0"
                   >
                     Trocar
                   </button>
@@ -1220,10 +1191,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                                }
                                if (item.action === 'theme') {
                                  toggleThemeDirectly();
-                                 return;
-                               }
-                               if (item.action === 'language') {
-                                 cycleLanguageDirectly();
                                  return;
                                }
                                if (currentRole === 'business' && onBusinessTabChange) {
@@ -1302,7 +1269,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {/* Drawer Footer */}
-            <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900 text-center text-[9px] text-slate-400 font-medium leading-none">
+            <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-700 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900 text-center text-[9px] text-slate-400 font-medium leading-none">
               Guigui.com v2.4 ⬢ Feito com paixão em Bissau
             </div>
           </div>
@@ -1316,10 +1283,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-                  {accountDialogOpen ? 'Conta' : showLogoutConfirm ? 'Sessão' : activeSettingsPanel === 'settings' ? 'Sistema' : activeSettingsPanel === 'theme' ? 'Tema e idioma' : 'Idioma'}
+                  {accountDialogOpen ? t('settings.user.account') : showLogoutConfirm ? t('settings.user.logoutConfirm') : activeSettingsPanel === 'settings' ? t('settings.label.system') : activeSettingsPanel === 'theme' ? t('theme.select') : t('language.select')}
                 </p>
                 <h3 className="mt-1 text-lg font-black text-slate-900 dark:text-white">
-                  {accountDialogOpen ? 'Minha Conta' : showLogoutConfirm ? 'Terminar sessão?' : activeSettingsPanel === 'settings' ? 'Configurações' : activeSettingsPanel === 'theme' ? 'Tema e idioma' : 'Preferências & Idioma'}
+                  {accountDialogOpen ? t('settings.user.myAccount') : showLogoutConfirm ? t('settings.user.logoutTitle') : activeSettingsPanel === 'settings' ? t('settings.label.config') : activeSettingsPanel === 'theme' ? t('theme.select') : t('language.select')}
                 </h3>
               </div>
               <button type="button" onClick={closeCurrentModule} className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700" aria-label={`${t('close')} módulo`}>
@@ -1351,10 +1318,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                         onClick={() => {
                           if (item.action === 'theme') {
                             toggleThemeDirectly();
-                            return;
-                          }
-                          if (item.action === 'language') {
-                            cycleLanguageDirectly();
                             return;
                           }
                           setSelectedSettingsSection(item.id);
@@ -1426,7 +1389,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                             <div className="text-[11px] text-slate-500 dark:text-slate-400">{option.description}</div>
                           </div>
                           <div className={`flex h-5 w-5 items-center justify-center rounded-full border ${selected ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 dark:border-slate-600'}`}>
-                            {selected && <span className="h-2 w-2 rounded-full bg-white" />}
+                            {selected && <span className="h-2 w-2 rounded-full bg-white dark:bg-slate-900" />}
                           </div>
                         </div>
                       </button>
@@ -1445,7 +1408,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                             <div className="text-sm font-black text-slate-900 dark:text-white">{option.flag} {option.name}</div>
                           </div>
                           <div className={`flex h-5 w-5 items-center justify-center rounded-full border ${selected ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 dark:border-slate-600'}`}>
-                            {selected && <span className="h-2 w-2 rounded-full bg-white" />}
+                            {selected && <span className="h-2 w-2 rounded-full bg-white dark:bg-slate-900" />}
                           </div>
                         </div>
                       </button>
@@ -1468,14 +1431,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <button key={option.code} type="button" onClick={() => handleLanguageApply(option.code)} className={`w-full rounded-2xl border p-3 text-left transition ${selected ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/30' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-700/60'}`}>
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          <span className="text-xl">{option.flag.split(' ')[0]}</span>
+                          <span className="text-xl">{option.flag}</span>
                           <div>
                             <div className="text-sm font-black text-slate-900 dark:text-white">{option.name}</div>
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400">{option.flag}</div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400">{formatLanguageCode(option.code)}</div>
                           </div>
                         </div>
                         <div className={`flex h-5 w-5 items-center justify-center rounded-full border ${selected ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 dark:border-slate-600'}`}>
-                          {selected && <span className="h-2 w-2 rounded-full bg-white" />}
+                          {selected && <span className="h-2 w-2 rounded-full bg-white dark:bg-slate-900" />}
                         </div>
                       </div>
                     </button>

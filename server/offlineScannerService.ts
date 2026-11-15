@@ -40,13 +40,16 @@ const manifestSignature = (payload: { eventId: string; companyId: string; expire
  */
 export async function buildOfflineManifest(eventId: string, companyId: string, secret: string): Promise<OfflineManifest> {
   if (!databasePool) throw new Error('O manifesto offline exige base de dados configurada.');
+  // Filtra também pela empresa organizadora: um evento de outra empresa nunca
+  // pode originar um manifesto válido, mesmo que o eventId seja conhecido.
   const result = await databasePool.query(
     `SELECT t.ticket_code, t.qr_token
      FROM tickets t
-     WHERE t.event_id=$1 AND t.status='valid' AND (t.expires_at IS NULL OR t.expires_at > NOW())
+     JOIN events e ON e.id = t.event_id
+     WHERE t.event_id=$1 AND e.company_id=$2 AND t.status='valid' AND (t.expires_at IS NULL OR t.expires_at > NOW())
      ORDER BY t.created_at ASC
      LIMIT 20000`,
-    [eventId],
+    [eventId, companyId],
   );
   const tickets: OfflineManifestEntry[] = result.rows.map((row) => ({ code: row.ticket_code, token: row.qr_token }));
   const generatedAt = new Date().toISOString();
@@ -94,17 +97,20 @@ export type BatchOutcome = {
  */
 export async function syncOfflineValidations(
   records: OfflineValidationRecord[],
+  companyId?: string,
 ): Promise<BatchOutcome[]> {
   if (!databasePool) throw new Error('A sincronização exige base de dados configurada.');
+  if (!companyId) throw new Error('A sincronização exige a empresa organizadora.');
   const outcomes: BatchOutcome[] = [];
 
   for (const record of records) {
     const result = await databasePool.query(
       `SELECT t.id, t.status, t.expires_at
        FROM tickets t
-       WHERE t.ticket_code=$1 OR t.qr_token=$1
+       JOIN events e ON e.id = t.event_id
+       WHERE (t.ticket_code=$1 OR t.qr_token=$1) AND e.company_id=$2
        LIMIT 1`,
-      [record.code],
+      [record.code, companyId],
     );
     const row = result.rows[0];
     if (!row) {

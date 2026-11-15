@@ -155,7 +155,7 @@ export const MAIN_CATEGORIES: BusinessCategory[] = [
     name: 'Eventos Culturais & Bilhética',
     iconName: 'Ticket',
     groupId: 'restauracao',
-    subcategories: ['Concertos & Festivais', 'Teatro & Dança', 'Exposições de Arte', 'Festas de Carnaval & Clubes', 'Conferências'],
+    subcategories: ['Concertos & Festivais', 'Teatro & Dança', 'Exposições de Arte', 'Festas de Carnaval', 'Clubes', 'Conferências'],
   },
   {
     id: 'cat-15',

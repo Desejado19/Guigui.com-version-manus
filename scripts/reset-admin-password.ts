@@ -1,10 +1,22 @@
-import 'dotenv/config';
+import 'dotenv/config?override=true';
 import { Pool } from 'pg';
 import { hashPassword } from '../server/modules/identity-access';
 
 // Repoe a password do admin demo para 'Guigui2026!' (mesmo algoritmo scrypt da app)
+
+// Ligação administrativa/migração: pode usar DATABASE_URL ou pooler/admin dedicado em ambiente real.
+// Para não interferir com o pool de runtime do servidor, este script cria a sua própria ligação e
+// liberta-a explicitamente no fim.
+const connectionString =
+  (process.env.DATABASE_POOLER_URL ?? process.env.DATABASE_URL)?.trim();
+if (!connectionString) {
+  console.error('ERRO: DATABASE_URL (ou DATABASE_POOLER_URL) não está definida.');
+  process.exit(1);
+}
+
+const pool = new Pool({ connectionString });
+
 async function main() {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   try {
     const email = 'admin.teste@guigui.com';
     const hash = hashPassword('Guigui2026!');

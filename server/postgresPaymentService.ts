@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { databasePool } from './db';
+import { databasePool, withDbIdentity } from './db';
 
 type PaymentTransaction = {
   id: string;
@@ -8,8 +8,8 @@ type PaymentTransaction = {
   status: string;
   amountXOF: number;
   payerName?: string;
-  payerPhone?: string;
-  useCase?: string;
+  payerPhone?: string;  useCase?: string;
+  businessId?: string;
   providerMode?: string;
   confirmedAt?: string;
   createdAt?: string;
@@ -96,19 +96,24 @@ export async function persistPostgresPayment(transaction: PaymentTransaction, id
   if (!databasePool) return;
   await databasePool.query(
     `INSERT INTO payment_transactions
-      (id,provider,provider_reference,status,gross_amount_xof,net_amount_xof,payer_name,payer_phone,use_case,provider_mode,confirmed_at,created_at,updated_at,idempotency_key)
-     VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$11,$12)
+      (id,provider,provider_reference,status,gross_amount_xof,net_amount_xof,payer_name,payer_phone,use_case,business_id,provider_mode,confirmed_at,created_at,updated_at,idempotency_key)
+     VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$12,$13)
      ON CONFLICT (id) DO UPDATE SET status=EXCLUDED.status, provider_reference=EXCLUDED.provider_reference,
-       payer_name=EXCLUDED.payer_name, payer_phone=EXCLUDED.payer_phone, confirmed_at=EXCLUDED.confirmed_at, updated_at=NOW()`,
-    [transaction.id, transaction.provider, transaction.providerRef || null, statusMap[transaction.status] || 'pending', transaction.amountXOF, transaction.payerName || null, transaction.payerPhone || null, transaction.useCase || null, transaction.providerMode || null, transaction.confirmedAt || null, transaction.createdAt || new Date().toISOString(), idempotencyKey || null],
+       payer_name=EXCLUDED.payer_name, payer_phone=EXCLUDED.payer_phone, business_id=EXCLUDED.business_id,
+       confirmed_at=EXCLUDED.confirmed_at, updated_at=NOW()`,
+    [transaction.id, transaction.provider, transaction.providerRef || null, statusMap[transaction.status] || 'pending', transaction.amountXOF, transaction.payerName || null, transaction.payerPhone || null, transaction.useCase || null, transaction.businessId || null, transaction.providerMode || null, transaction.confirmedAt || null, transaction.createdAt || new Date().toISOString(), idempotencyKey || null],
   );
 }
 
 export async function recordPostgresPaymentEvent(provider: string, transactionId: string, payload: unknown, signatureValid: boolean, eventReference?: string): Promise<void> {
   if (!databasePool) return;
-  await databasePool.query(
-    `INSERT INTO payment_events (id,transaction_id,provider,event_reference,signature_valid,payload)
-     VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (provider,event_reference) DO NOTHING`,
-    [`payment-event-${randomBytes(12).toString('hex')}`, transactionId, provider, eventReference || `${transactionId}-${Date.now()}`, signatureValid, JSON.stringify(payload)],
+  // Ingestão de sistema (webhook sem sessão): escrita de sistema, no padrão
+  // da auditoria (fase 1); o upsert exige visibilidade da linha em conflito.
+  await withDbIdentity({ userId: '', role: 'anon', system: true }, () =>
+    databasePool!.query(
+      `INSERT INTO payment_events (id,transaction_id,provider,event_reference,signature_valid,payload)
+       VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (provider,event_reference) DO NOTHING`,
+      [`payment-event-${randomBytes(12).toString('hex')}`, transactionId, provider, eventReference || `${transactionId}-${Date.now()}`, signatureValid, JSON.stringify(payload)],
+    ),
   );
 }

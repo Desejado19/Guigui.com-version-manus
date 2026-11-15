@@ -192,7 +192,7 @@ describe('CommunicationHub', () => {
     expect(document.querySelector('.guigui-communication-list')).toBeTruthy();
     expect(document.querySelector('.guigui-communication-thread')).toBeTruthy();
     expect(document.querySelector('.guigui-thread-header')).toBeTruthy();
-    expect(screen.getAllByText('Entrega dos bilhetes').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(business.name).length).toBeGreaterThan(0);
     expect(screen.getByText('Olá, bom dia.')).toBeTruthy();
     expect(screen.getByText('Bom dia, tudo pronto.')).toBeTruthy();
   });
@@ -202,7 +202,10 @@ describe('CommunicationHub', () => {
     const layout = document.querySelector('.guigui-communication-layout');
 
     expect(layout?.classList.contains('is-mobile-list')).toBe(true);
-    await userEvent.click(screen.getByRole('button', { name: /Entrega dos bilhetes/ }));
+    const conversationButton = document.querySelector('.guigui-conversation-item') as HTMLButtonElement | null;
+    expect(conversationButton).toBeTruthy();
+    if (!conversationButton) return;
+    await userEvent.click(conversationButton);
     expect(layout?.classList.contains('is-mobile-thread')).toBe(true);
 
     await userEvent.click(screen.getByRole('button', { name: 'Voltar às conversas' }));
@@ -224,12 +227,12 @@ describe('CommunicationHub', () => {
 
   it('opens and closes the conversation overlays', async () => {
     renderHub();
-    await userEvent.click(screen.getByRole('button', { name: 'Abrir perfil do participante' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Ver perfil do participante' }));
     expect(screen.getByText('Empresa · Perfil público')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Fechar perfil' }));
     expect(screen.queryByText('Empresa · Perfil público')).toBeNull();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Informações da conversa' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Detalhes da conversa' }));
     expect(screen.getByText('Informações da conversa')).toBeTruthy();
     expect(screen.getByText('2 mensagens nesta conversa.')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Fechar informações' }));
@@ -238,7 +241,7 @@ describe('CommunicationHub', () => {
 
   it('creates a new conversation with the selected business', async () => {
     const handlers = renderHub();
-    await userEvent.click(screen.getByRole('button', { name: '+ Nova mensagem' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Nova mensagem' }));
     expect(screen.getByText('Nova conversa')).toBeTruthy();
     await userEvent.selectOptions(screen.getByLabelText('Escolher empresa para nova conversa'), business.id);
     await userEvent.type(screen.getByLabelText('Assunto da nova conversa'), 'Nova dúvida');
@@ -262,7 +265,7 @@ describe('CommunicationHub', () => {
       currentUser: owner,
       conversations: [{ ...conversation, userId: 'usr-other', userName: 'Carlos Domingos' }],
     });
-    expect(screen.queryByRole('button', { name: '+ Nova mensagem' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Nova mensagem' })).toBeNull();
     expect(screen.getAllByText('Carlos Domingos').length).toBeGreaterThan(0);
   });
 });

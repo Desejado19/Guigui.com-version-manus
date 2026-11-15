@@ -118,7 +118,7 @@ A Área da Minha Empresa é aberta directamente pelo perfil empresarial e permit
 
 ### 11. Exportações e Impressão de Relatórios
 
-- Utilitário dedicado (`/src/utils/exportHelpers.ts`) para exportar dados em **CSV**, **Excel (.xls)** e **PDF** com layout institucional do Guigui.com / Grupo Gorila.
+- Utilitário dedicado (`/src/utils/exportHelpers.ts`) para exportar dados em **CSV**, **Excel nativo (.xlsx)** e **PDF** com layout institucional do Guigui.com / Grupo Gorila.
 
 ---
 
@@ -272,7 +272,7 @@ O **Super Admin** pode abrir “Matriz de Preços XOF” e editar o desconto anu
 
 O mesmo modelo financeiro é lido pela Área da Empresa e pela Agenda de Bilhetes quando esses ecrãs são abertos no mesmo navegador. O resumo de compra mantém o preço do bilhete separado das **taxas informativas da plataforma** (comissão + taxa fixa); a emissão de bilhetes e a validação QR continuam a ser operações da empresa organizadora, não do Super Admin.
 
-A Área da Empresa e o Centro de Relatórios administrativo apresentam filtros de período e âmbito, indicadores, tabelas e exportação estruturada para **CSV**, **Excel compatível (.xls)** e **PDF / Imprimir**. O último abre uma folha profissional no diálogo de impressão do navegador, onde o utilizador pode imprimir ou escolher “Guardar como PDF”; não é apresentado como um PDF binário gerado no servidor.
+A Área da Empresa e o Centro de Relatórios administrativo apresentam filtros de período e âmbito, indicadores, tabelas e exportação estruturada para **CSV**, **Excel nativo (.xlsx)** e **PDF / Imprimir**. O último abre uma folha profissional no diálogo de impressão do navegador, onde o utilizador pode imprimir ou escolher “Guardar como PDF”; não é apresentado como um PDF binário gerado no servidor.
 
 A confirmação de um plano pago é imutável para o Super Admin: o plano e o escalão pertencem à empresa durante o período comprado. A Administração pode supervisionar e reconciliar o pagamento e pode suspender a empresa quando existir quebra de contrato, mas não pode alterar o escalão pago. A opção **Suspensão automática após expiração** é configurável no próprio Super Admin. Quando activa, o vencimento coloca a empresa em suspensão; quando desligada, a empresa fica em modo de consulta até intervenção manual.
 

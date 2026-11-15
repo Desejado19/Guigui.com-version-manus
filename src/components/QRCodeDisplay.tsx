@@ -57,7 +57,7 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
       errorCorrectionLevel: 'M',
       margin: 2,
       width: 360,
-      color: { dark: '#0f172a', light: '#ffffff' },
+      color: { dark: '#0B3B37', light: '#ffffff' },
     }).then((url: string) => {
       if (!cancelled) setQrDataUrl(url);
     }).catch((error: unknown) => {
@@ -136,7 +136,9 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
   };
 
   return (
-    <div className={`ticket-surface ticket-proof-card mx-auto w-full max-w-md overflow-hidden rounded-2xl border text-center shadow-md relative ${purchaseReceipt ? 'ticket-receipt-purchase' : 'space-y-1.5 p-2.5'}`}>
+    <div className={`ticket-surface ticket-proof-card mx-auto w-full max-w-md overflow-hidden rounded-2xl border text-center shadow-md relative cursor-pointer ${purchaseReceipt ? 'ticket-receipt-purchase' : 'space-y-1.5 p-2.5'}`}
+      onClick={() => alert('QR Code card clicked')}
+    >
       <div className="ticket-proof-header space-y-1 rounded-xl p-2.5 text-left">
         <div className="flex items-center justify-center gap-1.5 text-emerald-400 text-[9px] font-bold uppercase tracking-wider">
           <ShieldCheck className="w-3.5 h-3.5" />
@@ -171,11 +173,11 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
       </div>
 
       <div className="ticket-proof-qr mx-auto inline-block rounded-xl border p-1.5">
-        <div className="relative mx-auto flex h-28 w-28 items-center justify-center rounded-lg border bg-white p-1">
+        <div className="relative mx-auto flex h-28 w-28 items-center justify-center rounded-lg border bg-white dark:bg-slate-900 p-1">
           {qrDataUrl ? (
             <img src={qrDataUrl} alt={t('qrAltText', { code })} className="h-full w-full object-contain" />
           ) : (
-            <div className="flex h-full w-full items-center justify-center px-2 text-center text-[10px] font-bold text-slate-500">
+            <div className="flex h-full w-full items-center justify-center px-2 text-center text-[10px] font-bold text-slate-500 dark:text-slate-400">
               {qrError || t('qrGenerating')}
             </div>
           )}
@@ -189,7 +191,7 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
           <div className="flex items-center justify-center gap-1.5">
             <span className="ticket-proof-code-value select-all font-mono text-lg font-semibold tracking-[0.18em]">{code}</span>
             {onCopyCode && (
-              <button type="button" onClick={onCopyCode} className="p-1 bg-white hover:bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200 transition" title={t('qrCopyCode')} aria-label={t('qrCopyCode')}>
+              <button type="button" onClick={onCopyCode} className="p-1 bg-white dark:bg-slate-900 hover:bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200 transition" title={t('qrCopyCode')} aria-label={t('qrCopyCode')}>
                 <Copy className="w-3.5 h-3.5" />
               </button>
             )}
@@ -227,7 +229,7 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
         </button>
       </div>
 
-      <p className="text-[9px] text-slate-400 italic leading-snug">{t('qrSingleUse')}</p>
+      <p className="text-[9px] text-slate-400 dark:text-slate-500 italic leading-snug">{t('qrSingleUse')}</p>
     </div>
   );
 };

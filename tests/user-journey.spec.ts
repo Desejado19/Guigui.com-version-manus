@@ -106,8 +106,11 @@ test.describe('jornada do visitante: descobrir e contactar empresas', () => {
     await page.waitForLoadState('domcontentloaded');
     await openCleanDirectory(page);
 
-    // Os filtros do directório são botões de categoria (ex.: "Restauração e Bebidas").
-    const restaurantFilter = page.getByRole('button', { name: 'Restauração e Bebidas' });
+    // As categorias vivem dentro do menu "Todas as Categorias".
+    const categoryMenu = page.getByRole('button', { name: /Filtrar por categoria/i });
+    await expect(categoryMenu).toBeVisible({ timeout: 10_000 });
+    await categoryMenu.click();
+    const restaurantFilter = page.getByRole('option', { name: 'Restauração e Bebidas' });
     await expect(restaurantFilter).toBeVisible({ timeout: 10_000 });
     await restaurantFilter.click();
     await page.waitForTimeout(1500);
@@ -116,10 +119,11 @@ test.describe('jornada do visitante: descobrir e contactar empresas', () => {
     await expect(page.getByText('Cantina Sabores de Bandim').first()).toBeVisible({ timeout: 15_000 });
     await page.screenshot({ path: 'test-results/journey-categoria-restaurantes.png', fullPage: false });
 
-    // "Todas as Categorias" limpa o filtro e devolve o directório completo.
-    const allCategories = page.getByRole('button', { name: 'Todas as Categorias' });
+    // "Todas as Categorias" dentro do menu limpa o filtro e devolve o directório completo.
+    const allCategories = page.getByRole('button', { name: /Filtrar por categoria/i });
     await expect(allCategories).toBeVisible({ timeout: 10_000 });
     await allCategories.click();
+    await page.getByRole('option', { name: 'Todas as Categorias' }).click();
     await page.waitForTimeout(1500);
     await expect(page.getByText('Restaurante Coqueiros').first()).toBeVisible({ timeout: 15_000 });
   });

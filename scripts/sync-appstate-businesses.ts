@@ -4,7 +4,7 @@
  * (empresas criadas, estados actuais e sem o lixo já removido).
  * Uso: npx tsx scripts/sync-appstate-businesses.ts
  */
-import 'dotenv/config';
+import 'dotenv/config?override=true';
 import { listPostgresBusinesses, setAppState } from '../server/postgresBusinessService';
 
 const DEFAULT_METRICS = { views: 0, phoneClicks: 0, websiteClicks: 0, whatsappClicks: 0, directionsClicks: 0 };

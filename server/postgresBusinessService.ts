@@ -146,6 +146,43 @@ export async function updatePostgresBusinessProfile(
   };
 }
 
+/** Ficha atual para o comparador de alterações (round-trip idempotente). */
+export async function getPostgresBusiness(businessId: string): Promise<Record<string, unknown> | null> {
+  if (!databasePool) {
+    const business = listJsonBusinesses<BusinessRecord>().find((record) => record.id === businessId);
+    if (!business) return null;
+
+    return {
+      ...(business.data && Object.keys(business.data).length > 0 ? business.data : {}),
+      id: business.id,
+      ownerUserId: business.ownerUserId,
+      name: business.name,
+      status: business.status,
+      categoryId: business.categoryId,
+      createdAt: business.createdAt,
+    };
+  }
+
+  const result = await databasePool.query(
+    `SELECT id, owner_user_id, name, status, category_id, created_at, data
+       FROM companies
+      WHERE id=$1`,
+    [businessId],
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+
+  return {
+    ...(row.data && Object.keys(row.data).length > 0 ? row.data : {}),
+    id: row.id,
+    ownerUserId: row.owner_user_id,
+    name: row.name,
+    status: row.status,
+    categoryId: row.category_id,
+    createdAt: row.created_at,
+  };
+}
+
 export async function setPostgresBusinessFeaturedOrder(businessIds: string[]): Promise<Record<string, unknown>[]> {
   if (new Set(businessIds).size !== businessIds.length) {
     throw new InvalidFeaturedBusinessOrderError('INVALID_FEATURED_BUSINESS_ORDER');
@@ -159,8 +196,14 @@ export async function setPostgresBusinessFeaturedOrder(businessIds: string[]): P
     }
 
     const orderById = new Map(businessIds.map((businessId, index) => [businessId, index]));
+    // Empresas suspensas mantêm a configuração de destaque guardada mas deixam
+    // de ser publicadas, porque a página inicial só lista empresas ativas.
     const updatedBusinesses = businesses.map((business) => {
-      const homepageFeaturedOrder = orderById.get(business.id) ?? null;
+      // Empresas fora do destaque mantêm a posição que já tinham (se alguma),
+      // mas nunca herdam a posição de outra; sem posição guardada fica `null`.
+      const homepageFeaturedOrder = business.status === 'active'
+        ? (orderById.get(business.id) ?? null)
+        : (business.homepageFeaturedOrder ?? null);
       return {
         ...business,
         homepageFeaturedOrder,
@@ -193,7 +236,8 @@ export async function setPostgresBusinessFeaturedOrder(businessIds: string[]): P
       `UPDATE companies
           SET data = COALESCE(data, '{}'::jsonb) || '{"homepageFeaturedOrder": null}'::jsonb,
               updated_at = NOW()
-        WHERE data ? 'homepageFeaturedOrder'
+        WHERE status = 'active'
+          AND data ? 'homepageFeaturedOrder'
           AND data->'homepageFeaturedOrder' <> 'null'::jsonb`,
     );
     await client.query(
@@ -383,9 +427,87 @@ export async function getAppState<T>(key: string): Promise<T | null> {
   return result.rows[0]?.value || null;
 }
 
-export async function setAppState<T>(key: string, value: T): Promise<void> {
-  if (!databasePool) return;
-  await databasePool.query(`INSERT INTO app_state (key, value, updated_at) VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, [key, JSON.stringify(value)]);
+/** Valor + versão da linha, para o cliente distinguir respostas antigas. */
+export async function getAppStateRecord<T>(key: string): Promise<{ value: T | null; updatedAt: string | null }> {
+  if (!databasePool) return { value: null, updatedAt: null };
+  const result = await databasePool.query<{ value: T; updated_at: Date | string }>(
+    `SELECT value, updated_at FROM app_state WHERE key = $1`,
+    [key],
+  );
+  const row = result.rows[0];
+  return {
+    value: row?.value || null,
+    updatedAt: row?.updated_at ? new Date(row.updated_at).toISOString() : null,
+  };
+}
+
+export async function setAppState<T>(key: string, value: T): Promise<string | null> {
+  if (!databasePool) return null;
+  const result = await databasePool.query<{ updated_at: Date | string }>(
+    `INSERT INTO app_state (key, value, updated_at) VALUES ($1, $2::jsonb, NOW())
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+     RETURNING updated_at`,
+    [key, JSON.stringify(value)],
+  );
+  const updatedAt = result.rows[0]?.updated_at;
+  return updatedAt ? new Date(updatedAt).toISOString() : null;
+}
+
+/**
+ * Altera apenas o estado operacional da empresa (ativo/suspenso).
+ * A aprovação/rejeição continua a passar pela decisão administrativa auditada.
+ */
+export async function updatePostgresBusinessStatus(
+  businessId: string,
+  status: 'active' | 'suspended',
+): Promise<Record<string, unknown> | null> {
+  const normalizedStatus = companyStatus[status];
+  if (!normalizedStatus) throw new Error('Estado empresarial inválido.');
+
+  if (!databasePool) {
+    const businesses = listJsonBusinesses<BusinessRecord>();
+    const index = businesses.findIndex((business) => business.id === businessId);
+    if (index === -1) return null;
+    const existing = businesses[index];
+    const updated: BusinessRecord = {
+      ...existing,
+      status: normalizedStatus,
+      data: { ...(existing.data || {}), status: normalizedStatus },
+    };
+    businesses[index] = updated;
+    saveJsonBusinesses(businesses);
+    return {
+      ...(updated.data || {}),
+      id: updated.id,
+      ownerUserId: updated.ownerUserId,
+      name: updated.name,
+      status: updated.status,
+      categoryId: updated.categoryId,
+      createdAt: updated.createdAt,
+    };
+  }
+
+  const result = await databasePool.query(
+    `UPDATE companies
+        SET status=$2,
+            data=COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $2::text),
+            updated_at=NOW()
+      WHERE id=$1
+      RETURNING id, owner_user_id, name, status, category_id, created_at, data`,
+    [businessId, normalizedStatus],
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+
+  return {
+    ...(row.data && Object.keys(row.data).length > 0 ? row.data : {}),
+    id: row.id,
+    ownerUserId: row.owner_user_id,
+    name: row.name,
+    status: row.status,
+    categoryId: row.category_id,
+    createdAt: row.created_at,
+  };
 }
 
 export async function listPostgresBusinesses(): Promise<any[]> {
@@ -401,8 +523,8 @@ export async function listPostgresBusinesses(): Promise<any[]> {
     }));
   }
 
-  const result = await databasePool.query(`SELECT id, owner_user_id, name, status, category_id, data FROM companies ORDER BY created_at ASC`);
-  return result.rows.map(row => ({ ...(row.data && Object.keys(row.data).length > 0 ? row.data : {}), id: row.id, ownerUserId: row.owner_user_id, name: row.name, status: row.status, categoryId: row.category_id }));
+  const result = await databasePool.query(`SELECT id, owner_user_id, name, status, category_id, created_at, data FROM companies ORDER BY created_at ASC`);
+  return result.rows.map(row => ({ ...(row.data && Object.keys(row.data).length > 0 ? row.data : {}), id: row.id, ownerUserId: row.owner_user_id, name: row.name, status: row.status, categoryId: row.category_id, createdAt: row.created_at }));
 }
 
 export async function listPostgresEvents(): Promise<any[]> {

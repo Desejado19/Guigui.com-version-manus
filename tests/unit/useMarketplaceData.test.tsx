@@ -126,7 +126,7 @@ describe('useMarketplaceData', () => {
 
     expect(result.current.source).toBe('local');
     expect(result.current.businesses).toEqual([staleBusiness]);
-    expect(result.current.events).toEqual([staleEvent]);
+    expect(result.current.events).toEqual([{ ...staleEvent, mediaType: 'image' }]);
     expect(result.current.groups).toHaveLength(5);
     expect(result.current.categories).toHaveLength(16);
   });

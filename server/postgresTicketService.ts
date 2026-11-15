@@ -13,19 +13,23 @@ export async function reservePostgresTicketInventory(input: {
   const client = await databasePool.connect();
   try {
     await client.query('BEGIN');
-    const inventory = await client.query<{ quantity: number; event_status: string }>(
-      `SELECT tt.quantity, e.status AS event_status
+    const inventory = await client.query<{ id: string; quantity: number; event_status: string }>(
+      `SELECT tt.id, tt.quantity, e.status AS event_status
          FROM ticket_types tt
          JOIN events e ON e.id = tt.event_id
-        WHERE tt.id = $1 AND tt.event_id = $2
+        WHERE tt.event_id = $2 AND (tt.id = $1 OR tt.name = $3)
+        ORDER BY CASE WHEN tt.id = $1 THEN 0 ELSE 1 END
         FOR UPDATE OF tt`,
-      [input.offer.ticketTypeId, input.offer.eventId],
+      [input.offer.ticketTypeId, input.offer.eventId, input.offer.ticketTypeName],
     );
     const row = inventory.rows[0];
     if (!row || row.event_status !== 'published') {
       await client.query('ROLLBACK');
       return 'unavailable';
     }
+    // A reserva é gravada com o id da linha física, mesmo quando o checkout
+    // usa o id do snapshot do evento.
+    const storedTicketTypeId = row.id;
 
     const existing = await client.query<{ event_id: string; ticket_type_id: string; quantity: number; status: string }>(
       'SELECT event_id, ticket_type_id, quantity, status FROM ticket_reservations WHERE id=$1',
@@ -35,7 +39,7 @@ export async function reservePostgresTicketInventory(input: {
     if (existingReservation) {
       await client.query('COMMIT');
       return existingReservation.event_id === input.offer.eventId
-        && existingReservation.ticket_type_id === input.offer.ticketTypeId
+        && existingReservation.ticket_type_id === storedTicketTypeId
         && Number(existingReservation.quantity) === input.quantity
         && existingReservation.status === 'pending'
         ? 'reserved'
@@ -50,13 +54,13 @@ export async function reservePostgresTicketInventory(input: {
             status IN ('valid', 'used')
             OR (status = 'pending' AND created_at > NOW() - INTERVAL '15 minutes')
           )`,
-      [input.offer.ticketTypeId],
+      [storedTicketTypeId],
     );
     const reserved = await client.query<{ quantity: number }>(
       `SELECT COALESCE(SUM(quantity), 0)::integer AS quantity
          FROM ticket_reservations
         WHERE ticket_type_id = $1 AND status = 'pending' AND expires_at > NOW()`,
-      [input.offer.ticketTypeId],
+      [storedTicketTypeId],
     );
     const available = Number(row.quantity) - Number(sold.rows[0]?.quantity || 0) - Number(reserved.rows[0]?.quantity || 0);
     if (available < input.quantity) {
@@ -67,7 +71,7 @@ export async function reservePostgresTicketInventory(input: {
     await client.query(
       `INSERT INTO ticket_reservations (id, event_id, ticket_type_id, quantity, expires_at)
        VALUES ($1, $2, $3, $4, $5)`,
-      [input.reservationId, input.offer.eventId, input.offer.ticketTypeId, input.quantity, input.expiresAt],
+      [input.reservationId, input.offer.eventId, storedTicketTypeId, input.quantity, input.expiresAt],
     );
     await client.query('COMMIT');
     return 'reserved';
@@ -106,6 +110,59 @@ function hashPin(pin: string): string {
   return `${salt}:${scryptSync(pin, salt, 32).toString('hex')}`;
 }
 
+interface ResolveTicketTypeInput {
+  eventId: string;
+  ticketTypeId?: string;
+  ticketTypeName: string;
+  priceXOF: number;
+}
+
+/**
+ * O checkout identifica a categoria pelo id do snapshot do evento. A tabela
+ * `ticket_types` pode ter sido preenchida por importações com ids próprios, por
+ * isso a linha é procurada pelo id, depois pelo nome e só então criada.
+ */
+async function resolveTicketTypeId(
+  client: { query: (text: string, values?: unknown[]) => Promise<{ rows: Array<{ id?: string }> }> },
+  input: ResolveTicketTypeInput,
+): Promise<string | undefined> {
+  if (input.ticketTypeId) {
+    const byId = await client.query(
+      'SELECT id FROM ticket_types WHERE event_id=$1 AND id=$2',
+      [input.eventId, input.ticketTypeId],
+    );
+    if (byId.rows[0]?.id) return byId.rows[0].id;
+  }
+
+  const byName = await client.query(
+    'SELECT id FROM ticket_types WHERE event_id=$1 AND name=$2 LIMIT 1',
+    [input.eventId, input.ticketTypeName],
+  );
+  if (byName.rows[0]?.id) return byName.rows[0].id;
+
+  const preferredId = (input.ticketTypeId || `type-${input.eventId}-${input.ticketTypeName}`).slice(0, 255);
+  const insertSql = `INSERT INTO ticket_types (id,event_id,name,price_xof,quantity)
+     VALUES ($1,$2,$3,$4,1)
+     ON CONFLICT (event_id,name) DO UPDATE SET price_xof=EXCLUDED.price_xof
+     RETURNING id`;
+
+  try {
+    const inserted = await client.query(insertSql, [preferredId, input.eventId, input.ticketTypeName, input.priceXOF]);
+    if (inserted.rows[0]?.id) return inserted.rows[0].id;
+  } catch {
+    // O id preferido já existe noutro evento: cria com um id próprio.
+    const inserted = await client.query(insertSql, [
+      `type-${input.eventId}-${input.ticketTypeName}-${Date.now()}`.slice(0, 255),
+      input.eventId,
+      input.ticketTypeName,
+      input.priceXOF,
+    ]);
+    if (inserted.rows[0]?.id) return inserted.rows[0].id;
+  }
+
+  return undefined;
+}
+
 export async function persistPostgresTickets(tickets: TicketForValidation[], buyerUserId?: string): Promise<void> {
   if (!databasePool || tickets.length === 0) return;
   const client = await databasePool.connect();
@@ -119,21 +176,19 @@ export async function persistPostgresTickets(tickets: TicketForValidation[], buy
       await client.query(`INSERT INTO companies (id,name,status) VALUES ($1,$2,'active') ON CONFLICT (id) DO NOTHING`, [businessId, `Empresa ${businessId}`]);
       await client.query(`INSERT INTO events (id,company_id,title,status) VALUES ($1,$2,$3,'published') ON CONFLICT (id) DO NOTHING`, [eventId, businessId, ticket.eventTitle || 'Evento Guigui']);
       await client.query(`INSERT INTO orders (id,buyer_user_id,event_id,status,gross_amount_xof,net_amount_xof,created_at,updated_at) VALUES ($1,$2,$3,'paid',$4,$4,$5,$5) ON CONFLICT (id) DO UPDATE SET buyer_user_id=COALESCE(EXCLUDED.buyer_user_id,orders.buyer_user_id)`, [orderId, buyerUserId || null, eventId, ticket.priceXOF, ticket.purchasedAt || new Date().toISOString()]);
-      const typeResult = ticket.ticketTypeId
-        ? await client.query(`SELECT id FROM ticket_types WHERE id=$1 AND event_id=$2`, [ticket.ticketTypeId, eventId])
-        : await client.query(
-            `INSERT INTO ticket_types (id,event_id,name,price_xof,quantity)
-             VALUES ($1,$2,$3,$4,1)
-             ON CONFLICT (event_id,name) DO UPDATE SET price_xof=EXCLUDED.price_xof RETURNING id`,
-            [`type-${eventId}-${typeName}`.slice(0, 255), eventId, typeName, ticket.priceXOF],
-          );
-      if (!typeResult.rows[0]?.id) throw new Error(`Tipo de bilhete inexistente para persistir o bilhete ${ticket.id}.`);
+      const storedTicketTypeId = await resolveTicketTypeId(client, {
+        eventId,
+        ticketTypeId: ticket.ticketTypeId,
+        ticketTypeName: typeName,
+        priceXOF: ticket.priceXOF,
+      });
+      if (!storedTicketTypeId) throw new Error(`Tipo de bilhete inexistente para persistir o bilhete ${ticket.id}.`);
       await client.query(
         `INSERT INTO tickets (id,order_id,event_id,ticket_type_id,qr_token,ticket_code,pin_hash,signature,status,expires_at,created_at,buyer_name,buyer_phone,holder_name,holder_phone,payment_method)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
          ON CONFLICT (id) DO UPDATE SET status=EXCLUDED.status, signature=EXCLUDED.signature, expires_at=EXCLUDED.expires_at,
          buyer_name=EXCLUDED.buyer_name, buyer_phone=EXCLUDED.buyer_phone, holder_name=EXCLUDED.holder_name, holder_phone=EXCLUDED.holder_phone`,
-        [ticket.id, orderId, eventId, typeResult.rows[0].id, ticket.qrToken, ticket.ticketCode, ticket.pinCode ? hashPin(ticket.pinCode) : null, ticket.signature || 'runtime-ticket-signature', ticket.status, ticket.expiresAt || null, ticket.purchasedAt || new Date().toISOString(), ticket.buyerName, ticket.buyerPhone, ticket.holderName || null, ticket.holderPhone || null, ticket.paymentMethod || null],
+        [ticket.id, orderId, eventId, storedTicketTypeId, ticket.qrToken, ticket.ticketCode, ticket.pinCode ? hashPin(ticket.pinCode) : null, ticket.signature || 'runtime-ticket-signature', ticket.status, ticket.expiresAt || null, ticket.purchasedAt || new Date().toISOString(), ticket.buyerName, ticket.buyerPhone, ticket.holderName || null, ticket.holderPhone || null, ticket.paymentMethod || null],
       );
     }
 
@@ -150,23 +205,37 @@ export async function persistPostgresTickets(tickets: TicketForValidation[], buy
 export async function listPostgresTicketsForUser(userId: string): Promise<TicketForValidation[]> {
   if (!databasePool) return [];
   const result = await databasePool.query(
-    `SELECT t.*, e.title AS event_title, tt.name AS ticket_type_name, tt.price_xof
+    `SELECT t.*, e.title AS event_title, e.starts_at::text AS event_starts_at, e.data AS event_data,
+            tt.name AS ticket_type_name, tt.price_xof
      FROM tickets t
      JOIN orders o ON o.id=t.order_id
      LEFT JOIN events e ON e.id=t.event_id
      LEFT JOIN ticket_types tt ON tt.id=t.ticket_type_id
      WHERE o.buyer_user_id=$1
      ORDER BY t.created_at DESC
-     LIMIT 500`,
+     LIMIT 2000`,
     [userId],
   );
-  return result.rows.map((row) => ({
-    id: row.id, ticketCode: row.ticket_code, qrToken: row.qr_token, eventId: row.event_id,
-    eventTitle: row.event_title, ticketTypeName: row.ticket_type_name, priceXOF: row.price_xof || 0,
-    buyerName: row.buyer_name || '', buyerPhone: row.buyer_phone || '', holderName: row.holder_name || undefined,
-    holderPhone: row.holder_phone || undefined, status: row.status, purchasedAt: row.created_at?.toISOString?.() || row.created_at,
-    expiresAt: row.expires_at?.toISOString?.() || row.expires_at, signature: row.signature, paymentMethod: row.payment_method,
-  }));
+  return result.rows.map((row) => {
+    const snapshot = (row.event_data && typeof row.event_data === 'object' ? row.event_data : {}) as Record<string, unknown>;
+    const startsAt = typeof row.event_starts_at === 'string' ? row.event_starts_at : undefined;
+    const eventDate = typeof snapshot.date === 'string'
+      ? snapshot.date
+      : startsAt ? startsAt.slice(0, 10) : undefined;
+    const eventTime = typeof snapshot.time === 'string'
+      ? snapshot.time
+      : startsAt ? startsAt.slice(11, 16) : undefined;
+    return {
+      id: row.id, ticketCode: row.ticket_code, qrToken: row.qr_token, eventId: row.event_id,
+      eventTitle: row.event_title, ticketTypeName: row.ticket_type_name, priceXOF: row.price_xof || 0,
+      ...(eventDate ? { eventDate } : {}),
+      ...(eventTime ? { eventTime } : {}),
+      ...(typeof snapshot.location === 'string' ? { eventLocation: snapshot.location } : {}),
+      buyerName: row.buyer_name || '', buyerPhone: row.buyer_phone || '', holderName: row.holder_name || undefined,
+      holderPhone: row.holder_phone || undefined, status: row.status, purchasedAt: row.created_at?.toISOString?.() || row.created_at,
+      expiresAt: row.expires_at?.toISOString?.() || row.expires_at, signature: row.signature, paymentMethod: row.payment_method,
+    };
+  });
 }
 
 export async function findPostgresTicket(value: string, phone?: string): Promise<TicketForValidation | null> {

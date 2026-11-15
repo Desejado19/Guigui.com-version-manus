@@ -46,6 +46,15 @@ interface TicketCatalogDependencies {
   loadLocalReservations(): Promise<LocalReservationSnapshot[]>;
 }
 
+interface PostgresEventRow {
+  id: string;
+  company_id: string | null;
+  title: string;
+  status: string;
+  starts_at: string | null;
+  data: Record<string, unknown> | null;
+}
+
 function isSalesOpen(value: boolean | undefined): boolean {
   return value !== false;
 }
@@ -116,76 +125,101 @@ export function createTicketCatalogService(dependencies: TicketCatalogDependenci
   };
 }
 
+function readSnapshotTypes(row: PostgresEventRow): Array<Record<string, unknown>> {
+  const snapshot = row.data;
+  if (!snapshot || typeof snapshot !== 'object') return [];
+  const types = (snapshot as Record<string, unknown>).ticketTypes;
+  return Array.isArray(types) ? types as Array<Record<string, unknown>> : [];
+}
+
+/**
+ * A fonte de verdade das categorias de bilhete é o snapshot do evento
+ * (`events.data->'ticketTypes'`), que é o mesmo que o checkout mostra. A tabela
+ * `ticket_types` pode ter linhas com ids gerados por importações antigas, por
+ * isso a oferta é resolvida pelo id do snapshot e a linha física é encontrada
+ * por id ou, em alternativa, pelo nome da categoria.
+ */
 async function loadPostgresOffer(eventId: string, ticketTypeId: string): Promise<TicketOffer | null> {
   if (!databasePool) return null;
-  const result = await databasePool.query<{
-    event_id: string;
-    business_id: string | null;
-    event_title: string;
-    event_date: string | null;
-    event_status: string;
-    ticket_type_id: string;
-    ticket_type_name: string;
-    unit_price_xof: number;
-    available_quantity: number;
-    sold_quantity: number;
-    reserved_quantity: number;
-    event_snapshot: Record<string, unknown> | null;
-  }>(
-    `SELECT e.id AS event_id, e.company_id AS business_id, e.title AS event_title, e.status AS event_status,
-            e.starts_at::text AS event_date,
-            tt.id AS ticket_type_id, tt.name AS ticket_type_name, tt.price_xof AS unit_price_xof,
-            tt.quantity AS available_quantity,
-            COUNT(t.id) FILTER (
-              WHERE t.status IN ('valid', 'used')
-                 OR (t.status = 'pending' AND t.created_at > NOW() - INTERVAL '15 minutes')
-            )::integer AS sold_quantity,
-            COALESCE((
-                SELECT SUM(tr.quantity)::integer
-                  FROM ticket_reservations tr
-                 WHERE tr.ticket_type_id = tt.id AND tr.status = 'pending' AND tr.expires_at > NOW()
-            ), 0) AS reserved_quantity,
-            e.data AS event_snapshot
-       FROM events e
-       JOIN ticket_types tt ON tt.event_id = e.id
-       LEFT JOIN tickets t ON t.ticket_type_id = tt.id
-      WHERE e.id = $1 AND tt.id = $2 AND e.status = 'published'
-        AND COALESCE(e.data->>'salesOpen', e.data->>'ticketSalesOpen', 'true') <> 'false'
-        AND (
-          jsonb_typeof(e.data->'ticketTypes') IS DISTINCT FROM 'array'
-          OR EXISTS (
-            SELECT 1
-              FROM jsonb_array_elements(COALESCE(e.data->'ticketTypes', '[]'::jsonb)) ticket_type
-             WHERE ticket_type->>'id' = tt.id
-          )
-        )
-        AND COALESCE((
-          SELECT ticket_type->>'salesOpen'
-            FROM jsonb_array_elements(COALESCE(e.data->'ticketTypes', '[]'::jsonb)) ticket_type
-           WHERE ticket_type->>'id' = tt.id
-           LIMIT 1
-        ), 'true') <> 'false'
-      GROUP BY e.id, tt.id`,
-    [eventId, ticketTypeId],
+
+  const eventResult = await databasePool.query<PostgresEventRow>(
+    `SELECT id, company_id, title, status, starts_at::text AS starts_at, data
+       FROM events
+      WHERE id = $1 AND status = 'published'`,
+    [eventId],
   );
-  const row = result.rows[0];
-  if (!row) return null;
+  const event = eventResult.rows[0];
+  if (!event) return null;
+
+  const snapshotTypes = readSnapshotTypes(event);
+  const snapshot = (event.data ?? {}) as Record<string, unknown>;
+  if (String(snapshot.salesOpen ?? snapshot.ticketSalesOpen ?? 'true') === 'false') return null;
+
+  const ticketType = snapshotTypes.find((candidate) => String(candidate.id) === ticketTypeId);
+  if (!ticketType) return null;
+  if (String(ticketType.salesOpen ?? 'true') === 'false') return null;
+
+  const unitPriceXOF = Number(ticketType.priceXOF);
+  const availableQuantity = Number(ticketType.availableQuantity);
+  const snapshotSold = Number(ticketType.soldQuantity);
+  if (!Number.isSafeInteger(unitPriceXOF) || unitPriceXOF <= 0 || unitPriceXOF > 100_000_000) return null;
+  if (!Number.isSafeInteger(availableQuantity) || availableQuantity < 0) return null;
+
+  const ticketTypeName = String(ticketType.name ?? 'Entrada Geral');
+
+  const rowResult = await databasePool.query<{ id: string }>(
+    `SELECT id
+       FROM ticket_types
+      WHERE event_id = $1 AND (id = $2 OR name = $3)
+      ORDER BY CASE WHEN id = $2 THEN 0 ELSE 1 END
+      LIMIT 1`,
+    [eventId, ticketTypeId, ticketTypeName],
+  );
+  const storedTicketTypeId = rowResult.rows[0]?.id;
+
+  let storedSold = 0;
+  let reservedQuantity = 0;
+  if (storedTicketTypeId) {
+    const soldResult = await databasePool.query<{ sold: number }>(
+      `SELECT COUNT(t.id)::integer AS sold
+         FROM tickets t
+        WHERE t.ticket_type_id = $1
+          AND (
+            t.status IN ('valid', 'used')
+            OR (t.status = 'pending' AND t.created_at > NOW() - INTERVAL '15 minutes')
+          )`,
+      [storedTicketTypeId],
+    );
+    storedSold = Number(soldResult.rows[0]?.sold ?? 0);
+
+    const reservedResult = await databasePool.query<{ reserved: number }>(
+      `SELECT COALESCE(SUM(tr.quantity), 0)::integer AS reserved
+         FROM ticket_reservations tr
+        WHERE tr.ticket_type_id = $1 AND tr.status = 'pending' AND tr.expires_at > NOW()`,
+      [storedTicketTypeId],
+    );
+    reservedQuantity = Number(reservedResult.rows[0]?.reserved ?? 0);
+  }
+
+  const eventDate = typeof snapshot.date === 'string'
+    ? snapshot.date
+    : event.starts_at ? event.starts_at.slice(0, 10) : undefined;
+  const eventTime = typeof snapshot.time === 'string'
+    ? snapshot.time
+    : event.starts_at ? event.starts_at.slice(11, 16) : undefined;
+
   return {
-    eventId: row.event_id,
-    ...(row.business_id ? { businessId: row.business_id } : {}),
-    eventTitle: row.event_title,
-    ...(row.event_snapshot && typeof row.event_snapshot.date === 'string'
-      ? { eventDate: row.event_snapshot.date }
-      : row.event_date ? { eventDate: row.event_date.slice(0, 10) } : {}),
-    ...(row.event_snapshot && typeof row.event_snapshot.time === 'string'
-      ? { eventTime: row.event_snapshot.time }
-      : row.event_date ? { eventTime: row.event_date.slice(11, 16) } : {}),
-    ticketTypeId: row.ticket_type_id,
-    ticketTypeName: row.ticket_type_name,
-    unitPriceXOF: Number(row.unit_price_xof),
-    availableQuantity: Number(row.available_quantity),
-    soldQuantity: Number(row.sold_quantity),
-    reservedQuantity: Number(row.reserved_quantity),
+    eventId: event.id,
+    ...(event.company_id ? { businessId: event.company_id } : {}),
+    eventTitle: event.title,
+    ...(eventDate ? { eventDate } : {}),
+    ...(eventTime ? { eventTime } : {}),
+    ticketTypeId,
+    ticketTypeName,
+    unitPriceXOF,
+    availableQuantity,
+    soldQuantity: Math.max(Number.isSafeInteger(snapshotSold) ? snapshotSold : 0, storedSold),
+    reservedQuantity,
     salesOpen: true,
   };
 }

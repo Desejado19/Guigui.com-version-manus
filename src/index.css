@@ -606,6 +606,50 @@ html.dark .guigui-filter-chip.active {
   border-color: rgba(155, 205, 187, 0.6);
   color: #ffffff;
 }
+/* Barra de navegação inferior flutuante (glassmorphism) */
+.guigui-bottom-nav__surface {
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.58));
+  box-shadow:
+    0 18px 42px -20px rgba(15, 23, 42, 0.45),
+    0 2px 10px -4px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  -webkit-backdrop-filter: blur(18px) saturate(1.7);
+  backdrop-filter: blur(18px) saturate(1.7);
+  transition: background-color 300ms ease, box-shadow 300ms ease;
+}
+.guigui-bottom-nav__item--active {
+  background: radial-gradient(120% 130% at 50% 120%, rgba(16, 185, 129, 0.22), rgba(16, 185, 129, 0.1));
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.22);
+}
+html.dark .guigui-bottom-nav__surface {
+  border-color: rgba(148, 226, 202, 0.18);
+  background: linear-gradient(135deg, rgba(9, 39, 35, 0.82), rgba(6, 28, 26, 0.68));
+  box-shadow:
+    0 18px 42px -18px rgba(0, 0, 0, 0.75),
+    0 2px 10px -4px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+html.dark .guigui-bottom-nav__item--active {
+  background: radial-gradient(120% 130% at 50% 120%, rgba(52, 211, 153, 0.26), rgba(52, 211, 153, 0.1));
+  box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.28);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .guigui-bottom-nav__surface {
+    background: rgba(255, 255, 255, 0.97);
+  }
+  html.dark .guigui-bottom-nav__surface {
+    background: rgba(7, 32, 29, 0.98);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .guigui-bottom-nav__surface *,
+  .guigui-bottom-nav__surface {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
 html.dark [class*="text-[#16221F]"],
 html.dark [class*="text-[#0B3B37]"],
 html.dark [class*="text-[#0F4A44]"],
@@ -1402,6 +1446,11 @@ html.dark .guigui-light-dashboard .bg-coral-800 {
 .guigui-navbar nav { display: none; }
 @media (min-width: 1101px) {
   .guigui-navbar nav { display: flex; }
+}
+/* Entre 1024px e 1100px o cabeçalho ainda não cabe, mas a barra inferior já
+   estava escondida por `lg:hidden`. Mantém-se a navegação acessível. */
+@media (min-width: 1024px) and (max-width: 1100px) {
+  .guigui-bottom-nav { display: flex; }
 }
 .guigui-navbar-inner > .guigui-nav-actions { display: flex; align-items: center; gap: 8px; }
 html:not(.dark) .guigui-business-content .text-slate-900 { color: var(--ink) !important; }
@@ -3464,3 +3513,28 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   font-weight: 700;
 }
 .dark .guigui-new-conversation-error { background: #3a1f18; color: #ffb9a8; }
+
+/* ------------------------------------------------------------------
+   Comentários mobile — estabilidade ao abrir o teclado virtual.
+   O Safari iOS faz zoom automático em campos com fonte < 16px; manter
+   os campos de escrita em 16px evita o zoom sem bloquear o zoom do
+   utilizador (a viewport continua a permitir pinch/scale).
+   ------------------------------------------------------------------ */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+@media (max-width: 767px) {
+  .guigui-mobile-input {
+    font-size: 16px;
+    line-height: 1.25;
+  }
+}
+
+/* Apenas iOS/iPadOS: garante 16px nos restantes formulários para que o
+   comportamento não regresse ao tocar noutros campos. */
+@supports (-webkit-touch-callout: none) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}

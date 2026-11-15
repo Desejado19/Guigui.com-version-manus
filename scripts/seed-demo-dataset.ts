@@ -8,7 +8,7 @@
  * Correr em C:\guigui:  npx tsx scripts/seed-demo-dataset.ts [--clean]
  * --clean remove APENAS registos seed (@guigui.test / seed-co-*).
  */
-import 'dotenv/config';
+import 'dotenv/config?override=true';
 import { Pool } from 'pg';
 import { hashPassword } from '../server/modules/identity-access';
 

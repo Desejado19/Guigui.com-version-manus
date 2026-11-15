@@ -117,7 +117,7 @@ O **Guigui.com** é uma plataforma digital multifacetada desenhada especificamen
     │   └── smsService.ts               # Serviço de envio/simulação de SMS
     │
     └── utils/                          # Utilitários
-        ├── exportHelpers.ts            # Exportação para CSV, Excel (.xls) e PDF
+        ├── exportHelpers.ts            # Exportação para CSV, Excel (.xlsx) e PDF
         ├── i18n.ts                     # Tradução (PT, Kriol, FR, EN)
         ├── moderation.ts               # Heurísticas de moderação
         ├── reviews.ts                  # Classificação qualitativa

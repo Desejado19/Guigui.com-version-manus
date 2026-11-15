@@ -59,6 +59,10 @@ CREATE TABLE IF NOT EXISTS rate_limit_buckets (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Coluna usada pelo rate limiter distribuído; já existente em bases já criadas,
+-- daí o ADD COLUMN idempotente em vez de a escrever só no CREATE TABLE.
+ALTER TABLE rate_limit_buckets ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
 CREATE TABLE IF NOT EXISTS request_metrics (
   metric_date DATE NOT NULL,
   route TEXT NOT NULL,

@@ -71,7 +71,6 @@ export function inspectTeamInvitation(token: string) {
   if (!entry) return null;
   return { email: entry.email, name: entry.name, businessId: entry.businessId, businessName: entry.businessName, role: entry.role, permissions: entry.permissions, expiresAt: entry.expiresAt };
 }
-
 export function consumeTeamInvitation(token: string): boolean {
   const key = Object.keys(teamInvitations).find((candidate) => validInvitation(teamInvitations[candidate], token));
   if (!key) return false;
@@ -79,7 +78,6 @@ export function consumeTeamInvitation(token: string): boolean {
   persistTeamInvitations();
   return true;
 }
-
 export function acceptTeamInvitation(token: string, password: string, phone = '', neighborhood = 'Bissau') {
   const key = Object.keys(teamInvitations).find((candidate) => validInvitation(teamInvitations[candidate], token));
   if (!key) return null;

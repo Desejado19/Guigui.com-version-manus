@@ -188,7 +188,7 @@ export const AdminReportsHub: React.FC<AdminReportsHubProps> = ({
             { name: 'Extras', valor: extraRevenue },
             { name: 'Reconciliado', valor: reconciledRevenue },
           ],
-          chartBars: [{ dataKey: 'valor', name: 'Receita de Plataforma', color: '#10B981' }],
+          chartBars: [{ dataKey: 'valor', name: 'Receita de Plataforma', color: '#2F9E68' }],
           headers: ['Módulo / Origem', 'Valor no âmbito (XOF)', 'Transações', 'Estado', 'Escopo'],
           rows: [
             ['Planos de Empresas (SaaS)', subscriptionRevenue.toLocaleString(), `${scopedPaymentTransactions.filter((transaction) => transaction.useCase.startsWith('subscription')).length}`, 'Filtrado', scopeLabel],
@@ -218,8 +218,8 @@ export const AdminReportsHub: React.FC<AdminReportsHubProps> = ({
           ],
           chartData: businessChartData,
           chartBars: [
-            { dataKey: 'ativas', name: 'Empresas Ativas', color: '#10B981' },
-            { dataKey: 'pendentes', name: 'Em Análise / Pendentes', color: '#F59E0B' },
+            { dataKey: 'ativas', name: 'Empresas Ativas', color: '#2F9E68' },
+            { dataKey: 'pendentes', name: 'Em Análise / Pendentes', color: '#C9852A' },
           ],
           headers: ['Categoria Económica', 'Total Registadas', 'Ativas', 'Com Selo Azul', 'Taxa de Conversão'],
           rows: (selectedBusiness ? [selectedBusiness] : businesses).map((business) => [
@@ -250,8 +250,8 @@ export const AdminReportsHub: React.FC<AdminReportsHubProps> = ({
             { name: 'Semana 4', novos: 1350, ativos: 25430 },
           ],
           chartBars: [
-            { dataKey: 'novos', name: 'Novos Cadastros', color: '#2563EB' },
-            { dataKey: 'ativos', name: 'Utilizadores Ativos', color: '#10B981' },
+            { dataKey: 'novos', name: 'Novos Cadastros', color: '#1570EF' },
+            { dataKey: 'ativos', name: 'Utilizadores Ativos', color: '#2F9E68' },
           ],
           headers: ['Perfil de Utilizador', 'Quantidade', 'Acessos / Semana', 'Ações Sociais', 'Status'],
           rows: [
@@ -282,8 +282,8 @@ export const AdminReportsHub: React.FC<AdminReportsHubProps> = ({
             activos: event.status === 'active' ? 1 : 0,
           })),
           chartBars: [
-            { dataKey: 'eventos', name: 'Eventos no âmbito', color: '#F59E0B' },
-            { dataKey: 'activos', name: 'Eventos activos', color: '#10B981' },
+            { dataKey: 'eventos', name: 'Eventos no âmbito', color: '#C9852A' },
+            { dataKey: 'activos', name: 'Eventos activos', color: '#2F9E68' },
           ],
           headers: ['Evento', 'Estado', 'Organizador', 'Empresa ligada', 'Âmbito'],
           rows: scopedEvents.map((event) => [
@@ -313,7 +313,7 @@ export const AdminReportsHub: React.FC<AdminReportsHubProps> = ({
             { name: 'Semana 3', valor: 5100 },
             { name: 'Semana 4', valor: 5400 },
           ],
-          chartBars: [{ dataKey: 'valor', name: 'Volume Processado', color: '#2563EB' }],
+          chartBars: [{ dataKey: 'valor', name: 'Volume Processado', color: '#1570EF' }],
           headers: ['Métrica / Indicador', 'Valor Registado', 'Meta Mensal', 'Desempenho', 'Estado'],
           rows: [
             ['Processamento em Tempo Real', '100%', '99.5%', 'Excelente', 'Concluído'],
@@ -363,9 +363,9 @@ export const AdminReportsHub: React.FC<AdminReportsHubProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* 1. SELETOR DE RELATÓRIO E FILTROS */}
-      <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+      <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-5">
           <div>
             <div className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-xs px-3 py-1 rounded-full font-bold mb-2 border border-blue-200">
@@ -408,7 +408,7 @@ export const AdminReportsHub: React.FC<AdminReportsHubProps> = ({
 
             <button type="button"
               onClick={handlePrint}
-              className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition flex items-center gap-1.5 border border-slate-300"
+              className="px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition flex items-center gap-1.5 border border-slate-300 dark:border-slate-600"
             >
               <Printer className="w-3.5 h-3.5 text-slate-600" />
               <span>🖨️ Imprimir</span>
@@ -432,12 +432,12 @@ export const AdminReportsHub: React.FC<AdminReportsHubProps> = ({
                   className={`p-3.5 rounded-2xl border text-left transition flex items-start gap-3 ${
                     isSelected
                       ? 'bg-blue-50/80 border-blue-600 ring-2 ring-blue-500/20 shadow-xs'
-                      : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-slate-300 hover:bg-slate-50/60'
                   }`}
                 >
                   <div
                     className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-bold ${
-                      isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+                      isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -467,7 +467,7 @@ export const AdminReportsHub: React.FC<AdminReportsHubProps> = ({
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -480,7 +480,7 @@ export const AdminReportsHub: React.FC<AdminReportsHubProps> = ({
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -492,7 +492,7 @@ export const AdminReportsHub: React.FC<AdminReportsHubProps> = ({
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">{t('allCategories')}</option>
               <option value="restauracao">Restauração, Cafés e Bares</option>
@@ -510,7 +510,7 @@ export const AdminReportsHub: React.FC<AdminReportsHubProps> = ({
             <select
               value={scopeFilter}
               onChange={(e) => setScopeFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">Toda a plataforma</option>
               {businesses.map((business) => <option key={business.id} value={`business:${business.id}`}>Empresa: {business.name}</option>)}
@@ -521,12 +521,12 @@ export const AdminReportsHub: React.FC<AdminReportsHubProps> = ({
       </div>
 
       {/* 2. REPORT GENERATED PREVIEW CONTAINER */}
-      <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+      <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
         {/* REPORT HEADER & RESUMO */}
         <div className="border-b border-slate-100 pb-5 space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-xl font-black text-slate-900">{report.title}</h3>
-            <span className="text-xs font-bold font-mono px-3 py-1 bg-slate-100 text-slate-700 rounded-full">
+            <span className="text-xs font-bold font-mono px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 rounded-full">
               Período: {dateFrom} até {dateTo}
             </span>
           </div>
@@ -542,7 +542,7 @@ export const AdminReportsHub: React.FC<AdminReportsHubProps> = ({
           </h4>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {report.kpis.map((kpi, idx) => (
-              <div key={idx} className="bg-slate-50 border border-slate-200/80 p-4 rounded-2xl">
+              <div key={idx} className="bg-slate-50 dark:bg-slate-800 border border-slate-200/80 p-4 rounded-2xl">
                 <span className="text-[11px] font-bold text-slate-500 uppercase">{kpi.label}</span>
                 <div className="text-lg sm:text-xl font-black text-slate-900 font-mono mt-1">
                   {kpi.value}
@@ -588,9 +588,9 @@ export const AdminReportsHub: React.FC<AdminReportsHubProps> = ({
             <span className="text-[11px] text-slate-400 font-semibold">{reportRowsWithScope.length} registos no âmbito</span>
           </div>
 
-          <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+          <div className="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-2xl">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+              <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 font-bold border-b border-slate-200 dark:border-slate-700">
                 <tr>
                   {report.headers.map((h, i) => (
                     <th key={i} className="px-4 py-3">
@@ -657,7 +657,7 @@ export const AdminReportsHub: React.FC<AdminReportsHubProps> = ({
             </button>
             <button type="button"
               onClick={handlePrint}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition flex items-center gap-1.5 border border-slate-300"
+              className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition flex items-center gap-1.5 border border-slate-300 dark:border-slate-600"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Imprimir</span>

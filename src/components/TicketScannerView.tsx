@@ -119,7 +119,7 @@ const queueKey = (eventId: string) => `guigui_scanner_offline_queue_${eventId}`;
 const DoorStaffLogin: React.FC<DoorStaffLoginProps & { currentLang: Language }> = ({ events, selectedEvent, doorCode, onSelectEvent, onDoorCodeChange, onSubmit, currentLang }) => {
   const t = (key: string) => getTranslation(currentLang, key);
   return (
-  <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-md mx-auto shadow-md space-y-5 text-center">
+  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 sm:p-8 max-w-md mx-auto shadow-md space-y-5 text-center">
     <div className="w-16 h-16 bg-blue-100 text-blue-700 rounded-3xl flex items-center justify-center mx-auto shadow-sm">
       <QrCode className="w-9 h-9" />
     </div>
@@ -138,7 +138,7 @@ const DoorStaffLogin: React.FC<DoorStaffLoginProps & { currentLang: Language }> 
         <select
           value={selectedEvent?.id}
           onChange={(e) => onSelectEvent(events.find((ev) => ev.id === e.target.value) || events[0] || null)}
-          className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-slate-900 font-bold focus:outline-none focus:border-blue-500"
+          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl p-3 text-slate-900 font-bold focus:outline-none focus:border-blue-500"
         >
           {events.map((ev) => (
             <option key={ev.id} value={ev.id}>
@@ -159,7 +159,7 @@ const DoorStaffLogin: React.FC<DoorStaffLoginProps & { currentLang: Language }> 
           value={doorCode}
           onChange={(e) => onDoorCodeChange(e.target.value)}
           placeholder="Ex: PORTA2026"
-          className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-slate-900 font-mono tracking-widest text-center text-base font-bold focus:outline-none focus:border-blue-500"
+          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl p-3 text-slate-900 font-mono tracking-widest text-center text-base font-bold focus:outline-none focus:border-blue-500"
         />
       </div>
 
@@ -284,7 +284,7 @@ const ScanFeedback: React.FC<{ lastScanResult: ScanResult | null; selectedEvent:
 const EntryHistory: React.FC<{ entryHistory: ScanHistoryEntry[]; currentLang: Language }> = ({ entryHistory, currentLang }) => {
   const t = (key: string) => getTranslation(currentLang, key);
   return (
-  <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xs">
+  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xs">
     <div className="flex items-center justify-between">
       <div>
         <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
@@ -293,7 +293,7 @@ const EntryHistory: React.FC<{ entryHistory: ScanHistoryEntry[]; currentLang: La
         </h3>
         <p className="text-xs text-slate-500">{t('scannerHistoryHint')}</p>
       </div>
-      <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-xl">
+      <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-xl">
         {entryHistory.length} registos
       </span>
     </div>
@@ -301,7 +301,7 @@ const EntryHistory: React.FC<{ entryHistory: ScanHistoryEntry[]; currentLang: La
     <div className="overflow-x-auto">
       <table className="w-full text-left text-xs border-collapse">
         <thead>
-          <tr className="border-b border-slate-200 text-[11px] font-extrabold text-slate-500 uppercase">
+          <tr className="border-b border-slate-200 dark:border-slate-700 text-[11px] font-extrabold text-slate-500 uppercase">
             <th className="pb-2.5">Hora</th>
             <th className="pb-2.5">Código</th>
             <th className="pb-2.5">Comprador</th>
@@ -916,12 +916,12 @@ export const TicketScannerView: React.FC<TicketScannerViewProps> = ({
             </div>
           )}
           {/* Top Info Header */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 flex flex-wrap items-center justify-between gap-4 shadow-xs">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-5 flex flex-wrap items-center justify-between gap-4 shadow-xs">
             <div className="space-y-0.5">
               <div className="flex items-center gap-2">
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />{t('scannerSession')}</span>
-                <span className="text-[11px] text-slate-500 font-medium">{selectedEvent?.neighborhood || 'Bissau'}</span>
+                <span className="text-[11px] text-slate-500 font-medium">{selectedEvent?.neighborhood || t('business.Todos')}</span>
               </div>
               <h2 className="text-lg font-black text-slate-900">{selectedEvent?.title}</h2>
             </div>
@@ -933,7 +933,7 @@ export const TicketScannerView: React.FC<TicketScannerViewProps> = ({
                 className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition ${
                   soundEnabled
                     ? 'bg-blue-50 border-blue-300 text-blue-800'
-                    : 'bg-slate-100 border-slate-300 text-slate-500'
+                    : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-500'
                 }`}
                 title={soundEnabled ? 'Som de Validação Ativado' : 'Som Silenciado'}
               >
@@ -984,7 +984,7 @@ export const TicketScannerView: React.FC<TicketScannerViewProps> = ({
 
               <button type="button"
                 onClick={() => { stopCamera(); setIsAuthenticated(false); }}
-                className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl border border-slate-200 font-bold transition"
+                className="text-xs bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 font-bold transition"
               >
                 Encerrar
               </button>
@@ -993,7 +993,7 @@ export const TicketScannerView: React.FC<TicketScannerViewProps> = ({
 
           {/* Attendance Stats & Occupancy Counter */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
-            <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-xs">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl shadow-xs">
               <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-500 uppercase font-extrabold">
                 <Users className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Pessoas Presentes</span>
@@ -1002,7 +1002,7 @@ export const TicketScannerView: React.FC<TicketScannerViewProps> = ({
               <div className="text-[10px] text-slate-400 mt-0.5">Bilhetes validados na porta</div>
             </div>
 
-            <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-xs">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl shadow-xs">
               <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-500 uppercase font-extrabold">
                 <Ticket className="w-3.5 h-3.5 text-blue-600" />
                 <span>Capacidade Estimada</span>
@@ -1013,13 +1013,13 @@ export const TicketScannerView: React.FC<TicketScannerViewProps> = ({
               <div className="text-[10px] text-slate-400 mt-0.5">{t('scannerMaxCapacity')}</div>
             </div>
 
-            <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-xs">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl shadow-xs">
               <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-500 uppercase font-extrabold">
                 <Clock className="w-3.5 h-3.5 text-purple-600" />
                 <span>{t('scannerOccupancy')}</span>
               </div>
               <div className="font-mono text-3xl font-black text-purple-600 mt-1">{occupancyPercent}%</div>
-              <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2 overflow-hidden">
+              <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 mt-2 overflow-hidden">
                 <div className="bg-purple-600 h-full rounded-full transition-all" style={{ width: `${occupancyPercent}%` }} />
               </div>
             </div>
@@ -1027,12 +1027,12 @@ export const TicketScannerView: React.FC<TicketScannerViewProps> = ({
 
           {/* Scanner Card with Dynamic Viewport Highlight */}
           <div
-            className={`bg-white border-2 rounded-3xl p-6 space-y-6 shadow-md transition-all duration-300 ${
+            className={`bg-white dark:bg-slate-900 border-2 rounded-3xl p-6 space-y-6 shadow-md transition-all duration-300 ${
               flashFeedback === 'success'
                 ? 'border-emerald-500 ring-4 ring-emerald-500/30'
                 : flashFeedback === 'error'
                 ? 'border-red-500 ring-4 ring-red-500/30'
-                : 'border-slate-200'
+                : 'border-slate-200 dark:border-slate-700'
             }`}
           >
             {/* Camera Viewfinder */}
@@ -1058,7 +1058,7 @@ export const TicketScannerView: React.FC<TicketScannerViewProps> = ({
 
               {/* Laser Scan Animation Line */}
               <div className={`absolute inset-x-8 top-1/2 h-0.5 shadow-lg animate-pulse ${
-                flashFeedback === 'success' ? 'bg-emerald-400 shadow-[0_0_16px_#10b981]' : flashFeedback === 'error' ? 'bg-red-500 shadow-[0_0_16px_#ef4444]' : 'bg-red-500 shadow-[0_0_12px_#ef4444]'
+                flashFeedback === 'success' ? 'bg-emerald-400 shadow-[0_0_16px_var(--color-green-400)]' : flashFeedback === 'error' ? 'bg-red-500 shadow-[0_0_16px_var(--color-red-500)]' : 'bg-red-500 shadow-[0_0_12px_var(--color-red-500)]'
               }`} />
 
               <div className={`relative z-10 w-16 h-16 rounded-2xl flex items-center justify-center mb-3 transition-colors ${
@@ -1127,7 +1127,7 @@ export const TicketScannerView: React.FC<TicketScannerViewProps> = ({
                   onChange={(e) => setTicketInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleValidateTicket()}
                   placeholder="Ex: GUI-2026-EVT-000458 ou PIN..."
-                  className="flex-1 bg-slate-50 border border-slate-300 rounded-xl p-3 text-slate-900 font-mono font-bold uppercase focus:outline-none focus:border-blue-500"
+                  className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl p-3 text-slate-900 font-mono font-bold uppercase focus:outline-none focus:border-blue-500"
                 />
                 <button type="button"
                   onClick={() => handleValidateTicket()}
@@ -1173,7 +1173,7 @@ export const TicketScannerView: React.FC<TicketScannerViewProps> = ({
 
                 {/* Real-time Issued Tickets in DB Selector */}
                 {availableTickets.length > 0 && (
-                  <div className="pt-1 bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-[11px] space-y-1">
+                  <div className="pt-1 bg-slate-50 dark:bg-slate-800 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] space-y-1">
                     <div className="text-slate-500 font-bold flex items-center justify-between">
                       <span>Bilhetes Emitidos no Sistema ({availableTickets.length}):</span>
                       <span className="text-[10px] text-emerald-600 font-medium">Clique para validar</span>

@@ -9,6 +9,27 @@ export type BusinessProfileRequiredField =
   | 'neighborhood';
 
 export const BUSINESS_PROFILE_DESCRIPTION_MIN_LENGTH = 30;
+export const BUSINESS_PROFILE_DESCRIPTION_MAX_LENGTH = 600;
+/** Número de caracteres da descrição apresentados no cartão do negócio. */
+export const BUSINESS_DESCRIPTION_CARD_LIMIT = 140;
+
+export interface BusinessDescriptionPreview {
+  preview: string;
+  truncated: boolean;
+}
+
+/** Recorta a descrição para o cartão, sem cortar palavras a meio, e assinala se há mais texto. */
+export function getBusinessDescriptionPreview(
+  text: string | undefined,
+  limit = BUSINESS_DESCRIPTION_CARD_LIMIT,
+): BusinessDescriptionPreview {
+  const normalized = (text || '').replace(/\s+/g, ' ').trim();
+  if (normalized.length <= limit) return { preview: normalized, truncated: false };
+  const slice = normalized.slice(0, limit);
+  const lastSpace = slice.lastIndexOf(' ');
+  const cut = lastSpace > limit * 0.6 ? slice.slice(0, lastSpace) : slice;
+  return { preview: `${cut.trimEnd()}…`, truncated: true };
+}
 
 export type BusinessProfileCompletionInput = Partial<
   Pick<Business, 'name' | 'categoryId' | 'subcategoryId' | 'description' | 'phone' | 'neighborhood'>

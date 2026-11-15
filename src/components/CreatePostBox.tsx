@@ -1,3 +1,4 @@
+import { BusinessLogo } from './ui';
 import React, { useState } from 'react';
 import {
   Image,
@@ -138,8 +139,8 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
           planBadge: isSubscriber ? `Plano ${business.tier?.toUpperCase()}` : undefined,
           createdAt: new Date().toISOString(),
           status: 'approved',
-          likesCount: 1,
-          reactions: { like: 1 },
+          likesCount: 0,
+          reactions: {},
           comments: [],
           sharesCount: 0,
           neighborhood: business.neighborhood,
@@ -167,17 +168,17 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
   return (
     <>
       {/* Modern Create Post Trigger Card */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-4 shadow-sm space-y-3">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 shadow-sm space-y-3">
         <div className="flex items-center gap-3">
-          <img
+          <BusinessLogo
+            name={currentUser?.name || business.name}
             src={currentUser?.avatarUrl || business.logo}
-            alt=""
-            className="w-10 h-10 rounded-2xl object-cover border border-slate-200 shrink-0"
+            className="w-10 h-10 rounded-2xl border border-slate-200 dark:border-slate-700 shrink-0"
           />
 
           <button type="button"
             onClick={handleOpenClick}
-            className="flex-1 bg-slate-100 hover:bg-slate-200/80 rounded-2xl px-4 py-3 text-left text-xs sm:text-sm text-slate-500 font-medium transition cursor-pointer border border-slate-200/60"
+            className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/80 rounded-2xl px-4 py-3 text-left text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium transition cursor-pointer border border-slate-200/60"
           >
             {currentUser ? `${t('publishAs')} ${currentUser.name}...` : t('publishLoginPrompt')}
           </button>
@@ -186,13 +187,13 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
         <hr className="border-slate-100" />
 
         {/* Action Buttons Row */}
-        <div className="flex items-center justify-around text-xs font-bold text-slate-600 gap-1">
+        <div className="flex items-center justify-around text-xs font-bold text-slate-600 dark:text-slate-300 gap-1">
           <button type="button"
             onClick={() => {
               setMediaTab('image');
               handleOpenClick();
             }}
-            className="flex-1 py-2 rounded-2xl hover:bg-slate-50 transition flex items-center justify-center gap-1.5 text-emerald-700"
+            className="flex-1 py-2 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition flex items-center justify-center gap-1.5 text-emerald-700"
           >
             <Image className="w-4 h-4 text-emerald-600" />
             <span>{t('photo')}</span>
@@ -203,7 +204,7 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
               setMediaTab('video');
               handleOpenClick();
             }}
-            className="flex-1 py-2 rounded-2xl hover:bg-slate-50 transition flex items-center justify-center gap-1.5 text-purple-700"
+            className="flex-1 py-2 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition flex items-center justify-center gap-1.5 text-purple-700"
           >
             <Video className="w-4 h-4 text-purple-600" />
             <span className="flex items-center gap-1">
@@ -217,7 +218,7 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
               setMediaTab('gallery');
               handleOpenClick();
             }}
-            className="flex-1 py-2 rounded-2xl hover:bg-slate-50 transition flex items-center justify-center gap-1.5 text-blue-700"
+            className="flex-1 py-2 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition flex items-center justify-center gap-1.5 text-blue-700"
           >
             <Tag className="w-4 h-4 text-blue-600" />
             <span className="hidden sm:inline">Galeria</span>
@@ -225,9 +226,9 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
 
           <button type="button"
             onClick={handleOpenClick}
-            className="flex-1 py-2 rounded-2xl hover:bg-[#F0F2F5] transition flex items-center justify-center gap-1.5 text-[#1877F2]"
+            className="flex-1 py-2 rounded-2xl hover:bg-[var(--color-neutral-100)] transition flex items-center justify-center gap-1.5 text-[var(--color-blue-600)]"
           >
-            <Sparkles className="w-4 h-4 text-[#1877F2]" />
+            <Sparkles className="w-4 h-4 text-[var(--color-blue-600)]" />
             <span className="hidden md:inline">IA</span>
           </button>
         </div>
@@ -236,11 +237,11 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
       {/* Post Modal Dialog with Media Selector */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl border border-slate-200 my-auto animate-in zoom-in-95">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700 my-auto animate-in zoom-in-95">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <h3 className="font-extrabold text-base text-slate-900">
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
                   Criar Publicação Comercial
                 </h3>
                 {isPlanSubscriber && (
@@ -252,7 +253,7 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
               </div>
               <button type="button"
                 onClick={() => setModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition"
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 transition"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -261,25 +262,21 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
             {/* Business Author Metadata */}
             <div className="p-6 space-y-4 text-xs">
               <div className="flex items-center gap-3">
-                <img src={business.logo} alt="" className="w-10 h-10 rounded-full object-cover border border-slate-200" />
+                <BusinessLogo name={business.name} src={business.logo} className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-700" />
                 <div>
-                  <div className="font-bold text-slate-900 text-sm">{business.name}</div>
-                  <span className="text-[10px] bg-blue-50 text-[#1877F2] px-2 py-0.5 rounded-full font-bold">
+                  <div className="font-bold text-slate-900 dark:text-white text-sm">{business.name}</div>
+                  <span className="text-[10px] bg-blue-50 text-[var(--color-blue-600)] px-2 py-0.5 rounded-full font-bold">
                     📍 {business.neighborhood} • Público 🌐
                   </span>
                 </div>
               </div>
 
               {/* Media Format Selector Tabs */}
-              <div className="bg-slate-100 p-1 rounded-2xl grid grid-cols-3 gap-1 font-bold text-center">
+              <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl grid grid-cols-3 gap-1 font-bold text-center">
                 <button
                   type="button"
                   onClick={() => setMediaTab('image')}
-                  className={`py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition ${
-                    mediaTab === 'image'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition ${ mediaTab === 'image' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs' : 'text-slate-600 hover:text-slate-900' }`}
                 >
                   <Image className="w-3.5 h-3.5 text-emerald-600" />
                   <span>{t('business.FotoUnica')}</span>
@@ -288,11 +285,7 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
                 <button
                   type="button"
                   onClick={() => setMediaTab('video')}
-                  className={`py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition ${
-                    mediaTab === 'video'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition ${ mediaTab === 'video' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs' : 'text-slate-600 hover:text-slate-900' }`}
                 >
                   <Video className="w-3.5 h-3.5 text-purple-600" />
                   <span>Vídeo Comercial</span>
@@ -301,11 +294,7 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
                 <button
                   type="button"
                   onClick={() => setMediaTab('gallery')}
-                  className={`py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition ${
-                    mediaTab === 'gallery'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition ${ mediaTab === 'gallery' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs' : 'text-slate-600 hover:text-slate-900' }`}
                 >
                   <Tag className="w-3.5 h-3.5 text-blue-600" />
                   <span>Galeria de Fotos</span>
@@ -314,33 +303,33 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">Título da Publicação</label>
+                  <label className="block text-slate-700 dark:text-slate-200 font-bold mb-1">Título da Publicação</label>
                   <input
                     type="text"
                     required
                     value={postTitle}
                     onChange={(e) => setPostTitle(e.target.value)}
                     placeholder="Ex: Novo Lote de Produtos & Oferta Especial..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 font-bold focus:outline-none focus:border-[#1877F2]"
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[var(--color-blue-600)]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">Descrição / Conteúdo</label>
+                  <label className="block text-slate-700 dark:text-slate-200 font-bold mb-1">Descrição / Conteúdo</label>
                   <textarea
                     required
                     rows={3}
                     value={postContent}
                     onChange={(e) => setPostContent(e.target.value)}
                     placeholder="Escreva a novidade para os clientes e moradores de Bissau..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 focus:outline-none focus:border-[#1877F2]"
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-slate-900 dark:text-white focus:outline-none focus:border-[var(--color-blue-600)]"
                   />
                 </div>
 
                 {/* 1. Single Image Tab */}
                 {mediaTab === 'image' && (
                   <div>
-                    <label className="block text-slate-600 font-bold mb-1">{t('business.ImagemPublicacao')}</label>
+                    <label className="block text-slate-600 dark:text-slate-300 font-bold mb-1">{t('business.ImagemPublicacao')}</label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-emerald-300 bg-emerald-50 px-3 py-3 text-[11px] font-bold text-emerald-800">
                         <span>Carregar</span>
@@ -351,11 +340,11 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
                         value={postImageUrl.startsWith('data:') ? '' : postImageUrl}
                         onChange={(e) => setPostImageUrl(e.target.value)}
                         placeholder="Ou inserir URL da imagem..."
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-slate-900 focus:outline-none focus:border-[#1877F2]"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white focus:outline-none focus:border-[var(--color-blue-600)]"
                       />
                     </div>
                     {postImageUrl && (
-                      <div className="mt-2 h-32 rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+                      <div className="mt-2 h-32 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800">
                         <img src={postImageUrl} alt={t('business.PreVisualizacao')} className="w-full h-full object-cover" />
                       </div>
                     )}
@@ -384,7 +373,7 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
                         value={postVideoUrl.startsWith('data:') ? '' : postVideoUrl}
                         onChange={(e) => setPostVideoUrl(e.target.value)}
                         placeholder="Ou inserir URL YouTube, Vimeo ou .MP4..."
-                        className="w-full bg-white border border-purple-200 rounded-xl p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        className="w-full bg-white dark:bg-slate-900 border border-purple-200 rounded-xl p-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                       />
                     </div>
                     <p className="text-[11px] text-purple-700">
@@ -416,7 +405,7 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
                         value={newGalleryInput}
                         onChange={(e) => setNewGalleryInput(e.target.value)}
                         placeholder="Cole o link da foto (URL)..."
-                        className="flex-1 bg-white border border-blue-200 rounded-xl p-2 text-xs text-slate-900"
+                        className="flex-1 bg-white dark:bg-slate-900 border border-blue-200 rounded-xl p-2 text-xs text-slate-900 dark:text-white"
                       />
                       <button
                         type="button"
@@ -450,11 +439,7 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
                 {/* AI Result Box */}
                 {aiResult && (
                   <div
-                    className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
-                      aiResult.status === 'verde'
-                        ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
-                        : 'bg-amber-50 border-amber-300 text-amber-900'
-                    }`}
+                    className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${ aiResult.status === 'verde' ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-amber-50 border-amber-300 text-amber-900' }`}
                   >
                     <ShieldCheck className="w-5 h-5 flex-shrink-0" />
                     <div>
@@ -467,7 +452,7 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
                 <button
                   type="submit"
                   disabled={isModerating}
-                  className="w-full py-3.5 bg-[#1877F2] hover:bg-blue-700 text-white font-extrabold rounded-2xl text-xs transition shadow-md flex items-center justify-center gap-2 min-h-[44px]"
+                  className="w-full py-3.5 bg-[var(--color-blue-600)] hover:bg-blue-700 text-white font-extrabold rounded-2xl text-xs transition shadow-md flex items-center justify-center gap-2 min-h-[44px]"
                 >
                   <Send className="w-4 h-4" />
                   <span>{isModerating ? 'A Validar com IA...' : 'Publicar no Feed Guigui'}</span>

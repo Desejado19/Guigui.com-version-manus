@@ -19,7 +19,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { AppNotification, Language, NotificationCategory, UserRole } from '../types';
-import { filterNotificationsForContext } from '../services/notificationService';
+import { filterNotificationsForContext, formatNotificationDateTime } from '../services/notificationService';
 import { getTranslation } from '../utils/i18n';
 
 interface NotificationBellProps {
@@ -158,7 +158,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
         <div
           className={`absolute ${
             align === 'right' ? 'right-0' : 'left-0'
-          } mt-2 w-84 sm:w-96 bg-[var(--color-bg-surface)] bg-[var(--color-bg-surface)] border border-[var(--color-border-subtle)] border-[var(--color-border-subtle)] rounded-3xl shadow-2xl z-50 text-xs overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150`}
+          } mt-2 w-84 sm:w-96 bg-[var(--color-bg-surface)] dark:bg-slate-800 bg-[var(--color-bg-surface)] dark:bg-slate-800 border border-[var(--color-border-subtle)] border-[var(--color-border-subtle)] rounded-3xl shadow-2xl z-50 text-xs overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150`}
         >
           {/* Header */}
           <div className="p-4 bg-[var(--color-bg-subtle)]/80 bg-[var(--color-bg-subtle)]/80 border-b border-[var(--color-border-subtle)] border-[var(--color-border-subtle)] flex items-center justify-between">
@@ -210,7 +210,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
               onClick={() => setActiveFilter('all')}
               className={`flex-1 py-1 px-2.5 rounded-xl text-center transition ${
                 activeFilter === 'all'
-                  ? 'bg-[var(--color-bg-surface)] bg-[var(--color-bg-surface)] text-[var(--color-text-strong)] dark:text-white shadow-xs font-black'
+                  ? 'bg-[var(--color-bg-surface)] dark:bg-slate-800 bg-[var(--color-bg-surface)] dark:bg-slate-800 text-[var(--color-text-strong)] dark:text-white shadow-xs font-black'
                   : 'text-[var(--color-slate-500)] hover:text-[var(--color-text-muted)] dark:hover:text-[var(--color-text-muted)]'
               }`}
             >
@@ -221,7 +221,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
               onClick={() => setActiveFilter('unread')}
               className={`flex-1 py-1 px-2.5 rounded-xl text-center transition ${
                 activeFilter === 'unread'
-                  ? 'bg-[var(--color-bg-surface)] bg-[var(--color-bg-surface)] text-[var(--color-emerald-600)] dark:text-[var(--color-emerald-400)] shadow-xs font-black'
+                  ? 'bg-[var(--color-bg-surface)] dark:bg-slate-800 bg-[var(--color-bg-surface)] dark:bg-slate-800 text-[var(--color-emerald-600)] dark:text-[var(--color-emerald-400)] shadow-xs font-black'
                   : 'text-[var(--color-slate-500)] hover:text-[var(--color-text-muted)] dark:hover:text-[var(--color-text-muted)]'
               }`}
             >
@@ -232,7 +232,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
               onClick={() => setActiveFilter('important')}
               className={`flex-1 py-1 px-2.5 rounded-xl text-center transition ${
                 activeFilter === 'important'
-                  ? 'bg-[var(--color-bg-surface)] bg-[var(--color-bg-surface)] text-[var(--color-amber-600)] dark:text-[var(--color-amber-400)] shadow-xs font-black'
+                  ? 'bg-[var(--color-bg-surface)] dark:bg-slate-800 bg-[var(--color-bg-surface)] dark:bg-slate-800 text-[var(--color-amber-600)] dark:text-[var(--color-amber-400)] shadow-xs font-black'
                   : 'text-[var(--color-slate-500)] hover:text-[var(--color-text-muted)] dark:hover:text-[var(--color-text-muted)]'
               }`}
             >
@@ -303,8 +303,8 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                           {notif.priority === 'critical' || notif.priority === 'urgent' ? 'Crítico' : notif.priority === 'attention' || notif.priority === 'high' ? 'Atenção' : notif.priority === 'success' ? 'Sucesso' : 'Info'}
                         </span>
                         <span className="text-[10px] text-[var(--color-text-muted)] font-medium flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                          {notif.timeAgo || 'Recentemente'}
+                          <Clock className="w-3 h-3" />
+                          <time dateTime={notif.createdAt}>{formatNotificationDateTime(notif.createdAt, currentLang)}</time>
                         </span>
                       </div>
 

@@ -104,9 +104,7 @@ export interface IdentityAccess {
 
 function asPublicIdentity(account: IdentityAccount | null): PublicIdentity | null {
   return account ? toPublicUser(account) : null;
-}
-
-export function createIdentityAccess(options: IdentityAccessOptions): IdentityAccess {
+}export function createIdentityAccess(options: IdentityAccessOptions): IdentityAccess {
   const jsonAccounts = createJsonIdentityRepository();
   const accounts = options.databaseConfigured
     ? createPostgresIdentityRepository()
@@ -131,8 +129,7 @@ export function createIdentityAccess(options: IdentityAccessOptions): IdentityAc
     accounts: invitationAccounts,
     invitations,
     businessAccess,
-  };
-  const credentialDependencies = { accounts, credentials };
+  };  const credentialDependencies = { accounts, credentials };
 
   return {
     authenticate: (input) => authenticateUser(input, {

@@ -36,6 +36,7 @@ import { INITIAL_ADMIN_STAFF } from './data/adminStaffData';
 import { INITIAL_AUDIT_LOGS } from './data/auditLogsData';
 import { INITIAL_NOTIFICATIONS } from './data/notificationsData';
 import { motion, AnimatePresence } from 'motion/react';
+import { resolveNotificationTarget, focusKeyForTarget, type NotificationTarget } from './utils/notificationTarget';
 import { calculateBusinessRating } from './utils/reviews';
 import { usePersistentState } from './utils/persistentState';
 import { useMarketplaceData } from './hooks/useMarketplaceData';
@@ -58,7 +59,9 @@ import { canSendConversationMessage, getRoleLandingTab, markOptimisticMessageSta
 import { startCommunicationPolling } from './utils/communicationPolling';
 
 import { Navbar } from './components/Navbar';
-import { Panel, PanelHeader } from './components/ui';
+import { LocationFilter, Panel, PanelHeader } from './components/ui';
+import { PostEngagementProvider } from './components/PostEngagementProvider';
+import { useLocationCatalog } from './hooks/useLocationCatalog';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { LoginModal } from './components/LoginModal';
 import { StoriesBar } from './components/StoriesBar';
@@ -77,6 +80,9 @@ import { Footer } from './components/Footer';
 import { BusinessComparisonModal } from './components/BusinessComparisonModal';
 import { EventAlertsManager } from './components/EventAlertsManager';
 import { SmsSimulatorToast } from './components/SmsSimulatorToast';
+
+const APP_TAB_IDS = ['feed', 'directory', 'map', 'promotions', 'events', 'scanner', 'client', 'messages', 'support', 'admin', 'institutional'] as const;
+const isAppTab = (value: string): value is typeof APP_TAB_IDS[number] => (APP_TAB_IDS as readonly string[]).includes(value);
 
 const BusinessDashboard = lazy(() => import('./components/BusinessDashboard').then((module) => ({ default: module.BusinessDashboard })));
 const CitizenDashboard = lazy(() => import('./components/CitizenDashboard').then((module) => ({ default: module.CitizenDashboard })));
@@ -97,6 +103,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LayoutGrid,
+  ChevronDown,
   LayoutList,
   QrCode,
   Scale,
@@ -251,6 +258,10 @@ export default function App() {
   const [currentLang, setCurrentLang] = usePersistentState<Language>('guigui_current_lang', detectLanguage());
   // A área pública pode ser consultada sem autenticação; o login é pedido apenas para ações privadas.
   const [currentUser, setCurrentUser] = usePersistentState<UserProfile | null>('guigui_current_user', null);
+  // A projeção local não é credencial: a barra inferior só mostra destinos privados
+  // depois de `/api/auth/session` confirmar a sessão no servidor.
+  type SessionGate = 'checking' | 'authenticated' | 'guest';
+  const [sessionGate, setSessionGate] = useState<SessionGate>('checking');
   // Sincroniza a preferência de idioma com a conta do utilizador (persistente entre dispositivos).
   React.useEffect(() => {
     if (!currentUser) return;
@@ -281,6 +292,44 @@ export default function App() {
     document.documentElement.lang = currentLang === 'pt' ? 'pt-BR' : currentLang;
     document.title = getTranslation(currentLang, 'appName');
   }, [currentLang]);
+  React.useEffect(() => {
+    let cancelled = false;
+    const reconcileSession = async () => {
+      try {
+        const response = await fetch('/api/auth/session', { credentials: 'same-origin', cache: 'no-store' });
+        const body = response.ok
+          ? (await response.json()) as { authenticated?: boolean } | null
+          : null;
+        if (cancelled) return;
+        if (body?.authenticated) {
+          setSessionGate('authenticated');
+          return;
+        }
+        // Sessão ausente, expirada ou revogada: a barra inferior volta ao estado
+        // de visitante e nenhuma área privada fica aberta.
+        setSessionGate('guest');
+        setCurrentRole('user');
+        setCurrentTab((tab) =>
+          ['client', 'messages', 'support', 'scanner', 'admin'].includes(tab) ? 'feed' : tab,
+        );
+      } catch {
+        if (!cancelled) setSessionGate('guest');
+      }
+    };
+    void reconcileSession();
+    const revalidate = () => {
+      if (document.visibilityState === 'visible') void reconcileSession();
+    };
+    document.addEventListener('visibilitychange', revalidate);
+    window.addEventListener('focus', revalidate);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', revalidate);
+      window.removeEventListener('focus', revalidate);
+    };
+    // Só no arranque: o login/logout actualizam o estado directamente.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [teamInviteToken, setTeamInviteToken] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
@@ -335,6 +384,13 @@ export default function App() {
   }, []);
 
   const handleTabChange = (tab: typeof currentTab, clientSection: 'overview' | 'support' | 'tickets' = 'overview') => {
+    // Notificações antigas podem trazer destinos que já não são ecrãs válidos
+    // (ex.: `moderation`, `financials`): sem esta guarda o conteúdo ficava vazio.
+    if (!isAppTab(tab)) {
+      setCurrentTab('feed');
+      pushTabToHistory('feed');
+      return;
+    }
     if (tab === 'admin' && currentUser?.role !== 'admin') {
       setCurrentTab('feed');
       pushTabToHistory('feed');
@@ -660,67 +716,48 @@ export default function App() {
     setSystemNotifications((prev) => prev.filter((n) => !visibleIds.has(n.id)));
   };
 
+  const businessTabForNotification = (kind: NotificationTarget['entity']['kind']): BusinessDashboardTab => {
+    switch (kind) {
+      case 'conversation':
+        return 'communications';
+      case 'support':
+        return 'support';
+      case 'order':
+      case 'ticket':
+      case 'payment':
+      case 'refund':
+        return 'tickets';
+      case 'post':
+        return 'posts';
+      case 'event':
+        return 'events';
+      default:
+        return 'overview';
+    }
+  };
+
   const handleOpenNotification = (notification: AppNotification) => {
     setSelectedNotification(null);
     handleMarkNotificationAsRead(notification.id);
     setSelectedNotification(notification);
-    const metadata = notification.metadata || {};
-    if (metadata.ticketDestination === 'my-tickets' && currentUser?.role === 'user') {
-      handleTabChange('client', 'tickets');
-      return;
-    }
-    const orderId = metadata.orderId || (notification.entityType === 'ticket' || notification.entityType === 'payment' || notification.entityType === 'order' ? notification.entityId : undefined);
-    const eventId = metadata.eventId || (notification.entityType === 'event' ? notification.entityId : undefined);
-    const postId = metadata.postId || (notification.entityType === 'post' ? notification.entityId : undefined);
-    const conversationId = metadata.conversationId || (notification.entityType === 'conversation' ? notification.entityId : undefined);
-    const supportId = metadata.supportId || (notification.entityType === 'support' ? notification.entityId : undefined);
 
-    setFocusedOrderId(orderId ? String(orderId) : null);
-    setFocusedEventId(eventId ? String(eventId) : null);
-    setFocusedPostId(postId ? String(postId) : null);
-    setFocusedConversationId(conversationId ? String(conversationId) : null);
-    setFocusedSupportId(supportId ? String(supportId) : null);
+    // Um só resolvedor decide o destino, para nenhuma notificação conseguir
+    // levar o feed a um ecrã que não existe (o que deixava a página em branco).
+    const target = resolveNotificationTarget(notification, currentUser?.role ?? 'user');
+    const focusKey = focusKeyForTarget(target);
+    setFocusedOrderId(focusKey === 'order' ? target.entity.id : null);
+    setFocusedEventId(focusKey === 'event' ? target.entity.id : null);
+    setFocusedPostId(focusKey === 'post' ? target.entity.id : null);
+    setFocusedConversationId(focusKey === 'conversation' ? target.entity.id : null);
+    setFocusedSupportId(focusKey === 'support' ? target.entity.id : null);
 
-    if (orderId) {
-      if (currentUser?.role === 'business') {
-        setBusinessDashboardStartTab('tickets');
-        handleTabChange('client');
-        return;
-      }
-      handleTabChange('client');
-      return;
+    if (currentUser?.role === 'admin' && target.adminTab) {
+      setAdminDashboardStartTab(target.adminTab);
     }
-    if (supportId) {
-      if (currentUser?.role === 'admin') {
-        handleTabChange('admin');
-        return;
-      }
-      if (currentUser?.role === 'business') {
-        setBusinessDashboardStartTab('support');
-        handleTabChange('client');
-        return;
-      }
-      handleTabChange('client');
-      return;
+    if (currentUser?.role === 'business' && target.tab === 'client') {
+      setBusinessDashboardStartTab(businessTabForNotification(target.entity.kind));
     }
-    if (conversationId) {
-      if (currentUser?.role === 'business') {
-        setBusinessDashboardStartTab('communications');
-        handleTabChange('client');
-        return;
-      }
-      handleTabChange('client');
-      return;
-    }
-    if (eventId || notification.linkTab === 'events') {
-      handleTabChange('events');
-    } else if (postId || notification.linkTab === 'feed') {
-      handleTabChange('feed');
-    } else if (notification.entityType === 'system' || notification.linkTab === 'client') {
-      handleTabChange('client');
-    } else if (notification.linkTab) {
-      handleTabChange(notification.linkTab as typeof currentTab);
-    }
+    handleTabChange(target.tab, target.clientSection);
   };
 
   const handleCreateConversation = async (businessId: string, subject: string, text: string): Promise<string | void> => {
@@ -989,47 +1026,6 @@ export default function App() {
     }
   }, [currentLang, theme, themeMode]);
 
-  // Global Drag-to-Scroll interaction
-  React.useEffect(() => {
-    let isMouseDown = false;
-    let startY = 0;
-    let startScrollY = 0;
-
-    const handleMouseDown = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      // Don't drag if clicking interactive controls
-      if (target.closest('button, input, select, textarea, a, [role="button"], img, svg, iframe')) {
-        return;
-      }
-      isMouseDown = true;
-      startY = e.clientY;
-      startScrollY = window.scrollY;
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isMouseDown) return;
-      const deltaY = e.clientY - startY;
-      window.scrollTo({
-        top: startScrollY - deltaY * 1.3,
-        behavior: 'auto',
-      });
-    };
-
-    const handleMouseUp = () => {
-      isMouseDown = false;
-    };
-
-    window.addEventListener('mousedown', handleMouseDown);
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      window.removeEventListener('mousedown', handleMouseDown);
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, []);
-
   const toggleTheme = (nextMode?: 'light' | 'dark' | 'auto') => {
     if (nextMode) {
       setThemeMode(nextMode);
@@ -1272,6 +1268,7 @@ export default function App() {
     }
 
     setCurrentUser(normalizedUser);
+    setSessionGate('authenticated');
     setCurrentRole(normalizedUser.role);
     // Aplica o idioma preferido guardado na conta (ou o atual, se a conta ainda não o tiver).
     if (normalizedUser.preferredLanguage && normalizedUser.preferredLanguage !== currentLang) {
@@ -1336,6 +1333,7 @@ export default function App() {
   const handleLogout = () => {
     void fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
     setCurrentUser(null);
+    setSessionGate('guest');
     setCurrentRole('user');
     setNavigationStack(['feed']);
     setCurrentTab('feed');
@@ -1353,8 +1351,9 @@ export default function App() {
       if (!response.ok && response.status !== 404) throw new Error(payload.error || 'Não foi possível desativar a conta.');
     }
     setCurrentUser(null);
+    setSessionGate('guest');
     setCurrentRole('user');
-    setLoginNotice('A sua conta foi desativada temporariamente. Para reativá-la, contacte o suporte.');
+    setLoginNotice('A sua conta foi desactivada temporariamente. Para reativá-la, contacte o suporte.');
     setShowLoginModal(true);
   };
 
@@ -1367,6 +1366,7 @@ export default function App() {
       if (!response.ok && response.status !== 404) throw new Error(payload.error || 'Não foi possível eliminar a conta.');
     }
     setCurrentUser(null);
+    setSessionGate('guest');
     setCurrentRole('user');
     setLoginNotice('A sua conta foi eliminada permanentemente.');
     setShowLoginModal(true);
@@ -1420,6 +1420,7 @@ export default function App() {
       window.clearInterval(interval);
     };
   }, [setBusinesses]);
+  const { locations: bissauLocations } = useLocationCatalog();
   const [userPosts, setUserPosts] = usePersistentState<BusinessPost[]>('guigui_user_posts', []);
   const [promotions, setPromotions] = usePersistentState<Promotion[]>('guigui_promotions', []);
   const [stories, setStories] = usePersistentState<Story[]>('guigui_stories', INITIAL_STORIES as Story[]);
@@ -1551,6 +1552,25 @@ export default function App() {
   // Search & Neighborhood Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [directoryCategoryOpen, setDirectoryCategoryOpen] = useState(false);
+  const directoryCategoryRef = React.useRef<HTMLDivElement | null>(null);
+  React.useEffect(() => {
+    if (!directoryCategoryOpen) return undefined;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (directoryCategoryRef.current && !directoryCategoryRef.current.contains(event.target as Node)) {
+        setDirectoryCategoryOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setDirectoryCategoryOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [directoryCategoryOpen]);
   const [selectedNeighborhood, setSelectedNeighborhood] = useState<string | null>(null);
   const [onlyOpenNow, setOnlyOpenNow] = useState(false);
   const [directorySort, setDirectorySort] = useState<'relevance' | 'name' | 'rating' | 'recent'>('relevance');
@@ -1570,18 +1590,20 @@ export default function App() {
   }, [selectedBusiness, selectedNotification, showComparisonModal]);
 
   // Flatten all posts from businesses AND system users (5 posts each)
+  // Publicações das empresas: usa-se a localização guardada no post; os posts
+  // antigos sem localização herdam o bairro da própria empresa.
   const allCompanyPosts = businesses.flatMap((b) =>
     b.posts.map((p) => ({
       ...p,
-      businessLogo: b.logo,
-      neighborhood: b.neighborhood,
+      businessLogo: p.businessLogo || b.logo,
+      businessName: p.businessName || b.name,
+      neighborhood: p.neighborhood || b.neighborhood,
     }))
   );
 
-  const allPosts = [...userPosts, ...allCompanyPosts]
+  const localPosts = [...userPosts, ...allCompanyPosts]
     .filter((p) => p.status === 'approved')
     .filter((p) => {
-      if (selectedNeighborhood && p.neighborhood !== selectedNeighborhood) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase().trim();
         const matchTitle = (p.title || '').toLowerCase().includes(q);
@@ -1594,8 +1616,120 @@ export default function App() {
     })
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
+  // O feed é filtrado pelo backend, diretamente na base de dados. Enquanto a
+  // resposta não chega (ou sem rede), mostra-se a lista já carregada.
+  // Paginação: 30 publicações na primeira página e 20 de cada vez que o
+  // utilizador chega às 5 últimas carregadas, até esgotar o feed.
+  const FEED_FIRST_PAGE = 30;
+  const FEED_NEXT_PAGE = 20;
+  const FEED_PRELOAD_THRESHOLD = 5;
+  const [serverFeedPosts, setServerFeedPosts] = React.useState<BusinessPost[] | null>(null);
+  const [feedTotal, setFeedTotal] = React.useState<number | null>(null);
+  const [feedHasMore, setFeedHasMore] = React.useState(false);
+  const [feedLoadingMore, setFeedLoadingMore] = React.useState(false);
+  const [feedLoadError, setFeedLoadError] = React.useState<string | null>(null);
+  const feedBaseQueryRef = React.useRef('');
+  const feedSentinelRef = React.useRef<HTMLDivElement | null>(null);
+  // Trava síncrona: o IntersectionObserver pode disparar outra vez antes de o
+  // estado `feedLoadingMore` chegar ao próximo render.
+  const feedLoadingRef = React.useRef(false);
+  // Último pedido da primeira página (filtros + instante) para não repetir
+  // pedidos idênticos quando várias colecções locais chegam no arranque.
+  const feedFirstPageRef = React.useRef<{ query: string; at: number } | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const baseParams = new URLSearchParams();
+    if (selectedNeighborhood) baseParams.set('neighborhood', selectedNeighborhood);
+    if (searchQuery.trim()) baseParams.set('q', searchQuery.trim());
+    feedBaseQueryRef.current = baseParams.toString();
+    const params = new URLSearchParams(baseParams);
+    params.set('limit', String(FEED_FIRST_PAGE));
+    params.set('offset', '0');
+    setFeedLoadingMore(false);
+    setFeedLoadError(null);
+    feedLoadingRef.current = false;
+    // Agrupa as actualizações que chegam juntas no arranque (publicações locais,
+    // empresas, sessão) num único pedido da primeira página.
+    const previous = feedFirstPageRef.current;
+    if (previous && previous.query === params.toString() && Date.now() - previous.at < 2000) {
+      return () => { cancelled = true; };
+    }
+    const timer = window.setTimeout(() => {
+      // Só conta como pedido feito quando parte mesmo: no StrictMode o
+      // primeiro agendamento é cancelado antes de disparar.
+      feedFirstPageRef.current = { query: params.toString(), at: Date.now() };
+      fetch(`/api/posts?${params.toString()}`, { credentials: 'include', cache: 'no-store' })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((payload: { posts?: BusinessPost[]; total?: number; hasMore?: boolean } | null) => {
+          if (cancelled) return;
+          setServerFeedPosts(Array.isArray(payload?.posts) ? payload.posts : null);
+          setFeedTotal(typeof payload?.total === 'number' ? payload.total : null);
+          setFeedHasMore(Boolean(payload?.hasMore));
+        })
+        .catch(() => {
+          feedFirstPageRef.current = null;
+          if (cancelled) return;
+          setServerFeedPosts(null);
+          setFeedTotal(null);
+          setFeedHasMore(false);
+        });
+    }, 150);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [selectedNeighborhood, searchQuery, userPosts.length, allCompanyPosts.length]);
+
+  const loadMoreFeed = React.useCallback(() => {
+    if (feedLoadingRef.current || !feedHasMore) return;
+    const loaded = serverFeedPosts?.length ?? 0;
+    const params = new URLSearchParams(feedBaseQueryRef.current);
+    params.set('limit', String(FEED_NEXT_PAGE));
+    params.set('offset', String(loaded));
+    feedLoadingRef.current = true;
+    setFeedLoadingMore(true);
+    setFeedLoadError(null);
+    fetch(`/api/posts?${params.toString()}`, { credentials: 'include', cache: 'no-store' })
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .then((payload: { posts?: BusinessPost[]; total?: number; hasMore?: boolean } | null) => {
+        const nextPosts = Array.isArray(payload?.posts) ? payload.posts : [];
+        setServerFeedPosts((previous) => {
+          const seen = new Set((previous ?? []).map((item) => item.id));
+          return [...(previous ?? []), ...nextPosts.filter((item) => !seen.has(item.id))];
+        });
+        if (typeof payload?.total === 'number') setFeedTotal(payload.total);
+        setFeedHasMore(Boolean(payload?.hasMore));
+      })
+      .catch(() => {
+        // Mantém `hasMore` para o utilizador poder tentar de novo.
+        setFeedLoadError('Não foi possível carregar mais publicações.');
+      })
+      .finally(() => {
+        feedLoadingRef.current = false;
+        setFeedLoadingMore(false);
+      });
+  }, [feedHasMore, serverFeedPosts]);
+
+  // O sentinela fica depois da 5.ª publicação a contar do fim: assim que entra
+  // no ecrã carregam-se as 20 seguintes.
+  React.useEffect(() => {
+    if (!feedHasMore || feedLoadingMore || feedLoadError) return;
+    const node = feedSentinelRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) loadMoreFeed();
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [feedHasMore, feedLoadingMore, feedLoadError, loadMoreFeed, serverFeedPosts?.length]);
+
   // Mostrar sempre as publicações mais recentes primeiro, sem reordenar o feed.
-  const feedPosts = allPosts;
+  const feedPosts = serverFeedPosts ?? localPosts;
+  const feedDisplayTotal = feedTotal ?? feedPosts.length;
 
   // Filter Businesses for Directory / Marketplace
   const filteredBusinesses = businesses.filter((b) => {
@@ -1781,7 +1915,17 @@ export default function App() {
   };
 
   const handleAddStory = (story: Story) => {
-    setStories((previous) => [{ ...story, comments: story.comments || [] }, ...previous]);
+    // Também é chamado pelo módulo de stories do painel: a story publicada aí
+    // tem de aparecer na faixa do feed, e publicar duas vezes não a duplica.
+    setStories((previous) => {
+      const exists = previous.some((candidate) => candidate.id === story.id);
+      if (exists) {
+        return previous.map((candidate) => (
+          candidate.id === story.id ? { ...candidate, ...story, comments: story.comments || candidate.comments || [] } : candidate
+        ));
+      }
+      return [{ ...story, comments: story.comments || [] }, ...previous];
+    });
   };
 
   /** Marca a story como vista: anel da faixa passa a cinzento (estilo Instagram). */
@@ -2184,7 +2328,9 @@ export default function App() {
 
   return (
     <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm font-bold text-slate-600 dark:bg-slate-950 dark:text-slate-300">A carregar o painel...</div>}>
-      <div className="guigui-app-shell flex min-h-screen flex-col antialiased">
+
+      <PostEngagementProvider currentUserId={currentUser?.id ?? null}>
+             <div className={`guigui-app-shell flex min-h-screen flex-col antialiased ${currentUser?.role === 'user' ? 'pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:pb-0' : ''}`}>
       {/* Login Overlay Modal */}
       <LoginModal
         isOpen={showLoginModal}
@@ -2245,8 +2391,9 @@ export default function App() {
         }}
       />
 
-      {currentUser?.role === 'user' && (
+      {(!currentUser || currentUser.role === 'user') && (
         <CitizenBottomNav
+          isAuthenticated={Boolean(currentUser) && sessionGate === 'authenticated'}
           activeId={
             currentTab === 'messages'
               ? 'messages'
@@ -2256,6 +2403,8 @@ export default function App() {
                   ? 'events'
                   : currentTab === 'directory'
                     ? 'directory'
+                    : currentTab === 'promotions'
+                    ? 'promotions'
                     : currentTab === 'map'
                     ? 'map'
                     : 'feed'
@@ -2339,7 +2488,7 @@ export default function App() {
                             Resultados da pesquisa por: <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">"{searchQuery}"</span>
                           </h2>
                           <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                            {allPosts.length} publicações • {filteredBusinesses.length} empresas • {filteredSearchPromotions.length} promoções • {filteredSearchEvents.length} eventos
+                            {feedDisplayTotal} publicações • {filteredBusinesses.length} empresas • {filteredSearchPromotions.length} promoções • {filteredSearchEvents.length} eventos
                           </p>
                         </div>
                       </div>
@@ -2362,7 +2511,7 @@ export default function App() {
                             : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                         }`}
                       >
-                        Publicações ({allPosts.length})
+                        Publicações ({feedDisplayTotal})
                       </button>
                       <button type="button"
                         onClick={() => handleTabChange('directory')}
@@ -2416,10 +2565,13 @@ export default function App() {
 
               <div className="mt-5 flex flex-wrap items-center gap-2 text-xs">
                 <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wider text-[#5B6B67] flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-[#C9852A]" />Localização</span>
-                <button type="button" onClick={() => setSelectedNeighborhood(null)} className={`guigui-filter-chip ${selectedNeighborhood === null ? 'active' : ''}`}>Todos</button>
-                {['Praça (Centro)', 'Bairro do Cinto', 'Pinto', 'Bandim', 'Santa Luzia', 'Caracol'].map((n) => (
-                  <button type="button" key={n} onClick={() => setSelectedNeighborhood(selectedNeighborhood === n ? null : n)} className={`guigui-filter-chip ${selectedNeighborhood === n ? 'active' : ''}`}>{n}</button>
-                ))}
+                <LocationFilter
+                  locations={bissauLocations}
+                  selectedLocation={selectedNeighborhood}
+                  onSelect={setSelectedNeighborhood}
+                  triggerLabel="Todos"
+                  allLabel="Ver todos"
+                />
               </div>
 
               <FeaturedHomepageBanner
@@ -2479,22 +2631,50 @@ export default function App() {
                     <span className="rounded-full bg-white/70 px-2 py-1 text-[10px] text-emerald-700 dark:bg-emerald-900/70 dark:text-emerald-200">Actualização {feedRefreshToken}</span>
                   </div>
                 )}
-                <div className="w-full space-y-6">
-                  {feedPosts.map((post) => {
+                <div className="w-full space-y-0">
+                  {feedPosts.map((post, index) => {
                     const biz = businesses.find((b) => b.id === post.businessId);
+                    const showSentinel = feedHasMore && index === Math.max(0, feedPosts.length - FEED_PRELOAD_THRESHOLD);
                     return (
-                      <FeedPostCard
-                        key={post.id}
-                        post={post}
-                        business={biz}
-                        currentLang={currentLang}
-                        onSelectBusiness={setSelectedBusiness}
-                        currentUser={currentUser}
-                        onRequireLogin={handleRequireLogin}
-                        isHighlighted={focusedPostId === post.id}
-                      />
+                      <React.Fragment key={post.id}>
+                        <FeedPostCard
+                          post={post}
+                          business={biz}
+                          currentLang={currentLang}
+                          onSelectBusiness={setSelectedBusiness}
+                          currentUser={currentUser}
+                          onRequireLogin={handleRequireLogin}
+                          isHighlighted={focusedPostId === post.id}
+                        />
+                        {showSentinel && <div ref={feedSentinelRef} aria-hidden="true" />}
+                      </React.Fragment>
                     );
                   })}
+                  <div className="min-h-[48px]" aria-live="polite">
+                    {feedLoadingMore && (
+                      <div className="flex items-center justify-center gap-2 py-4 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" aria-hidden="true" />
+                        A carregar mais publicações…
+                      </div>
+                    )}
+                    {!feedLoadingMore && feedLoadError && feedHasMore && (
+                      <div className="flex items-center justify-center gap-2 py-4 text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                        <span>{feedLoadError}</span>
+                        <button
+                          type="button"
+                          onClick={() => loadMoreFeed()}
+                          className="rounded-lg bg-slate-100 px-2.5 py-1 font-black text-slate-700 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                        >
+                          Tentar novamente
+                        </button>
+                      </div>
+                    )}
+                    {!feedLoadingMore && !feedHasMore && serverFeedPosts !== null && feedPosts.length > FEED_FIRST_PAGE && (
+                      <div className="py-4 text-center text-[11px] font-bold text-slate-400">
+                        Fim do feed — {feedPosts.length} publicações carregadas.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -2628,34 +2808,64 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Category Horizontal Filter Pills */}
+                {/* Filtro de categoria: uma única entrada que abre a lista completa */}
                 <div className="flex flex-wrap items-center gap-2 py-1 text-xs">
-                  <button type="button"
-                    onClick={() => setSelectedCategory(null)}
-                    className={`px-4 py-2 rounded-2xl font-bold transition shrink-0 ${
-                      selectedCategory === null
-                        ? 'bg-slate-900 text-emerald-400 shadow-sm'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                    }`}
-                  >
-                    Todas as Categorias
-                  </button>
-
-                  {marketplaceCategories.map((cat) => (
-                    <button type="button"
-                      key={cat.id}
-                      onClick={() =>
-                        setSelectedCategory(selectedCategory === cat.id ? null : cat.id)
-                      }
-                      className={`px-4 py-2 rounded-2xl font-bold transition shrink-0 flex items-center gap-1.5 ${
-                        selectedCategory === cat.id
-                          ? 'bg-emerald-600 text-white shadow-sm'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                      }`}
+                  <div ref={directoryCategoryRef} className="relative inline-flex">
+                    <button
+                      type="button"
+                      onClick={() => setDirectoryCategoryOpen((value) => !value)}
+                      aria-haspopup="listbox"
+                      aria-expanded={directoryCategoryOpen}
+                      aria-label={`Filtrar por categoria. ${selectedCategory ? marketplaceCategories.find((cat) => cat.id === selectedCategory)?.name ?? 'Todas as Categorias' : 'Todas as Categorias'}`}
+                      className={`guigui-filter-chip max-w-[260px] ${selectedCategory === null ? 'active' : ''}`}
                     >
-                      <span>{cat.name}</span>
+                      <span className="inline-flex min-w-0 items-center gap-1.5">
+                        <LayoutGrid className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span className="truncate">
+                          {selectedCategory
+                            ? marketplaceCategories.find((cat) => cat.id === selectedCategory)?.name ?? 'Todas as Categorias'
+                            : 'Todas as Categorias'}
+                        </span>
+                        <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition ${directoryCategoryOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                      </span>
                     </button>
-                  ))}
+
+                    {directoryCategoryOpen && (
+                      <div
+                        role="dialog"
+                        aria-label="Categorias de empresas"
+                        className="absolute left-0 top-full z-50 mt-2 w-[min(92vw,340px)] overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+                      >
+                        <div className="max-h-[min(60vh,420px)] overflow-y-auto p-1.5" role="listbox" aria-label="Lista de categorias">
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={selectedCategory === null}
+                            onClick={() => { setSelectedCategory(null); setDirectoryCategoryOpen(false); }}
+                            className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] font-bold transition ${selectedCategory === null ? 'bg-emerald-600 text-white' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'}`}
+                          >
+                            <LayoutGrid className={`h-3.5 w-3.5 shrink-0 ${selectedCategory === null ? 'text-white' : 'text-emerald-600'}`} aria-hidden="true" />
+                            <span className="min-w-0 flex-1 truncate">Todas as Categorias</span>
+                          </button>
+                          {marketplaceCategories.map((cat) => {
+                            const active = selectedCategory === cat.id;
+                            return (
+                              <button
+                                type="button"
+                                role="option"
+                                key={cat.id}
+                                aria-selected={active}
+                                onClick={() => { setSelectedCategory(cat.id); setDirectoryCategoryOpen(false); }}
+                                className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] font-bold transition ${active ? 'bg-emerald-600 text-white' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'}`}
+                              >
+                                <span className="min-w-0 flex-1 truncate">{cat.name}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -2874,7 +3084,8 @@ export default function App() {
           )}
 
           {currentTab === 'support' && (
-            currentUser ? (
+            <ErrorBoundary currentLang={currentLang} area="Suporte">
+            {currentUser ? (
               <div className="mx-auto w-full max-w-6xl space-y-6">
                 <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -2908,7 +3119,8 @@ export default function App() {
                 <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-300">Entre na sua conta para abrir um ticket de suporte ou acompanhar as respostas da equipa.</p>
                 <button type="button" onClick={() => setShowLoginModal(true)} className="mt-4 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white hover:bg-emerald-700">Entrar</button>
               </div>
-            )
+            )}
+            </ErrorBoundary>
           )}
 
           {currentTab === 'client' && (
@@ -2976,6 +3188,7 @@ export default function App() {
                   onEventCancelled={handleCancelBusinessEvent}
                   onUpdateBusiness={handleUpdateBusiness}
                   onSaveBusinessProfile={handleSaveBusinessProfile}
+                  onStoryPublished={handleAddStory}
                   notifications={visibleNotifications}
                   onMarkNotificationAsRead={handleMarkNotificationAsRead}
                   onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead}
@@ -3186,8 +3399,7 @@ export default function App() {
             <PanelHeader
               eyebrow="Notificação"
               title={selectedNotification.title}
-              tone="info"
-              icon={Bell}
+              icon={<Bell className="h-5 w-5" />}
               actions={
                 <button type="button" onClick={() => setSelectedNotification(null)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] hover:bg-[var(--color-border-default)]" aria-label="Fechar detalhe da notificação" title="Fechar"><X className="h-4 w-4" /></button>
               }
@@ -3219,6 +3431,8 @@ export default function App() {
         }
       />
       </div>
+
+      </PostEngagementProvider>
     </Suspense>
   );
 }

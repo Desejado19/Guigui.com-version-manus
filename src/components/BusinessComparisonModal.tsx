@@ -1,4 +1,5 @@
 import React from 'react';
+import { BusinessLogo } from './ui';
 import {
   X,
   CheckCircle2,
@@ -58,7 +59,7 @@ export const BusinessComparisonModal: React.FC<BusinessComparisonModalProps> = (
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 overflow-hidden overscroll-contain">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-700 dark:border-slate-800 text-slate-900 dark:text-white dark:text-slate-100 overflow-hidden overscroll-contain">
         
         {/* Modal Header */}
         <div className="p-4 sm:p-6 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
@@ -80,7 +81,7 @@ export const BusinessComparisonModal: React.FC<BusinessComparisonModalProps> = (
                   {t('compareBusinesses')}
                 </h2>
               </div>
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                 {t('servicesProducts')} · {t('priceRange')} · {t('userRating')}
               </p>
             </div>
@@ -102,7 +103,7 @@ export const BusinessComparisonModal: React.FC<BusinessComparisonModalProps> = (
             <h3 className="font-bold text-base text-slate-700 dark:text-slate-300">
               {t('noBusinessesSelected')}
             </h3>
-            <p className="text-xs text-slate-500 max-w-md mx-auto">
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
               Selecione até 3 empresas no diretório marcando a opção "{t('compare')}" para visualizar a tabela detalhada de serviços, preços e avaliações.
             </p>
             <button type="button"
@@ -118,11 +119,11 @@ export const BusinessComparisonModal: React.FC<BusinessComparisonModalProps> = (
             <table className="w-full text-left border-collapse min-w-[650px]">
               <thead>
                 <tr>
-                  <th className="p-3 w-40 text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-50 dark:bg-slate-800/50 rounded-tl-2xl">
+                  <th className="p-3 w-40 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider bg-slate-50 dark:bg-slate-800/50 rounded-tl-2xl">
                     {t('locationAddress')}
                   </th>
                   {businesses.map((b) => (
-                    <th key={b.id} className="p-3 bg-slate-50 dark:bg-slate-800/50 min-w-[220px] text-center relative border-l border-slate-200 dark:border-slate-800">
+                    <th key={b.id} className="p-3 bg-slate-50 dark:bg-slate-800/50 min-w-[220px] text-center relative border-l border-slate-200 dark:border-slate-700 dark:border-slate-800">
                       <button type="button"
                         onClick={() => onRemoveBusiness(b.id)}
                         className="absolute top-2 right-2 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-full transition"
@@ -132,10 +133,10 @@ export const BusinessComparisonModal: React.FC<BusinessComparisonModalProps> = (
                       </button>
 
                       <div className="flex flex-col items-center space-y-2 pt-2">
-                        <img
+                        <BusinessLogo
+                          name={b.name}
                           src={b.logo}
-                          alt={b.name}
-                          className="w-14 h-14 rounded-2xl object-cover border-2 border-white dark:border-slate-700 shadow"
+                          className="w-14 h-14 rounded-2xl border-2 border-white dark:border-slate-700 shadow"
                         />
                         <div className="text-center">
                           <h4 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center justify-center gap-1">
@@ -151,8 +152,8 @@ export const BusinessComparisonModal: React.FC<BusinessComparisonModalProps> = (
                   ))}
                   {/* Empty Slot Fillers if less than 3 */}
                   {Array.from({ length: 3 - businesses.length }).map((_, idx) => (
-                    <th key={idx} className="p-3 bg-slate-50/50 dark:bg-slate-800/20 text-center border-l border-slate-200 dark:border-slate-800">
-                      <div className="p-4 text-center text-slate-400 text-xs border border-dashed border-slate-300 dark:border-slate-700 rounded-2xl">
+                    <th key={idx} className="p-3 bg-slate-50/50 dark:bg-slate-800/20 text-center border-l border-slate-200 dark:border-slate-700 dark:border-slate-800">
+                      <div className="p-4 text-center text-slate-400 dark:text-slate-500 text-xs border border-dashed border-slate-300 dark:border-slate-600 dark:border-slate-700 rounded-2xl">
                         {t('availableSlot')}
                       </div>
                     </th>
@@ -168,7 +169,7 @@ export const BusinessComparisonModal: React.FC<BusinessComparisonModalProps> = (
                     <span>{t('userRating')}</span>
                   </td>
                   {businesses.map((b) => (
-                    <td key={b.id} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-800">
+                    <td key={b.id} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-700 dark:border-slate-800">
                       <div className="inline-flex flex-col items-center bg-purple-50 dark:bg-purple-950/30 px-3 py-1.5 rounded-xl border border-purple-200 dark:border-purple-800/50">
                         <span className="font-black text-purple-700 dark:text-purple-300 text-xs">
                           {b.ratingLabel}
@@ -180,7 +181,7 @@ export const BusinessComparisonModal: React.FC<BusinessComparisonModalProps> = (
                     </td>
                   ))}
                   {Array.from({ length: 3 - businesses.length }).map((_, idx) => (
-                    <td key={idx} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-800 text-slate-400">-</td>
+                    <td key={idx} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-700 dark:border-slate-800 text-slate-400 dark:text-slate-500">-</td>
                   ))}
                 </tr>
 
@@ -191,11 +192,11 @@ export const BusinessComparisonModal: React.FC<BusinessComparisonModalProps> = (
                     <span>{t('priceRange')}</span>
                   </td>
                   {businesses.map((b) => (
-                    <td key={b.id} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-800">
+                    <td key={b.id} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-700 dark:border-slate-800">
                       <div className="font-extrabold text-emerald-600 dark:text-emerald-400 text-sm tracking-widest">
                         {b.priceRange}
                       </div>
-                      <span className="text-[10px] text-slate-500 font-medium block mt-0.5">
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block mt-0.5">
                         {b.priceRange === '$'
                           ? 'Económico (< 5.000 XOF)'
                           : b.priceRange === '$$'
@@ -207,7 +208,7 @@ export const BusinessComparisonModal: React.FC<BusinessComparisonModalProps> = (
                     </td>
                   ))}
                   {Array.from({ length: 3 - businesses.length }).map((_, idx) => (
-                    <td key={idx} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-800 text-slate-400">-</td>
+                    <td key={idx} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-700 dark:border-slate-800 text-slate-400 dark:text-slate-500">-</td>
                   ))}
                 </tr>
 
@@ -218,7 +219,7 @@ export const BusinessComparisonModal: React.FC<BusinessComparisonModalProps> = (
                     <span>{t('servicesProducts')}</span>
                   </td>
                   {businesses.map((b) => (
-                    <td key={b.id} className="p-3.5 border-l border-slate-200 dark:border-slate-800 text-center">
+                    <td key={b.id} className="p-3.5 border-l border-slate-200 dark:border-slate-700 dark:border-slate-800 text-center">
                       <div className="space-y-1.5 max-w-[200px] mx-auto">
                         <span className="inline-block px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-lg text-[11px] font-bold">
                           {b.subcategoryId}
@@ -235,7 +236,7 @@ export const BusinessComparisonModal: React.FC<BusinessComparisonModalProps> = (
                     </td>
                   ))}
                   {Array.from({ length: 3 - businesses.length }).map((_, idx) => (
-                    <td key={idx} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-800 text-slate-400">-</td>
+                    <td key={idx} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-700 dark:border-slate-800 text-slate-400 dark:text-slate-500">-</td>
                   ))}
                 </tr>
 
@@ -246,17 +247,17 @@ export const BusinessComparisonModal: React.FC<BusinessComparisonModalProps> = (
                     <span>{t('locationAddress')}</span>
                   </td>
                   {businesses.map((b) => (
-                    <td key={b.id} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-800">
-                      <div className="font-bold text-slate-900 dark:text-slate-100 text-xs">
+                    <td key={b.id} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-700 dark:border-slate-800">
+                      <div className="font-bold text-slate-900 dark:text-white dark:text-slate-100 text-xs">
                         {b.neighborhood}
                       </div>
-                      <div className="text-[10px] text-slate-500 mt-0.5 line-clamp-2">
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2">
                         {b.address}
                       </div>
                     </td>
                   ))}
                   {Array.from({ length: 3 - businesses.length }).map((_, idx) => (
-                    <td key={idx} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-800 text-slate-400">-</td>
+                    <td key={idx} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-700 dark:border-slate-800 text-slate-400 dark:text-slate-500">-</td>
                   ))}
                 </tr>
 
@@ -267,20 +268,18 @@ export const BusinessComparisonModal: React.FC<BusinessComparisonModalProps> = (
                     <span>{t('statusHours')}</span>
                   </td>
                   {businesses.map((b) => (
-                    <td key={b.id} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-800">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
-                        b.isOpenNow ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                      }`}>
+                    <td key={b.id} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-700 dark:border-slate-800">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${ b.isOpenNow ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' }`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${b.isOpenNow ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
                         {b.isOpenNow ? t('openNow') : t('closedNow')}
                       </span>
-                      <span className="block text-[10px] text-slate-500 mt-1 font-mono">
+                      <span className="block text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-mono">
                         {b.openingHours}
                       </span>
                     </td>
                   ))}
                   {Array.from({ length: 3 - businesses.length }).map((_, idx) => (
-                    <td key={idx} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-800 text-slate-400">-</td>
+                    <td key={idx} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-700 dark:border-slate-800 text-slate-400 dark:text-slate-500">-</td>
                   ))}
                 </tr>
 
@@ -291,7 +290,7 @@ export const BusinessComparisonModal: React.FC<BusinessComparisonModalProps> = (
                     <span>{t('directAction')}</span>
                   </td>
                   {businesses.map((b) => (
-                    <td key={b.id} className="p-3.5 border-l border-slate-200 dark:border-slate-800">
+                    <td key={b.id} className="p-3.5 border-l border-slate-200 dark:border-slate-700 dark:border-slate-800">
                       <div className="flex flex-col gap-2 max-w-[180px] mx-auto">
                         <a
                           href={`https://wa.me/${b.whatsapp.replace(/\D/g, '')}?text=Olá ${b.name}! Gostaria de informações.`}
@@ -317,7 +316,7 @@ export const BusinessComparisonModal: React.FC<BusinessComparisonModalProps> = (
                     </td>
                   ))}
                   {Array.from({ length: 3 - businesses.length }).map((_, idx) => (
-                    <td key={idx} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-800 text-slate-400">-</td>
+                    <td key={idx} className="p-3.5 text-center border-l border-slate-200 dark:border-slate-700 dark:border-slate-800 text-slate-400 dark:text-slate-500">-</td>
                   ))}
                 </tr>
               </tbody>
@@ -326,8 +325,8 @@ export const BusinessComparisonModal: React.FC<BusinessComparisonModalProps> = (
         )}
 
         {/* Modal Footer */}
-        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs shrink-0">
-          <span className="text-slate-500 font-medium">
+        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 dark:border-slate-800 flex items-center justify-between text-xs shrink-0">
+          <span className="text-slate-500 dark:text-slate-400 font-medium">
             {businesses.length} de 3 {t('selectedBusinesses')}
           </span>
 

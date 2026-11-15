@@ -1,6 +1,7 @@
 import React from 'react';
 import { Language, UserRole } from '../types';
 import { getTranslation } from '../utils/i18n';
+import { GuiguiStar } from './GuiguiStar';
 
 interface FooterProps {
   currentLang: Language;
@@ -18,8 +19,8 @@ export const Footer: React.FC<FooterProps> = ({ currentLang, currentRole = 'user
         {/* Col 1 */}
         <div className="space-y-3">
           <div className="font-extrabold text-lg text-white flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center font-black text-white text-sm">
-              G
+            <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center">
+              <GuiguiStar className="h-5 w-5" fill="#ffffff" stroke="#ffffff" />
             </div>
             <span>Guigui<span className="text-blue-400">.com</span></span>
           </div>
@@ -33,7 +34,7 @@ export const Footer: React.FC<FooterProps> = ({ currentLang, currentRole = 'user
 
         {/* Col 2 */}
         <div className="space-y-2">
-          <h4 className="font-extrabold text-white uppercase tracking-wider text-[11px]">{t('navigation')}</h4>
+          <h2 className="font-extrabold text-white uppercase tracking-wider text-[11px]">{t('navigation')}</h2>
           <ul className="space-y-2 text-slate-300">
             <li>
               <button type="button" onClick={() => onTabChange('directory')} className="hover:text-blue-400 transition">
@@ -60,7 +61,7 @@ export const Footer: React.FC<FooterProps> = ({ currentLang, currentRole = 'user
 
         {/* Col 3 */}
         <div className="space-y-2">
-          <h4 className="font-extrabold text-white uppercase tracking-wider text-[11px]">{t('bissauZones')}</h4>
+          <h2 className="font-extrabold text-white uppercase tracking-wider text-[11px]">{t('bissauZones')}</h2>
           <ul className="space-y-1.5 text-slate-400 text-[11px]">
             <li>⬢ Bissau Velho & Porto</li>
             <li>⬢ Mercado de Bandim</li>
@@ -73,7 +74,7 @@ export const Footer: React.FC<FooterProps> = ({ currentLang, currentRole = 'user
         {/* Col 4: Apenas acessos profissionais autorizados pelo papel activo */}
         {(currentRole === 'business' || currentRole === 'admin') && (
           <div className="space-y-3">
-            <h4 className="font-extrabold text-white uppercase tracking-wider text-[11px]">{t('profileAccess')}</h4>
+            <h2 className="font-extrabold text-white uppercase tracking-wider text-[11px]">{t('profileAccess')}</h2>
             <div className="space-y-2">
               {currentRole === 'business' && (
                 <>
@@ -104,7 +105,7 @@ export const Footer: React.FC<FooterProps> = ({ currentLang, currentRole = 'user
         )}
       </div>
 
-      <div className="max-w-7xl mx-auto mt-8 pt-4 border-t border-slate-800 text-center text-[10px] text-slate-500">
+      <div className="max-w-7xl mx-auto mt-8 pt-4 border-t border-slate-800 text-center text-[11px] text-slate-400 dark:text-slate-400">
         © 2026 Guigui.com. {t('allRightsReserved')}
       </div>
     </footer>

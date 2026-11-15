@@ -38,6 +38,12 @@ describe('business registration profile collection', () => {
           json: async () => ({ transaction: { id: 'payment-1', providerRef: 'provider-1' } }),
         });
       }
+      if (url === '/api/locations') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ locations: [{ id: 'bandim', name: 'Bandim' }], neighborhoods: [], sectors: [] }),
+        });
+      }
       if (url === '/api/auth/register') {
         return Promise.resolve({
           ok: true,
@@ -49,7 +55,7 @@ describe('business registration profile collection', () => {
               categoryId: 'restauracao',
               groupGroupId: 'restauracao',
               subcategoryId: 'Costura',
-              description: 'Costura e reparação de roupas.',
+              description: 'Costura e reparação de roupas tradicionais.',
               phone: '+245 955 123 456',
               neighborhood: 'Bandim',
               publicEmail: 'contacto@atelier.test',
@@ -63,12 +69,13 @@ describe('business registration profile collection', () => {
     vi.stubGlobal('fetch', fetchMock);
     render(<LoginModal isOpen currentLang="pt" onLogin={onLogin} />);
     enterBusinessRegistration();
+    await waitFor(() => expect(screen.getAllByRole('option', { name: 'Bandim' }).length).toBeGreaterThan(0));
 
     fireEvent.change(screen.getByPlaceholderText('ex: Restaurante Coqueiros'), { target: { value: 'Atelier Nô Pintcha' } });
     fireEvent.change(screen.getByPlaceholderText('ex: contacto@exemplo.com'), { target: { value: 'owner@atelier.test' } });
     fireEvent.change(screen.getByLabelText('Contacto Telefónico da Conta / Pagamento'), { target: { value: '+245 966 000 000' } });
     fireEvent.change(screen.getByLabelText('Subcategoria da Empresa *'), { target: { value: 'Costura' } });
-    fireEvent.change(screen.getByLabelText('Descrição da Empresa *'), { target: { value: 'Costura e reparação de roupas.' } });
+    fireEvent.change(screen.getByLabelText('Descrição da Empresa *'), { target: { value: 'Costura e reparação de roupas tradicionais.' } });
     fireEvent.change(screen.getByLabelText('Telefone Público da Empresa *'), { target: { value: '+245 955 123 456' } });
     fireEvent.change(screen.getByLabelText('Bairro da Empresa *'), { target: { value: 'Bandim' } });
     fireEvent.change(screen.getByLabelText('E-mail Público'), { target: { value: 'contacto@atelier.test' } });
@@ -92,7 +99,7 @@ describe('business registration profile collection', () => {
       businessName: 'Atelier Nô Pintcha',
       categoryId: 'restauracao',
       subcategoryId: 'Costura',
-      description: 'Costura e reparação de roupas.',
+      description: 'Costura e reparação de roupas tradicionais.',
       businessPhone: '+245 955 123 456',
       businessNeighborhood: 'Bandim',
       publicEmail: 'contacto@atelier.test',

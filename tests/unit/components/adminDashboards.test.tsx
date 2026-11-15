@@ -89,14 +89,14 @@ describe('AdminDashboard', () => {
     const businessesNav = screen.getAllByText(/Empresas/i)[0];
     await user.click(businessesNav);
     await waitFor(() => {
-      expect(screen.getByText(/Empresas Registadas na Plataforma/i)).toBeTruthy();
+      expect(screen.getAllByRole('heading', { name: /Empresas & Negócios/i }).length).toBeGreaterThan(0);
     });
   });
 
   it('honours the initialTab prop', async () => {
     renderAdmin({ initialTab: 'businesses' });
     await waitFor(() => {
-      expect(screen.getByText(/Empresas Registadas na Plataforma/i)).toBeTruthy();
+      expect(screen.getAllByRole('heading', { name: /Empresas & Negócios/i }).length).toBeGreaterThan(0);
     });
   });
 
@@ -104,13 +104,14 @@ describe('AdminDashboard', () => {
     const user = userEvent.setup();
     renderAdmin();
     const aside = document.querySelector('aside')!;
-    const initialWidth = aside.getAttribute('style') || '';
-    const toggle = screen.getAllByRole('button').find((button) => button.querySelector('svg'));
-    expect(toggle).toBeTruthy();
-    await user.click(toggle!);
+    expect(aside.getAttribute('style')).toContain('260');
+    await user.click(screen.getByRole('button', { name: 'Recolher menu' }));
     await waitFor(() => {
-      const current = document.querySelector('aside')!.getAttribute('style') || '';
-      expect(current).not.toBe(initialWidth);
+      expect(document.querySelector('aside')!.getAttribute('style')).toContain('72');
+    });
+    await user.click(screen.getByRole('button', { name: 'Expandir menu' }));
+    await waitFor(() => {
+      expect(document.querySelector('aside')!.getAttribute('style')).toContain('260');
     });
   });
 
@@ -171,8 +172,8 @@ describe('BusinessDashboard', () => {
   it('navigates to the promotions tab from the sidebar', async () => {
     const user = userEvent.setup();
     await renderBusiness();
-    const promotionsNav = screen.getAllByText(/Promoções/i)[0];
-    await user.click(promotionsNav);
+    const marketingNav = screen.getAllByText('Marketing')[0];
+    await user.click(marketingNav);
     await waitFor(() => {
       expect(document.querySelector('.guigui-profile-dashboard')).toBeTruthy();
     });

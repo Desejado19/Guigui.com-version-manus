@@ -262,6 +262,43 @@ function buildAdminAnnouncement(input: NotificationEventInput): AppNotification 
   };
 }
 
+const NOTIFICATION_DATE_LOCALES: Record<Language, string> = {
+  pt: 'pt-PT',
+  en: 'en-GB',
+  fr: 'fr-FR',
+  es: 'es-ES',
+};
+
+/** Data e hora completas para qualquer notificação, em todos os painéis. */
+export function formatNotificationDateTime(
+  createdAt: string | null | undefined,
+  language: Language = 'pt'
+): string {
+  if (!createdAt) return 'Data e hora não disponíveis';
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) return 'Data e hora não disponíveis';
+  return new Intl.DateTimeFormat(NOTIFICATION_DATE_LOCALES[language] || 'pt-PT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date);
+}
+
+/** Garante uma data/hora válida mesmo para registos antigos ou incompletos. */
+export function normalizeNotification(notification: AppNotification): AppNotification {
+  const metadataCreatedAt = typeof notification.metadata?.createdAt === 'string'
+    ? notification.metadata.createdAt
+    : '';
+  const candidate = notification.createdAt || metadataCreatedAt;
+  const createdAt = candidate && !Number.isNaN(Date.parse(candidate))
+    ? new Date(candidate).toISOString()
+    : new Date().toISOString();
+  return { ...notification, createdAt };
+}
+
 function timeAgo(createdAt: string) {
   const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(createdAt)) / 1000));
   if (seconds < 60) return 'Agora';
@@ -432,6 +469,20 @@ export function buildNotificationsForEvent(input: NotificationEventInput): AppNo
     case 'NEW_REVIEW':
       result.push(makeNotification(input, 'business', 'review', 'normal', 'Nova avaliação recebida', `A sua empresa recebeu uma nova avaliação de um cliente.`, 'client', 'Responder'));
       break;
+    case 'STORY_COMMENT': {
+      const author = input.userName || 'Um utilizador';
+      result.push(makeNotification(
+        input,
+        'business',
+        'stats',
+        'normal',
+        'Novo comentário na sua story',
+        input.message || `${author} comentou a sua story.`,
+        'client',
+        'Ver comentário',
+      ));
+      break;
+    }
     case 'NEW_CONTACT':
       result.push(makeNotification(input, 'business', 'support', 'normal', 'Novo contacto recebido', 'Um utilizador iniciou um contacto através do Guigui.com.', 'client', 'Ver contactos'));
       break;
@@ -530,5 +581,8 @@ export function isChannelEnabled(
 }
 
 export function refreshNotificationTimes(notifications: AppNotification[]) {
-  return notifications.map((notification) => ({ ...notification, timeAgo: timeAgo(notification.createdAt) }));
+  return notifications.map((notification) => {
+    const normalized = normalizeNotification(notification);
+    return { ...normalized, timeAgo: timeAgo(normalized.createdAt) };
+  });
 }

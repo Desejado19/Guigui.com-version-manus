@@ -1,388 +1,222 @@
-
-const PRESET_IMAGES = [
-  { label: 'Coqueiros', url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80' },
-  { label: 'Peixe grelhado', url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80' },
-  { label: 'Farmácia', url: 'https://images.unsplash.com/photo-1586015555751-63bb77f4322a?auto=format&fit=crop&w=800&q=80' },
-  { label: 'Clínica', url: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=800&q=80' },
-];
-
-const PRESET_VIDEOS = [
-  { label: 'Eventos', thumbnail: 'https://images.unsplash.com/photo-1517849845537-4d2574be8cfc?auto=format&fit=crop&w=800&q=80', url: 'https://www.w3schools.com/html/mov_bbb.mp4' },
-  { label: 'Protocolo', thumbnail: 'https://images.unsplash.com/photo-1541354329998-f4d9a9f9297f?auto=format&fit=crop&w=800&q=80', url: 'https://www.w3schools.com/html/mov_bbb.mp4' },
-  { label: 'Rota', thumbnail: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=800&q=80', url: 'https://www.w3schools.com/html/mov_bbb.mp4' },
-  { label: 'Cultura', thumbnail: 'https://images.unsplash.com/photo-1517849845537-4d2574be8cfc?auto=format&fit=crop&w=800&q=80', url: 'https://www.w3schools.com/html/mov_bbb.mp4' },
-];
-
-import React, { useMemo, useState } from 'react';
-import { X, Plus } from 'lucide-react';
-import { Story, Business, UserRole, UserProfile, Language } from '../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Plus, Settings2 } from 'lucide-react';
+import type { Business, Language, Story, UserProfile } from '../types';
 import { StoryModal } from './StoryModal';
+import { StoryComposer } from './StoryComposer';
+import { StoriesManagementHub } from './StoriesManagementHub';
 import { filterActiveStories, groupStoriesByBusiness } from '../utils/stories';
+import { storyApi, type StoryHighlightApi } from '../services/storyApi';
 
 export interface StoriesBarProps {
   stories: Story[];
   businesses: Business[];
   onTabChange: (tab: unknown) => void;
   currentUser?: UserProfile | null;
-  currentRole?: UserRole;
+  currentRole?: 'user' | 'business' | 'admin';
   onAddStory?: (story: Story) => void;
   onRequireLogin?: (notice?: string) => void;
   onStoryComment?: (payload: {
-    story: Story;
-    text: string;
-    businessId: string;
-    businessName: string;
-    authorName: string;
-    authorId: string;
+    story: Story; text: string; businessId: string; businessName: string;
+    authorName: string; authorId: string;
   }) => void;
-  /** Marca a story como vista pelo utilizador actual (anel passa a cinzento). */
   onStoryViewed?: (story: Story) => void;
+  onManageStories?: () => void;
+  onStoriesChanged?: () => void;
   currentLang: Language;
 }
 
-const StoryPreview = ({
-  story,
-  seen,
-  storyCount = 1,
-  currentLang,
-  onClick,
-}: {
-  story: Story;
-  /** `true` quando o utilizador actual já viu todas as stories do grupo. */
-  seen: boolean;
-  storyCount?: number;
-  currentLang: Language;
-  onClick: () => void;
-}) => {
-  const caption = story.caption || '';
-
+function StoryCircle({ story, seen, count, admin, label, onClick }: {
+  story: Story; seen: boolean; count: number; admin?: boolean; label?: string; onClick: () => void;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="relative h-36 w-24 shrink-0 cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-white p-0 shadow-sm transition hover:border-emerald-400 hover:shadow-md sm:h-40 sm:w-28"
+      data-testid="story-ring"
+      data-seen={seen ? 'true' : 'false'}
+      className="group flex w-[76px] shrink-0 flex-col items-center gap-1.5 text-center"
+      aria-label={`Ver story de ${label || story.businessName}`}
     >
-      {story.storyType === 'video' && story.mediaUrl ? (
-        <video
-          src={story.mediaUrl}
-          className="absolute inset-0 h-full w-full object-cover"
-          muted
-          playsInline
-        />
-      ) : story.imageUrl || story.mediaUrl ? (
-        <img
-          src={story.imageUrl || story.mediaUrl}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover transition duration-300"
-        />
-      ) : (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 p-2 text-center text-xs font-bold text-white">
-          {caption || 'Story'}
-        </div>
-      )}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/70" />
-      <div className="relative z-10 flex h-full flex-col justify-between p-2.5">
-        <div className="relative">
-          <div
-            data-testid="story-ring"
-            data-seen={seen ? 'true' : 'false'}
-            className={`rounded-full p-[2px] ${seen ? 'bg-slate-300 dark:bg-slate-600' : 'bg-gradient-to-br from-amber-400 via-rose-500 to-violet-500'}`}
-          >
-            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white">
-          {story.businessLogo ? (
-            <img
-              src={story.businessLogo}
-              alt=""
-              className="block h-full w-full rounded-full object-cover"
-            />
-          ) : (
-            <span className="block h-full w-full align-middle text-center text-[10px] font-black uppercase text-slate-600">
-              {story.businessName?.charAt(0)}
-            </span>
-          )}
-            </div>
-          </div>
-          {storyCount > 1 && (
-            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-slate-900/85 px-1.5 py-px text-[9px] font-black text-white">
-              {storyCount}
-            </span>
-          )}
-        </div>
-        <span className="relative z-10 text-xs font-bold leading-tight text-white drop-shadow-md truncate">
-          {story.businessName || 'Empresa'}
+      <span className={`relative rounded-full p-[2.5px] transition ${admin ? 'bg-gradient-to-br from-amber-300 via-amber-500 to-yellow-700' : seen ? 'bg-slate-300 dark:bg-slate-600' : 'bg-gradient-to-br from-amber-400 via-rose-500 to-violet-600'}`}>
+        <span className="flex h-[62px] w-[62px] items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-white dark:border-slate-900 dark:bg-slate-800">
+          {story.businessLogo ? <img src={story.businessLogo} alt="" className="h-full w-full object-cover" /> : <span className="text-lg font-black text-slate-600 dark:text-slate-200">{story.businessName.charAt(0)}</span>}
         </span>
-      </div>
+        {count > 1 && <span className="absolute -bottom-0.5 -right-0.5 min-w-[18px] rounded-full bg-slate-900 px-1 py-0.5 text-[9px] font-black text-white ring-2 ring-white dark:ring-slate-900">{count}</span>}
+        {!seen && <span role="img" className="absolute right-0 top-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-500 dark:border-slate-900" aria-label="Story nova" />}
+      </span>
+      <span className="line-clamp-2 max-w-[76px] text-[10px] font-bold leading-tight text-slate-700 dark:text-slate-200">{label || story.businessName}</span>
     </button>
   );
-};
+}
 
 export const StoriesBar: React.FC<StoriesBarProps> = ({
-  stories,
-  businesses,
-  currentUser,
-  onAddStory,
-  onRequireLogin,
-  onStoryComment,
-  onStoryViewed,
-  currentLang,
+  stories, currentUser, onAddStory, onRequireLogin, onStoryViewed,
+  onManageStories, onStoriesChanged,
 }) => {
-  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [activeGroupIndex, setActiveGroupIndex] = useState<number | null>(null);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [managerOpen, setManagerOpen] = useState(false);
+  const [highlights, setHighlights] = useState<StoryHighlightApi[]>([]);
+  const [activeHighlight, setActiveHighlight] = useState<StoryHighlightApi | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [sharedStory, setSharedStory] = useState<Story | null>(null);
+  const canCreateStory = currentUser?.role === 'business' || currentUser?.role === 'admin';
   const visibleStories = useMemo(() => filterActiveStories(stories), [stories]);
-  const groups = useMemo(
-    () => groupStoriesByBusiness(visibleStories, currentUser?.id),
-    [visibleStories, currentUser?.id],
-  );
-  const activeGroup = activeGroupId ? groups.find((group) => group.key === activeGroupId) ?? null : null;
-  const [showCreator, setShowCreator] = useState(false);
-  const [creativeMode, setCreativeMode] = useState<'image' | 'video' | 'text'>('image');
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [customUrl, setCustomUrl] = useState<string>('');
-  const [caption, setCaption] = useState('');
-  const [posting, setPosting] = useState(false);
-  const [creatorNotice, setCreatorNotice] = useState<string | null>(null);
+  const groups = useMemo(() => groupStoriesByBusiness(visibleStories, currentUser?.id), [visibleStories, currentUser?.id]);
 
-  const activeBusiness = currentUser?.role === 'business' && currentUser.businessId
-    ? businesses.find((business) => business.id === currentUser.businessId) || null
-    : null;
+  useEffect(() => {
+    let cancelled = false;
+    storyApi.highlights(currentUser?.role === 'business' ? currentUser.businessId : undefined)
+      .then((result) => { if (!cancelled) setHighlights(result.highlights || []); })
+      .catch(() => { if (!cancelled) setHighlights([]); });
+    return () => { cancelled = true; };
+  }, [currentUser?.businessId, currentUser?.role, stories.length]);
 
-  const subscriptionActive = (user: UserProfile | null, business?: Business | null): boolean => {
-    if (user?.role === 'admin') return true;
-    if (user?.role === 'business') {
-      if (!business) return false;
-      if (business.status === 'suspended' || business.subscriptionStatus === 'suspended') return false;
-      const renew = new Date(business.subscriptionRenewDate || '').getTime();
-      return renew > Date.now() && business.subscriptionStatus === 'active';
-    }
-    if (user?.subscriptionStatus === 'active') {
-      const renew = new Date(user.subscriptionRenewDate || '').getTime();
-      return renew > Date.now() || !user.subscriptionRenewDate;
-    }
-    return false;
-  };
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get('story');
+    if (!token) return;
+    let cancelled = false;
+    storyApi.share(token)
+      .then((result) => { if (!cancelled) setSharedStory(result.story as unknown as Story); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
 
-  const canCreateStory = !!currentUser && subscriptionActive(currentUser, activeBusiness);
+  const openGroup = (index: number) => { setActiveGroupIndex(index); };
 
-  const resetCreativeState = () => {
-    setCreativeMode('image');
-    setImageUrl(null);
-    setVideoUrl(null);
-    setCustomUrl('');
-    setCaption('');
-    setCreatorNotice(null);
-  };
-
-  const closeCreator = () => {
-    resetCreativeState();
-    setShowCreator(false);
-  };
+  const activeGroup = activeGroupIndex == null ? null : groups[activeGroupIndex] || null;
+  const highlightPlaying = activeHighlight?.stories?.length ? activeHighlight : null;
 
   return (
-    <div className="w-full">
-      <div className="flex flex-wrap items-center gap-2.5 overflow-hidden py-1 px-1">
+    <section className="w-full rounded-2xl border border-slate-200 bg-white px-2 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900" aria-label="Stories">
+      <div className="mb-2 flex items-center justify-between px-1">
+        <div>
+          <h2 className="text-xs font-black uppercase tracking-[0.14em] text-slate-700 dark:text-slate-200">Stories</h2>
+          <p className="text-[10px] font-medium text-slate-500">Empresas e administração · 24 horas</p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {canCreateStory && (
+            <button type="button" onClick={() => setComposerOpen(true)} className="flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1.5 text-[10px] font-black text-white shadow-sm hover:bg-emerald-500">
+              <Plus className="h-3.5 w-3.5" /> Criar story
+            </button>
+          )}
+          {canCreateStory && (
+            <button type="button" onClick={() => onManageStories ? onManageStories() : setManagerOpen(true)} className="flex items-center gap-1 rounded-full border border-slate-200 px-2.5 py-1.5 text-[10px] font-black text-slate-600 dark:border-slate-700 dark:text-slate-300" aria-label="Gerir stories">
+              <Settings2 className="h-3.5 w-3.5" /> Gerir
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-nowrap items-start gap-3 overflow-x-auto px-1 pb-1">
         {canCreateStory && (
-          <button
-            type="button"
-            onClick={() => {
-              resetCreativeState();
-              setShowCreator(true);
-            }}
-            className="group relative flex h-36 w-24 shrink-0 flex-col items-center justify-between overflow-hidden rounded-2xl border border-dashed border-emerald-300 bg-gradient-to-br from-emerald-50 to-white p-2.5 shadow-sm transition hover:border-emerald-500 hover:shadow-md sm:h-40 sm:w-28"
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-600 text-white shadow-sm">
-              <Plus className="h-5 w-5" />
-            </div>
-            <div className="text-center">
-              <div className="text-xs font-black text-slate-900">Criar Story</div>
-              <div className="mt-1 text-[10px] text-slate-500">Foto, vídeo ou texto</div>
-            </div>
+          <button type="button" onClick={() => setComposerOpen(true)} className="flex w-[76px] shrink-0 flex-col items-center gap-1.5">
+            <span className="flex h-[68px] w-[68px] items-center justify-center rounded-full border-2 border-dashed border-emerald-400 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"><Plus className="h-6 w-6" /></span>
+            <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">O seu story</span>
           </button>
         )}
 
-        {groups.map((group) => (
-          <StoryPreview
+        {highlights.map((highlight) => highlight.cover && (
+          <StoryCircle
+            key={highlight.id}
+            story={highlight.cover as unknown as Story}
+            seen={false}
+            count={highlight.itemCount}
+            admin={highlight.cover.ownerRole === 'admin'}
+            label={highlight.title}
+            onClick={() => setActiveHighlight(highlight)}
+          />
+        ))}
+
+        {groups.map((group, index) => (
+          <StoryCircle
             key={group.key}
             story={group.latestStory}
             seen={!group.hasUnseen}
-            storyCount={group.stories.length}
-            currentLang={currentLang}
-            onClick={() => setActiveGroupId(group.key)}
+            count={group.stories.length}
+            admin={group.latestStory.ownerRole === 'admin'}
+            onClick={() => openGroup(index)}
           />
         ))}
+
+        {groups.length === 0 && highlights.length === 0 && (
+          <p className="px-2 py-4 text-[11px] font-medium text-slate-500">Ainda não há stories ativas. As empresas podem publicar a partir da sua área.</p>
+        )}
       </div>
+
+      {notice && <p className="mt-2 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">{notice}</p>}
 
       {activeGroup && (
         <StoryModal
+          key={activeGroup.key}
           stories={activeGroup.stories}
           initialStoryIndex={0}
-          onClose={() => setActiveGroupId(null)}
           currentUser={currentUser}
           onRequireLogin={onRequireLogin}
-          onStoryComment={onStoryComment}
           onStoryViewed={onStoryViewed}
+          onClose={() => setActiveGroupIndex(null)}
+          onNextProfile={() => {
+            if (activeGroupIndex == null) return;
+            if (activeGroupIndex < groups.length - 1) setActiveGroupIndex(activeGroupIndex + 1);
+            else setActiveGroupIndex(null);
+          }}
+          onPrevProfile={() => {
+            if (activeGroupIndex == null) return;
+            if (activeGroupIndex > 0) setActiveGroupIndex(activeGroupIndex - 1);
+          }}
         />
       )}
 
-      {showCreator && (
-        <div className="mt-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          {canCreateStory ? (
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-black text-slate-900 dark:text-white">Criar Story</h2>
-              <button
-                type="button"
-                onClick={closeCreator}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
-                aria-label="Fechar criador de stories"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          ) : (
-            <p className="mt-2 text-xs font-bold text-amber-600 dark:text-amber-400">
-              Só pode publicar stories com uma conta paga, empresa ou administração.
-            </p>
-          )}
-
-          {creatorNotice && (
-            <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-              {creatorNotice}
-            </p>
-          )}
-
-          <div className="grid grid-cols-3 gap-2 mt-3">
-            {(['image', 'video', 'text'] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setCreativeMode(mode)}
-                className={`rounded-xl px-3 py-2 text-xs font-black transition capitalize ${
-                  creativeMode === mode
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
-                }`}
-              >
-                {mode === 'image' ? 'Foto' : mode === 'video' ? 'Vídeo' : 'Texto'}
-              </button>
-            ))}
-          </div>
-          {creativeMode === 'image' && (
-            <div className="mt-3 space-y-2">
-              <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Imagem de destaque</p>
-              <div className="grid grid-cols-2 gap-2">
-                {PRESET_IMAGES.map((img) => (
-                  <button
-                    key={img.url}
-                    type="button"
-                    onClick={() => setImageUrl(img.url)}
-                    className={`rounded-xl border overflow-hidden transition ${
-                      imageUrl === img.url ? 'border-emerald-500 ring-2 ring-emerald-500' : 'border-slate-200 hover:border-slate-300 dark:border-slate-700'
-                    }`}
-                  >
-                    <img src={img.url} alt={img.label} className="h-20 w-full object-cover" />
-                  </button>
-                ))}
-              </div>
-              <input
-                value={customUrl}
-                onChange={(event) => setCustomUrl(event.target.value)}
-                placeholder="Ou insere a URL de uma imagem..."
-                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              />
-            </div>
-          )}
-          {creativeMode === 'video' && (
-            <div className="mt-3 space-y-2">
-              <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Vídeo de destaque</p>
-              <div className="grid grid-cols-2 gap-2">
-                {PRESET_VIDEOS.map((vid, index) => (
-                  <button
-                    key={`${vid.label}-${index}`}
-                    type="button"
-                    onClick={() => setVideoUrl(vid.url)}
-                    className={`rounded-xl border overflow-hidden transition ${
-                      videoUrl === vid.url ? 'border-emerald-500 ring-2 ring-emerald-500' : 'border-slate-200 hover:border-slate-300 dark:border-slate-700'
-                    }`}
-                  >
-                    <img src={vid.thumbnail} alt={vid.label} className="h-20 w-full object-cover" />
-                  </button>
-                ))}
-              </div>
-              <input
-                value={customUrl}
-                onChange={(event) => setCustomUrl(event.target.value)}
-                placeholder="Ou insere a URL de um vídeo..."
-                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              />
-            </div>
-          )}
-
-          {creativeMode === 'text' && (
-            <div className="mt-3 space-y-2">
-              <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Texto para a story</p>
-              <textarea
-                value={caption}
-                onChange={(event) => setCaption(event.target.value)}
-                rows={4}
-                placeholder="O que queres partilhar?"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              />
-            </div>
-          )}
-          <div className="flex justify-end gap-2 mt-4">
-            <button
-              type="button"
-              onClick={closeCreator}
-              className="rounded-xl px-4 py-2 text-xs font-black text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!currentUser || !subscriptionActive(currentUser, activeBusiness)) {
-                  onRequireLogin?.('Publicar uma story requer sessão e um plano de pagamento ativo (cidadão pago, empresa ou admin).');
-                  return;
-                }
-                setPosting(true);
-                const trimmedCustomUrl = customUrl.trim();
-                const resolvedImageUrl =
-                  creativeMode === 'image'
-                    ? trimmedCustomUrl || imageUrl
-                    : null;
-                const resolvedVideoUrl =
-                  creativeMode === 'video'
-                    ? trimmedCustomUrl || videoUrl
-                    : null;
-                if (creativeMode !== 'text' && !resolvedImageUrl && !resolvedVideoUrl) {
-                  setPosting(false);
-                  setCreatorNotice('Escolhe uma imagem ou vídeo de destaque, ou insere uma URL válida.');
-                  return;
-                }
-                const payload: Story = {
-                  id: `story-${Date.now()}`,
-                  businessId: currentUser.businessId || '',
-                  businessName: currentUser.businessName || currentUser.name,
-                  businessLogo: currentUser.avatarUrl || '',
-                  storyType: resolvedVideoUrl ? 'video' : resolvedImageUrl ? 'image' : 'text',
-                  imageUrl: resolvedImageUrl || undefined,
-                  mediaUrl: resolvedVideoUrl || undefined,
-                  caption: caption.trim() || undefined,
-                  createdAt: new Date().toISOString(),
-                  isUnread: true,
-                };
-                onAddStory?.(payload);
-                closeCreator();
-                setPosting(false);
-              }}
-              className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={posting}
-            >
-              {posting ? 'A publicar...' : 'Publicar Story'}
-            </button>
-          </div>
-        </div>
+      {highlightPlaying && (
+        <StoryModal
+          key={highlightPlaying.id}
+          stories={highlightPlaying.stories as unknown as Story[]}
+          initialStoryIndex={0}
+          currentUser={currentUser}
+          onRequireLogin={onRequireLogin}
+          onStoryViewed={onStoryViewed}
+          onClose={() => setActiveHighlight(null)}
+        />
       )}
-    </div>
+
+      {sharedStory && (
+        <StoryModal
+          stories={[sharedStory]}
+          initialStoryIndex={0}
+          currentUser={currentUser}
+          onRequireLogin={onRequireLogin}
+          onStoryViewed={onStoryViewed}
+          onClose={() => {
+            setSharedStory(null);
+            const url = new URL(window.location.href);
+            url.searchParams.delete('story');
+            window.history.replaceState({}, '', url.pathname + url.search);
+          }}
+        />
+      )}
+
+      {managerOpen && currentUser && (
+        <StoriesManagementHub
+          currentUser={currentUser}
+          onClose={() => setManagerOpen(false)}
+          onStoryPublished={onAddStory}
+        />
+      )}
+
+      {composerOpen && currentUser && (
+        <StoryComposer
+          open={composerOpen}
+          currentUser={currentUser}
+          onClose={() => setComposerOpen(false)}
+          onNotice={(message) => setNotice(message)}
+          onPublished={(story) => {
+            onAddStory?.(story);
+            setNotice('Story publicada. Já está visível na faixa.');
+            onStoriesChanged?.();
+          }}
+        />
+      )}
+    </section>
   );
 };
 

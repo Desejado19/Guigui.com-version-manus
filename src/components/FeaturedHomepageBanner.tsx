@@ -108,16 +108,16 @@ export const FeaturedHomepageBanner: React.FC<FeaturedHomepageBannerProps> = ({
             type="button"
             aria-label="Destaque anterior"
             onClick={() => goToSlide(-1)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-800 shadow-sm hover:bg-white"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 dark:bg-slate-900/95 text-slate-800 dark:text-slate-100 shadow-sm hover:bg-white"
           >
             <ArrowLeft aria-hidden="true" className="h-4 w-4" />
           </button>
-          <span className="min-w-12 text-center text-xs font-bold text-slate-700">{activeSlideIndex + 1} / {slides.length}</span>
+          <span className="min-w-12 text-center text-xs font-bold text-slate-700 dark:text-slate-200">{activeSlideIndex + 1} / {slides.length}</span>
           <button
             type="button"
             aria-label="Próximo destaque"
             onClick={() => goToSlide(1)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-800 shadow-sm hover:bg-white"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 dark:bg-slate-900/95 text-slate-800 dark:text-slate-100 shadow-sm hover:bg-white"
           >
             <ArrowRight aria-hidden="true" className="h-4 w-4" />
           </button>

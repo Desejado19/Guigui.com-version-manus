@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { databasePool } from './db';
+import { databasePool, withDbIdentity } from './db';
 
 const allowedEvents = new Set([
   'page_view',
@@ -20,18 +20,22 @@ export async function persistProductEvent(input: {
   context?: Record<string, unknown>;
 }): Promise<void> {
   if (!databasePool || !allowedEvents.has(input.eventName)) return;
-  await databasePool.query(
-    `INSERT INTO product_events (id,event_name,source,app_version,user_id,session_id,context)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-    [
-      `pe-${randomUUID()}`,
-      input.eventName,
-      input.source.slice(0, 120),
-      (input.appVersion || '1').slice(0, 40),
-      input.userId || null,
-      input.sessionId?.slice(0, 120) || null,
-      JSON.stringify(input.context || {}),
-    ],
+  // Eventos de telemetria ingestados sem sessão (endpoint aberto): escrita
+  // de sistema, no padrão da auditoria (fase 1).
+  await withDbIdentity({ userId: '', role: 'anon', system: true }, () =>
+    databasePool!.query(
+      `INSERT INTO product_events (id,event_name,source,app_version,user_id,session_id,context)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [
+        `pe-${randomUUID()}`,
+        input.eventName,
+        input.source.slice(0, 120),
+        (input.appVersion || '1').slice(0, 40),
+        input.userId || null,
+        input.sessionId?.slice(0, 120) || null,
+        JSON.stringify(input.context || {}),
+      ],
+    ),
   );
 }
 

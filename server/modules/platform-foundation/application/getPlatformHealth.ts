@@ -17,9 +17,9 @@ export type HealthResponse = {
   status: HealthStatus;
   app: 'Guigui.com Bissau';
   timestamp: string;
-  geminiActive: boolean;
-  database: DatabaseHealth;
-  observability: {
+  geminiActive?: boolean;
+  database?: DatabaseHealth;
+  observability?: {
     inProcess: true;
     persistent: boolean;
   };
@@ -31,6 +31,7 @@ export function classifyHealth(database: DatabaseHealth): HealthStatus {
 
 export async function getPlatformHealth(
   dependencies: HealthDependencies,
+  detailed = true,
 ): Promise<HealthResponse> {
   let database: DatabaseHealth = {
     configured: dependencies.databaseConfigured,
@@ -49,10 +50,14 @@ export async function getPlatformHealth(
     }
   }
 
-  return {
+  const base: HealthResponse = {
     status: classifyHealth(database),
     app: 'Guigui.com Bissau',
     timestamp: dependencies.now().toISOString(),
+  };
+  if (!detailed) return base;
+  return {
+    ...base,
     geminiActive: dependencies.geminiActive(),
     database,
     observability: { inProcess: true, persistent: Boolean(database.connected) },

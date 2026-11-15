@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const ADMIN_EMAIL = 'admin.teste@guigui.com';
-const ADMIN_PASSWORD = 'Guigui2026!';
+const ADMIN_PASSWORD = 'Guigui@2026!';
 
 async function signInAdmin(page: Page) {
   const response = await page.request.post('/api/auth/login', {
@@ -14,28 +14,28 @@ async function signInAdmin(page: Page) {
     window.localStorage.setItem('guigui_current_user', JSON.stringify(account));
     window.localStorage.setItem('guigui_current_lang', JSON.stringify('pt'));
   }, user);
-  return user as { id: string; role: string };
 }
 
 test.describe('Painel Admin — Finanças com dados reais', () => {
-  test('financas mostra historico real do banco + fluxo de reconciliacao intacto', async ({ page }) => {
+  test('finanças mostra resumo real e transações numa página independente', async ({ page }) => {
     await signInAdmin(page);
     await page.goto('/');
 
-    // A visao geral do admin deve aparecer
-    await expect(page.getByText('Visão Geral', { exact: false }).first()).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText('PAINEL ADMINISTRATIVO').first()).toBeVisible({ timeout: 20000 });
+    await page.locator('aside').getByRole('button', { name: /^Financeiro/ }).first().click();
 
-    // Navegar para a aba Financas
-    await page.getByRole('button', { name: /finan/i }).first().click();
+    await expect(page.getByRole('heading', { name: 'Financeiro', exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Volume financeiro registado')).toBeVisible();
+    await expect(page.getByText('Indicadores e operações financeiras da plataforma.')).toBeVisible();
+    const summaryResponse = await page.request.get('/api/admin/finance/summary');
+    expect(summaryResponse.ok()).toBeTruthy();
+    const summary = await summaryResponse.json() as { platform: { transactionCount: number } };
+    await expect(page.getByText(new RegExp(`${summary.platform.transactionCount} transações de plataforma`))).toBeVisible();
 
-    // 1) Historico real do banco aparece (endpoint /api/admin/payments)
-    await expect(page.getByText(/Histórico real de pagamentos/i)).toBeVisible({ timeout: 20000 });
-    await expect(page.getByText(/registada.*no PostgreSQL/i)).toBeVisible({ timeout: 20000 });
-
-    // 2) Fluxo de reconciliacao continua intacto (Secao 10)
-    await expect(page.getByText(/reconciliação da plataforma/i).first()).toBeVisible({ timeout: 10000 });
-
-    await page.screenshot({ path: 'test-results/financas-historico-real.png', fullPage: false });
+    await page.getByRole('button', { name: /Transações/ }).click();
+    await expect(page.getByRole('heading', { name: 'Transações', exact: true })).toBeVisible();
+    await expect(page.getByText('TXN-2026-9011')).toBeVisible();
+    await expect(page.getByText('Plataforma Guigui.com')).toBeVisible();
+    await expect(page.getByText(/receita de bilhetes pertence às empresas organizadoras/i)).toBeVisible();
   });
 });
-

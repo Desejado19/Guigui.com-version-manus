@@ -92,10 +92,10 @@ export const FeaturedBusinessesAdmin: React.FC<FeaturedBusinessesAdminProps> = (
       <fieldset disabled={isSaving} className="space-y-2">
         <legend className="mb-2 text-xs font-bold text-slate-700">Empresas ativas disponíveis</legend>
         {activeBusinesses.length === 0 ? (
-          <p className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-500">Não existem empresas ativas para selecionar.</p>
+          <p className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 text-xs text-slate-500">Não existem empresas ativas para selecionar.</p>
         ) : (
           activeBusinesses.map((business) => (
-            <label key={business.id} className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">
+            <label key={business.id} className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-800">
               <input
                 type="checkbox"
                 aria-label={`Selecionar ${business.name}`}
@@ -112,11 +112,11 @@ export const FeaturedBusinessesAdmin: React.FC<FeaturedBusinessesAdminProps> = (
       <div>
         <h5 className="mb-2 text-xs font-bold text-slate-700">Ordem publicada</h5>
         {orderedBusinesses.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-300 bg-white/70 p-3 text-xs text-slate-500">Ainda não há empresas selecionadas.</p>
+          <p className="rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-white/70 p-3 text-xs text-slate-500">Ainda não há empresas selecionadas.</p>
         ) : (
           <ol aria-label="Ordem das empresas em destaque" className="space-y-2">
             {orderedBusinesses.map((business, index) => (
-              <li key={business.id} className="flex min-h-11 items-center justify-between gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2">
+              <li key={business.id} className="flex min-h-11 items-center justify-between gap-2 rounded-xl border border-amber-200 bg-white dark:bg-slate-900 px-3 py-2">
                 <span className="min-w-0 truncate text-sm font-semibold text-slate-800">{index + 1}. {business.name}</span>
                 <div className="flex shrink-0 items-center gap-1">
                   <button
@@ -158,7 +158,7 @@ export const FeaturedBusinessesAdmin: React.FC<FeaturedBusinessesAdminProps> = (
         type="button"
         onClick={() => void saveOrder()}
         disabled={isSaving}
-        className="inline-flex min-h-11 items-center justify-center rounded-xl bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-700 disabled:cursor-wait disabled:opacity-60"
+        className="inline-flex min-h-11 items-center justify-center rounded-xl bg-amber-700 px-4 py-2 text-sm font-bold text-white hover:bg-amber-800 disabled:cursor-wait disabled:opacity-60"
       >
         {isSaving ? 'A guardar...' : 'Guardar ordem'}
       </button>

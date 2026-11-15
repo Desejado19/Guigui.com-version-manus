@@ -17,6 +17,12 @@ export interface UserProfile {
   businessName?: string;
   teamRole?: BusinessTeamRole;
   teamPermissions?: BusinessTeamMember['permissions'];
+  /** Acesso granular por módulo quando a conta é de colaborador. */
+  teamAccess?: TeamModuleAccess;
+  jobTitle?: string;
+  accessStatus?: 'active' | 'pending' | 'suspended' | 'disabled';
+  /** Acesso administrativo por módulo para membros da equipa da plataforma. */
+  adminAccess?: TeamModuleAccess;
   privacySettings?: {
     privateProfile: boolean;
     sessionAlerts: boolean;
@@ -363,6 +369,8 @@ export interface PostComment {
   content: string;
   createdAt: string;
   likesCount?: number;
+  parentId?: string;
+  replies?: PostComment[];
 }
 
 export type ReactionType = 'like' | 'love' | 'haha' | 'wow' | 'sad' | 'angry';
@@ -641,14 +649,21 @@ export interface Business {
 
 export type BusinessTeamRole = 'manager' | 'editor' | 'finance' | 'support';
 
+/** Mapa de módulos → acções concedidas (ver `config/teamAccess`). */
+export type TeamModuleAccess = import('./config/teamAccess').TeamModuleAccess;
+export type TeamAction = import('./config/teamAccess').TeamAction;
+
+export type TeamAccessStatus = 'invited' | 'pending' | 'active' | 'suspended' | 'disabled';
+
 export interface BusinessTeamMember {
   id: string;
   businessId: string;
   name: string;
   email: string;
   phone?: string;
-  role: BusinessTeamRole;
-  status: 'invited' | 'active' | 'suspended';
+  role: BusinessTeamRole | string;
+  status: TeamAccessStatus;
+  /** Permissões legadas mantidas para compatibilidade com contas antigas. */
   permissions: {
     profile: boolean;
     content: boolean;
@@ -656,6 +671,9 @@ export interface BusinessTeamMember {
     tickets: boolean;
     billing: boolean;
   };
+  /** Acesso granular por módulo. Ausente em contas antigas. */
+  access?: TeamModuleAccess;
+  jobTitle?: string;
   createdAt: string;
   lastActiveAt?: string;
 }
@@ -773,7 +791,7 @@ export interface ModerationResult {
 
 export interface ModerationAuditLog {
   timestamp: string;
-  action: 'auto_classified' | 'human_approved' | 'human_rejected' | 'appealed_by_user' | 'sensitivity_updated';
+  action: 'auto_classified' | 'human_approved' | 'human_rejected' | 'appealed_by_user' | 'sensitivity_updated' | 'appeal_simulated';
   actor: string; // 'Sistema IA', 'Admin Moderador', 'Autor'
   notes?: string;
 }
@@ -990,6 +1008,13 @@ export interface AppNotification {
 export interface NotificationPreferences {
   categories: Partial<Record<NotificationCategory, boolean>>;
   channels: Partial<Record<NotificationChannel, boolean>>;
+  language?: Language;
+  theme?: 'light' | 'dark';
+  notificationsEnabled?: boolean;
+  newPosts?: boolean;
+  comments?: boolean;
+  mentions?: boolean;
+  weeklyDigest?: boolean;
 }
 
 export type ConversationParticipantType = 'person' | 'business' | 'event' | 'organizer';

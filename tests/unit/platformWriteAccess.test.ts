@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ADMIN_ONLY_STATE_KEYS,
   PLATFORM_STATE_KEYS,
+  PUBLIC_STATE_KEYS,
+  isPublicAppStateKey,
+  readAppStateForSession,
   resolveAppStateValue,
   resolveAppStateWrite,
+  resolveBusinessScope,
   resolveBusinessWrite,
   resolveEventWrite,
 } from '../../server/platformWriteAccess';
@@ -43,15 +48,107 @@ describe('escrita de estado da plataforma', () => {
     }
   });
 
-  it('permite que um cidadão publique o seu próprio conteúdo, sujeito a moderação', () => {
+  it('permite que um cidadão publique os seus posts, sujeitos a moderação', () => {
     expect(resolveAppStateWrite('user', 'guigui_user_posts', 'user-1')).toEqual({ allowed: true });
-    expect(resolveAppStateWrite('user', 'guigui_stories', 'user-1')).toEqual({ allowed: true });
   });
 
-  it('dá à administração e às empresas o controlo do estado da plataforma', () => {
+  it('impede um cidadão de publicar stories, mesmo com plano pago', () => {
+    // As stories são a vitrine das empresas e da administração; o cidadão
+    // apenas as vê. Enviar a colecção inteira permitiria reescrever ou apagar
+    // stories de empresas.
+    expect(resolveAppStateWrite('user', 'guigui_stories', 'user-1')).toEqual({
+      allowed: false,
+      status: 403,
+      code: 'STORY_PUBLISH_FORBIDDEN',
+    });
+  });
+
+  it('dá à administração o controlo de todo o estado da plataforma', () => {
     for (const key of PLATFORM_STATE_KEYS) {
       expect(resolveAppStateWrite('admin', key, 'admin-1')).toEqual({ allowed: true });
-      expect(resolveAppStateWrite('business', key, 'biz-1')).toEqual({ allowed: true });
+    }
+  });
+
+  it('permite à empresa escrever apenas as chaves que lhe pertencem', () => {
+    // Espelha BUSINESS_FORBIDDEN_VALUE_KEYS: catálogo, planos, modelo de
+    // negócio, conversas e suporte são de administração.
+    const forbiddenForBusiness = [
+      'guigui_monetization_catalog',
+      'guigui_subscription_plans',
+      'guigui_admin_business_model_config',
+      'guigui_conversations',
+      'guigui_conversation_messages',
+      'guigui_support_requests',
+    ];
+    for (const key of PLATFORM_STATE_KEYS) {
+      if (forbiddenForBusiness.includes(key)) {
+        expect(resolveAppStateWrite('business', key, 'biz-1')).toEqual({
+          allowed: false,
+          status: 403,
+          code: 'APP_STATE_WRITE_FORBIDDEN',
+        });
+      } else {
+        expect(resolveAppStateWrite('business', key, 'biz-1'), key).toEqual({ allowed: true });
+      }
+    }
+  });
+});
+
+describe('leitura pública do estado da plataforma', () => {
+  it('não expõe a configuração do modelo de negócio a visitantes nem a perfis não administrativos', () => {
+    const key = 'guigui_admin_business_model_config';
+    expect(PUBLIC_STATE_KEYS.has(key)).toBe(false);
+    expect(isPublicAppStateKey(key)).toBe(false);
+    expect(ADMIN_ONLY_STATE_KEYS.has(key)).toBe(true);
+
+    const value = { ticketCommissionPercent: 10 };
+
+    expect(readAppStateForSession(key, undefined, { userId: '' }, value)).toEqual({
+      allowed: false,
+      status: 401,
+      code: 'AUTHENTICATION_REQUIRED',
+    });
+    expect(readAppStateForSession(key, 'user', { userId: 'user-1' }, value)).toEqual({
+      allowed: false,
+      status: 403,
+      code: 'APP_STATE_READ_FORBIDDEN',
+    });
+    expect(readAppStateForSession(key, 'business', { userId: 'user-1', businessId: 'biz-1' }, value)).toEqual({
+      allowed: false,
+      status: 403,
+      code: 'APP_STATE_READ_FORBIDDEN',
+    });
+    expect(readAppStateForSession(key, 'admin', { userId: 'admin-1' }, value)).toEqual({
+      allowed: true,
+      value,
+    });
+  });
+
+  it('mantém os catálogos públicos acessíveis sem sessão', () => {
+    for (const key of [
+      'guigui_businesses',
+      'guigui_events',
+      'guigui_promotions',
+      'guigui_stories',
+      'guigui_user_posts',
+      'guigui_subscription_plans',
+      'guigui_monetization_catalog',
+    ]) {
+      expect(isPublicAppStateKey(key), key).toBe(true);
+      expect(readAppStateForSession(key, undefined, { userId: '' }, [1])).toEqual({
+        allowed: true,
+        value: [1],
+      });
+    }
+  });
+
+  it('continua a exigir sessão para conversas, suporte e encomendas sem sessão', () => {
+    for (const key of ['guigui_conversations', 'guigui_support_requests', 'guigui_purchase_orders']) {
+      expect(readAppStateForSession(key, undefined, { userId: '' }, []), key).toEqual({
+        allowed: false,
+        status: 401,
+        code: 'AUTHENTICATION_REQUIRED',
+      });
     }
   });
 });
@@ -89,6 +186,92 @@ describe('escrita da ficha de empresa', () => {
 
   it('permite à administração gerir qualquer ficha', () => {
     expect(resolveBusinessWrite('admin', undefined, 'biz-9')).toEqual({ allowed: true });
+  });
+});
+
+describe('âmbito empresarial reutilizável', () => {
+  it('exige sessão e recusa um cidadão', () => {
+    expect(resolveBusinessScope(undefined, undefined, 'biz-1')).toEqual({
+      allowed: false,
+      status: 401,
+      code: 'AUTHENTICATION_REQUIRED',
+    });
+    expect(resolveBusinessScope('user', 'biz-1', 'biz-1')).toEqual({
+      allowed: false,
+      status: 403,
+      code: 'BUSINESS_SCOPE_FORBIDDEN',
+    });
+  });
+
+  it('aceita apenas a empresa da sessão e recusa ids divergentes', () => {
+    expect(resolveBusinessScope('business', 'biz-1', 'biz-1')).toEqual({ allowed: true });
+    expect(resolveBusinessScope('business', 'biz-1', 'biz-2')).toEqual({
+      allowed: false,
+      status: 403,
+      code: 'BUSINESS_SCOPE_REQUIRED',
+    });
+  });
+
+  it('recusa uma conta de empresa sem empresa associada', () => {
+    expect(resolveBusinessScope('business', undefined, 'biz-1')).toEqual({
+      allowed: false,
+      status: 403,
+      code: 'BUSINESS_ACCOUNT_REQUIRED',
+    });
+  });
+
+  it('mantém a administração sujeita às permissões administrativas, mas com acesso ao âmbito pedido', () => {
+    expect(resolveBusinessScope('admin', undefined, 'biz-9')).toEqual({ allowed: true });
+  });
+});
+
+describe('isolamento de leitura por dono e empresa', () => {
+  const conversations = [
+    { id: 'c-1', userId: 'user-1', businessId: 'biz-1' },
+    { id: 'c-2', userId: 'user-2', businessId: 'biz-2' },
+  ];
+  const messages = [
+    { id: 'm-1', conversationId: 'c-1' },
+    { id: 'm-2', conversationId: 'c-2' },
+  ];
+
+  it('um cidadão só vê as suas conversas e mensagens', () => {
+    const result = readAppStateForSession('guigui_conversations', 'user', { userId: 'user-1' }, conversations);
+    expect(result).toEqual({ allowed: true, value: [conversations[0]] });
+
+    const ids = new Set(['c-1']);
+    expect(readAppStateForSession('guigui_conversation_messages', 'user', { userId: 'user-1' }, messages, ids)).toEqual({
+      allowed: true,
+      value: [messages[0]],
+    });
+  });
+
+  it('uma empresa só vê o suporte e as encomendas que lhe pertencem', () => {
+    const support = [
+      { id: 's-1', businessId: 'biz-1', requesterId: 'user-9' },
+      { id: 's-2', businessId: 'biz-2', requesterId: 'user-9' },
+    ];
+    expect(readAppStateForSession('guigui_support_requests', 'business', { userId: 'user-1', businessId: 'biz-1' }, support)).toEqual({
+      allowed: true,
+      value: [support[0]],
+    });
+
+    const orders = [
+      { id: 'o-1', businessId: 'biz-1' },
+      { id: 'o-2', businessId: 'biz-2' },
+    ];
+    expect(readAppStateForSession('guigui_purchase_orders', 'business', { userId: 'user-1', businessId: 'biz-1' }, orders)).toEqual({
+      allowed: true,
+      value: [orders[0]],
+    });
+  });
+
+  it('recusa a leitura de uma chave privada desconhecida a qualquer perfil não administrativo', () => {
+    expect(readAppStateForSession('guigui_private_unknown', 'user', { userId: 'user-1' }, [])).toEqual({
+      allowed: false,
+      status: 403,
+      code: 'APP_STATE_READ_FORBIDDEN',
+    });
   });
 });
 
@@ -183,4 +366,5 @@ describe('âmbito do valor gravado por uma empresa', () => {
     const result = resolveAppStateValue('admin', 'guigui_businesses', undefined, [], stored);
     expect(result).toEqual({ allowed: true, value: [] });
   });
+
 });

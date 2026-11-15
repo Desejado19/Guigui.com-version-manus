@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import 'dotenv/config?override=true';
 import { Pool } from 'pg';
 
 async function main() {

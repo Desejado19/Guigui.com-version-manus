@@ -8,8 +8,33 @@ import type { StoredSession as IdentityStoredSession } from '../domain/identityT
 const dataDirectory = process.env.GUIGUI_DATA_DIR || path.resolve(process.cwd(), 'data');
 const sessionStorePath = path.join(dataDirectory, 'sessions.json');
 const sessionTtlMs = 7 * 24 * 60 * 60 * 1000;
-const sessionSecret = process.env.SESSION_COOKIE_SECRET
-  || (process.env.NODE_ENV === 'production' ? undefined : randomBytes(32).toString('hex'));
+// O token de sessão é guardado apenas como HMAC, por isso um segredo diferente
+// a cada arranque invalida todas as sessões existentes (o browser recebia 401 e
+// voltava ao ecrã de login em cada reinício do servidor). Em produção continua a
+// ser obrigatório vir do ambiente; em desenvolvimento é gerado uma vez e
+// persistido em data/.session-secret.
+function resolveSessionSecret(): string | undefined {
+  const provided = process.env.SESSION_COOKIE_SECRET?.trim();
+  if (provided) return provided;
+  if (process.env.NODE_ENV === 'production') return undefined;
+  const secretPath = path.join(dataDirectory, '.session-secret');
+  try {
+    const existing = fs.readFileSync(secretPath, 'utf8').trim();
+    if (existing) return existing;
+  } catch {
+    /* ficheiro ainda não existe */
+  }
+  const generated = randomBytes(32).toString('hex');
+  try {
+    fs.mkdirSync(dataDirectory, { recursive: true });
+    fs.writeFileSync(secretPath, generated, { encoding: 'utf8', mode: 0o600 });
+  } catch {
+    /* sem permissão de escrita: usa o segredo apenas neste processo */
+  }
+  return generated;
+}
+
+const sessionSecret = resolveSessionSecret();
 
 export const SESSION_COOKIE_NAME = 'guigui_session';
 
@@ -124,6 +149,73 @@ export async function revokeAllUserSessions(userId: string): Promise<number> {
   });
   if (count > 0) persistSessions();
   return count;
+}
+
+export interface UserSessionSummary {
+  id: string;
+  current: boolean;
+  createdAt: string;
+  lastSeenAt: string | null;
+  expiresAt: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+}
+
+/** Sessões activas de um utilizador, com a sessão usada no pedido marcada. */
+export async function listUserSessions(userId: string, currentToken?: string): Promise<UserSessionSummary[]> {
+  const currentHash = currentToken ? hashToken(currentToken) : '';
+  if (databasePool) {
+    const result = await databasePool.query(
+      `SELECT id, token_hash, created_at, last_seen_at, expires_at, ip_address, user_agent
+         FROM sessions
+        WHERE user_id=$1 AND revoked_at IS NULL AND expires_at > NOW()
+        ORDER BY created_at DESC`,
+      [userId],
+    );
+    return result.rows.map((row) => ({
+      id: String(row.id),
+      current: Boolean(currentHash) && row.token_hash === currentHash,
+      createdAt: new Date(row.created_at).toISOString(),
+      lastSeenAt: row.last_seen_at ? new Date(row.last_seen_at).toISOString() : null,
+      expiresAt: new Date(row.expires_at).toISOString(),
+      ipAddress: row.ip_address || null,
+      userAgent: row.user_agent || null,
+    }));
+  }
+  removeExpiredSessions();
+  return sessions
+    .filter((session) => session.userId === userId && !session.revokedAt && Date.parse(session.expiresAt) > Date.now())
+    .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
+    .map((session) => ({
+      id: session.tokenHash.slice(0, 32),
+      current: session.tokenHash === currentHash,
+      createdAt: session.createdAt,
+      lastSeenAt: null,
+      expiresAt: session.expiresAt,
+      ipAddress: session.ipAddress || null,
+      userAgent: session.userAgent || null,
+    }));
+}
+
+/** Revoga uma sessão do próprio utilizador; sessões de outras contas não são tocadas. */
+export async function revokeUserSessionById(userId: string, sessionId: string): Promise<boolean> {
+  if (!sessionId) return false;
+  if (databasePool) {
+    const result = await databasePool.query(
+      `UPDATE sessions SET revoked_at=NOW()
+        WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL
+        RETURNING id`,
+      [sessionId, userId],
+    );
+    return result.rowCount === 1;
+  }
+  const session = sessions.find(
+    (candidate) => candidate.userId === userId && !candidate.revokedAt && candidate.tokenHash.slice(0, 32) === sessionId,
+  );
+  if (!session) return false;
+  session.revokedAt = new Date().toISOString();
+  persistSessions();
+  return true;
 }
 
 export function createSessionRepository(): IdentitySessionRepository {

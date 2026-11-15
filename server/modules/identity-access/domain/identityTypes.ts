@@ -1,3 +1,5 @@
+import type { TeamModuleAccess } from '../../../../src/config/teamAccess';
+
 export type IdentityRole = 'user' | 'business' | 'admin';
 
 export type BusinessTeamRole = 'manager' | 'editor' | 'finance' | 'support';
@@ -9,6 +11,8 @@ export interface BusinessTeamPermissions {
   tickets: boolean;
   billing: boolean;
 }
+
+export type IdentityAccessStatus = 'active' | 'pending' | 'suspended' | 'disabled';
 
 export interface PublicIdentity {
   id: string;
@@ -23,6 +27,12 @@ export interface PublicIdentity {
   accountStatus?: 'active' | 'deactivated';
   teamRole?: BusinessTeamRole;
   teamPermissions?: BusinessTeamPermissions;
+  /** Acesso granular por módulo do colaborador empresarial. */
+  teamAccess?: TeamModuleAccess;
+  /** Acesso granular por módulo de um membro da equipa administrativa. */
+  adminAccess?: TeamModuleAccess;
+  jobTitle?: string;
+  accessStatus?: IdentityAccessStatus;
 }
 
 export interface IdentityAccount extends PublicIdentity {

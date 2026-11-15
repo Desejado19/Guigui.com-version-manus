@@ -81,7 +81,7 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
       date,
       time,
       location,
-      neighborhood: business.neighborhood || 'Bissau',
+      neighborhood: business.neighborhood || t('business.Todos'),
       coverImage: imageUrl,
       mediaType,
       category,
@@ -131,9 +131,9 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-3 p-4 sm:p-5">
+      <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-3 p-3.5 sm:p-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 text-xs px-3 py-1 rounded-full font-bold mb-1 border border-amber-200">
@@ -167,7 +167,7 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
 
       {/* Events List */}
       {myEvents.length === 0 ? (
-        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-8 text-center text-[var(--color-text-muted)] space-y-4 shadow-[var(--shadow-xs)]">
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 p-8 text-center text-[var(--color-text-muted)] space-y-4 shadow-[var(--shadow-xs)]">
           <Calendar className="w-12 h-12 mx-auto text-slate-300" />
           <h3 className="font-bold text-sm text-slate-800">
             {t('noEventsCreated')}
@@ -188,10 +188,10 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
           {myEvents.map((ev) => (
             <div
               key={ev.id}
-              className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] hover:shadow-[var(--shadow-md)] transition flex flex-col justify-between overflow-hidden"
+              className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] hover:shadow-[var(--shadow-md)] transition flex flex-col justify-between overflow-hidden"
             >
               <div>
-                <div className="h-36 relative overflow-hidden bg-slate-100">
+                <div className="h-36 relative overflow-hidden bg-slate-100 dark:bg-slate-800">
                   {ev.mediaType === 'video' ? (
                     <video src={ev.coverImage} controls muted className="w-full h-full object-cover" aria-label={ev.title} />
                   ) : (
@@ -234,7 +234,7 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
                 </div>
               </div>
 
-              <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+              <div className="p-4 bg-slate-50 dark:bg-slate-800 border-t border-slate-100 flex items-center justify-between">
                 <span className="text-[10px] text-slate-600 uppercase font-bold">
                   Status: {({
                     active: 'Ativo no Feed',
@@ -265,7 +265,7 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
 
       {selectedEvent && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`Participantes de ${selectedEvent.title}`}>
-          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5 shadow-[var(--shadow-lg)] sm:p-7">
+          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 p-5 shadow-[var(--shadow-lg)] sm:p-7">
             <div className="mb-5 flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Gestão de bilhetes</p>
@@ -275,14 +275,14 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
               <button type="button" onClick={() => setSelectedEvent(null)} className="guigui-close-button" aria-label="Fechar participantes"><X className="h-4 w-4" /></button>
             </div>
             {purchaseOrders.filter((order) => order.eventId === selectedEvent.id && order.businessId === business.id).length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-xs text-slate-500">
+              <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 p-8 text-center text-xs text-slate-500">
                 <Ticket className="mx-auto mb-2 h-8 w-8 text-slate-300" />
                 Ainda não existem participantes ou vendas registadas para este evento.
               </div>
             ) : (
               <div className="space-y-2">
                 {purchaseOrders.filter((order) => order.eventId === selectedEvent.id && order.businessId === business.id).map((order) => (
-                  <div key={order.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 p-3">
+                  <div key={order.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 p-3">
                     <div>
                       <div className="text-xs font-black text-slate-900">{order.customerName}</div>
                       <div className="text-[11px] text-slate-500">{order.customerPhone} · {order.quantity} bilhete(s)</div>
@@ -302,7 +302,7 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
       {/* CREATE EVENT MODAL */}
       {showCreateModal && (
         <div className="event-modal-overlay fixed inset-0 z-[200] bg-slate-900/70 backdrop-blur-xs flex items-start justify-center p-3 overflow-y-auto">
-          <div ref={createModalRef} className="my-4 w-full max-w-3xl space-y-5 overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 shadow-[var(--shadow-lg)] sm:my-8 sm:p-7">
+          <div ref={createModalRef} className="my-4 w-full max-w-3xl space-y-5 overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 p-4 shadow-[var(--shadow-lg)] sm:my-8 sm:p-7">
           <div className="sticky top-0 z-10 -mx-4 -mt-4 flex items-start justify-between gap-3 border-b border-slate-100 bg-white/95 px-4 py-4 backdrop-blur sm:-mx-7 sm:-mt-7 sm:px-7">
               <div className="flex min-w-0 items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
@@ -324,7 +324,7 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
             </div>
 
             <form onSubmit={handleCreateEvent} className="space-y-3">
-            <div className="event-form-section space-y-3 rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3 sm:p-4">
+            <div className="event-form-section space-y-3 rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] p-3 sm:p-4">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">1. Informações principais</p>
                   <p className="mt-1 text-[11px] text-slate-500">Apresente o evento com um título e uma descrição objetiva.</p>
@@ -336,7 +336,7 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
                   placeholder="Ex: Noite de Kizomba e Marisco na Esplanada"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="mt-1.5 min-h-11 w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="mt-1.5 min-h-11 w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
                 </label>
 
@@ -347,28 +347,29 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
                   placeholder="Atrações musicais, menu incluído, dress code..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="mt-1.5 min-h-28 w-full resize-y px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="mt-1.5 min-h-28 w-full resize-y px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
                 </label>
               </div>
 
-              <div className="event-form-section event-schedule-section space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-3.5">
+              <div className="event-form-section event-schedule-section space-y-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 sm:p-3.5">
                 <div>
                   <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">2. Data e local</p>
                   <p className="mt-0.5 text-[10px] text-slate-500">Ajude os participantes a planear a presença.</p>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <label className="text-[11px] font-bold text-slate-700">Data
-                    <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                    <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="mt-1 w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </label>
                   <label className="text-[11px] font-bold text-slate-700">Horário
-                    <input type="time" required value={time} onChange={(e) => setTime(e.target.value)} className="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                    <input type="time" required value={time} onChange={(e) => setTime(e.target.value)} className="mt-1 w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </label>
                   <label className="text-[11px] font-bold text-slate-700 sm:col-span-2">Local
-                    <input type="text" required value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ex: Restaurante Coqueiros, Bissau Velho" className="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                    <input type="text" required value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ex: Restaurante Coqueiros, Bissau Velho" className="mt-1 w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </label>
                   <label className="text-[11px] font-bold text-slate-700">Categoria
-                    <select value={category} onChange={(e) => setCategory(e.target.value as typeof category)} className="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <select value={category} onChange={(e) => setCategory(e.target.value as typeof category)} className="mt-1 w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                      <option value="todos">Todos</option>
                       <option value="gastronomia">Gastronomia</option>
                       <option value="musica">Música</option>
                       <option value="cultural">Cultural</option>
@@ -378,20 +379,20 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
                 </div>
               </div>
 
-              <div className="event-form-section space-y-2.5 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-3.5">
+              <div className="event-form-section space-y-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 sm:p-3.5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">3. Divulgação</p>
                     <label className="text-xs font-black text-slate-800">Imagem ou vídeo do evento</label>
                     <p className="mt-0.5 text-[10px] text-slate-500">Escolha um ficheiro ou cole um URL para destacar o evento.</p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white p-1">
+                  <div className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1">
                     <button type="button" onClick={() => { setMediaType('image'); setMediaError(''); }} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold ${mediaType === 'image' ? 'bg-blue-600 text-white' : 'text-slate-600'}`}><ImageIcon className="mr-1 inline h-3 w-3" />{t('business.Imagem')}</button>
                     <button type="button" onClick={() => { setMediaType('video'); setMediaError(''); }} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold ${mediaType === 'video' ? 'bg-violet-600 text-white' : 'text-slate-600'}`}><Video className="mr-1 inline h-3 w-3" />{t('video')}</button>
                   </div>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                  <input type="url" value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); setMediaError(''); }} placeholder={mediaType === 'image' ? 'URL da imagem (opcional)' : 'URL do vídeo (opcional)'} className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900" />
+                  <input type="url" value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); setMediaError(''); }} placeholder={mediaType === 'image' ? 'URL da imagem (opcional)' : 'URL do vídeo (opcional)'} className="min-h-11 w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900" />
                   <input type="file" accept={mediaType === 'image' ? 'image/*' : 'video/*'} onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
@@ -410,10 +411,10 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
                     } catch (error) {
                       setMediaError(error instanceof Error ? error.message : 'Não foi possível carregar este ficheiro.');
                     }
-                  }} className="min-h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-xs file:font-bold file:text-white" />
+                  }} className="min-h-11 w-full min-w-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-2 text-xs text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-xs file:font-bold file:text-white" />
                 </div>
                 {mediaError && <p className="text-xs font-semibold text-rose-600">{mediaError}</p>}
-                {imageUrl && <div className="h-36 overflow-hidden rounded-xl border border-slate-200 bg-white">{mediaType === 'video' ? <video src={imageUrl} controls muted className="h-full w-full object-cover" /> : <img src={imageUrl} alt="Pré-visualização do evento" className="h-full w-full object-cover" />}</div>}
+                {imageUrl && <div className="h-36 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">{mediaType === 'video' ? <video src={imageUrl} controls muted className="h-full w-full object-cover" /> : <img src={imageUrl} alt="Pré-visualização do evento" className="h-full w-full object-cover" />}</div>}
               </div>
 
               <div className="event-form-section space-y-2.5 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3 sm:p-3.5">
@@ -428,7 +429,7 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
                     required
                     value={priceXOF}
                     onChange={(e) => setPriceXOF(Number(e.target.value))}
-                    className="mt-1.5 min-h-11 w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="mt-1.5 min-h-11 w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                   </label>
 
@@ -437,7 +438,7 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
                     type="number"
                     value={vipPriceXOF}
                     onChange={(e) => setVipPriceXOF(Number(e.target.value))}
-                    className="mt-1.5 min-h-11 w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="mt-1.5 min-h-11 w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                   </label>
                   <label className="text-xs font-bold text-slate-700">Lotação máxima
@@ -446,7 +447,7 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
                     required
                     value={capacity}
                     onChange={(e) => setCapacity(Number(e.target.value))}
-                    className="mt-1.5 min-h-11 w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="mt-1.5 min-h-11 w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                   </label>
                 </div>
@@ -456,7 +457,7 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="min-h-11 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition sm:min-h-0"
+                  className="min-h-11 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition sm:min-h-0"
                 >
                   Cancelar
                 </button>

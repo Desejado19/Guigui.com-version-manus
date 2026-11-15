@@ -1,6 +1,15 @@
 import React from 'react';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'link' | 'destructive' | 'success';
+export type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'outline'
+  | 'ghost'
+  | 'link'
+  | 'destructive'
+  | 'success'
+  | 'accent'
+  | 'danger';
 export type ButtonSize = 'xs' | 'sm' | 'md' | 'lg' | 'icon';
 
 export interface ButtonOwnProps {
@@ -10,105 +19,85 @@ export interface ButtonOwnProps {
   icon?: React.ReactNode;
   iconRight?: React.ReactNode;
   children?: React.ReactNode;
+  /** Renderiza um <a> (quando há `href`) ou um elemento customizado. */
+  asChild?: boolean;
+  href?: string;
 }
 
-export interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, keyof ButtonOwnProps>, ButtonOwnProps {
-  asChild?: false;
-}
+export interface ButtonProps
+  extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, keyof ButtonOwnProps>,
+    ButtonOwnProps {}
 
-export interface AnchorButtonProps extends Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, keyof ButtonOwnProps>, ButtonOwnProps {
-  asChild: true;
-}
+export type AnchorButtonProps = ButtonProps & React.AnchorHTMLAttributes<HTMLAnchorElement>;
+export type AnyButtonProps = ButtonProps;
 
-export type AnyButtonProps = ButtonProps | AnchorButtonProps;
+export const Button = React.forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonProps>(
+  function Button(
+    {
+      variant = 'primary',
+      size = 'md',
+      loading = false,
+      icon,
+      iconRight,
+      children,
+      className = '',
+      asChild = false,
+      href,
+      type,
+      disabled,
+      ...rest
+    },
+    ref,
+  ) {
+    const classes = [
+      baseClasses,
+      sizeClasses[size],
+      variantClasses[variant],
+      loading ? 'pointer-events-none' : '',
+      className,
+    ]
+      .filter(Boolean)
+      .join(' ');
 
-type ButtonRef<T extends AnyButtonProps> = T extends AnchorButtonProps ? React.Ref<HTMLAnchorElement> : React.Ref<HTMLButtonElement>;
-
-export const Button = React.forwardRef(function Button<T extends AnyButtonProps>(
-  props: T,
-  ref: ButtonRef<T>,
-) {
-  const {
-    variant = 'primary',
-    size = 'md',
-    loading = false,
-    icon,
-    iconRight,
-    children,
-    className = '',
-    asChild = false,
-    ...rest
-  } = props;
-
-  const classes = [
-    baseClasses,
-    sizeClasses[size],
-    variantClasses[variant],
-    loading ? 'pointer-events-none' : '',
-    className,
-  ]
-    .filter(Boolean)
-    .join(' ');
-
-  const anchorRest = rest as React.AnchorHTMLAttributes<HTMLAnchorElement> & { href?: string };
-  const buttonRest = rest as React.ButtonHTMLAttributes<HTMLButtonElement>;
-
-  if (asChild && anchorRest.href) {
-    const Comp = 'a';
-    return (
-      <Comp
-        ref={ref as React.Ref<HTMLAnchorElement>}
-        className={classes}
-        href={anchorRest.href}
-        target={anchorRest.target}
-        rel={anchorRest.rel}
-        download={anchorRest.download}
-      >
+    const content = (
+      <>
         {icon}
         {loading ? <Spinner size="sm" /> : null}
         {children}
         {!loading && iconRight}
-      </Comp>
+      </>
     );
-  }
 
-  if (asChild) {
-    const Comp = 'button';
+    if (asChild && href) {
+      return (
+        <a
+          {...(rest as unknown as React.AnchorHTMLAttributes<HTMLAnchorElement>)}
+          ref={ref as React.Ref<HTMLAnchorElement>}
+          className={classes}
+          href={href}
+          aria-busy={loading || undefined}
+          aria-disabled={loading ? true : undefined}
+        >
+          {content}
+        </a>
+      );
+    }
+
     return (
-      <Comp
+      <button
+        {...rest}
         ref={ref as React.Ref<HTMLButtonElement>}
-        type={buttonRest.type ?? 'button'}
-        disabled={loading || buttonRest.disabled}
-        aria-busy={loading ? true : undefined}
+        type={type ?? 'button'}
+        disabled={loading || disabled}
+        aria-busy={loading || undefined}
         aria-disabled={loading ? true : undefined}
         className={classes}
-        {...buttonRest}
       >
-        {icon}
-        {loading ? <Spinner /> : null}
-        {children}
-        {!loading && iconRight}
-      </Comp>
+        {content}
+      </button>
     );
-  }
-
-  return (
-    <button
-      ref={ref as React.Ref<HTMLButtonElement>}
-      type={buttonRest.type ?? 'button'}
-      disabled={loading || buttonRest.disabled}
-      aria-busy={loading ? true : undefined}
-      aria-disabled={loading ? true : undefined}
-      className={classes}
-      {...buttonRest}
-    >
-      {icon}
-      {loading ? <Spinner /> : null}
-      {children}
-      {!loading && iconRight}
-    </button>
-  );
-}) as <T extends AnyButtonProps>(props: T, ref: ButtonRef<T>) => React.ReactElement;
+  },
+);
 
 Button.displayName = 'Button';
 
@@ -133,6 +122,10 @@ const variantClasses: Record<ButtonVariant, string> = {
   ghost: 'bg-transparent text-[var(--color-text-strong)] hover:bg-[var(--color-bg-subtle)] active:bg-[var(--color-bg-strong)]',
   link: 'bg-transparent text-[var(--color-text-link)] hover:bg-[var(--color-bg-brand-soft)]',
   destructive:
+    'bg-[var(--color-red-600)] text-white shadow-[0_1px_0_0_var(--color-border-strong)] hover:brightness(96) active:shadow-[0_1px_0_0_var(--color-red-500)]',
+  accent:
+    'bg-[var(--color-accent-600)] text-white shadow-[0_1px_0_0_var(--color-border-strong)] hover:brightness(96) active:shadow-[0_1px_0_0_var(--color-accent-500)]',
+  danger:
     'bg-[var(--color-red-600)] text-white shadow-[0_1px_0_0_var(--color-border-strong)] hover:brightness(96) active:shadow-[0_1px_0_0_var(--color-red-500)]',
   success:
     'bg-[var(--color-green-600)] text-white shadow-[0_1px_0_0_var(--color-border-strong)] hover:brightness(96) active:shadow-[0_1px_0_0_var(--color-green-500)]',

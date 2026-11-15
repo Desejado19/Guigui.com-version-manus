@@ -141,6 +141,9 @@ describe('BusinessDashboard simulated quota purchases', () => {
   it('waits for profile persistence before showing the saved state', async () => {
     const onSaveBusinessProfile = vi.fn().mockResolvedValue(undefined);
     renderDashboard(vi.fn(), onSaveBusinessProfile);
+    fireEvent.change(screen.getByLabelText(/descrição e apresentação/i), {
+      target: { value: 'Empresa de eventos com serviços completos para eventos culturais.' },
+    });
     fireEvent.click(screen.getByRole('button', { name: /actualizar dados da empresa/i }));
 
     await waitFor(() => expect(onSaveBusinessProfile).toHaveBeenCalledWith(expect.objectContaining({

@@ -175,8 +175,13 @@ export async function markPostgresConversationRead(input: { conversationId: stri
   }
   const field = input.role === 'user' ? 'unread_for_user' : 'unread_for_business';
   const readField = input.role === 'user' ? 'read_by_user' : 'read_by_business';
-  const access = input.role === 'user' ? 'user_id=$2' : 'business_id=$3';
-  const result = await databasePool.query(`UPDATE conversations SET ${field}=FALSE WHERE id=$1 AND ${access} RETURNING id`, [input.conversationId, input.userId, input.businessId || '']);
+  // Cidadão e empresa usam $1 e $2: um marcador sem utilização ($2 na versão
+  // antiga do ramo empresarial) fazia o Postgres abortar com 42P18.
+  const access = input.role === 'user' ? 'user_id=$2' : 'business_id=$2';
+  const params = input.role === 'user'
+    ? [input.conversationId, input.userId]
+    : [input.conversationId, input.businessId || ''];
+  const result = await databasePool.query(`UPDATE conversations SET ${field}=FALSE WHERE id=$1 AND ${access} RETURNING id`, params);
   if (!result.rowCount) return false;
   await databasePool.query(`UPDATE conversation_messages SET ${readField}=TRUE WHERE conversation_id=$1`, [input.conversationId]);
   return true;
@@ -205,7 +210,7 @@ export async function createPostgresConversationMessage(input: { id: string; con
     await client.query(
       `INSERT INTO conversation_messages (id,conversation_id,sender_id,sender_role,text,read_by_user,read_by_business,client_message_id,reply_to_message_id,message_type,delivery_status,attachment_name,attachment_url)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-       ON CONFLICT (conversation_id,client_message_id) DO NOTHING`,
+       ON CONFLICT (conversation_id,client_message_id) WHERE client_message_id IS NOT NULL DO NOTHING`,
       [input.id, input.conversationId, input.senderId, input.senderRole, input.text, input.senderRole === 'user', input.senderRole === 'business', input.clientMessageId || null, input.replyToId || null, input.messageType || 'text', 'delivered', input.attachmentName || null, input.attachmentUrl || null],
     );
     await client.query(
@@ -222,7 +227,6 @@ export async function createPostgresConversationMessage(input: { id: string; con
 }
 
 export async function persistPostgresNotification(notification: NotificationRecord): Promise<void> {
-  if (!notification.userId) return;
   if (!databasePool) {
     const existing = memoryNotifications.get(notification.id);
     memoryNotifications.set(notification.id, {
@@ -279,6 +283,25 @@ export async function listPostgresSupportTickets(userId: string, role: 'user' | 
   return result.rows;
 }
 
+/**
+ * Verifica, no servidor, se a sessão pode responder ao pedido de suporte.
+ * É chamado antes de validar o corpo para que a recusa seja sempre 403.
+ */
+export async function canAccessSupportTicket(ticketId: string, senderId: string, senderRole: 'user' | 'business' | 'admin', businessId?: string): Promise<boolean> {
+  if (!databasePool) {
+    const ticket = memorySupportTickets.get(ticketId);
+    if (!ticket) return false;
+    if (senderRole === 'admin') return true;
+    if (senderRole === 'user') return ticket.requesterUserId === senderId;
+    return Boolean(businessId) && ticket.businessId === businessId;
+  }
+  const access = await databasePool.query(
+    `SELECT 1 FROM support_tickets WHERE id=$1 AND ($2='admin' OR ($2='user' AND requester_user_id=$3) OR ($2='business' AND business_id=$4))`,
+    [ticketId, senderRole, senderId, businessId || ''],
+  );
+  return Boolean(access.rowCount);
+}
+
 export async function createPostgresSupportReply(input: { id: string; ticketId: string; senderId: string; senderRole: 'user' | 'business' | 'admin'; businessId?: string; text: string; status?: string }) {
   if (!databasePool) {
     const ticket = memorySupportTickets.get(input.ticketId);
@@ -330,6 +353,33 @@ export async function updatePostgresSupportStatus(ticketId: string, status: stri
     [status, ticketId]
   );
   return (result.rowCount ?? 0) > 0;
+}
+
+export type CommunicationParticipants = { userId: string | null; businessId: string | null };
+
+/**
+ * Participantes reais de uma conversa: quem pode receber sinais de tempo real
+ * sobre ela. Devolve `null` quando a conversa não existe.
+ */
+export async function getConversationParticipants(conversationId: string): Promise<CommunicationParticipants | null> {
+  if (!databasePool) {
+    const conversation = memoryConversations.get(conversationId);
+    return conversation ? { userId: conversation.user_id, businessId: conversation.business_id || null } : null;
+  }
+  const result = await databasePool.query('SELECT user_id, business_id FROM conversations WHERE id=$1', [conversationId]);
+  const row = result.rows[0];
+  return row ? { userId: row.user_id as string, businessId: (row.business_id as string) || null } : null;
+}
+
+/** Participantes reais de um pedido de suporte. */
+export async function getSupportTicketParticipants(ticketId: string): Promise<CommunicationParticipants | null> {
+  if (!databasePool) {
+    const ticket = memorySupportTickets.get(ticketId);
+    return ticket ? { userId: ticket.requesterUserId, businessId: ticket.businessId || null } : null;
+  }
+  const result = await databasePool.query('SELECT requester_user_id, business_id FROM support_tickets WHERE id=$1', [ticketId]);
+  const row = result.rows[0];
+  return row ? { userId: row.requester_user_id as string, businessId: (row.business_id as string) || null } : null;
 }
 
 export async function listPostgresNotifications(userId: string): Promise<unknown[]> {

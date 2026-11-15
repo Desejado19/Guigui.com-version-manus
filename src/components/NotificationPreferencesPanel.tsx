@@ -54,7 +54,7 @@ export const NotificationPreferencesPanel: React.FC<NotificationPreferencesPanel
   };
 
   return (
-    <section className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+    <section className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
       <div className="flex items-start gap-3 border-b border-slate-100 pb-5 dark:border-slate-800">
         <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 flex items-center justify-center shrink-0"><Bell className="w-5 h-5" /></div>
         <div>
@@ -70,9 +70,9 @@ export const NotificationPreferencesPanel: React.FC<NotificationPreferencesPanel
             const enabled = value.categories[category] !== false;
             const locked = LOCKED_CATEGORIES.includes(category);
             return (
-              <button key={category} type="button" onClick={() => updateCategory(category)} disabled={locked} className={`flex items-center justify-between gap-3 rounded-2xl border p-3 text-left transition ${enabled ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/30' : 'border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/50'} ${locked ? 'cursor-not-allowed opacity-90' : 'hover:border-emerald-400'}`}>
+              <button key={category} type="button" onClick={() => updateCategory(category)} disabled={locked} className={`flex items-center justify-between gap-3 rounded-2xl border p-3 text-left transition ${enabled ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/30' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:border-slate-800 dark:bg-slate-950/50'} ${locked ? 'cursor-not-allowed opacity-90' : 'hover:border-emerald-400'}`}>
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-100">{CATEGORY_LABELS[category]}</span>
-                <span className="flex items-center gap-1.5 shrink-0">{locked && <LockKeyhole className="w-3.5 h-3.5 text-amber-500" />}<span className={`w-8 h-5 rounded-full p-0.5 ${enabled ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'}`}><span className={`block w-4 h-4 rounded-full bg-white transition-transform ${enabled ? 'translate-x-3' : ''}`} /></span></span>
+                <span className="flex items-center gap-1.5 shrink-0">{locked && <LockKeyhole className="w-3.5 h-3.5 text-amber-500" />}<span className={`w-8 h-5 rounded-full p-0.5 ${enabled ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'}`}><span className={`block w-4 h-4 rounded-full bg-white dark:bg-slate-900 transition-transform ${enabled ? 'translate-x-3' : ''}`} /></span></span>
               </button>
             );
           })}
@@ -86,10 +86,10 @@ export const NotificationPreferencesPanel: React.FC<NotificationPreferencesPanel
             const enabled = value.channels[id] !== false;
             const locked = id === 'in_app' && role === 'admin';
             return (
-              <button key={id} type="button" onClick={() => updateChannel(id)} disabled={locked} className={`flex items-start gap-3 rounded-2xl border p-3 text-left transition ${enabled ? 'border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/50' : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'} ${locked ? 'cursor-not-allowed' : 'hover:border-emerald-400'}`}>
+              <button key={id} type="button" onClick={() => updateChannel(id)} disabled={locked} className={`flex items-start gap-3 rounded-2xl border p-3 text-left transition ${enabled ? 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:border-slate-800 dark:bg-slate-950/50' : 'border-slate-200 dark:border-slate-700 bg-white dark:border-slate-800 dark:bg-slate-900'} ${locked ? 'cursor-not-allowed' : 'hover:border-emerald-400'}`}>
                 <Icon className={`w-4 h-4 mt-0.5 ${enabled ? 'text-emerald-600 dark:text-emerald-300' : 'text-slate-400'}`} />
                 <span className="min-w-0 flex-1"><span className="block text-xs font-black text-slate-800 dark:text-slate-100">{label}{locked && <LockKeyhole className="inline ml-1 w-3 h-3 text-amber-500" />}</span><span className="block text-[10px] leading-relaxed text-slate-500 dark:text-slate-400 mt-0.5">{description}</span></span>
-                <span className={`w-8 h-5 rounded-full p-0.5 shrink-0 ${enabled ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'}`}><span className={`block w-4 h-4 rounded-full bg-white transition-transform ${enabled ? 'translate-x-3' : ''}`} /></span>
+                <span className={`w-8 h-5 rounded-full p-0.5 shrink-0 ${enabled ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'}`}><span className={`block w-4 h-4 rounded-full bg-white dark:bg-slate-900 transition-transform ${enabled ? 'translate-x-3' : ''}`} /></span>
               </button>
             );
           })}

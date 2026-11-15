@@ -1,21 +1,7 @@
-/**
- * Deploy Poller with exponential backoff retry.
- *
- * Provides retry logic with exponential backoff for deployment polling.
- * Uses the p-retry library which is already a dependency.
- *
- * @param fn - Async function to retry
- * @param options - Retry options with backoff configuration
- * @returns Resolution of the function if retries succeed
- *
- * @example
- * ```typescript
- * const result = await pollWithBackoff(
- *   () => fetchDeploymentStatus(),
- *   { retries: 5, startingDelay: 1000 }
- * );
- * ```
- */
+// Deploy Poller with exponential backoff retry.
+// Provides retry logic with exponential backoff for deployment polling.
+// Uses the p-retry library which is already a dependency.
+
 import pRetry from 'p-retry';
 
 /**
@@ -40,7 +26,7 @@ export interface PollWithBackoffOptions<T> {
   /** Maximum delay in ms between attempts */
   maxDelay?: number;
   /** Callback called on each failed attempt */
-  onFailedAttempt?: (error: Error, attempt: number) => void;
+  onFailedAttempt?: (error: Error) => void;
   /** Callback called when retry succeeds */
   onSuccess?: (result: T, attempt: number) => void;
 }
@@ -101,19 +87,14 @@ export async function pollWithBackoff<T>(
 
   const attemptOptions = {
     retries: maxAttempts - 1,
-    onFailedAttempt: (error: any, currentAttempt: number) => {
-      const attemptNumber = currentAttempt + 1; // Convert from 0-indexed to 1-indexed
-      const delay = startingDelay * Math.pow(multiplier, attemptNumber - 1);
+    onFailedAttempt: (error: Error) => {
+      lastError = error;
 
-      // Apply maxDelay cap if specified
-      const finalDelay = maxDelay ? Math.min(delay, maxDelay) : delay;
-
-      lastError = error instanceof Error ? error : new Error(String(error));
-
-      onFailedAttempt?.(lastError, attemptNumber);
+      onFailedAttempt?.(error);
 
       // Return the wait time for p-retry
-      return new Promise(resolve => setTimeout(resolve, finalDelay));
+      // Note: p-retry handles the delay internally based on the retry count
+      return Promise.resolve();
     },
   } as const;
 
@@ -143,4 +124,79 @@ export async function pollWithBackoff<T>(
   }
 }
 
+/** Recibo devolvido pela API de deployment (subconjunto estável de OperationReceipt). */
+export interface DeployReceipt {
+  status: string;
+  [key: string]: unknown;
+}
+
+export interface DeployPollerOptions {
+  siteId: string;
+  environment: 'preview' | 'production';
+  requestId: string;
+  manifestPath: string;
+  /** Consulta do estado; por omissão falha porque depende da API de deployment. */
+  checkStatus?: () => Promise<DeployReceipt>;
+  maxAttempts?: number;
+  baseDelayMs?: number;
+}
+
+export interface DeployPollerResult {
+  receipt: DeployReceipt;
+  attempts: number;
+  succeeded: boolean;
+  error?: Error;
+}
+
+/**
+ * Consulta o recibo de deployment com retry exponencial (p-retry).
+ *
+ * Só considera o deployment concluído com `succeeded`/`published`; qualquer
+ * outro estado devolve `succeeded: false` em vez de o apresentar como feito.
+ */
+export async function pollDeploy(options: DeployPollerOptions): Promise<DeployPollerResult> {
+  const { checkStatus, maxAttempts = DEFAULT_MAX_ATTEMPTS, baseDelayMs = 5_000 } = options;
+  let attempts = 0;
+
+  const check = async (): Promise<DeployReceipt> => {
+    attempts += 1;
+    if (!checkStatus) {
+      throw new Error(
+        'A consulta do estado de deployment requer integração com a API de Sites.',
+      );
+    }
+    return checkStatus();
+  };
+
+  try {
+    const receipt = await pRetry<DeployReceipt>(check, {
+      retries: Math.max(0, maxAttempts - 1),
+      onFailedAttempt: (error) => {
+        const delay = baseDelayMs * Math.pow(DEFAULT_MULTIPLIER, error.attemptNumber - 1);
+        console.info(
+          `Deploy poller tentativa ${error.attemptNumber}/${maxAttempts} falhou. ` +
+            `Nova tentativa em ${Math.round(delay / 1000)}s: ${error.message}`,
+        );
+      },
+    });
+
+    const succeeded = receipt.status === 'succeeded' || receipt.status === 'published';
+    return {
+      receipt,
+      attempts: Math.max(attempts, 1),
+      succeeded,
+      error: succeeded ? undefined : new Error(`Deployment não concluído (estado: ${receipt.status}).`),
+    };
+  } catch (error) {
+    const failure = error instanceof Error ? error : new Error(String(error));
+    return {
+      receipt: { status: 'failed' },
+      attempts: Math.max(attempts, 1),
+      succeeded: false,
+      error: failure,
+    };
+  }
+}
+
+/** Mantém o utilitário genérico como exportação por omissão. */
 export default pollWithBackoff;

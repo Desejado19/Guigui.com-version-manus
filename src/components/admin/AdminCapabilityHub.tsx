@@ -329,8 +329,8 @@ export const AdminCapabilityHub: React.FC<AdminCapabilityHubProps> = ({ onNaviga
   };
 
   return (
-    <section className="rounded-3xl border border-slate-700 bg-slate-950 text-white shadow-2xl overflow-hidden">
-      <div className="border-b border-slate-800 bg-gradient-to-r from-slate-950 via-emerald-950/50 to-slate-950 p-5 sm:p-6">
+    <section className="rounded-2xl border border-slate-700 bg-slate-950 text-white shadow-2xl overflow-hidden">
+      <div className="border-b border-slate-800 bg-gradient-to-r from-slate-950 via-emerald-950/50 to-slate-950 p-4">
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-300">
@@ -355,7 +355,7 @@ export const AdminCapabilityHub: React.FC<AdminCapabilityHubProps> = ({ onNaviga
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-0">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 sm:p-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3.5 sm:p-4">
           {capabilityGroups.map((group) => {
             const Icon = group.icon;
             const groupIntegrated = group.items.filter((item) => item.status === 'integrated').length;
@@ -395,7 +395,7 @@ export const AdminCapabilityHub: React.FC<AdminCapabilityHubProps> = ({ onNaviga
           })}
         </div>
 
-        <aside className="border-t xl:border-t-0 xl:border-l border-slate-800 bg-slate-900/60 p-5 sm:p-6">
+        <aside className="border-t xl:border-t-0 xl:border-l border-slate-800 bg-slate-900/60 p-4">
           <div className="flex items-center gap-2 text-emerald-300">
             <Gauge className="h-4 w-4" />
             <span className="text-[10px] font-black uppercase tracking-[0.14em]">{t('admin.selectedCapability')}</span>

@@ -13,13 +13,44 @@ import {
   Zap,
   Play,
   Video,
-  Crown,
   Sparkles,
   Image as ImageIcon,
 } from 'lucide-react';
-import { BusinessPost, ReactionType, Business, Language, UserProfile } from '../types';
+import { BusinessPost, ReactionType, Business, Language, PostComment, UserProfile } from '../types';
+import { usePostEngagementContext } from './PostEngagementProvider';
+import { PostCommentsSheet } from './feed/PostCommentsSheet';
+
+const formatPostDate = (value?: string) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('pt-PT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
 import { useTranslatedText } from '../utils/contentTranslation';
 import { getTranslation } from '../utils/i18n';
+
+const MOBILE_QUERY = '(max-width: 767px)';
+
+/** Decide entre o painel inferior (mobile) e a secção inline (desktop). */
+const useIsMobileViewport = () => {
+  const [isMobile, setIsMobile] = useState<boolean>(() =>
+    typeof window !== 'undefined' && window.matchMedia(MOBILE_QUERY).matches,
+  );
+  useEffect(() => {
+    const query = window.matchMedia(MOBILE_QUERY);
+    const sync = () => setIsMobile(query.matches);
+    sync();
+    query.addEventListener('change', sync);
+    return () => query.removeEventListener('change', sync);
+  }, []);
+  return isMobile;
+};
 
 interface FeedPostCardProps {
   post: BusinessPost;
@@ -40,11 +71,16 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
   onRequireLogin,
   isHighlighted = false,
 }) => {
+  const engagementContext = usePostEngagementContext();
+  const engagement = engagementContext?.engagements[post.id];
+  const isMobileViewport = useIsMobileViewport();
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [selectedReaction, setSelectedReaction] = useState<ReactionType | null>(post.userReaction || null);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentsList, setCommentsList] = useState(post.comments || []);
   const [newCommentText, setNewCommentText] = useState('');
+  const [replyTarget, setReplyTarget] = useState<string | null>(null);
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [sharesCount, setSharesCount] = useState(post.sharesCount || 0);
   const [activeMediaGalleryIndex, setActiveMediaGalleryIndex] = useState(0);
   const articleRef = useRef<HTMLElement | null>(null);
@@ -56,6 +92,15 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
     if (!isHighlighted) return;
     articleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [isHighlighted]);
+
+  // Os números vêm do registo partilhado no servidor: o mesmo post mostra a
+  // mesma contagem no feed, na ficha da empresa e no painel de gestão.
+  useEffect(() => {
+    if (!engagement) return;
+    setSelectedReaction(engagement.myReaction ?? null);
+    setCommentsList(engagement.comments);
+    setSharesCount(engagement.shares);
+  }, [engagement]);
 
   // Helpers to detect embeddable video links
   const getEmbedVideoUrl = (url?: string) => {
@@ -80,9 +125,9 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
     return url.endsWith('.mp4') || url.endsWith('.webm') || url.endsWith('.mov') || url.includes('video');
   };
 
-  // Compute total reactions
-  const baseLikes = post.likesCount || 12;
-  const currentTotalLikes = baseLikes + (selectedReaction ? 1 : 0);
+  // Contagem real de gostos (sem valores simulados).
+  const baseLikes = engagement?.likes ?? post.likesCount ?? 0;
+  const currentTotalLikes = baseLikes;
 
   const reactionsList: { type: ReactionType; emoji: string; label: string; color: string }[] = [
     { type: 'like', emoji: '👍', label: 'Gostar', color: 'text-[#1877F2]' },
@@ -93,41 +138,59 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
     { type: 'angry', emoji: '😡', label: 'Bravo', color: 'text-orange-600' },
   ];
 
-  const handleSelectReaction = (type: ReactionType) => {
+  const handleSelectReaction = async (type: ReactionType) => {
     if (!currentUser) {
       onRequireLogin?.('Inicie sessão ou crie uma conta (Cidadão ou Empresa) para curtir publicações.');
       return;
     }
 
-    if (selectedReaction === type) {
-      setSelectedReaction(null);
-    } else {
-      setSelectedReaction(type);
-    }
+    const nextReaction = selectedReaction === type ? null : type;
+    const previousReaction = selectedReaction;
+    setSelectedReaction(nextReaction);
     setShowReactionPicker(false);
+    if (!engagementContext) return;
+    try {
+      await engagementContext.react(post.id, nextReaction);
+    } catch (error) {
+      setSelectedReaction(previousReaction);
+      onRequireLogin?.(error instanceof Error ? error.message : 'Não foi possível registar a reação.');
+    }
   };
 
-  const handleAddComment = (e: React.FormEvent) => {
+  const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) {
       onRequireLogin?.('Inicie sessão ou crie uma conta (Cidadão ou Empresa) para comentar publicações.');
       return;
     }
 
-    if (!newCommentText.trim()) return;
+    const text = newCommentText.trim();
+    if (!text || !engagementContext) return;
 
-    const newComment = {
-      id: 'c-' + Date.now(),
-      postId: post.id,
-      authorName: currentUser.name,
-      authorAvatar: currentUser.avatarUrl,
-      content: newCommentText,
-      createdAt: 'Agora mesmo',
-      likesCount: 0,
-    };
-
-    setCommentsList([...commentsList, newComment]);
     setNewCommentText('');
+    try {
+      await engagementContext.comment(post.id, text);
+    } catch (error) {
+      setNewCommentText(text);
+      onRequireLogin?.(error instanceof Error ? error.message : 'Não foi possível guardar o comentário.');
+    }
+  };
+
+  const handleAddReply = async (event: React.FormEvent, parentId: string) => {
+    event.preventDefault();
+    if (!currentUser) {
+      onRequireLogin?.('Inicie sessão ou crie uma conta (Cidadão ou Empresa) para responder a comentários.');
+      return;
+    }
+    const text = (replyDrafts[parentId] ?? '').trim();
+    if (!text || !engagementContext) return;
+    try {
+      await engagementContext.reply(post.id, parentId, text);
+      setReplyDrafts((previous) => ({ ...previous, [parentId]: '' }));
+      setReplyTarget(null);
+    } catch (error) {
+      onRequireLogin?.(error instanceof Error ? error.message : 'Não foi possível guardar a resposta.');
+    }
   };
 
   const handleShareWhatsApp = async () => {
@@ -149,10 +212,46 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
     const text = encodeURIComponent(`${shareText}\n\n${window.location.href}`);
     const shareWindow = window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank', 'noopener,noreferrer');
     if (shareWindow) setSharesCount((prev) => prev + 1);
+    // Regista a partilha no servidor para alimentar as métricas da empresa.
+    if (currentUser && engagementContext) {
+      engagementContext.share(post.id).catch(() => {});
+    }
   };
 
+  const openComments = () => {
+    setCommentsOpen(true);
+    setReplyTarget(null);
+  };
+
+  const closeComments = () => setCommentsOpen(false);
+
+  const renderCommentRow = (comment: PostComment, depth: number) => (
+    <div className={`flex items-start gap-2.5 ${depth > 0 ? 'ml-8' : ''}`}>
+      <img
+        src={comment.authorAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}
+        alt=""
+        className="w-7 h-7 rounded-full object-cover border border-slate-200 flex-shrink-0"
+      />
+      <div className="bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-slate-200 p-2.5 rounded-2xl flex-1 shadow-2xs">
+        <div className="font-extrabold text-slate-900 dark:text-slate-300 text-xs">{comment.authorName}</div>
+        <p className="text-slate-700 mt-0.5 text-xs">{comment.content}</p>
+        <div className="flex items-center gap-3 text-[10px] text-slate-400 font-bold mt-1">
+          {depth === 0 && (
+            <button
+              type="button"
+              onClick={() => setReplyTarget(replyTarget === comment.id ? null : comment.id)}
+              className="hover:underline text-[#1877F2]"
+            >
+              Responder
+            </button>
+          )}
+          <span>{formatPostDate(comment.createdAt)}</span>
+        </div>
+      </div>
+    </div>
+  );
   return (
-    <article ref={articleRef} className={`bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-slate-200 rounded-3xl shadow-sm overflow-hidden text-slate-800 dark:text-slate-300 space-y-3 transition hover:border-slate-300 ${isHighlighted ? 'ring-4 ring-emerald-400 ring-offset-4 ring-offset-slate-50' : ''}`}>
+    <article ref={articleRef} data-post-id={post.id} className={`bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-slate-200 rounded-3xl shadow-sm overflow-hidden text-slate-800 dark:text-slate-300 space-y-3 transition hover:border-slate-300 ${isHighlighted ? 'ring-4 ring-emerald-400 ring-offset-4 ring-offset-slate-50' : ''}`}>
       {/* Post Author Header */}
       <div className="p-4 sm:p-5 pb-0 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -176,20 +275,16 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
                 {post.businessName}
               </span>
               <CheckCircle2 className="w-4 h-4 text-emerald-600 fill-emerald-600 text-white shrink-0" />
-
-              {/* Verified Plan Subscriber Badge */}
-              {(post.isPlanSubscriberPost || post.planBadge || business?.tier) && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-2xs">
-                  <Crown className="w-3 h-3 text-amber-100" />
-                  <span>{post.planBadge || business?.tier?.toUpperCase() || 'VIP'}</span>
-                </span>
-              )}
             </div>
 
             <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5 mt-0.5">
               <span>📍 {post.neighborhood || business?.neighborhood || t("business.Todos")}</span>
               <span>•</span>
               <span>{post.mediaType === 'video' ? `🎬 ${t('business.VideoComercial')}` : post.mediaType === 'gallery' ? `📸 ${t('business.Galeria')}` : t('business.Publicacao')}</span>
+              {post.createdAt && <>
+                <span>•</span>
+                <time dateTime={post.createdAt}>{formatPostDate(post.createdAt)}</time>
+              </>}
             </div>
           </div>
         </div>
@@ -298,15 +393,15 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
             <span className="w-4 h-4 rounded-full bg-[#1877F2] text-white flex items-center justify-center text-[9px]">👍</span>
             <span className="w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[9px]">❤️</span>
           </div>
-          <span className="font-bold text-slate-700 ml-1">{currentTotalLikes}</span>
+          <span className="font-bold text-slate-700 ml-1" data-testid="post-likes">{currentTotalLikes}</span>
         </div>
 
         <div className="flex items-center gap-3 text-[11px]">
-          <button type="button" onClick={() => setCommentsOpen(!commentsOpen)} className="hover:underline">
+          <button type="button" onClick={openComments} className="hover:underline" data-testid="post-comments">
             {commentsList.length} Comentários
           </button>
           <span>•</span>
-          <span>{sharesCount} Partilhas</span>
+          <span data-testid="post-shares">{sharesCount} Partilhas</span>
         </div>
       </div>
 
@@ -351,7 +446,8 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
         {/* Comment Button */}
         <button
           type="button"
-          onClick={() => setCommentsOpen(!commentsOpen)}
+          onClick={openComments}
+          data-testid="post-comment-button"
           className="flex-1 py-2 rounded-xl hover:bg-[#F0F2F5] transition flex items-center justify-center gap-1.5 text-slate-600"
         >
           <MessageCircle className="w-4 h-4" />
@@ -381,8 +477,29 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
         )}
       </div>
 
-      {/* Inline Comments Section */}
-      {commentsOpen && (
+      {/* Painel inferior (mobile) — versão Instagram */}
+      {isMobileViewport && (
+        <PostCommentsSheet
+          open={commentsOpen}
+          onClose={closeComments}
+          title={translatedTitle}
+          subtitle={post.businessName}
+          comments={commentsList}
+          currentUser={currentUser}
+          onRequireLogin={onRequireLogin}
+          onSubmit={async (text) => {
+            if (!engagementContext) return;
+            await engagementContext.comment(post.id, text);
+          }}
+          onReply={async (parentId, text) => {
+            if (!engagementContext) return;
+            await engagementContext.reply(post.id, parentId, text);
+          }}
+        />
+      )}
+
+      {/* Inline Comments Section (desktop) */}
+      {commentsOpen && !isMobileViewport && (
         <div className="p-3.5 sm:p-4 bg-slate-50/80 space-y-3 text-xs">
           {/* Comment Input */}
           <form onSubmit={handleAddComment} className="flex items-center gap-2">
@@ -410,6 +527,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
             />
             <button
               type="submit"
+              aria-label="Publicar comentário"
               className="w-8 h-8 rounded-full bg-[#1877F2] text-white flex items-center justify-center hover:bg-blue-700 transition"
             >
               <Send className="w-3.5 h-3.5" />
@@ -417,24 +535,35 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
           </form>
 
           {/* Comments List */}
-          <div className="space-y-2.5 pt-2">
+          <div className="space-y-3 pt-2">
+            {commentsList.length === 0 && (
+              <p className="text-[11px] text-slate-500">Ainda não existem comentários.</p>
+            )}
             {commentsList.map((c) => (
-              <div key={c.id} className="flex items-start gap-2.5">
-                <img
-                  src={c.authorAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}
-                  alt=""
-                  className="w-7 h-7 rounded-full object-cover border border-slate-200 flex-shrink-0"
-                />
-
-                <div className="bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-slate-200 p-2.5 rounded-2xl flex-1 shadow-2xs">
-                  <div className="font-extrabold text-slate-900 dark:text-slate-300 text-xs">{c.authorName}</div>
-                  <p className="text-slate-700 mt-0.5 text-xs">{c.content}</p>
-                  <div className="flex items-center gap-3 text-[10px] text-slate-400 font-bold mt-1">
-                    <button type="button" className="hover:underline text-[#1877F2]">Gostar</button>
-                    <span>•</span>
-                    <span>{c.createdAt}</span>
-                  </div>
-                </div>
+              <div key={c.id} className="space-y-2">
+                {renderCommentRow(c, 0)}
+                {(c.replies ?? []).map((child) => (
+                  <div key={child.id}>{renderCommentRow(child, 1)}</div>
+                ))}
+                {replyTarget === c.id && (
+                  <form onSubmit={(event) => handleAddReply(event, c.id)} className="ml-8 flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={replyDrafts[c.id] ?? ''}
+                      onChange={(event) => setReplyDrafts((previous) => ({ ...previous, [c.id]: event.target.value }))}
+                      placeholder={`Responder a ${c.authorName}...`}
+                      aria-label={`Responder a ${c.authorName}`}
+                      className="flex-1 bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-slate-200 rounded-full px-4 py-2 text-xs text-slate-900 dark:text-slate-300 focus:outline-none focus:border-blue-600"
+                    />
+                    <button
+                      type="submit"
+                      aria-label="Publicar resposta"
+                      className="w-8 h-8 rounded-full bg-[#1877F2] text-white flex items-center justify-center hover:bg-blue-700 transition"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                    </button>
+                  </form>
+                )}
               </div>
             ))}
           </div>

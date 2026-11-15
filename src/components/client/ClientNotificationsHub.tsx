@@ -17,7 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { AppNotification, Business, Language } from '../../types';
-import { filterNotificationsForContext } from '../../services/notificationService';
+import { filterNotificationsForContext, formatNotificationDateTime } from '../../services/notificationService';
 import { getTranslation } from '../../utils/i18n';
 
 interface ClientNotificationsHubProps {
@@ -88,7 +88,7 @@ export const ClientNotificationsHub: React.FC<ClientNotificationsHubProps> = ({
   const unreadCount = scopedNotifications.filter((notification) => !notification.read).length;
 
   return (
-    <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+    <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-5 dark:border-slate-800">
         <div>
           <div className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-xs px-3 py-1 rounded-full font-bold mb-2 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
@@ -135,7 +135,7 @@ export const ClientNotificationsHub: React.FC<ClientNotificationsHubProps> = ({
             const Icon = iconForNotification(notification);
             const priority = notification.priority || 'normal';
             return (
-              <div key={notification.id} className={`p-4 rounded-2xl border transition flex items-start gap-3.5 ${notification.read ? 'bg-slate-50/50 border-slate-200 dark:bg-slate-950/50 dark:border-slate-800' : 'bg-blue-50/40 border-blue-200 shadow-2xs dark:bg-blue-950/20 dark:border-blue-800'}`}>
+              <div key={notification.id} className={`p-4 rounded-2xl border transition flex items-start gap-3.5 ${notification.read ? 'bg-slate-50/50 border-slate-200 dark:border-slate-700 dark:bg-slate-950/50 dark:border-slate-800' : 'bg-blue-50/40 border-blue-200 shadow-2xs dark:bg-blue-950/20 dark:border-blue-800'}`}>
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${priorityClasses[priority] || priorityClasses.normal}`}>
                   <Icon className="w-4.5 h-4.5" />
                 </div>
@@ -146,7 +146,7 @@ export const ClientNotificationsHub: React.FC<ClientNotificationsHubProps> = ({
                   </div>
                   <p className="text-xs text-slate-600 mt-1 leading-relaxed dark:text-slate-300">{notification.message}</p>
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-[10px] text-slate-400 dark:text-slate-400">
-                    <span className="inline-flex items-center gap-1"><Clock3 className="w-3 h-3" />{notification.timeAgo || t('recently')}</span>
+                    <span className="inline-flex items-center gap-1"><Clock3 className="w-3 h-3" /><time dateTime={notification.createdAt}>{formatNotificationDateTime(notification.createdAt, currentLang)}</time></span>
                     {notification.channels?.map((channel) => <span key={channel} className="uppercase font-bold">{channel.replace('_', ' ')}</span>)}
                   </div>
                 </div>

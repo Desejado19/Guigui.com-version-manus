@@ -37,7 +37,7 @@ A interface é uma aplicação React 19 com TypeScript, compilada por Vite e est
 | Servidor | Node.js, Express e TypeScript através de `tsx`. |
 | IA | Google GenAI SDK para moderação de texto/imagem quando `GEMINI_API_KEY` está configurada; existe fallback heurístico. |
 | Persistência demo | `localStorage` para sessão e dados da interface; JSON em `data/` para dados do servidor local. |
-| Exportação | Utilitários para CSV, Excel compatível em `.xls` e folha profissional de impressão/guardar como PDF. |
+| Exportação | Utilitários para CSV, Excel nativo em `.xlsx` e folha profissional de impressão/guardar como PDF. |
 | Linguagens da interface | Português, Francês e Inglês. |
 
 O fluxo geral de eventos segue esta lógica:
@@ -594,7 +594,7 @@ O sistema disponibiliza operações de backup manual, histórico, consentimento 
 | Formato | Comportamento actual |
 |---|---|
 | CSV | Ficheiro estruturado com BOM, escape de aspas e colunas. |
-| Excel | Excel compatível em `.xls` através de tabela HTML/XML. |
+| Excel | Ficheiro XLSX nativo (OOXML), com cabeçalho estilizado e colunas dimensionadas. |
 | PDF / Imprimir | Abre folha profissional no diálogo de impressão do navegador; o utilizador escolhe imprimir ou Guardar como PDF. |
 
 O sistema não deve afirmar que gera PDF binário no servidor quando o comportamento é impressão do navegador.

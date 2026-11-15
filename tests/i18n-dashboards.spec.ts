@@ -145,7 +145,12 @@ async function openBusinessDashboard(page: Page) {
 async function collectDashboardText(page: Page) {
   const container = page.locator('.guigui-profile-dashboard');
   const chunks: string[] = [await container.innerText()];
-  const entries = container.locator('aside button');
+  // Filtra os botões de colapso do menu (Recolher menu / Fechar menu lateral),
+  // pois clicá-los esconde a sidebar e as etiquetas deixam de ser visíveis.
+  const entries = container.locator('aside button').filter({
+    has: page.locator('span, div, svg'),
+    hasNotText: /menu/i,
+  });
   const total = await entries.count();
   for (let index = 0; index < total; index += 1) {
     const entry = entries.nth(index);

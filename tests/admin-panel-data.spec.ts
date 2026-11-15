@@ -97,9 +97,11 @@ test.describe('Admin painel com dados reais', () => {
     const usersTab = page.getByRole('button', { name: /utilizadores/i }).first();
     await expect(usersTab).toBeVisible({ timeout: 15000 });
     await usersTab.click();
-    await expect(page.getByText('Utilizadores da plataforma')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText(/contas registadas na base de dados/i)).toBeVisible();
-    await page.getByPlaceholder(/pesquisar nome ou email/i).fill('seed01');
+    await expect(page.getByRole('heading', { name: 'Utilizadores', exact: true }).first()).toBeVisible({ timeout: 15000 });
+    await page.getByRole('button', { name: /^Todas as contas/ }).first().click();
+    await expect(page.getByRole('heading', { name: 'Visão geral de utilizadores' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/todas as contas da plataforma num único local/i)).toBeVisible();
+    await page.getByPlaceholder(/pesquisar por nome/i).fill('seed01');
     await page.waitForTimeout(900);
     await expect(page.getByText('empresa.seed01@guigui.test').first()).toBeVisible();
     await page.screenshot({ path: 'test-results/admin-users-real.png', fullPage: true });

@@ -21,8 +21,8 @@ describe('category catalog', () => {
     const subcategoryRows = firstRows.filter((row) => row.parentId && mainCategoryIds.has(row.parentId));
     const repeatedSubcategoryRows = secondRows.filter((row) => row.parentId && mainCategoryIds.has(row.parentId));
 
-    expect(subcategoryRows.length).toBe(71);
-    expect(new Set(subcategoryRows.map(({ id }) => id)).size).toBe(71);
+    expect(subcategoryRows.length).toBe(72);
+    expect(new Set(subcategoryRows.map(({ id }) => id)).size).toBe(72);
     expect(subcategoryRows.map(({ id }) => id)).toEqual(repeatedSubcategoryRows.map(({ id }) => id));
     expect(subcategoryRows[0]).toMatchObject({
       id: 'cat-1-restaurantes',

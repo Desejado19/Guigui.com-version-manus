@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, LifeBuoy, MessageCircle, UserRound } from "lucide-react";
+import { LifeBuoy, MessageCircle, ShieldCheck, UserRound } from "lucide-react";
 import type {
   Business,
   Conversation,
@@ -15,6 +15,9 @@ import {
   SupportList,
   type ConversationFilter,
   type SupportStatusFilter,
+  type ConversationRowMeta,
+  type CommunicationLabels,
+  COMMUNICATION_LABELS,
 } from "./communication/CommunicationSections";
 import {
   CommunicationOverlays,
@@ -43,8 +46,14 @@ interface CommunicationHubProps {
   onSendMessage: (
     conversationId: string,
     text: string,
-    options?: { replyToId?: string },
-  ) => void;
+    options?: {
+      replyToId?: string;
+      attachmentName?: string;
+      attachmentUrl?: string;
+      messageType?: "text" | "image" | "document" | "link" | "shared_content";
+      clientMessageId?: string;
+    },
+  ) => void | boolean | Promise<void | boolean>;
   onCreateSupport: (
     subject: string,
     description: string,
@@ -95,6 +104,8 @@ export const CommunicationHub: React.FC<CommunicationHubProps> = ({
     null,
   );
   const [newConversationOpen, setNewConversationOpen] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [newConversationError, setNewConversationError] = useState<string | null>(null);
   const [newBusinessId, setNewBusinessId] = useState<string | null>(
     initialBusinessId || null,
   );
@@ -154,18 +165,8 @@ export const CommunicationHub: React.FC<CommunicationHubProps> = ({
         )
         .filter(
           (conversation) =>
-            conversationFilter !== "business" ||
-            Boolean(conversation.businessId),
-        )
-        .filter(
-          (conversation) =>
-            conversationFilter !== "events" ||
-            conversation.participantType === "event",
-        )
-        .filter(
-          (conversation) =>
-            conversationFilter !== "people" ||
-            conversation.participantType === "person",
+            conversationFilter !== "awaiting" ||
+            !(conversationMeta[conversation.id]?.lastFromMe ?? false),
         )
         .filter((conversation) =>
           `${conversation.subject} ${conversation.lastMessage || ""} ${conversation.businessName || conversation.userName || ""}`
@@ -179,6 +180,65 @@ export const CommunicationHub: React.FC<CommunicationHubProps> = ({
         ),
     [conversationFilter, messageSearch, mode, scopedConversations],
   );
+  const conversationMeta = useMemo(
+    () => {
+      const grouped: Record<string, ConversationMessage[]> = Object.create(null);
+      for (const message of messages) {
+        (grouped[message.conversationId] ||= []).push(message);
+      }
+      const map: Record<string, ConversationRowMeta> = Object.create(null);
+      for (const conversation of scopedConversations) {
+        const conversationMessages = grouped[conversation.id] ?? [];
+        conversationMessages.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+        const last = conversationMessages[conversationMessages.length - 1];
+        const unreadCount = conversationMessages.filter(
+          (message) =>
+            message.senderId !== currentUser.id &&
+            (mode === "user" ? !message.readByUser : !message.readByBusiness),
+        ).length;
+        map[conversation.id] = {
+          unreadCount,
+          lastAt: last?.createdAt ?? conversation.updatedAt,
+          lastText:
+            last?.text ||
+            (last?.attachmentName ? `Anexo: ${last.attachmentName}` : "") ||
+            conversation.lastMessage ||
+            "",
+          lastFromMe: !!last && last.senderId === currentUser.id,
+        };
+      }
+      return map;
+    },
+    [messages, scopedConversations, currentUser.id, mode],
+  );
+
+  const conversationCounts = useMemo(
+    () => {
+      let all = 0;
+      let unread = 0;
+      let awaiting = 0;
+      for (const conversation of scopedConversations) {
+        const meta = conversationMeta[conversation.id];
+        if (!meta) continue;
+        all += 1;
+        if (meta.unreadCount > 0) unread += 1;
+        if (mode === "business" && !meta.lastFromMe) awaiting += 1;
+      }
+      return { all, unread, awaiting };
+    },
+    [scopedConversations, conversationMeta, mode],
+  );
+
+  const supportCounts: Record<SupportStatusFilter, number> = useMemo(
+    () => ({
+      all: scopedSupport.length,
+      open: scopedSupport.filter((request) => request.status === "open").length,
+      in_progress: scopedSupport.filter((request) => request.status === "in_progress").length,
+      resolved: scopedSupport.filter((request) => request.status === "resolved").length,
+    }),
+    [scopedSupport],
+  );
+
   const visibleSupport = useMemo(
     () =>
       scopedSupport
@@ -194,57 +254,69 @@ export const CommunicationHub: React.FC<CommunicationHubProps> = ({
         .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
     [scopedSupport, supportFilter, supportSearch],
   );
+
   const selectedSupport = newSupportOpen
     ? null
-    : scopedSupport.find((request) => request.id === selectedSupportId) ||
+    : scopedSupport.find((r) => r.id === selectedSupportId) ||
       visibleSupport[0] ||
       null;
 
+  // Limpa apenas a selecção que deixou de existir nos dados sincronizados.
   useEffect(() => {
     if (
       selectedConversationId &&
-      !scopedConversations.some(
-        (conversation) => conversation.id === selectedConversationId,
-      )
+      !scopedConversations.some((c) => c.id === selectedConversationId)
     ) {
       setSelectedConversationId(null);
     }
+  }, [scopedConversations, selectedConversationId]);
+
+  // Aplica o foco pedido uma única vez por foco. Antes, este efeito voltava a
+  // correr a cada sondagem (10 s, porque os arrays mudam de identidade) e repunha
+  // o canal e a conversa seleccionados, fazendo a caixa de mensagens saltar
+  // entre painéis e perder a escolha do utilizador.
+  const appliedFocusRef = React.useRef<string | null>(null);
+  const focusSignature = `${initialChannel}|${initialBusinessId ?? ""}|${focusConversationId ?? ""}|${focusSupportId ?? ""}`;
+
+  useEffect(() => {
+    if (appliedFocusRef.current === focusSignature) return;
+    if (focusConversationId) {
+      // Espera que a conversa chegue com os dados, sem aplicar duas vezes.
+      if (!scopedConversations.some((c) => c.id === focusConversationId)) return;
+      appliedFocusRef.current = focusSignature;
+      setActiveChannel("messages");
+      setSelectedConversationId(focusConversationId);
+      return;
+    }
+    if (focusSupportId) {
+      if (!scopedSupport.some((r) => r.id === focusSupportId)) return;
+      appliedFocusRef.current = focusSignature;
+      setActiveChannel("support");
+      setSelectedSupportId(focusSupportId);
+      setNewSupportOpen(false);
+      return;
+    }
+    appliedFocusRef.current = focusSignature;
     if (
       initialBusinessId &&
-      businesses.some((business) => business.id === initialBusinessId)
+      businesses.some((b) => b.id === initialBusinessId)
     ) {
       setActiveChannel("messages");
       const existingConversation = scopedConversations.find(
-        (conversation) => conversation.businessId === initialBusinessId,
+        (c) => c.businessId === initialBusinessId,
       );
-      setSelectedConversationId(existingConversation?.id || null);
+      if (existingConversation) setSelectedConversationId(existingConversation.id);
     }
-    if (
-      focusConversationId &&
-      scopedConversations.some(
-        (conversation) => conversation.id === focusConversationId,
-      )
-    ) {
-      setActiveChannel("messages");
-      setSelectedConversationId(focusConversationId);
-    } else if (
-      focusSupportId &&
-      scopedSupport.some((request) => request.id === focusSupportId)
-    ) {
-      setActiveChannel("support");
-      setSelectedSupportId(focusSupportId);
-    } else if (initialChannel) {
-      setActiveChannel(initialChannel);
-    }
+    if (initialChannel) setActiveChannel(initialChannel);
   }, [
     businesses,
     focusConversationId,
+    focusSignature,
     focusSupportId,
     initialBusinessId,
     initialChannel,
     scopedConversations,
     scopedSupport,
-    selectedConversationId,
   ]);
 
   useEffect(() => {
@@ -291,14 +363,44 @@ export const CommunicationHub: React.FC<CommunicationHubProps> = ({
     });
   };
 
-  const submitMessage = (event: React.FormEvent) => {
+  const submitMessage = async (
+    event: React.FormEvent,
+    attachment?: { name: string; url: string; mimeType: string },
+  ): Promise<boolean> => {
     event.preventDefault();
-    if (!selectedConversation || !messageText.trim()) return;
-    onSendMessage(selectedConversation.id, messageText.trim(), {
+    const text = messageText.trim();
+    if (!selectedConversation || (!text && !attachment)) return false;
+    setSendError(null);
+    const result = await onSendMessage(selectedConversation.id, text, {
       replyToId: replyToId || undefined,
+      attachmentName: attachment?.name,
+      attachmentUrl: attachment?.url,
+      messageType: attachment
+        ? attachment.mimeType.startsWith("image/")
+          ? "image"
+          : "document"
+        : undefined,
     });
+    if (result === false) {
+      setSendError("Não foi possível enviar a mensagem. Verifique a ligação e tente novamente.");
+      return false;
+    }
     setMessageText("");
     setReplyToId(null);
+    return true;
+  };
+
+  const retryMessage = (message: ConversationMessage) => {
+    setSendError(null);
+    void Promise.resolve(onSendMessage(message.conversationId, message.text, {
+      replyToId: message.replyToId,
+      attachmentName: message.attachmentName,
+      attachmentUrl: message.attachmentUrl,
+      messageType: message.type,
+      clientMessageId: message.clientMessageId,
+    })).then((result) => {
+      if (result === false) setSendError("Não foi possível reenviar a mensagem. Tente novamente.");
+    });
   };
 
   const submitSupportReply = (event: React.FormEvent) => {
@@ -311,19 +413,26 @@ export const CommunicationHub: React.FC<CommunicationHubProps> = ({
   const submitNewConversation = async (event: React.FormEvent) => {
     event.preventDefault();
     const targetBusinessId = newBusinessId || initialBusinessId;
-    if (!targetBusinessId || !newSubject.trim() || !newMessage.trim())
+    if (!targetBusinessId || !newSubject.trim() || !newMessage.trim()) {
+      setNewConversationError("Escolha uma empresa e preencha o assunto e a mensagem.");
       return;
-    const conversationId = await onCreateConversation(
-      targetBusinessId,
-      newSubject.trim(),
-      newMessage.trim(),
-    );
-    if (conversationId) {
+    }
+    setNewConversationError(null);
+    try {
+      const conversationId = await onCreateConversation(
+        targetBusinessId,
+        newSubject.trim(),
+        newMessage.trim(),
+      );
+      if (!conversationId) throw new Error("Não foi possível criar a conversa. Tente novamente.");
       setSelectedConversationId(conversationId);
       setNewConversationOpen(false);
+      // Só limpa o rascunho depois de a conversa ficar guardada no servidor.
+      setNewSubject("");
+      setNewMessage("");
+    } catch (error) {
+      setNewConversationError((error as Error).message || "Não foi possível criar a conversa. Tente novamente.");
     }
-    setNewSubject("");
-    setNewMessage("");
   };
 
   const submitSupport = async (event: React.FormEvent) => {
@@ -333,9 +442,9 @@ export const CommunicationHub: React.FC<CommunicationHubProps> = ({
       mode === "user"
         ? initialBusinessId || currentUser.businessId
         : currentUser.businessId;
-
-    if (!targetBusinessId) return;
-
+    // Um cidadão sem empresa também pode abrir pedido de suporte: o servidor
+    // deriva o âmbito do ticket a partir da sessão. Só a empresa exige businessId.
+    if (mode === "business" && !targetBusinessId) return;
     const requestId = await onCreateSupport(
       supportSubject.trim(),
       supportDescription.trim(),
@@ -354,39 +463,51 @@ export const CommunicationHub: React.FC<CommunicationHubProps> = ({
     businesses.find((business) => business.id === businessId)?.name ||
     "Empresa Guigui";
 
+  const accountInitials =
+    currentUser.name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase() || "G";
+
   return (
     <section
       className="guigui-communication-shell guigui-dpanel"
       aria-labelledby="communication-title"
     >
-      <header className="guigui-communication-header">
-        <div>
-          <p className="guigui-communication-eyebrow">
+      <header className="guigui-communication-topbar">
+        <div className="guigui-communication-brand">
+          <span
+            className={`guigui-communication-brand-mark ${initialChannel === "support" ? "is-support" : ""}`}
+            aria-hidden="true"
+          >
+            {initialChannel === "support" ? (
+              <LifeBuoy className="h-4 w-4" />
+            ) : (
+              <ShieldCheck className="h-4 w-4" />
+            )}
+          </span>
+          <span className="guigui-communication-brand-label">
             {t("secureCommunication")}
-          </p>
-          <h2 id="communication-title">
+          </span>
+          <span className="guigui-communication-brand-divider" aria-hidden="true" />
+          <h2 id="communication-title" className="guigui-communication-topbar-title">
             {channelOnly
               ? initialChannel === "support"
                 ? t("support")
                 : t("messages")
               : t("messagesAndSupport")}
           </h2>
-          <p>
-            {channelOnly
-              ? initialChannel === "support"
-                ? "Pedidos de apoio e intervenções à administração."
-                : "Conversas privadas com empresas."
-              : t("communicationDescription")}
-          </p>
         </div>
-        <div
-          className={`guigui-communication-icon ${initialChannel === "support" ? "is-support" : ""}`}
-        >
-          {initialChannel === "support" ? (
-            <LifeBuoy className="h-5 w-5" />
-          ) : (
-            <MessageCircle className="h-5 w-5" />
-          )}
+        <div className="guigui-communication-account">
+          <span className="guigui-communication-account-avatar" aria-hidden="true">
+            {accountInitials}
+          </span>
+          <span className="guigui-communication-account-name">
+            {currentUser.name}
+          </span>
         </div>
       </header>
 
@@ -424,6 +545,7 @@ export const CommunicationHub: React.FC<CommunicationHubProps> = ({
             visibleConversations={visibleConversations}
             messageSearch={messageSearch}
             conversationFilter={conversationFilter}
+            counts={conversationCounts}
             onSearch={setMessageSearch}
             onFilter={setConversationFilter}
             onNew={() => {
@@ -431,6 +553,7 @@ export const CommunicationHub: React.FC<CommunicationHubProps> = ({
               setNewConversationOpen(true);
               setNewBusinessId(null);
               setMessageSearch("");
+              setNewConversationError(null);
               setMobilePane("list");
             }}
             onSelect={(conversationId) => {
@@ -442,6 +565,9 @@ export const CommunicationHub: React.FC<CommunicationHubProps> = ({
             businessNameFor={businessNameFor}
             participantNameFor={participantNameFor}
             t={t}
+            labels={COMMUNICATION_LABELS[currentLang]}
+            metaFor={(conversation) => conversationMeta[conversation.id]}
+            lang={currentLang}
           />
           <ConversationThread
             mode={mode}
@@ -463,10 +589,12 @@ export const CommunicationHub: React.FC<CommunicationHubProps> = ({
             messageText={messageText}
             setMessageText={setMessageText}
             submitMessage={submitMessage}
+            sendError={sendError}
+            onRetryMessage={retryMessage}
             threadEndRef={threadEndRef}
             onBackToList={() => setMobilePane("list")}
           >
-            {(newConversationOpen || initialBusinessId) ? (
+            {newConversationOpen || initialBusinessId ? (
               <NewConversationForm
                 businesses={businesses}
                 initialBusinessId={initialBusinessId}
@@ -479,6 +607,7 @@ export const CommunicationHub: React.FC<CommunicationHubProps> = ({
                 submitNewConversation={submitNewConversation}
                 businessNameFor={businessNameFor}
                 t={t}
+                error={newConversationError}
               />
             ) : (
               <div className="guigui-communication-empty is-centered">
@@ -499,6 +628,7 @@ export const CommunicationHub: React.FC<CommunicationHubProps> = ({
             visibleSupport={visibleSupport}
             supportSearch={supportSearch}
             supportFilter={supportFilter}
+            counts={supportCounts}
             onSearch={setSupportSearch}
             onFilter={setSupportFilter}
             onNew={() => {
@@ -511,6 +641,8 @@ export const CommunicationHub: React.FC<CommunicationHubProps> = ({
               setNewSupportOpen(false);
             }}
             selectedId={selectedSupport?.id || null}
+            labels={COMMUNICATION_LABELS[currentLang]}
+            lang={currentLang}
           />
           <SupportThread
             currentUser={currentUser}
@@ -548,13 +680,6 @@ export const CommunicationHub: React.FC<CommunicationHubProps> = ({
         supportInfoOpen={supportInfoOpen}
         setSupportInfoOpen={setSupportInfoOpen}
       />
-      <footer className="guigui-communication-notice">
-        <CheckCircle2 className="h-4 w-4" />
-        As mensagens comerciais ficam limitadas aos participantes; os tickets de
-        suporte ficam visíveis ao requerente e à Administração.
-      </footer>
     </section>
   );
 };
-
-

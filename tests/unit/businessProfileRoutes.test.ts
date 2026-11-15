@@ -92,6 +92,16 @@ beforeAll(async () => {
     phone: '+245955000004',
     neighborhood: 'Bissau',
   });
+  auth.createUser({
+    name: 'Empresa Três',
+    email: 'perfil-empresa-tres@test.guigui',
+    password,
+    role: 'business',
+    phone: '+245955000005',
+    neighborhood: 'Bissau',
+    businessId: 'profile-biz-3',
+    businessName: 'Empresa Três',
+  });
 
   await businessService.persistPostgresBusiness({
     id: 'profile-biz-1',
@@ -124,6 +134,23 @@ beforeAll(async () => {
       description: 'Reparação profissional de equipamentos domésticos.',
       phone: '+245955000002',
       neighborhood: 'Bandim',
+    },
+  });
+
+  // Ficha legada (tal como a maioria das entradas da produção): descrição
+  // vazia e outros campos default nunca preenchidos. O round-trip completo
+  // do marketplace não deve falhar por causa de valores legados.
+  await businessService.persistPostgresBusiness({
+    id: 'profile-biz-3',
+    name: 'Empresa Três',
+    categoryId: 'services',
+    status: 'active',
+    ownerUserId: auth.findUserByEmail('perfil-empresa-tres@test.guigui')?.id,
+    data: {
+      categoryId: 'services',
+      phone: '+245955000005',
+      neighborhood: 'Bissau',
+      description: '',
     },
   });
 
@@ -161,6 +188,16 @@ describe('PATCH /api/businesses/:id/profile', () => {
   it('denies a business account from editing another business', async () => {
     const cookie = await login('perfil-empresa-um@test.guigui');
     const response = await patchProfile('profile-biz-2', cookie, { name: 'Nome Invadido' });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ code: 'BUSINESS_SCOPE_REQUIRED' });
+  });
+
+  it('authorizes before validating: another business gets 403 even with an invalid body', async () => {
+    const cookie = await login('perfil-empresa-um@test.guigui');
+    // Este corpo seria 400 (INVALID_BUSINESS_PROFILE) para a empresa dona;
+    // para outra empresa a posse é decidida primeiro e devolve 403.
+    const response = await patchProfile('profile-biz-2', cookie, { description: 'Curta descrição.' });
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({ code: 'BUSINESS_SCOPE_REQUIRED' });
@@ -275,5 +312,71 @@ describe('PATCH /api/businesses/:id/profile', () => {
       fs.rmSync(storePath, { recursive: true, force: true });
       fs.writeFileSync(storePath, storedContents);
     }
+  });
+});
+
+describe('POST /api/businesses (round-trip do marketplace)', () => {
+  const postBusiness = (cookie: string, body: Record<string, unknown>) =>
+    fetch(`${baseUrl}/api/businesses`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify(body),
+    });
+
+  it('accepts a full-record round-trip with legacy-invalid values that did not change', async () => {
+    const cookie = await login('perfil-empresa-tres@test.guigui');
+    // A descrição legada está vazia em BD; o cliente envia o registo completo
+    // (incluindo o campo) mas nada foi editado: deve ser um 200 idempotente,
+    // não um 400 (o que aconteceu antes da correção).
+    const response = await postBusiness(cookie, {
+      id: 'profile-biz-3',
+      name: 'Empresa Três',
+      categoryId: 'services',
+      description: '',
+      phone: '+245955000005',
+      neighborhood: 'Bissau',
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ success: true });
+  });
+
+  it('persists a real change alongside unchanged legacy-invalid fields', async () => {
+    const cookie = await login('perfil-empresa-tres@test.guigui');
+    // Reproduz o cenário do marketplace: o cliente envia o registo completo
+    // em que apenas o telefone mudou; a descrição legada vazia não foi editada
+    // e não deve impedir a gravação.
+    const response = await postBusiness(cookie, {
+      id: 'profile-biz-3',
+      name: 'Empresa Três',
+      categoryId: 'services',
+      description: '',
+      phone: '+245955555555',
+      neighborhood: 'Bissau',
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ success: true });
+    await expect(businessService.listPostgresBusinesses()).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'profile-biz-3', phone: '+245955555555', description: '' }),
+    ]));
+  });
+
+  it('still rejects a field that the owner deliberately changed to an invalid value', async () => {
+    const cookie = await login('perfil-empresa-tres@test.guigui');
+    const response = await postBusiness(cookie, {
+      id: 'profile-biz-3',
+      name: 'Empresa Três',
+      categoryId: 'services',
+      // A descrição legada está vazia; o utilizador entrou numa descrição nova
+      // demasiado curta — alteração deliberada, deve continuar a ser 400 sem
+      // escrever nada.
+      description: 'Curta.',
+      phone: '+245955555555',
+      neighborhood: 'Bissau',
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ code: 'INVALID_BUSINESS_PROFILE' });
   });
 });

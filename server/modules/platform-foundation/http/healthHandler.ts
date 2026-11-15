@@ -6,10 +6,12 @@ import {
 
 export function createHealthHandler(
   dependencies: HealthDependencies,
+  detailed: boolean | ((request: Parameters<RequestHandler>[0]) => boolean | Promise<boolean>) = true,
 ): RequestHandler {
-  return async (_request, response, next) => {
+  return async (request, response, next) => {
     try {
-      response.json(await getPlatformHealth(dependencies));
+      const isDetailed = typeof detailed === 'function' ? await detailed(request) : detailed;
+      response.json(await getPlatformHealth(dependencies, isDetailed));
     } catch (error) {
       next(error);
     }

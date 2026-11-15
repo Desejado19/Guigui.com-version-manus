@@ -22,6 +22,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react';
+import { usePostEngagementContext } from '../PostEngagementProvider';
 import type {
   AppNotification,
   Business,
@@ -37,9 +38,11 @@ import type {
   PurchaseOrder,
   ScheduledItem,
   SupportRequest,
+  UserProfile,
 } from '../../types';
 import { storyApi, type StoryApi } from '../../services/storyApi';
 import { downloadCSV, downloadExcel, downloadExcelWorkbook, downloadPDFReport } from '../../utils/exportHelpers';
+import { readExportHistory, recordExportHistory, type ExportHistoryEntry } from '../../utils/exportHistory';
 import { getTranslation } from '../../utils/i18n';
 
 type ExportFormat = 'pdf' | 'excel' | 'csv';
@@ -62,6 +65,7 @@ interface ClientExportHubProps {
   notifications?: AppNotification[];
   followerCount?: number;
   audienceReach?: number;
+  currentUser?: UserProfile;
 }
 
 interface ExportDataset {
@@ -287,6 +291,7 @@ export const ClientExportHub: React.FC<ClientExportHubProps> = ({
   notifications = [],
   followerCount = 0,
   audienceReach = 0,
+  currentUser,
 }) => {
   const t = (key: string, variables?: Record<string, string | number>) =>
     getTranslation(currentLang, key, variables);
@@ -355,6 +360,7 @@ export const ClientExportHub: React.FC<ClientExportHubProps> = ({
       || (catalogAvailability === 'available' ? product.isAvailable : !product.isAvailable))
     && matchesQuery(queryTerm, product.name, product.category)
   ));
+  const postEngagement = usePostEngagementContext();
   const filteredPosts = business.posts.filter((post) => (
     withinPeriod(post.publishedAt || post.createdAt, exportCutoff)
     && (postStatus === 'all' || post.status === postStatus)
@@ -658,9 +664,9 @@ export const ClientExportHub: React.FC<ClientExportHubProps> = ({
       formatDateValue(post.createdAt),
       post.scheduledAt ? formatDateValue(post.scheduledAt) : '—',
       post.publishedAt ? formatDateValue(post.publishedAt) : '—',
-      post.likesCount || 0,
-      post.comments?.length || 0,
-      post.sharesCount || 0,
+      postEngagement?.engagements[post.id]?.likes ?? 0,
+      postEngagement?.engagements[post.id]?.comments.length ?? 0,
+      postEngagement?.engagements[post.id]?.shares ?? 0,
       post.moderationReason || '—',
     ]),
     kpis: [
@@ -1278,7 +1284,29 @@ export const ClientExportHub: React.FC<ClientExportHubProps> = ({
   ];
   const totalRecords = datasets.reduce((sum, { dataset }) => sum + dataset.rows.length, 0);
 
+  const [history, setHistory] = useState<ExportHistoryEntry[]>(() => readExportHistory(business.id));
+
+  useEffect(() => {
+    setHistory(readExportHistory(business.id));
+    const refresh = () => setHistory(readExportHistory(business.id));
+    window.addEventListener('guigui:export-history', refresh);
+    return () => window.removeEventListener('guigui:export-history', refresh);
+  }, [business.id]);
+
+  const logExport = (fileName: string, category: string, format: ExportFormat, records: number) => {
+    recordExportHistory(business.id, {
+      fileName,
+      category,
+      format: format === 'excel' ? 'xlsx' : format,
+      records,
+      actor: currentUser?.name || currentUser?.email || business.name,
+      status: 'completed',
+      detail: `${timeframeLabel} · ${category}`,
+    });
+  };
+
   const exportDataset = (dataset: ExportDataset, format: ExportFormat) => {
+    logExport(`${dataset.filename}.${format === 'excel' ? 'xlsx' : format}`, dataset.group, format, dataset.rows.length);
     if (format === 'pdf') {
       downloadPDFReport(
         dataset.title,
@@ -1295,6 +1323,7 @@ export const ClientExportHub: React.FC<ClientExportHubProps> = ({
   };
 
   const downloadAll = () => {
+    logExport(`Guigui_Dados_Empresa_${businessSlug}_${dateStamp}.xlsx`, 'Todos os conjuntos', 'excel', totalRecords);
     downloadExcelWorkbook(
       `Guigui_Dados_Empresa_${businessSlug}_${dateStamp}`,
       datasets.map(({ dataset }) => ({
@@ -1333,7 +1362,7 @@ export const ClientExportHub: React.FC<ClientExportHubProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel dark:bg-slate-800 shadow-[var(--shadow-xs)] space-y-2 p-4 sm:p-5">
+      <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel dark:bg-slate-800 shadow-[var(--shadow-xs)] space-y-2 p-3.5 sm:p-4">
         <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
           <Download className="h-3.5 w-3.5" />
           <span>{t('businessDataExport')}</span>
@@ -1420,7 +1449,7 @@ export const ClientExportHub: React.FC<ClientExportHubProps> = ({
         <p className="text-[9px] text-slate-500 dark:text-slate-400">{t('business.exportFullWorkbookHint')}</p>
       </section>
 
-      <div className="grid gap-3 rounded-3xl border border-slate-200 bg-slate-900 p-4 text-white shadow-sm sm:grid-cols-4 sm:p-5 dark:border-slate-700">
+      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-900 p-4 text-white shadow-sm sm:grid-cols-4 sm:p-5 dark:border-slate-700">
         <div>
           <p className="text-[10px] font-black uppercase tracking-wider text-blue-300">{t('business.PedidosNoAmbito')}</p>
           <p className="mt-1 text-sm font-black">{filteredOrders.length}</p>
@@ -1498,6 +1527,52 @@ export const ClientExportHub: React.FC<ClientExportHubProps> = ({
           <strong className="font-black text-slate-900 dark:text-white">Bilhetes e promoções:</strong> {filteredTicketOrders.length} pedido(s) de bilhetes ou promoções no período filtrado.
         </div>
       </div>
+
+      <section className="space-y-3 rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 shadow-[var(--shadow-xs)] dark:border-slate-700 dark:bg-slate-800 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h4 className="text-sm font-black text-slate-900 dark:text-white">Histórico de exportações</h4>
+            <p className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">Últimas operações desta empresa neste dispositivo. O acesso fica limitado à conta autenticada.</p>
+          </div>
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9px] font-black text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">{history.length} registo(s)</span>
+        </div>
+        {history.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-[11px] font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">Ainda não foram gerados ficheiros. Escolha um conjunto de dados e um formato para registar a primeira exportação.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-[11px]" data-testid="export-history-table">
+              <thead className="bg-slate-50 text-[9px] uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                <tr>
+                  <th className="p-2">Ficheiro</th>
+                  <th className="p-2">Categoria</th>
+                  <th className="p-2">Formato</th>
+                  <th className="p-2">Registos</th>
+                  <th className="p-2">Responsável</th>
+                  <th className="p-2">Data</th>
+                  <th className="p-2">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.slice(0, 20).map((entry) => (
+                  <tr key={entry.id} className="border-t border-slate-100 dark:border-slate-700">
+                    <td className="p-2 font-black text-slate-900 dark:text-white">{entry.fileName}</td>
+                    <td className="p-2 text-slate-600 dark:text-slate-300">{entry.category}</td>
+                    <td className="p-2 uppercase text-slate-600 dark:text-slate-300">{entry.format}</td>
+                    <td className="p-2 text-slate-600 dark:text-slate-300">{entry.records}</td>
+                    <td className="p-2 text-slate-600 dark:text-slate-300">{entry.actor}</td>
+                    <td className="p-2 text-slate-600 dark:text-slate-300">{new Date(entry.createdAt).toLocaleString('pt-PT')}</td>
+                    <td className="p-2">
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200">
+                        {entry.status === 'completed' ? 'Concluída' : 'Falhou'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 };

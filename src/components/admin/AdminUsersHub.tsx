@@ -71,7 +71,7 @@ export const AdminUsersHub: React.FC = () => {
   useEffect(() => { void load(); }, [load]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">

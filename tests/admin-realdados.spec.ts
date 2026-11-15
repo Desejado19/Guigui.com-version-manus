@@ -43,9 +43,10 @@ test.describe('Admin painel - dados reais', () => {
     const usersLink = page.getByRole('button', { name: /utilizadores/i }).first();
     await expect(usersLink).toBeVisible({ timeout: 10000 });
     await usersLink.click();
-    await page.waitForTimeout(2500);
-    await expect(page.getByText('Utilizadores da plataforma')).toBeVisible({ timeout: 10000 });
-    const search = page.getByPlaceholder(/pesquisar nome ou email/i);
+    await page.waitForTimeout(500);
+    await page.getByRole('button', { name: /^Todas as contas/ }).first().click();
+    await expect(page.getByRole('heading', { name: 'Visão geral de utilizadores' })).toBeVisible({ timeout: 10000 });
+    const search = page.getByPlaceholder(/pesquisar por nome/i);
     await expect(search).toBeVisible();
     await search.fill('seed01');
     await page.waitForTimeout(1500);

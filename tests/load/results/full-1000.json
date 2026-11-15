@@ -1,0 +1,187 @@
+{
+    "root_group": {
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {
+            "login: 200": {
+                "fails": 0,
+                "name": "login: 200",
+                "path": "::login: 200",
+                "id": "d197f3faedc4c064674fc90d1995e47a",
+                "passes": 220
+            },
+            "login: sessão devolvida": {
+                "passes": 220,
+                "fails": 0,
+                "name": "login: sessão devolvida",
+                "path": "::login: sessão devolvida",
+                "id": "1ab992ec418bd894117ffc73b7a15b20"
+            },
+            "eventos: 200": {
+                "name": "eventos: 200",
+                "path": "::eventos: 200",
+                "id": "45a0558c2a8855751b3998209f8e7764",
+                "passes": 250,
+                "fails": 0
+            },
+            "sessão: 200": {
+                "fails": 0,
+                "name": "sessão: 200",
+                "path": "::sessão: 200",
+                "id": "2f4d7f4fd79b92f199bbee00c163709c",
+                "passes": 175
+            },
+            "feed: 200": {
+                "name": "feed: 200",
+                "path": "::feed: 200",
+                "id": "05b2445f48ec4bcc47f694b8e310ec0c",
+                "passes": 859,
+                "fails": 0
+            },
+            "empresas: 200": {
+                "name": "empresas: 200",
+                "path": "::empresas: 200",
+                "id": "9ff47ca0b4b4b8555846dee1753d60e9",
+                "passes": 693,
+                "fails": 0
+            },
+            "stories/bootstrap: 200": {
+                "fails": 0,
+                "name": "stories/bootstrap: 200",
+                "path": "::stories/bootstrap: 200",
+                "id": "6d6317cdc2a7c74da233efc5792ade60",
+                "passes": 139
+            },
+            "interações: 200": {
+                "name": "interações: 200",
+                "path": "::interações: 200",
+                "id": "f677f8c6ac5aa22652c2cfc5c571a359",
+                "passes": 154,
+                "fails": 0
+            }
+        },
+        "name": "",
+        "path": ""
+    },
+    "metrics": {
+        "iteration_duration": {
+            "p(90)": 48675.62178,
+            "p(95)": 50236.355055,
+            "avg": 31238.399402570656,
+            "min": 1346.7389,
+            "med": 33831.587700000004,
+            "max": 54493.8762
+        },
+        "http_req_duration{expected_response:true}": {
+            "avg": 10478.641471087676,
+            "min": 37.3353,
+            "med": 10064.544,
+            "max": 36017.865,
+            "p(90)": 16853.6352,
+            "p(95)": 19713.0233
+        },
+        "vus_max": {
+            "value": 1000,
+            "min": 1000,
+            "max": 1000
+        },
+        "http_reqs": {
+            "count": 3981,
+            "rate": 52.97018426216813
+        },
+        "data_received": {
+            "count": 2810232189,
+            "rate": 37392242.368954055
+        },
+        "checks": {
+            "passes": 2710,
+            "fails": 0,
+            "value": 1
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 3981,
+            "thresholds": {
+                "rate<0.02": false
+            },
+            "value": 0
+        },
+        "http_req_connecting": {
+            "max": 11.0283,
+            "p(90)": 1.0297,
+            "p(95)": 1.0874,
+            "avg": 0.227405224817885,
+            "min": 0,
+            "med": 0
+        },
+        "http_req_waiting": {
+            "avg": 10477.517803190154,
+            "min": 37.3353,
+            "med": 10063.2158,
+            "max": 36016.3494,
+            "p(90)": 16852.9129,
+            "p(95)": 19712.2621
+        },
+        "http_req_receiving": {
+            "min": 0,
+            "med": 0.5179,
+            "max": 47.6294,
+            "p(90)": 3.0927,
+            "p(95)": 3.6719,
+            "avg": 1.1010248178849538
+        },
+        "data_sent": {
+            "count": 633567,
+            "rate": 8430.08307772647
+        },
+        "vus": {
+            "value": 19,
+            "min": 19,
+            "max": 1000
+        },
+        "iterations": {
+            "count": 778,
+            "rate": 10.351872232094149
+        },
+        "http_req_duration": {
+            "avg": 10478.641471087676,
+            "min": 37.3353,
+            "med": 10064.544,
+            "max": 36017.865,
+            "p(90)": 16853.6352,
+            "p(95)": 19713.0233,
+            "thresholds": {
+                "p(95)<1500": true,
+                "p(99)<3000": true
+            }
+        },
+        "http_req_tls_handshaking": {
+            "p(95)": 0,
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0
+        },
+        "http_req_blocked": {
+            "p(90)": 1.0474,
+            "p(95)": 1.1156,
+            "avg": 0.2520878924893241,
+            "min": 0,
+            "med": 0,
+            "max": 11.0283
+        },
+        "http_req_sending": {
+            "p(95)": 0,
+            "avg": 0.0226430796282341,
+            "min": 0,
+            "med": 0,
+            "max": 2.9481,
+            "p(90)": 0
+        }
+    },
+    "setup_data": {
+        "businessId": "biz-1",
+        "postId": "post-seed-co-18-1"
+    }
+}

@@ -23,6 +23,8 @@ const gw = {
   'auth.invalidInvite': 'Konbiti ka sta balu.',
   'auth.passwordMismatch': 'Palavra-pasinan ka-mesmu.',
   'auth.passwordMin': 'Palavra-pasi kin ten susu {{count}} letra.',
+  'auth.passwordStrength': 'Palavra-passe kin ten konten 3 di ku: minúsculas, maiúsculas, númeru, karatér especial.',
+
   'auth.inviteFailed': 'Ka da konseba aseti konbiti.',
   'auth.demoFailed': 'Ka da konseba kumexa konta di proba.',
   'auth.resetGenerated': 'Kódigu di rekupera yegau pa demonstrason. Pón nova palavra-pasi inba.',
@@ -570,6 +572,7 @@ const gw = {
   'business.UltimosDias90': 'últimu 90 dian',
   'business.AnoCorrente': 'anu korrenti',
   'business.TodoHistorico': 'istóriku tudu',
+  'business.IntervaloPersonalizado': 'intervalu pesusal',
   'business.PedidosNoAmbito': 'pidun na períodu',
   'business.VolumeNoAmbito': 'volumi na períodu',
   'business.Imagem': 'imajin',

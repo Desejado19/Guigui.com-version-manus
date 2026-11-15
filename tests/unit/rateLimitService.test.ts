@@ -10,6 +10,7 @@ vi.mock('../../server/db', () => ({
     return pool;
   },
   databaseConfigured: true,
+  withDbIdentity: (_identity: unknown, callback: () => unknown) => callback(),
 }));
 
 const { consumeDistributedRateLimit } = await import('../../server/rateLimitService');

@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   XCircle,
   Building2,
+  LayoutDashboard,
   Ticket,
   DollarSign,
   Search,
@@ -63,21 +64,53 @@ import {
   Globe,
 } from 'lucide-react';
 import { AdminProfilePanel } from './admin/AdminProfilePanel';
-import { AdminStaffManagement } from './admin/AdminStaffManagement';
+import { AdminTeamHub } from './admin/AdminTeamHub';
 import { AdminAuditLogsHub } from './admin/AdminAuditLogsHub';
 import { AdminOverview } from './admin/AdminOverview';
-import { AdminUsersHub } from './admin/AdminUsersHub';
+import { LocationCatalogAdmin } from './admin/LocationCatalogAdmin';
 import { AdminCapabilityHub } from './admin/AdminCapabilityHub';
 import { AdminPermissionsMatrix } from './admin/AdminPermissionsMatrix';
 import { AdminReportsHub } from './admin/AdminReportsHub';
+import { StoriesModerationPanel } from './admin/StoriesModerationPanel';
 import { AdminSupportHub } from './admin/AdminSupportHub';
 import { SubscriptionPlansAdmin } from './admin/SubscriptionPlansAdmin';
-import { FeaturedBusinessesAdmin } from './admin/FeaturedBusinessesAdmin';
+import { CommercialModule } from './admin/management/CommercialModule';
+import { CommercialPlansPage } from './admin/management/CommercialPlansPage';
+import { CommercialSubscriptionsPage } from './admin/management/CommercialSubscriptionsPage';
+import { CommercialFeaturesPage } from './admin/management/CommercialFeaturesPage';
+import { CommercialPricingPage } from './admin/management/CommercialPricingPage';
+import { CommercialProductsPage } from './admin/management/CommercialProductsPage';
+import { CommercialTicketFeesPage } from './admin/management/CommercialTicketFeesPage';
+import { CommercialRulesPage } from './admin/management/CommercialRulesPage';
+import { CommercialAuditPage } from './admin/management/CommercialAuditPage';
+import type { CommercialSection } from './admin/management/commercialApi';
+import { BusinessesModule } from './admin/management/BusinessesModule';
+import { BusinessesManagementPage } from './admin/management/BusinessesManagementPage';
+import { FeaturedBusinessesManagementPage } from './admin/management/FeaturedBusinessesManagementPage';
+import { EventsManagementPage } from './admin/management/EventsManagementPage';
+import { TicketsManagementPage } from './admin/management/TicketsManagementPage';
+import { TransactionsManagementPage } from './admin/management/TransactionsManagementPage';
+import { FinanceModule } from './admin/management/FinanceModule';
+import { FinanceTransactionsPage } from './admin/management/FinanceTransactionsPage';
+import { FinanceReconciliationPage } from './admin/management/FinanceReconciliationPage';
+import { FinanceOperatorsPage } from './admin/management/FinanceOperatorsPage';
+import { FinancePendingPage } from './admin/management/FinancePendingPage';
+import { FinanceRefundsPage } from './admin/management/FinanceRefundsPage';
+import { FinanceStatementsPage } from './admin/management/FinanceStatementsPage';
+import { PromotionsManagementPage } from './admin/management/PromotionsManagementPage';
+import { SupportManagementPage } from './admin/management/SupportManagementPage';
+import { CitizensManagementPage } from './admin/management/CitizensManagementPage';
+import { UsersModule } from './admin/management/UsersModule';
+import { UsersActivityPage } from './admin/management/UsersActivityPage';
+import { SessionsManagementPage } from './admin/management/SessionsManagementPage';
+import { CampaignsManagementPage } from './admin/management/CampaignsManagementPage';
+import { ManagementPage, ModuleNav } from './admin/management/ManagementUi';
 import { MonetizationAdmin } from './admin/MonetizationAdmin';
 import { INITIAL_ADMIN_STAFF } from '../data/adminStaffData';
 import { INITIAL_AUDIT_LOGS } from '../data/auditLogsData';
 import { downloadCSV, downloadExcel, downloadPDFReport } from '../utils/exportHelpers';
 import { filterModerationLogs, getModerationWorkflowColumn, transitionModerationLog } from '../utils/moderationWorkflow';
+import { persistModerationDecision } from '../utils/moderationPersistence';
 import {
   Business,
   EventItem,
@@ -90,6 +123,7 @@ import {
   ModerationLogItem,
   ModerationSettings,
   PaymentTransaction,
+  Promotion,
   MonetizationCatalog,
   MobileOperatorConfig,
   PaymentUseCase,
@@ -102,6 +136,7 @@ import {
   NotificationPriority,
   NotificationChannel,
   SupportRequest,
+  UserProfile,
 } from '../types';
 import { getLanguageShortLabel, getNextLanguage, getTranslation } from '../utils/i18n';
 import { DEFAULT_MODERATION_SETTINGS } from '../utils/moderation';
@@ -112,10 +147,13 @@ import { DEFAULT_MONETIZATION_CATALOG } from '../data/monetizationCatalog';
 import { usePageEntryScroll } from '../utils/navigationBehavior';
 import { Badge, Button, Card, EmptyState, IconButton } from './ui';
 import { ADMIN_NAVIGATION } from '../config/navigation';
+import { GlassBottomNav } from './navigation/GlassBottomNav';
+import { ModuleSubnav } from './navigation/ModuleSubnav';
 
 interface AdminDashboardProps {
   businesses: Business[];
   events: EventItem[];
+  promotions?: Promotion[];
   currentLang: Language;
   currentThemeMode?: 'light' | 'dark' | 'auto';
   onLanguageChange?: (lang: Language) => void;
@@ -134,6 +172,8 @@ interface AdminDashboardProps {
   onUpdateSupportStatus?: (requestId: string, status: SupportRequest['status']) => void;
   focusSupportId?: string | null;
   initialTab?: 'capabilities' | 'profile' | 'overview' | 'businesses' | 'moderation' | 'pricing' | 'categories' | 'roles' | 'admin_staff' | 'audit_logs' | 'events' | 'financials' | 'architecture' | 'reports' | 'notifications' | 'support';
+  currentUser?: UserProfile | null;
+  onLogout?: () => void;
   sidebarCollapsed?: boolean;
   onSidebarCollapsedChange?: (collapsed: boolean) => void;
 }
@@ -157,6 +197,7 @@ const getPaymentStatusLabel = (
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   businesses: initialBusinesses,
   events,
+  promotions = [],
   currentLang,
   currentThemeMode = 'auto',
   onLanguageChange,
@@ -175,6 +216,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onUpdateSupportStatus,
   focusSupportId,
   initialTab = 'overview',
+  currentUser,
+  onLogout,
   sidebarCollapsed: controlledSidebarCollapsed,
   onSidebarCollapsedChange,
 }) => {
@@ -184,14 +227,44 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       tickets: 'events',
       logs: 'audit_logs',
     };
+    setManagementPage(null);
     setActiveTab(aliases[tab] || tab as typeof activeTab);
+  };
+
+  const openBusinessList = (review: 'all' | 'duplicates' | 'test' = 'all') => {
+    try {
+      const key = 'admin.management.businesses';
+      const raw = window.sessionStorage.getItem(key);
+      const parsed = raw ? JSON.parse(raw) : {};
+      parsed.filters = { ...(parsed.filters || {}), review };
+      parsed.page = 1;
+      window.sessionStorage.setItem(key, JSON.stringify(parsed));
+    } catch {
+      // Preferência de filtros: falha de storage não impede abrir a lista.
+    }
+    setActiveTab('businesses');
+    setManagementPage('businesses');
   };
 
   const pendingAdminSupport = supportRequests.filter((request) => request.status !== 'resolved').length;
   // Badge de empresas pendentes reflecte o banco (prop inicial já vem do PostgreSQL).
   const pendingBusinessesCount = initialBusinesses.filter((business) => business.status === 'pending').length;
+  const [operationalAlerts, setOperationalAlerts] = useState({ divergences: 0, overdue: 0 });
+  const operationalAlertsLoaded = React.useRef(false);
+  const operationalAlertsTotal = operationalAlerts.divergences + operationalAlerts.overdue;
+  const operationalAlertsLabel = `${operationalAlerts.divergences} ${operationalAlerts.divergences === 1 ? 'divergência' : 'divergências'} e ${operationalAlerts.overdue} ${operationalAlerts.overdue === 1 ? 'pagamento em atraso' : 'pagamentos em atraso'}`;
+  const operationalAlertsHelp = `${operationalAlerts.divergences} ${operationalAlerts.divergences === 1 ? 'divergência' : 'divergências'} · ${operationalAlerts.overdue} ${operationalAlerts.overdue === 1 ? 'atraso' : 'atrasos'}`;
   // Badge de moderação pendente vem das estatísticas reais agregadas do banco.
   const [pendingModerationCount, setPendingModerationCount] = useState(0);
+  const [adminStats, setAdminStats] = useState<{
+    users?: { total?: number; byRole?: Record<string, number> };
+    events?: { total?: number; byStatus?: Record<string, number> };
+    tickets?: { total?: number; byStatus?: Record<string, number> };
+    payments?: { total?: number; byStatus?: Record<string, number> };
+    revenue?: { grossXOF?: number };
+    support?: { total?: number; byStatus?: Record<string, number> };
+    moderation?: { total?: number; byStatus?: Record<string, number> };
+  } | null>(null);
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -199,15 +272,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const response = await fetch('/api/admin/stats', { credentials: 'include' });
         if (!response.ok) return;
         const data = await response.json();
+        if (cancelled) return;
+        setAdminStats(data);
         const pending = Number(data?.moderation?.byStatus?.pending ?? 0);
-        if (!cancelled && Number.isFinite(pending)) setPendingModerationCount(pending);
+        if (Number.isFinite(pending)) setPendingModerationCount(pending);
       } catch {
         // Badge informativo: uma falha de rede não deve bloquear o painel.
       }
     })();
     return () => { cancelled = true; };
   }, []);
-  const adminNavigationGroups: Array<{ heading: string; items: Array<{ label: string; tab: typeof activeTab; icon: React.ComponentType<{ className?: string }>; help: string; count?: number }> }> = [
+  const adminAccess = currentUser?.adminAccess || null;
+  const adminTabAllows = (tab: string): boolean => {
+    if (!adminAccess) return true;
+    const actions = adminAccess[tab];
+    return Array.isArray(actions) && actions.includes('view');
+  };
+
+  const adminNavigationGroupsAll: Array<{ heading: string; items: Array<{ label: string; tab: typeof activeTab; icon: React.ComponentType<{ className?: string }>; help: string; count?: number; countLabel?: string }> }> = [
     {
       heading: t('adminNavDashboard'),
       items: [
@@ -225,7 +307,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     {
       heading: t('adminNavFinance'),
       items: [
-        { label: t('adminNavFinancials'), tab: 'financials', icon: DollarSign, help: t('adminNavFinancialsHelp') },
+        { label: t('adminNavFinancials'), tab: 'financials', icon: DollarSign, help: operationalAlertsTotal > 0 ? operationalAlertsHelp : t('adminNavFinancialsHelp'), count: operationalAlertsTotal, countLabel: operationalAlertsTotal > 0 ? operationalAlertsLabel : undefined },
         { label: t('adminNavPricing'), tab: 'pricing', icon: CreditCard, help: t('adminNavPricingHelp') },
       ],
     },
@@ -261,9 +343,44 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     },
   ];
 
+  // Um colaborador administrativo só vê os módulos que lhe foram concedidos.
+  const adminNavigationGroups = adminNavigationGroupsAll
+    .map((group) => ({ ...group, items: group.items.filter((item) => adminTabAllows(item.tab)) }))
+    .filter((group) => group.items.length > 0);
+
   const allAdminItems = adminNavigationGroups.flatMap((group) => group.items);
   const configuredAdminNavigation = ADMIN_NAVIGATION;
   const [activeTab, setActiveTab] = useState<'capabilities' | 'profile' | 'overview' | 'businesses' | 'moderation' | 'pricing' | 'categories' | 'users' | 'roles' | 'admin_staff' | 'audit_logs' | 'events' | 'financials' | 'architecture' | 'reports' | 'notifications' | 'support'>(initialTab);
+  const [commercialView, setCommercialView] = useState<'summary' | CommercialSection>('summary');
+  // Submódulos que antes apareciam empilhados na mesma página.
+  const [moderationSection, setModerationSection] = useState<'stories' | 'pipeline' | 'queue'>('pipeline');
+  const [notificationSection, setNotificationSection] = useState<'send' | 'preferences'>('send');
+  // Páginas independentes de gestão. A sidebar mantém o módulo destacado e o
+  // botão de retorno devolve o utilizador ao módulo de origem.
+  const [managementPage, setManagementPage] = useState<'businesses' | 'featured' | 'events' | 'tickets' | 'transactions' | 'promotions' | 'support' | 'users' | 'users-all' | 'users-citizens' | 'users-business' | 'users-admins' | 'users-suspended' | 'users-activity' | 'staff' | 'audit' | 'reports' | 'sessions' | 'campaigns' | 'finance-transactions' | 'finance-reconciliation' | 'finance-operators' | 'finance-pending' | 'finance-refunds' | 'finance-statements' | null>(null);
+  // Badge informativo: actualiza ao abrir o Financeiro e ao mudar de subpágina,
+  // sem duplicar o painel de alertas que continua a ser a fonte de verdade.
+  useEffect(() => {
+    if (activeTab !== 'financials' && operationalAlertsLoaded.current) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch('/api/admin/finance/alerts', { credentials: 'include' });
+        if (!response.ok) return;
+        const data = await response.json() as { alerts?: Array<{ id?: string; count?: number }> };
+        if (cancelled) return;
+        const counts = new Map((data.alerts || []).map((alert) => [alert.id, Number(alert.count) || 0]));
+        setOperationalAlerts({
+          divergences: counts.get('reconciliation_divergence') || 0,
+          overdue: counts.get('pending_payment_overdue') || 0,
+        });
+        operationalAlertsLoaded.current = true;
+      } catch {
+        // Badge informativo: falha de rede não deve bloquear o painel.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab, managementPage]);
   const [adminSearchQuery, setAdminSearchQuery] = useState('');
   usePageEntryScroll(activeTab);
   // Events & tickets tab: estado + dados derivados
@@ -309,7 +426,49 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   useEffect(() => {
     setBusinessesList(initialBusinesses);
   }, [initialBusinesses]);
-  const [staffList, setStaffList] = useState<AdminStaffMember[]>(initialAdminStaff);
+  // Equipa administrativa real: a matriz de permissões e os resumos usam a
+  // lista devolvida pelo servidor, não dados estáticos.
+  const [staffList, setStaffList] = useState<AdminStaffMember[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch('/api/admin/team/members', { credentials: 'include', cache: 'no-store' });
+        if (!response.ok) return;
+        const payload = await response.json() as { members?: Array<{ userId: string; name: string; email: string; phone: string; jobTitle?: string; role: string; status: string; access: Record<string, string[]>; lastActiveAt?: string }> };
+        if (cancelled) return;
+        setStaffList((payload.members || []).map((member) => {
+          const modules = Object.keys(member.access || {}).filter((module) => (member.access[module] || []).includes('view'));
+          return {
+            id: member.userId,
+            name: member.name,
+            email: member.email,
+            phone: member.phone,
+            department: 'Financeiro & Contabilidade',
+            accessLevel: member.role === 'admin' ? 'super_admin' : 'moderator',
+            status: member.status === 'active' ? 'active' : member.status === 'suspended' ? 'suspended' : 'revoked',
+            permissions: {
+              manageBusinesses: modules.includes('businesses'),
+              contentModeration: modules.includes('moderation'),
+              financialAudit: modules.includes('financials'),
+              manageAdmins: modules.includes('admin_staff'),
+              viewAuditLogs: modules.includes('audit_logs'),
+              exportReports: modules.includes('reports'),
+              managePricing: modules.includes('pricing'),
+              validateTickets: modules.includes('events'),
+            },
+            twoFactorEnabled: false,
+            lastLoginAt: member.lastActiveAt,
+            createdAt: member.lastActiveAt || new Date().toISOString(),
+            createdBy: 'platform',
+          } satisfies AdminStaffMember;
+        }));
+      } catch {
+        // Sem ligação: a lista fica vazia em vez de mostrar dados fictícios.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
   const [logsList, setLogsList] = useState<AuditLogEntry[]>(initialAuditLogs);
   useEffect(() => {
     if (focusSupportId) setActiveTab('support');
@@ -323,21 +482,66 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [announcementChannels, setAnnouncementChannels] = useState<NotificationChannel[]>(['in_app']);
   const [announcementExpiresAt, setAnnouncementExpiresAt] = useState('');
 
+  const staffAccessFromMember = (member: AdminStaffMember): Record<string, string[]> => {
+    const access: Record<string, string[]> = { overview: ['view'] };
+    const grant = (module: string, actions: string[]) => { access[module] = actions; };
+    if (member.permissions.manageBusinesses) grant('businesses', ['view', 'edit', 'approve', 'reject']);
+    if (member.permissions.contentModeration) grant('moderation', ['view', 'approve', 'reject']);
+    if (member.permissions.financialAudit) grant('financials', ['view', 'export']);
+    if (member.permissions.manageAdmins) grant('admin_staff', ['view', 'create', 'edit', 'delete', 'manage']);
+    if (member.permissions.viewAuditLogs) grant('audit_logs', ['view']);
+    if (member.permissions.exportReports) grant('reports', ['view', 'export']);
+    if (member.permissions.managePricing) grant('pricing', ['view', 'edit', 'manage']);
+    if (member.permissions.validateTickets) grant('events', ['view', 'edit']);
+    return access;
+  };
+
+  const persistStaffMember = (member: AdminStaffMember) => {
+    void fetch(`/api/admin/team/members/${member.id}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ access: staffAccessFromMember(member), status: member.status === 'active' ? 'active' : member.status === 'suspended' ? 'suspended' : 'disabled' }),
+    }).catch(() => undefined);
+  };
+
   const handleUpdateStaff = (newStaff: AdminStaffMember[]) => {
+    const previous = new Map(staffList.map((member) => [member.id, member]));
+    newStaff.forEach((member) => {
+      const before = previous.get(member.id);
+      if (before && JSON.stringify(before) !== JSON.stringify(member)) persistStaffMember(member);
+    });
     setStaffList(newStaff);
     if (onUpdateAdminStaff) onUpdateAdminStaff(newStaff);
   };
 
   const handleAddStaff = (newStaff: AdminStaffMember) => {
-    handleUpdateStaff([...staffList, newStaff]);
+    // A criação real exige e-mail e palavra-passe; a área «Equipa» é o caminho
+    // oficial. Aqui só actualizamos a lista após o servidor confirmar.
+    void fetch('/api/admin/team/members', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: newStaff.name,
+        email: newStaff.email,
+        password: `Guigui-${Math.random().toString(36).slice(2, 10)}!`,
+        jobTitle: newStaff.department,
+        preset: 'staff',
+        access: staffAccessFromMember(newStaff),
+      }),
+    }).catch(() => undefined);
+    setStaffList([...staffList, newStaff]);
   };
 
   const handleUpdateStaffEntry = (updatedStaff: AdminStaffMember) => {
-    handleUpdateStaff(staffList.map((staff) => staff.id === updatedStaff.id ? updatedStaff : staff));
+    persistStaffMember(updatedStaff);
+    setStaffList(staffList.map((staff) => staff.id === updatedStaff.id ? updatedStaff : staff));
   };
 
   const handleRevokeStaffAccess = (id: string, reason: string) => {
-    handleUpdateStaff(staffList.map((staff) => staff.id === id ? { ...staff, status: 'revoked' as const } : staff));
+    void fetch(`/api/admin/team/members/${id}`, { method: 'DELETE', credentials: 'include' }).catch(() => undefined);
+    setStaffList(staffList.map((staff) => staff.id === id ? { ...staff, status: 'revoked' as const } : staff));
     handleUpdateLogs([
       {
         id: `LOG-${Date.now()}`,
@@ -447,28 +651,62 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newCatSubcategories, setNewCatSubcategories] = useState('');
   const [selectedCatForSub, setSelectedCatForSub] = useState<string | null>(null);
   const [newSubcatName, setNewSubcatName] = useState('');
+  const [categoriesError, setCategoriesError] = useState('');
+  const [categoriesBusy, setCategoriesBusy] = useState(false);
+
+  type AdminCategoryResponse = { id: string; name: string; groupId: string; subcategories?: string[] };
+  const mapCategories = (list: AdminCategoryResponse[]): BusinessCategory[] => list.map((cat) => ({
+    id: cat.id,
+    name: cat.name,
+    groupId: (cat.groupId || '') as BusinessCategory['groupId'],
+    iconName: 'FolderTree',
+    subcategories: Array.isArray(cat.subcategories) ? cat.subcategories : [],
+  }));
+
+  const loadCategoriesFromDb = React.useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/categories', { credentials: 'include' });
+      const payload = await response.json().catch(() => null) as { categories?: AdminCategoryResponse[]; error?: string } | null;
+      if (!response.ok) {
+        setCategoriesError(payload?.error || 'Não foi possível carregar as categorias.');
+        return;
+      }
+      setCategoriesError('');
+      setCategoriesList(mapCategories(Array.isArray(payload?.categories) ? payload.categories : []));
+    } catch {
+      setCategoriesError('Não foi possível carregar as categorias. Verifique a ligação à base de dados.');
+    }
+  }, []);
 
   React.useEffect(() => {
-    // Load categories from database (PostgreSQL) instead of static initialData.ts fallback.
-    const loadCategoriesFromDb = async () => {
-      try {
-        const response = await fetch('/api/admin/categories');
-        if (!response.ok) return;
-        const data = await response.json() as { categories?: Array<{ id: string; name: string; groupId: string; subcategories?: string[] }> };
-        if (!Array.isArray(data.categories)) return;
-        setCategoriesList(data.categories.map((cat) => ({
-          id: cat.id,
-          name: cat.name,
-          groupId: (cat.groupId || '') as BusinessCategory['groupId'],
-          iconName: 'FolderTree',
-          subcategories: Array.isArray(cat.subcategories) ? cat.subcategories : ['Geral'],
-        })));
-      } catch {
-        // Database unavailable: remain empty; no static fallback.
-      }
-    };
     void loadCategoriesFromDb();
-  }, []);
+  }, [loadCategoriesFromDb]);
+
+  const saveCategory = async (method: 'POST' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<boolean> => {
+    setCategoriesBusy(true);
+    setCategoriesError('');
+    try {
+      const response = await fetch(path, {
+        method,
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      const payload = await response.json().catch(() => null) as { categories?: AdminCategoryResponse[]; error?: string } | null;
+      if (!response.ok) {
+        setCategoriesError(payload?.error || 'Não foi possível guardar a alteração.');
+        return false;
+      }
+      if (Array.isArray(payload?.categories)) setCategoriesList(mapCategories(payload.categories));
+      else await loadCategoriesFromDb();
+      return true;
+    } catch {
+      setCategoriesError('Não foi possível guardar a alteração. Verifique a ligação.');
+      return false;
+    } finally {
+      setCategoriesBusy(false);
+    }
+  };
   React.useEffect(() => {
     const isModalOpen = Boolean(showAddCategoryModal);
     if (isModalOpen) {
@@ -1150,64 +1388,55 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setEditingCell(null);
   };
 
-  const handleAddCategorySubmit = (e: React.FormEvent) => {
+  const handleAddCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCatName) return;
+    const name = newCatName.trim();
+    if (!name) return;
 
     const subList = newCatSubcategories
       .split(',')
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
 
-    const newCategory: BusinessCategory = {
-      id: 'cat-' + (categoriesList.length + 1),
-      name: newCatName,
-      iconName: 'FolderTree',
+    const created = await saveCategory('POST', '/api/admin/categories', {
+      name,
       groupId: newCatGroupId,
-      subcategories: subList.length > 0 ? subList : ['Geral'],
-    };
-
-    setCategoriesList((prev) => [...prev, newCategory]);
+      subcategories: subList,
+    });
+    if (!created) return;
     setNewCatName('');
     setNewCatSubcategories('');
     setShowAddCategoryModal(false);
   };
 
-  const handleAddSubcategory = (catId: string) => {
-    if (!newSubcatName.trim()) return;
-    setCategoriesList((prev) =>
-      prev.map((cat) => {
-        if (cat.id === catId) {
-          return {
-            ...cat,
-            subcategories: [...cat.subcategories, newSubcatName.trim()],
-          };
-        }
-        return cat;
-      })
-    );
+  const handleAddSubcategory = async (catId: string) => {
+    const subName = newSubcatName.trim();
+    if (!subName) return;
+    const category = categoriesList.find((cat) => cat.id === catId);
+    if (!category) return;
+    if (category.subcategories.includes(subName)) {
+      setCategoriesError('Essa subcategoria já existe nesta categoria.');
+      return;
+    }
+    const saved = await saveCategory('PATCH', `/api/admin/categories/${encodeURIComponent(catId)}`, {
+      subcategories: [...category.subcategories, subName],
+    });
+    if (!saved) return;
     setNewSubcatName('');
     setSelectedCatForSub(null);
   };
 
-  const handleRemoveSubcategory = (catId: string, subName: string) => {
-    setCategoriesList((prev) =>
-      prev.map((cat) => {
-        if (cat.id === catId) {
-          return {
-            ...cat,
-            subcategories: cat.subcategories.filter((s) => s !== subName),
-          };
-        }
-        return cat;
-      })
-    );
+  const handleRemoveSubcategory = async (catId: string, subName: string) => {
+    const category = categoriesList.find((cat) => cat.id === catId);
+    if (!category) return;
+    await saveCategory('PATCH', `/api/admin/categories/${encodeURIComponent(catId)}`, {
+      subcategories: category.subcategories.filter((sub) => sub !== subName),
+    });
   };
 
-  const handleArchiveCategory = (catId: string) => {
-    if (confirm('Tem a certeza que deseja arquivar esta categoria principal?')) {
-      setCategoriesList((prev) => prev.filter((c) => c.id !== catId));
-    }
+  const handleArchiveCategory = async (catId: string) => {
+    if (!confirm('Tem a certeza que deseja arquivar esta categoria principal? Os registos históricos mantêm-se.')) return;
+    await saveCategory('DELETE', `/api/admin/categories/${encodeURIComponent(catId)}`);
   };
 
   const handleUpdateBusinesses = (nextBusinesses: Business[]) => {
@@ -1241,18 +1470,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     ]);
   };
 
-  const handlePendingBusinessDecision = async (id: string, decision: 'approve' | 'reject') => {
+  const handlePendingBusinessDecision = async (id: string, decision: 'approve' | 'reject'): Promise<boolean> => {
     if (!onBusinessDecision) {
       alert('A decisão administrativa requer a ligação à base de dados.');
-      return;
+      return false;
     }
     const reason = decision === 'reject' ? window.prompt('Indique o motivo da rejeição:')?.trim() : undefined;
-    if (decision === 'reject' && (!reason || reason.length < 3)) return;
+    if (decision === 'reject' && (!reason || reason.length < 3)) return false;
     try {
       await onBusinessDecision(id, decision, reason);
       setBusinessesList((previous) => previous.map((business) => business.id === id ? { ...business, status: decision === 'approve' ? 'active' : 'rejected' } : business));
+      return true;
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Não foi possível persistir a decisão administrativa.');
+      return false;
     }
   };
 
@@ -1302,69 +1533,75 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     ]);
   };
 
-  // Persiste a decisão de moderação no servidor (moderation_items em PostgreSQL).
-  const persistModerationDecision = (id: string, action: 'approve' | 'reject' | 'appeal', notes?: string) => {
-    void fetch('/api/moderation/review', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, action, notes }),
-    }).catch(() => {});
-  };
-
-  const handleApproveModerationLog = (id: string) => {
+  const handleApproveModerationLog = async (id: string) => {
     const item = moderationLogsList.find((entry) => entry.id === id);
     const business = item?.businessName ? businessesList.find((entry) => entry.name === item.businessName) : undefined;
-    if (item && business) {
-      onSystemEvent?.({
-        eventType: item.type === 'business_profile' ? 'BUSINESS_APPROVED' : 'POST_APPROVED',
-        businessId: business.id,
-        businessName: business.name,
-        entityType: item.type === 'business_profile' ? 'business' : 'post',
-        entityId: item.id,
-      });
-    }
+    const previous = moderationLogsList;
     setModerationLogsList((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          return transitionModerationLog(item, 'approved', 'Admin Guigui');
+      prev.map((entry) => {
+        if (entry.id === id) {
+          return transitionModerationLog(entry, 'approved', 'Admin Guigui');
         }
-        return item;
+        return entry;
       })
     );
-    persistModerationDecision(id, 'approve');
+    try {
+      // O evento de sistema só é emitido depois de o servidor confirmar a decisão.
+      await persistModerationDecision(id, 'approve');
+      if (item && business) {
+        onSystemEvent?.({
+          eventType: item.type === 'business_profile' ? 'BUSINESS_APPROVED' : 'POST_APPROVED',
+          businessId: business.id,
+          businessName: business.name,
+          entityType: item.type === 'business_profile' ? 'business' : 'post',
+          entityId: item.id,
+        });
+      }
+    } catch (error) {
+      setModerationLogsList(previous);
+      alert(error instanceof Error ? error.message : 'Falha ao persistir a decisão de moderação.');
+    }
   };
 
-  const handleRejectModerationLog = (id: string) => {
+  const handleRejectModerationLog = async (id: string) => {
     const reason = prompt('Indique o motivo da rejeição a enviar ao autor:', 'Violação de regras de concorrência ou conteúdo inadequado');
     if (!reason) return;
 
     const item = moderationLogsList.find((entry) => entry.id === id);
     const business = item?.businessName ? businessesList.find((entry) => entry.name === item.businessName) : undefined;
-    if (item && business) {
-      onSystemEvent?.({
-        eventType: item.type === 'business_profile' ? 'BUSINESS_REJECTED' : 'POST_REJECTED',
-        businessId: business.id,
-        businessName: business.name,
-        entityType: item.type === 'business_profile' ? 'business' : 'post',
-        entityId: item.id,
-        message: reason,
-      });
-    }
+    const previous = moderationLogsList;
     setModerationLogsList((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          return transitionModerationLog(item, 'rejected', 'Admin Guigui', reason);
+      prev.map((entry) => {
+        if (entry.id === id) {
+          return transitionModerationLog(entry, 'rejected', 'Admin Guigui', reason);
         }
-        return item;
+        return entry;
       })
     );
-    persistModerationDecision(id, 'reject', reason);
+    try {
+      // O evento de sistema só é emitido depois de o servidor confirmar a decisão.
+      await persistModerationDecision(id, 'reject', reason);
+      if (item && business) {
+        onSystemEvent?.({
+          eventType: item.type === 'business_profile' ? 'BUSINESS_REJECTED' : 'POST_REJECTED',
+          businessId: business.id,
+          businessName: business.name,
+          entityType: item.type === 'business_profile' ? 'business' : 'post',
+          entityId: item.id,
+          message: reason,
+        });
+      }
+    } catch (error) {
+      setModerationLogsList(previous);
+      alert(error instanceof Error ? error.message : 'Falha ao persistir a decisão de moderação.');
+    }
   };
 
-  const handleSimulateAppeal = (id: string) => {
-    const appealText = prompt('Introduza a mensagem de contestação/recurso do autor:', 'Possuo alvará comercial e pretendo esclarecer a oferta.');
+  const handleSimulateAppeal = async (id: string) => {
+    const appealText = prompt('Introduza a mensagem de contestação/recurso do autor (SIMULAÇÃO administrativa):', 'Possuo alvará comercial e pretendo esclarecer a oferta.');
     if (!appealText) return;
 
+    const previous = moderationLogsList;
     setModerationLogsList((prev) =>
       prev.map((item) => {
         if (item.id === id) {
@@ -1372,14 +1609,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           return {
             ...item,
             status: 'appealed',
-            appealReason: appealText,
+            appealReason: `[SIMULAÇÃO] ${appealText}`,
             auditTrail: [
               ...item.auditTrail,
               {
                 timestamp: nowStr,
-                action: 'appealed_by_user',
-                actor: 'Autor do Conteúdo',
-                notes: `Recurso submetido: "${appealText}"`,
+                action: 'appeal_simulated',
+                actor: 'Administração (simulação)',
+                notes: `Recurso SIMULADO pela administração: "${appealText}"`,
               },
             ],
           };
@@ -1387,7 +1624,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         return item;
       })
     );
-    persistModerationDecision(id, 'appeal', appealText);
+    try {
+      await persistModerationDecision(id, 'simulate-appeal', appealText);
+    } catch (error) {
+      setModerationLogsList(previous);
+      alert(error instanceof Error ? error.message : 'Falha ao registar o recurso simulado.');
+    }
   };
 
   const moderationBusinessOptions: string[] = Array.from(new Set<string>(moderationLogsList.map((item) => item.businessName))).sort((a, b) => a.localeCompare(b));
@@ -1447,8 +1689,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     onSidebarCollapsedChange?.(sidebarCollapsed);
   }, [onSidebarCollapsedChange, sidebarCollapsed]);
 
+  const adminDisplayName = currentUser?.name?.trim() || 'Administração Guigui';
+  const adminAvatarUrl = currentUser?.avatarUrl || '';
+  const adminInitials = adminDisplayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || 'AD';
+
   return (
     <>
+      <GlassBottomNav
+        ariaLabel="Navegação principal da administração"
+        testId="admin-bottom-nav"
+        activeId={String(activeTab)}
+        onSelect={(id) => setActiveTab(id as typeof activeTab)}
+        items={[
+          { id: 'overview', label: 'Visão Geral', icon: LayoutDashboard },
+          { id: 'businesses', label: 'Empresas', icon: Building2 },
+          { id: 'users', label: 'Utilizadores', icon: Users },
+          { id: 'financials', label: 'Financeiro', icon: CreditCard },
+          { id: 'support', label: 'Suporte', icon: HelpCircle },
+        ]}
+      />
       <div className="guigui-profile-dashboard guigui-light-dashboard w-full min-h-[calc(100vh-72px)] bg-[#f3efe9]">
         <div className="flex min-h-[calc(100vh-72px)] w-full bg-[#f3efe9]">
           <div className={`${mobileSidebarOpen ? 'block' : 'hidden'} fixed inset-0 z-40 bg-slate-950/35 backdrop-blur-[1px] md:hidden`} onClick={() => setMobileSidebarOpen(false)} />
@@ -1456,55 +1720,79 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <aside
             style={{ width: sidebarCollapsed ? 72 : 260 }}
             data-navigation-groups={configuredAdminNavigation.length}
-            className={`${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed left-0 top-[120px] z-50 h-[calc(100vh-120px)] max-w-[calc(100vw-16px)] shrink-0 border-r border-[#e5d9c6] bg-[linear-gradient(180deg,_#fbf7f3_0%,_#f4efe9_100%)] shadow-[inset_-1px_0_0_rgba(15,23,42,0.04)] transition-[transform,box-shadow,width] duration-300 ease-out md:top-[120px] md:h-[calc(100vh-120px)] md:translate-x-0`}
+            className={`${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed left-0 top-[62px] z-50 h-[calc(100vh-62px)] max-w-[calc(100vw-16px)] shrink-0 border-r border-[#0c3a34] bg-[radial-gradient(135%_85%_at_0%_0%,_#10443d_0%,_#0b332e_45%,_#072420_100%)] text-white shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)] transition-[transform,box-shadow,width] duration-300 ease-out min-[761px]:top-[72px] min-[761px]:h-[calc(100vh-72px)] md:translate-x-0`}
           >
             <div className="flex h-full min-h-0 flex-col">
-              <div className="flex items-center justify-between border-b border-[#e5d9c6] bg-[#fffdfb]/95 px-1.5 py-2.5 backdrop-blur-sm">
-                <div className={`flex items-center ${sidebarCollapsed ? 'w-full justify-center' : 'gap-1.5'} pl-0.5`}>
-                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#102d2b] text-base font-black text-[#e8a23a] shadow-[0_10px_18px_-14px_rgba(16,45,43,0.9)]">
-                    g
+              <div className="flex items-center justify-between px-3 py-4">
+                <div className={`flex items-center ${sidebarCollapsed ? 'w-full justify-center' : 'gap-2.5'}`}>
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#3fae80] text-lg font-black text-[#072420] shadow-[0_12px_22px_-12px_rgba(63,174,128,0.85)]">
+                    G
                   </div>
                   {!sidebarCollapsed && (
                     <div className="min-w-0">
-                      <div className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-500">{t('adminPanel')}</div>
-                      <div className="text-lg font-black text-slate-900">Guigui.com</div>
+                      <div className="text-lg font-black leading-none text-white">Guigui<span className="text-[#e8a23a]">.com</span></div>
+                      <div className="mt-1.5 text-[8.5px] font-black uppercase tracking-[0.2em] text-[#8fb3ac]">Painel Administrativo</div>
                     </div>
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
+                {!sidebarCollapsed && (
                   <IconButton
-                    label={sidebarCollapsed ? t('expandMenu') : t('collapseMenu')}
+                    label={t('collapseMenu')}
                     variant="secondary"
                     size="sm"
-                    className="h-8 w-8 rounded-full"
-                    onClick={() => setSidebarCollapsed((value) => !value)}
-                    title={sidebarCollapsed ? t('expandMenu') : t('collapseMenu')}
+                    className="h-8 w-8 rounded-full border-0 bg-transparent text-[#8fb3ac] shadow-none hover:bg-white/10 hover:text-white"
+                    onClick={() => setSidebarCollapsed(true)}
+                    title={t('collapseMenu')}
                   >
-                    {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                    <ChevronLeft className="h-4 w-4" />
                   </IconButton>
+                )}
+                {sidebarCollapsed && (
                   <IconButton
-                    label={t('closeSidebar')}
+                    label={t('expandMenu')}
                     variant="secondary"
                     size="sm"
-                    className="h-8 w-8 rounded-full md:hidden"
-                    onClick={() => setMobileSidebarOpen(false)}
+                    className="absolute right-1 top-3 h-6 w-6 rounded-full border-0 bg-transparent text-[#8fb3ac] shadow-none hover:bg-white/10 hover:text-white"
+                    onClick={() => setSidebarCollapsed(false)}
+                    title={t('expandMenu')}
                   >
-                    <X className="h-4 w-4" />
+                    <ChevronRight className="h-3.5 w-3.5" />
                   </IconButton>
-                </div>
+                )}
               </div>
 
-              <div className="flex-1 overflow-y-auto overflow-x-hidden p-2">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
+                {!sidebarCollapsed && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('profile')}
+                    className="mb-2 flex w-full items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.045] p-2.5 text-left transition hover:bg-white/[0.08]"
+                  >
+                    {adminAvatarUrl ? (
+                      <img src={adminAvatarUrl} alt={adminDisplayName} className="h-10 w-10 shrink-0 rounded-full border border-white/10 object-cover" />
+                    ) : (
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#155048] text-xs font-black text-[#d8e6e2]">
+                        {adminInitials}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[12px] font-black text-white">{adminDisplayName}</div>
+                      <div className="mt-0.5 text-[10px] font-semibold text-[#8fb3ac]">Administrador</div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-[#6f8f89]" />
+                  </button>
+                )}
+
                 {filteredNavigationGroups.map((group) => (
-                  <div key={group.heading} className={`${sidebarCollapsed ? 'space-y-1.5' : 'space-y-2'}`}>
-                    {!sidebarCollapsed && (
-                      <div className="px-2 text-[8px] font-black uppercase tracking-[0.22em] text-[#52706b]">
+                  <div key={group.heading} className={sidebarCollapsed ? 'mb-2 space-y-1.5' : 'mb-3 space-y-1'}>
+                    {!sidebarCollapsed && group.heading !== t('adminNavDashboard') && (
+                      <div className="px-3 pb-1 pt-1.5 text-[8px] font-black uppercase tracking-[0.22em] text-[#6f8f89]">
                         {group.heading}
                       </div>
                     )}
 
-                    <div className={`${sidebarCollapsed ? 'space-y-1.5' : 'space-y-1'}`}>
+                    <div className={sidebarCollapsed ? 'space-y-1.5' : 'space-y-1'}>
                       {group.items.map((item) => {
                         const Icon = item.icon;
                         const isActive = activeTab === item.tab;
@@ -1514,42 +1802,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             key={`${group.heading}-${item.label}`}
                             type="button"
                             onClick={() => {
+                              setManagementPage(null);
                               setActiveTab(item.tab);
                               setMobileSidebarOpen(false);
                             }}
-                            aria-label={item.label}
-                            title={item.label}
-                            className={`group relative flex w-full items-center rounded-2xl border text-left transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[#d5b06e]/60 ${
+                            aria-label={item.countLabel ? `${item.label}: ${item.countLabel}` : item.label}
+                            aria-current={isActive ? 'page' : undefined}
+                            title={item.countLabel ? `${item.label}: ${item.countLabel}` : item.label}
+                            className={`group relative flex w-full items-center rounded-full text-left transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[#3fae80]/50 ${
                               sidebarCollapsed
-                                ? 'justify-center border-transparent p-2.5'
-                                : 'gap-2 border-[#e4ddd2] bg-white p-2.5 shadow-[0_8px_16px_-18px_rgba(15,23,42,0.18)] hover:-translate-y-0.5 hover:border-[#cbbda8] hover:bg-[#fffefa] hover:shadow-[0_16px_26px_-22px_rgba(15,23,42,0.3)]'
+                                ? 'justify-center p-2.5'
+                                : 'gap-3 px-3 py-2'
                             } ${
                               isActive
-                                ? 'border-[#0b4a45] bg-[#0b4a45] text-[#f7f2eb] shadow-[0_18px_28px_-20px_rgba(11,74,69,0.8)]'
-                                : 'text-slate-700'
+                                ? 'bg-[#3fae80] text-white shadow-[0_16px_28px_-16px_rgba(63,174,128,0.9)]'
+                                : 'text-[#d8e6e2] hover:bg-white/[0.05]'
                             }`}
                           >
-                            <div className={`flex shrink-0 items-center justify-center rounded-xl ${sidebarCollapsed ? 'h-7 w-7' : 'h-7 w-7'} ${isActive ? 'bg-[#17635b] text-[#f4d497] ring-1 ring-[#e8a23a]/25' : 'bg-[#f7f5f1] text-[#5f706d] group-hover:bg-[#efe6d9]'}`}>
-                              <Icon className={sidebarCollapsed ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
+                            <div className={`flex shrink-0 items-center justify-center rounded-full ${sidebarCollapsed ? 'h-8 w-8' : 'h-9 w-9'} ${isActive ? 'bg-black/10 text-white' : 'bg-white/[0.06] text-[#a9c4be] group-hover:bg-white/[0.1] group-hover:text-white'}`}>
+                              <Icon className="h-4 w-4" />
                             </div>
 
                             {!sidebarCollapsed && (
                               <div className="min-w-0 flex-1">
-                                <div className="text-[10px] font-black leading-snug">{item.label}</div>
-                                <div className={`mt-0.5 text-[7.8px] leading-relaxed ${isActive ? 'text-[#ebe0c8]/85' : 'text-slate-500'}`}>
+                                <div className={`truncate text-[11.5px] font-black leading-snug ${isActive ? 'text-white' : 'text-[#eef6f4]'}`}>{item.label}</div>
+                                <div className={`mt-0.5 truncate text-[9.5px] font-medium leading-relaxed ${isActive ? 'text-white/75' : 'text-[#8fb3ac]'}`}>
                                   {item.help}
                                 </div>
                               </div>
                             )}
 
-                            {!sidebarCollapsed && (
-                              <div className={`text-[6.5px] font-black uppercase tracking-[0.14em] ${isActive ? 'text-[#f0d59c]' : 'text-slate-400'}`}>
-                                {t('openLabel')}
-                              </div>
-                            )}
-
                             {!sidebarCollapsed && item.count !== undefined && item.count > 0 && (
-                              <Badge variant={isActive ? 'verified' : 'danger'} className="border-0 px-1.5 py-0.5 text-[9px]">{item.count}</Badge>
+                              <span className={`flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-black ${isActive ? 'bg-white/25 text-white' : 'bg-[#f7bcbc] text-[#8a1f1f]'}`}>
+                                {item.count}
+                              </span>
                             )}
                           </button>
                         );
@@ -1558,17 +1844,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                 ))}
                 {adminSearchQuery && filteredNavigationGroups.length === 0 && (
-                  <div className="mt-3 rounded-2xl border border-dashed border-[#d8c7a5] bg-white/60 p-3 text-[11px] font-medium text-slate-500">
+                  <div className="mt-2 rounded-2xl border border-dashed border-white/15 bg-white/[0.04] p-3 text-[11px] font-medium text-[#a9c4be]">
                     Nenhum módulo encontrado para “{adminSearchQuery}”.
                   </div>
                 )}
+              </div>
 
+              <div className="mt-auto border-t border-white/10 px-2 py-2.5">
+                {!sidebarCollapsed && (
+                  <div className="flex items-center gap-3 rounded-2xl px-1 py-1.5">
+                    {adminAvatarUrl ? (
+                      <img src={adminAvatarUrl} alt={adminDisplayName} className="h-9 w-9 shrink-0 rounded-full border border-white/10 object-cover" />
+                    ) : (
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#155048] text-[10px] font-black text-[#d8e6e2]">
+                        {adminInitials}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[11.5px] font-black text-white">{adminDisplayName}</div>
+                      <div className="text-[9.5px] font-semibold text-[#8fb3ac]">Administrador</div>
+                    </div>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  title="Terminar sessão"
+                  className={`mt-1 flex w-full items-center rounded-2xl py-2.5 text-left text-[#d8e6e2] transition hover:bg-white/[0.07] hover:text-white ${sidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-2'}`}
+                >
+                  <LogOut className="h-5 w-5 shrink-0 text-[#a9c4be]" />
+                  {!sidebarCollapsed && <span className="text-[12px] font-black">Terminar sessão</span>}
+                </button>
               </div>
             </div>
           </aside>
           <main
             style={{ '--admin-sidebar-width': `${sidebarCollapsed ? 72 : 260}px` } as React.CSSProperties}
-            className="min-w-0 flex-1 bg-[#f7f2ec] p-0 transition-[width,margin] duration-300 ease-out md:ml-[var(--admin-sidebar-width)]"
+            className="min-w-0 flex-1 bg-[#f7f2ec] p-0 pb-[calc(4.75rem+env(safe-area-inset-bottom))] transition-[width,margin] duration-300 ease-out md:ml-[var(--admin-sidebar-width)] lg:pb-0"
           >
             <div className="flex flex-col gap-3 border-b border-[#e6dac8] bg-[#f7f2ec] px-4 py-3.5 sm:px-5 sm:py-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -1621,6 +1933,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         key={`search-${item.label}`}
                         type="button"
                         onClick={() => {
+                          setManagementPage(null);
                           setActiveTab(item.tab);
                           setAdminSearchQuery('');
                           setMobileSidebarOpen(false);
@@ -1648,6 +1961,127 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </Badge>
               </div>
             </div>
+
+      {managementPage ? (
+        <>
+          {managementPage === 'businesses' && (
+            <BusinessesManagementPage
+              businesses={businessesList}
+              onBack={() => setManagementPage(null)}
+              onBusinessesChanged={handleUpdateBusinesses}
+              onDecision={handlePendingBusinessDecision}
+            />
+          )}
+          {managementPage === 'featured' && (
+            <FeaturedBusinessesManagementPage
+              businesses={businessesList}
+              onBack={() => setManagementPage(null)}
+              onBusinessesChanged={handleUpdateBusinesses}
+            />
+          )}
+          {managementPage === 'events' && (
+            <EventsManagementPage events={events} onBack={() => setManagementPage(null)} />
+          )}
+          {managementPage === 'tickets' && (
+            <TicketsManagementPage events={events} onBack={() => setManagementPage(null)} />
+          )}
+          {managementPage === 'transactions' && (
+            <TransactionsManagementPage
+              transactions={Array.from(new Map([...paymentTransactionsList, ...adminPaymentHistory].map((transaction) => [transaction.id, transaction])).values())}
+              onBack={() => setManagementPage(null)}
+            />
+          )}
+          {managementPage === 'finance-transactions' && (
+            <FinanceTransactionsPage onBack={() => setManagementPage(null)} />
+          )}
+          {managementPage === 'finance-reconciliation' && (
+            <FinanceReconciliationPage onBack={() => setManagementPage(null)} />
+          )}
+          {managementPage === 'finance-operators' && (
+            <FinanceOperatorsPage onBack={() => setManagementPage(null)} />
+          )}
+          {managementPage === 'finance-pending' && (
+            <FinancePendingPage onBack={() => setManagementPage(null)} />
+          )}
+          {managementPage === 'finance-refunds' && (
+            <FinanceRefundsPage onBack={() => setManagementPage(null)} />
+          )}
+          {managementPage === 'finance-statements' && (
+            <FinanceStatementsPage onBack={() => setManagementPage(null)} />
+          )}
+          {managementPage === 'promotions' && (
+            <PromotionsManagementPage businesses={businessesList} promotions={promotions} onBack={() => setManagementPage(null)} />
+          )}
+          {managementPage === 'support' && (
+            <SupportManagementPage
+              supportRequests={supportRequests}
+              onBack={() => setManagementPage(null)}
+              onReplySupport={onReplySupport}
+              onUpdateSupportStatus={onUpdateSupportStatus}
+            />
+          )}
+          {managementPage === 'users-all' && (
+            <CitizensManagementPage mode="all" onBack={() => setManagementPage(null)} />
+          )}
+          {managementPage === 'users-citizens' && (
+            <CitizensManagementPage mode="user" onBack={() => setManagementPage(null)} />
+          )}
+          {managementPage === 'users-business' && (
+            <CitizensManagementPage mode="business" onBack={() => setManagementPage(null)} />
+          )}
+          {managementPage === 'users-admins' && (
+            <CitizensManagementPage mode="admin" onBack={() => setManagementPage(null)} />
+          )}
+          {managementPage === 'users-suspended' && (
+            <CitizensManagementPage mode="suspended" onBack={() => setManagementPage(null)} />
+          )}
+          {managementPage === 'users-activity' && (
+            <UsersActivityPage onBack={() => setManagementPage(null)} />
+          )}
+          {managementPage === 'staff' && (
+            <ManagementPage
+              title="Administradores e funcionários"
+              description="Equipa administrativa, funções, permissões e estado de acesso."
+              moduleLabel="Equipa"
+              onBack={() => setManagementPage(null)}
+            >
+              <AdminTeamHub currentLang={currentLang} />
+            </ManagementPage>
+          )}
+          {managementPage === 'audit' && (
+            <ManagementPage
+              title="Registos de auditoria"
+              description="Ações administrativas e eventos de segurança, com filtros e paginação."
+              moduleLabel="Auditoria"
+              onBack={() => setManagementPage(null)}
+            >
+              <AdminAuditLogsHub currentLang={currentLang} logs={logsList} />
+            </ManagementPage>
+          )}
+          {managementPage === 'reports' && (
+            <ManagementPage
+              title="Relatórios e documentos"
+              description="Relatórios operacionais e financeiros gerados a partir dos dados reais da plataforma."
+              moduleLabel="Relatórios"
+              onBack={() => setManagementPage(null)}
+            >
+              <AdminReportsHub
+                currentLang={currentLang}
+                businesses={businessesList}
+                events={events}
+                paymentTransactions={platformPaymentTransactions}
+              />
+            </ManagementPage>
+          )}
+          {managementPage === 'sessions' && (
+            <SessionsManagementPage onBack={() => setManagementPage(null)} />
+          )}
+          {managementPage === 'campaigns' && (
+            <CampaignsManagementPage onBack={() => setManagementPage(null)} />
+          )}
+        </>
+      ) : (
+        <>
 
       {/* TAB: Perfil do administrador (antes órfão — acessível via avatar) */}
       {activeTab === 'profile' && (
@@ -1695,145 +2129,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         />
       )}
 
-      {/* TAB 1: Businesses */}
+      {/* TAB 1: Empresas & Negócios — resumo; a lista completa abre numa página própria */}
       {activeTab === 'businesses' && (
-        <Card className="border-slate-200 bg-white p-6 space-y-4 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-            <div>
-              <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider">
-                Empresas Registadas na Plataforma Guigui.com ({businessesList.length})
-              </h3>
-              <p className="text-xs text-slate-500 font-medium">
-                Aprovação direta, verificação de comerciante e exportação de base de dados
-              </p>
-            </div>
-            
-            {/* Export Buttons */}
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold text-slate-400">Exportar:</span>
-              <Button type="button" size="sm" variant="secondary"
-                onClick={() => {
-                  const headers = ['ID', 'Nome', 'Categoria', 'Bairro', 'Plano', 'Estado', 'Telefone', 'Classificação'];
-                  const rows = businessesList.map(b => [b.id, b.name, b.category, b.neighborhood, b.tier, b.status, b.phone, b.rating]);
-                  downloadCSV('diretorio_empresas_guigui.csv', headers, rows);
-                }}
-                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-[11px] transition flex items-center gap-1.5"
-                title="Exportar CSV"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>CSV</span>
-              </Button>
-              <Button type="button" size="sm" variant="secondary"
-                onClick={() => {
-                  const headers = ['ID', 'Nome', 'Categoria', 'Bairro', 'Plano', 'Estado', 'Telefone', 'Classificação'];
-                  const rows = businessesList.map(b => [b.id, b.name, b.category, b.neighborhood, b.tier, b.status, b.phone, b.rating]);
-                  downloadExcel('diretorio_empresas_guigui.xls', 'Empresas', headers, rows);
-                }}
-                className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg text-[11px] transition flex items-center gap-1.5"
-                title="Exportar Excel"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5" />
-                <span>Excel</span>
-              </Button>
-              <Button type="button" size="sm" variant="secondary"
-                onClick={() => {
-                  const headers = ['Nome', 'Categoria', 'Bairro', 'Plano', 'Estado', 'Telefone'];
-                  const rows = businessesList.map(b => [b.name, b.category, b.neighborhood, b.tier.toUpperCase(), b.status.toUpperCase(), b.phone]);
-                  downloadPDFReport(
-                    'Relatório Oficial de Comércios - Guigui.com',
-                    `Base de dados de empresas cadastradas no portal Guigui.com (Guiné-Bissau). Total de ${businessesList.length} empresas registadas.`,
-                    [
-                      { label: 'Total Registadas', value: `${businessesList.length}` },
-                      { label: 'Empresas Ativas', value: `${businessesList.filter(b => b.status === 'active').length}` },
-                      { label: 'Empresas Premium', value: `${businessesList.filter(b => b.tier === 'premium').length}` },
-                    ],
-                    headers,
-                    rows
-                  );
-                }}
-                className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-800 font-bold rounded-lg text-[11px] transition flex items-center gap-1.5"
-                title="Exportar PDF Oficial"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>PDF</span>
-              </Button>
-            </div>
-          </div>
-
-          <div className="divide-y divide-slate-100 text-xs">
-            {businessesList.map((b) => (
-              <div key={b.id} className="py-3 flex flex-wrap items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <img src={b.logo} alt="" className="w-11 h-11 rounded-xl object-cover border border-slate-200" />
-                  <div>
-                    <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                      <span>{b.name}</span>
-                      <Badge variant="info" className="px-2 py-0.5 text-[10px] uppercase">
-                        {b.tier}
-                      </Badge>
-                      {b.status === 'active' ? (
-                        <Badge variant="success" className="px-2 py-0.5 text-[10px]">
-                          {t('workspace.admin.businessActive')}
-                        </Badge>
-                      ) : b.status === 'pending' ? (
-                        <Badge variant="warning" className="px-2 py-0.5 text-[10px]">
-                          {t('workspace.admin.businessPending')}
-                        </Badge>
-                      ) : (
-                        <Badge variant="danger" className="px-2 py-0.5 text-[10px]">
-                          {b.status === 'rejected' ? t('workspace.admin.businessRejected') : t('workspace.admin.businessSuspended')}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="text-slate-500 text-[11px] mt-0.5">
-                      📍 {b.neighborhood} • WhatsApp: {b.whatsapp} • Quota: {b.postsQuotaRemaining} posts
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[10px] font-black text-blue-800" title="Alterar o plano de acesso empresarial">
-                    <span>Plano</span>
-                    <select
-                      value={b.tier}
-                      onChange={(e) => handleChangeBusinessTier(b.id, e.target.value as SubscriptionTier)}
-                      className="bg-transparent text-[10px] font-black text-blue-900 outline-none"
-                    >
-                      <option value="basic">Basic</option>
-                      <option value="professional">Professional</option>
-                      <option value="premium">Premium</option>
-                      <option value="enterprise">Enterprise</option>
-                    </select>
-                  </label>
-                  <Button type="button" size="sm"
-                    onClick={() => b.status === 'pending' || b.status === 'rejected' ? void handlePendingBusinessDecision(b.id, 'approve') : handleToggleBusinessStatus(b.id)}
-                    className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1 ${
-                      b.status === 'active'
-                        ? 'bg-amber-100 hover:bg-amber-200 text-amber-900'
-                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                    }`}
-                  >
-                    {b.status === 'active' ? t('workspace.admin.suspendBusiness') : t('workspace.admin.approveBusiness')}
-                  </Button>
-                  {(b.status === 'pending' || b.status === 'rejected') && (
-                    <Button type="button" size="sm" onClick={() => void handlePendingBusinessDecision(b.id, 'reject')} className="rounded-xl bg-red-50 px-3 py-1.5 text-xs font-bold text-red-800 hover:bg-red-100">
-                      {t('workspace.admin.rejectBusiness')}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <FeaturedBusinessesAdmin businesses={businessesList} onUpdateBusinesses={handleUpdateBusinesses} />
-        </Card>
+        <BusinessesModule
+          businesses={businessesList}
+          onOpenList={openBusinessList}
+          onOpenFeatured={() => setManagementPage('featured')}
+          onOpenPromotions={() => setManagementPage('promotions')}
+          onOpenCampaigns={() => setManagementPage('campaigns')}
+        />
       )}
 
       {/* TAB 2: AI & Human Content Moderation Pipeline (Section 9) */}
       {activeTab === 'moderation' && (
-        <div className="space-y-6 text-xs">
+        <div className="space-y-4 text-xs">
+          <ModuleSubnav
+            panelLabel="Administração"
+            moduleLabel="Moderação"
+            activeId={moderationSection}
+            onChange={(id) => setModerationSection(id as 'stories' | 'pipeline' | 'queue')}
+            items={[
+              { id: 'pipeline', label: 'Pipeline IA', description: 'Resumo e regras de moderação automática' },
+              { id: 'queue', label: 'Fila de revisão', description: 'Itens pendentes e decisões humanas' },
+              { id: 'stories', label: 'Stories', description: 'Moderação de stories' },
+            ]}
+          />
+
+          {moderationSection === 'stories' && <StoriesModerationPanel />}
+
+          {moderationSection === 'pipeline' && (<>
           {/* Section 9 Summary & Classification Banner */}
-          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white p-6 rounded-3xl border border-slate-800 shadow-md space-y-4">
+          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white p-6 rounded-2xl border border-slate-800 shadow-md space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800/80 pb-3">
               <div>
                 <span className="bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded font-black text-[10px] uppercase tracking-wider">
@@ -1887,7 +2213,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           {/* Section 9.3 Sensitivity & Policy Settings Controls */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 space-y-4 shadow-sm">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <Sliders className="w-4 h-4 text-blue-600" />
@@ -1968,7 +2294,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
           </div>
+          </>)}
 
+          {moderationSection === 'queue' && (<>
           {/* Pipeline Filters */}
           <Card className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2037,7 +2365,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {moderationColumns.map((column) => {
                 const columnItems = filteredModerationItems.filter((item) => getModerationWorkflowColumn(item.status) === column.id);
                 return (
-                  <section key={column.id} className={`rounded-3xl border p-3 ${column.className}`}>
+                  <section key={column.id} className={`rounded-2xl border p-3 ${column.className}`}>
                     <div className="flex items-start justify-between gap-2 border-b border-slate-200/80 pb-3 mb-3">
                       <div>
                         <h4 className="text-xs font-black text-slate-900">{column.label}</h4>
@@ -2054,7 +2382,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 return (
                   <Card
                     key={item.id}
-                    className={`bg-white rounded-3xl p-5 border text-xs space-y-4 shadow-sm transition ${
+                    className={`bg-white rounded-2xl p-5 border text-xs space-y-4 shadow-sm transition ${
                       item.status === 'pending_human'
                         ? 'border-amber-300 ring-1 ring-amber-200'
                         : item.status === 'rejected' || item.status === 'appealed'
@@ -2220,279 +2548,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               })}
             </div>
           )}
+          </>)}
         </div>
       )}
 
-      {/* TAB: Pricing Matrix & Business Model (Section 4) */}
+      {/* TAB: Planos & Assinaturas — centro comercial independente */}
       {activeTab === 'pricing' && (
-        <div className="space-y-6 text-xs">
-          {/* Banner: Rule of 3 Posts/month Across All Tiers */}
-          <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white p-6 rounded-3xl border border-blue-800 shadow-sm space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded font-black text-[10px] uppercase tracking-wider">
-                Regra Transversal 4.1
-              </span>
-              <h3 className="font-extrabold text-sm sm:text-base text-white">
-                Catálogo de Planos & Preços Dinâmicos por Categoria
-              </h3>
-            </div>
-            <p className="text-slate-200 leading-relaxed text-[11px]">
-              Os valores iniciais do catálogo incluem <strong>3 posts/mês</strong> nos quatro planos base, mas o Super Admin pode alterar este e qualquer outro limite por plano.
-              Posts adicionais além da quota configurada são pagos à parte por compra avulsa (<strong>{config.extraPostPriceXOF.toLocaleString('pt-PT')} XOF/post</strong>).
-            </p>
-          </div>
-
-          <SubscriptionPlansAdmin currentLang={currentLang} businesses={businessesList} />
-          <MonetizationAdmin
-            currentLang={currentLang}
-            businesses={businessesList}
-            paymentTransactions={paymentTransactionsList}
-            onLegacyConfigChange={(patch) => setConfig((previous) => ({ ...previous, ...patch }))}
-          />
-
-          {/* Matrix Configuration Card */}
-          <Card className="border-slate-200 bg-white p-6 space-y-6 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4 border-slate-100">
-              <div>
-                <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <Table className="w-4 h-4 text-blue-600" />
-                  Matriz Configurável de Preços (Grupo de Categoria × Escalão de Subscrição)
-                </h3>
-                <p className="text-slate-500 text-[11px] mt-0.5">
-                  Preços definidos e ajustados no Guigui.com em XOF. Alterações aplicam-se a novas adesões e renovações.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-end gap-2 text-[10px] font-bold bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
-                <Percent className="w-3.5 h-3.5 text-emerald-600" />
-                <label htmlFor="annual-discount" className="text-slate-700">Desconto anual antecipado</label>
-                <input id="annual-discount" type="number" min="0" max="100" step="1" value={config.annualDiscountPercent} onChange={(event) => updateFinancialConfig('annualDiscountPercent', Number(event.target.value))} className="w-16 rounded-lg border border-slate-300 bg-white px-2 py-1 text-center font-black text-slate-900" aria-label="Desconto de pagamento anual antecipado em percentagem" />
-                <span className="text-slate-700">%</span>
-                <Button type="button" variant="primary" size="sm" onClick={handleSaveFinancialConfig} className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[10px] font-black text-white hover:bg-emerald-700">Guardar parâmetros</Button>
-              </div>
-              {configNotice && <p className="mt-2 text-right text-[11px] font-bold text-emerald-700" role="status">{configNotice}</p>}
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-950">
-                <div>
-                  <p className="font-black">Suspensão automática após expiração</p>
-                  <p className="mt-0.5 leading-relaxed">Quando activa, a empresa passa para modo suspenso no fim do período pago. Quando desligada, fica em modo de consulta até intervenção manual.</p>
-                </div>
-                <label className="flex cursor-pointer items-center gap-2 rounded-xl bg-white px-3 py-2 font-black shadow-sm">
-                  <input
-                    type="checkbox"
-                    checked={config.automaticSubscriptionSuspensionEnabled !== false}
-                    onChange={(event) => setConfig((previous) => ({ ...previous, automaticSubscriptionSuspensionEnabled: event.target.checked }))}
-                    aria-label="Activar suspensão automática após expiração do plano"
-                    className="h-4 w-4 accent-amber-600"
-                  />
-                  {config.automaticSubscriptionSuspensionEnabled !== false ? 'Activa' : 'Desligada'}
-                </label>
-              </div>
-            </div>
-
-            {/* Matrix Table */}
-            <div className="overflow-x-auto border border-slate-200 rounded-2xl">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-extrabold uppercase text-[10px]">
-                    <th className="p-3.5 w-1/3">Grupo de Categoria (Atividade)</th>
-                    <th className="p-3.5 text-center">Básico</th>
-                    <th className="p-3.5 text-center">Profissional</th>
-                    <th className="p-3.5 text-center">Premium</th>
-                    <th className="p-3.5 text-center">Enterprise</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-800">
-                  {categoryGroups.map((group) => (
-                    <tr key={group.id} className="hover:bg-slate-50/50 transition">
-                      <td className="p-3.5">
-                        <div className="font-bold text-slate-900 text-xs">{group.name}</div>
-                        <div className="text-[10px] text-slate-500 mt-0.5">{group.description}</div>
-                      </td>
-
-                      {(['basic', 'professional', 'premium', 'enterprise'] as SubscriptionTier[]).map((tier) => {
-                        const isEditing =
-                          editingCell?.groupId === group.id && editingCell?.tier === tier;
-                        const currentPrice = group.prices[tier];
-                        const annualDiscountedPrice = Math.round(currentPrice * 12 * (1 - config.annualDiscountPercent / 100));
-
-                        return (
-                          <td key={tier} className="p-3 text-center align-top">
-                            {isEditing ? (
-                              <div className="p-2 bg-blue-50 border border-blue-300 rounded-xl space-y-1.5 text-[10px]">
-                                <input
-                                  type="number"
-                                  step={1000}
-                                  value={editingCell.price}
-                                  onChange={(e) =>
-                                    setEditingCell({
-                                      ...editingCell,
-                                      price: Number(e.target.value),
-                                    })
-                                  }
-                                  className="w-full p-1.5 bg-white border border-slate-300 rounded text-center font-bold text-slate-900"
-                                />
-                                <div className="flex gap-1 justify-center">
-                                  <button type="button"
-                                    onClick={() => handleSaveCellPrice(group.id, tier, editingCell.price)}
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-2 py-1 rounded flex items-center gap-1"
-                                  >
-                                    <Save className="w-3 h-3" />
-                                    <span>Guardar</span>
-                                  </button>
-                                  <button type="button"
-                                    onClick={() => setEditingCell(null)}
-                                    className="bg-slate-200 text-slate-700 font-bold px-2 py-1 rounded"
-                                  >
-                                    Cancelar
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div
-                                onClick={() =>
-                                  setEditingCell({
-                                    groupId: group.id,
-                                    tier,
-                                    price: currentPrice,
-                                  })
-                                }
-                                className="group/cell p-2 rounded-xl hover:bg-blue-50/80 cursor-pointer transition border border-transparent hover:border-blue-200"
-                              >
-                                <div className="font-black text-slate-900 font-mono text-xs flex items-center justify-center gap-1">
-                                  <span>{currentPrice.toLocaleString('pt-PT')} XOF</span>
-                                  <Edit2 className="w-3 h-3 text-slate-400 group-hover/cell:text-blue-600 opacity-0 group-hover/cell:opacity-100 transition" />
-                                </div>
-                                <div className="text-[9px] text-slate-400 mt-0.5">/mês</div>
-                                <div className="text-[9px] text-emerald-700 font-medium mt-1 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
-                                  Anual: {annualDiscountedPrice.toLocaleString('pt-PT')} XOF
-                                </div>
-                              </div>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-
-          {/* Additional Revenue Parameters & Fees */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-4 shadow-sm">
-              <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                <Tag className="w-4 h-4 text-amber-600" />
-                Fontes de Receita Adicionais (Venda Avulsa & Banners)
-              </h3>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-200">
-                  <div>
-                    <div className="font-bold text-slate-900">Post Extra Avulso (Acima dos 3 incluídos)</div>
-                    <div className="text-[10px] text-slate-500">Comprado por comerciantes quando esgotam os 3 posts</div>
-                  </div>
-                  <label className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-1">
-                    <input type="number" min="0" step="500" value={config.extraPostPriceXOF} onChange={(event) => updateFinancialConfig('extraPostPriceXOF', Number(event.target.value))} className="w-24 bg-transparent text-right font-black font-mono text-blue-700 outline-none" aria-label="Preço do post extra avulso" />
-                    <span className="font-black font-mono text-blue-700">XOF</span>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-200">
-                  <div>
-                    <div className="font-bold text-slate-900">Promoção Extra Avulsa</div>
-                    <div className="text-[10px] text-slate-500">Destaque promocional com selo customizado</div>
-                  </div>
-                  <label className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-1">
-                    <input type="number" min="0" step="500" value={config.extraPromotionPriceXOF} onChange={(event) => updateFinancialConfig('extraPromotionPriceXOF', Number(event.target.value))} className="w-24 bg-transparent text-right font-black font-mono text-amber-700 outline-none" aria-label="Preço da promoção extra avulsa" />
-                    <span className="font-black font-mono text-amber-700">XOF</span>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-200">
-                  <div>
-                    <div className="font-bold text-slate-900">Banner Rotativo de Publicidade Premium</div>
-                    <div className="text-[10px] text-slate-500">Exibição de destaque no topo da homepage</div>
-                  </div>
-                  <label className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-1">
-                    <input type="number" min="0" step="1000" value={config.bannerWeeklyPriceXOF} onChange={(event) => updateFinancialConfig('bannerWeeklyPriceXOF', Number(event.target.value))} className="w-24 bg-transparent text-right font-black font-mono text-slate-900 outline-none" aria-label="Preço do banner premium por semana" />
-                    <span className="font-black font-mono text-slate-900">XOF / semana</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-4 shadow-sm">
-              <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                <Ticket className="w-4 h-4 text-emerald-600" />
-                Taxas da Bilheteira de Eventos Culturais
-              </h3>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-200">
-                  <div>
-                    <div className="font-bold text-slate-900">Comissão Percentual sobre Bilhete</div>
-                    <div className="text-[10px] text-slate-500">Retida automaticamente nas vendas via SMS</div>
-                  </div>
-                  <label className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-1">
-                    <input type="number" min="0" max="100" step="0.5" value={config.ticketCommissionPercent} onChange={(event) => updateFinancialConfig('ticketCommissionPercent', Number(event.target.value))} className="w-16 bg-transparent text-right font-black font-mono text-emerald-700 outline-none" aria-label="Comissão percentual sobre bilhete" />
-                    <span className="font-black font-mono text-emerald-700">%</span>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-200">
-                  <div>
-                    <div className="font-bold text-slate-900">Taxa Fixa por Emissão de Bilhete SMS</div>
-                    <div className="text-[10px] text-slate-500">Custo de processamento de gateway e envio SMS</div>
-                  </div>
-                  <label className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-1">
-                    <input type="number" min="0" step="50" value={config.ticketFixedFeeXOF} onChange={(event) => updateFinancialConfig('ticketFixedFeeXOF', Number(event.target.value))} className="w-24 bg-transparent text-right font-black font-mono text-emerald-700 outline-none" aria-label="Taxa fixa por emissão de bilhete" />
-                    <span className="font-black font-mono text-emerald-700">XOF / bilhete</span>
-                  </label>
-                </div>
-
-                <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-[11px] text-emerald-900 leading-relaxed">
-                  💡 <strong>Exemplo:</strong> Num bilhete de 2.500 XOF, a receita da plataforma é {Math.round(2500 * (config.ticketCommissionPercent / 100)) + config.ticketFixedFeeXOF} XOF ({Math.round(2500 * (config.ticketCommissionPercent / 100))} XOF de comissão + {config.ticketFixedFeeXOF} XOF de taxa fixa).
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Audit Log / Price Change History (4.2.c) */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-4 shadow-sm">
-            <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <Clock className="w-4 h-4 text-slate-600" />
-              Histórico & Auditoria de Alterações de Preço (4.2)
-            </h3>
-
-            <div className="divide-y divide-slate-100 text-xs">
-              {auditLogs.map((log) => (
-                <div key={log.id} className="py-2.5 flex flex-wrap items-center justify-between gap-2">
-                  <div className="space-y-0.5">
-                    <span className="font-bold text-slate-900">{log.categoryGroup}</span>
-                    <span className="text-[10px] text-blue-700 font-extrabold uppercase bg-blue-50 ml-2 px-2 py-0.5 rounded">
-                      Escalão {log.tier}
-                    </span>
-                    <div className="text-[10px] text-slate-500">Alterado por: {log.updatedBy} • {log.date}</div>
-                  </div>
-
-                  <div className="font-mono text-xs flex items-center gap-2">
-                    <span className="line-through text-slate-400">{log.oldPrice.toLocaleString('pt-PT')} XOF</span>
-                    <span className="text-slate-400">➔</span>
-                    <span className="font-extrabold text-emerald-700">{log.newPrice.toLocaleString('pt-PT')} XOF</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+        <div className="space-y-4">
+          {commercialView === 'summary' && <CommercialModule onOpenSection={setCommercialView} />}
+          {commercialView === 'plans' && <CommercialPlansPage onBack={() => setCommercialView('summary')} />}
+          {commercialView === 'subscriptions' && <CommercialSubscriptionsPage onBack={() => setCommercialView('summary')} />}
+          {commercialView === 'features' && <CommercialFeaturesPage onBack={() => setCommercialView('summary')} />}
+          {commercialView === 'pricing' && <CommercialPricingPage onBack={() => setCommercialView('summary')} />}
+          {commercialView === 'products' && <CommercialProductsPage onBack={() => setCommercialView('summary')} />}
+          {commercialView === 'ticket-fees' && <CommercialTicketFeesPage onBack={() => setCommercialView('summary')} />}
+          {commercialView === 'rules' && <CommercialRulesPage onBack={() => setCommercialView('summary')} />}
+          {commercialView === 'audit' && <CommercialAuditPage onBack={() => setCommercialView('summary')} />}
         </div>
       )}
 
       {/* TAB: Categories Structure Management (Section 5) */}
       {activeTab === 'categories' && (
-        <div className="space-y-6 text-xs">
+        <div className="space-y-4 text-xs">
           {/* Header & Rules Banner */}
-          <div className="bg-gradient-to-r from-purple-900 to-indigo-950 text-white p-6 rounded-3xl border border-purple-800 shadow-sm space-y-3">
+          <div className="bg-gradient-to-r from-purple-900 to-indigo-950 text-white p-6 rounded-2xl border border-purple-800 shadow-sm space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
@@ -2511,7 +2590,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <button type="button"
                 onClick={() => setShowAddCategoryModal(true)}
-                className="bg-purple-500 hover:bg-purple-600 text-white font-extrabold px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 shadow-sm min-h-[40px]"
+                disabled={categoriesBusy}
+                className="bg-purple-500 hover:bg-purple-600 text-white font-extrabold px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 shadow-sm min-h-[40px] disabled:opacity-60"
               >
                 <Plus className="w-4 h-4" />
                 <span>Nova Categoria Principal</span>
@@ -2535,8 +2615,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
 
+          {categoriesError && (
+            <p role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-[11px] font-bold text-rose-800">
+              {categoriesError}
+            </p>
+          )}
+          {categoriesBusy && (
+            <p role="status" className="text-[11px] font-bold text-purple-700">A guardar alterações...</p>
+          )}
+
+          <LocationCatalogAdmin />
+
           {/* Cultural Events Special Differentiated Handling Banner (#14) */}
-          <div className="bg-amber-50 border border-amber-300 rounded-3xl p-5 space-y-2 shadow-sm text-amber-950">
+          <div className="bg-amber-50 border border-amber-300 rounded-2xl p-5 space-y-2 shadow-sm text-amber-950">
             <div className="flex items-center gap-2 font-extrabold text-xs uppercase tracking-wider text-amber-900">
               <Ticket className="w-4 h-4 text-amber-600" />
               <span>Diferenciação Técnica - Categoria 14: Eventos Culturais & Bilhética</span>
@@ -2548,6 +2639,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {/* Categories Grid (16 Primary Categories) */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {categoriesList.length === 0 && !categoriesBusy && !categoriesError && (
+              <p className="md:col-span-2 lg:col-span-3 rounded-2xl border border-slate-200 bg-white p-6 text-center text-xs font-semibold text-slate-500">
+                Ainda não existem categorias principais. Crie a primeira com o botão acima.
+              </p>
+            )}
             {categoriesList.map((cat, index) => {
               const isCulturalEventCat = cat.id === 'cat-14';
               const isAddingSub = selectedCatForSub === cat.id;
@@ -2555,7 +2651,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               return (
                 <div
                   key={cat.id}
-                  className={`bg-white border rounded-3xl p-5 space-y-4 shadow-sm flex flex-col justify-between transition hover:border-purple-300 ${
+                  className={`bg-white border rounded-2xl p-5 space-y-4 shadow-sm flex flex-col justify-between transition hover:border-purple-300 ${
                     isCulturalEventCat ? 'border-amber-300 ring-2 ring-amber-400/30' : 'border-slate-200'
                   }`}
                 >
@@ -2657,7 +2753,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* Modal: New Primary Category */}
           {showAddCategoryModal && (
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overscroll-contain">
-              <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 overscroll-contain">
+              <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 overscroll-contain">
                 <div className="flex items-center justify-between border-b pb-3 border-slate-100">
                   <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
                     <FolderTree className="w-5 h-5 text-purple-600" />
@@ -2729,13 +2825,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* TAB: Users Directory (real accounts from PostgreSQL) */}
       {activeTab === 'users' && (
-        <AdminUsersHub />
+        <UsersModule
+          onOpenSection={(section) => {
+            const target = {
+              all: 'users-all',
+              citizens: 'users-citizens',
+              business: 'users-business',
+              admins: 'users-admins',
+              suspended: 'users-suspended',
+              activity: 'users-activity',
+            } as const;
+            setManagementPage(target[section]);
+          }}
+        />
       )}
 
       {/* TAB 3: Roles & Permissions Matrix */}
       {activeTab === 'roles' && (
         <>
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-6 shadow-sm text-xs">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm text-xs">
             <AdminPermissionsMatrix
               currentLang={currentLang}
               staffList={staffList}
@@ -2890,842 +2998,104 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </>
       )}
 
-      {/* TAB: Admin Staff Management (Gestão de Administradores) */}
+      {/* TAB: Administradores e funcionários */}
       {activeTab === 'admin_staff' && (
-        <AdminStaffManagement
-          currentLang={currentLang}
-          staffList={staffList}
-          onAddStaff={handleAddStaff}
-          onUpdateStaff={handleUpdateStaffEntry}
-          onRevokeAccess={handleRevokeStaffAccess}
-          onLogAuditAction={(entry) => {
-            const newLogs = [
-              {
-                id: `LOG-${Date.now()}`,
-                timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-                ...entry,
-              } as AuditLogEntry,
-              ...logsList,
-            ];
-            handleUpdateLogs(newLogs);
-          }}
-        />
+        <ManagementPage
+          title="Equipa"
+          description="Equipa administrativa, funções, permissões e sessões."
+          moduleLabel="Equipa"
+          breadcrumbTail="Módulo"
+        >
+          <ModuleNav
+            items={[
+              { key: 'staff', label: 'Administradores e funcionários', icon: <ShieldCheck className="h-4 w-4" />, count: staffList.length },
+              { key: 'sessions', label: 'Sessões e dispositivos', icon: <Smartphone className="h-4 w-4" /> },
+            ]}
+            onSelect={(key) => setManagementPage(key === 'sessions' ? 'sessions' : 'staff')}
+            ariaLabel="Submódulos da equipa"
+          />
+        </ManagementPage>
       )}
 
       {/* TAB: Audit Logs Hub (Logs de Auditoria) */}
       {activeTab === 'audit_logs' && (
-          <AdminAuditLogsHub
-            currentLang={currentLang}
-            logs={logsList}
-            onRefreshLogs={() => {
-              void (async () => {
-                try {
-                  const response = await fetch('/api/admin/audit-logs?limit=500', { credentials: 'include' });
-                  if (!response.ok) return;
-                  const data = await response.json() as { logs?: AuditLogEntry[] };
-                  if (Array.isArray(data.logs) && data.logs.length > 0) setLogsList(data.logs);
-                } catch {
-                  // manter a lista actual quando a base de dados estiver indisponível
-                }
-              })();
-            }}
-          />
+        <ManagementPage
+          title="Registos de auditoria"
+          description="Ações administrativas e eventos de segurança, com filtros e paginação."
+          moduleLabel="Auditoria"
+          onBack={() => navigateAdminTab('overview')}
+        >
+          <AdminAuditLogsHub currentLang={currentLang} logs={logsList} />
+        </ManagementPage>
       )}
 
       {/* TAB 4: Events & Ticket Sales */}
       {activeTab === 'events' && (
-        <div className="space-y-4">
-          {/* KPI strip */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              { label: 'Eventos totais', value: adminEventsKpis.total.toLocaleString('pt-PT'), icon: Calendar, tone: 'text-blue-600 bg-blue-50' },
-              { label: 'Eventos activos', value: adminEventsKpis.active.toLocaleString('pt-PT'), icon: CheckCircle2, tone: 'text-emerald-600 bg-emerald-50' },
-              { label: 'Bilhetes vendidos', value: adminEventsKpis.ticketsSold.toLocaleString('pt-PT'), icon: Ticket, tone: 'text-purple-600 bg-purple-50' },
-              { label: 'Receita de eventos', value: `${adminEventsKpis.revenueXOF.toLocaleString('pt-PT')} XOF`, icon: DollarSign, tone: 'text-amber-600 bg-amber-50' },
-            ].map(({ label, value, icon: KpiIcon, tone }) => (
-              <div key={label} className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
-                <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase font-extrabold">
-                  <span className={`w-7 h-7 rounded-xl flex items-center justify-center ${tone}`}>
-                    <KpiIcon className="w-4 h-4" />
-                  </span>
-                  {label}
-                </div>
-                <div className="font-mono text-xl font-black text-slate-900 mt-2">{value}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-4 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider">
-                Eventos e Agenda da Plataforma ({filteredAdminEvents.length})
-              </h3>
-              <div className="relative w-full sm:w-64">
-                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                <input
-                  type="text"
-                  value={eventsQuery}
-                  onChange={(e) => setEventsQuery(e.target.value)}
-                  placeholder="Procurar evento, organizador, local..."
-                  className="w-full rounded-full border border-slate-300 bg-slate-50 pl-8 pr-3 py-2 text-[11px] font-medium text-slate-700 outline-none transition focus:border-blue-500"
-                />
-              </div>
-            </div>
-
-            {/* Status chips */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              {([
-                { id: 'all', label: 'Todos' },
-                { id: 'active', label: 'Activos' },
-                { id: 'draft', label: 'Pendentes' },
-                { id: 'cancelled', label: 'Cancelados' },
-                { id: 'ended', label: 'Encerrados' },
-              ] as const).map((chip) => (
-                <button
-                  key={chip.id}
-                  type="button"
-                  onClick={() => setEventsStatusFilter(chip.id)}
-                  className={`rounded-full px-3 py-1.5 text-[10px] font-black transition ${eventsStatusFilter === chip.id ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                >
-                  {chip.label}
-                </button>
-              ))}
-            </div>
-
-            {filteredAdminEvents.length === 0 ? (
-              <EmptyState
-                icon={<Calendar className="h-6 w-6" />}
-                title="Nenhum evento encontrado"
-                description={events.length === 0 ? 'A plataforma ainda não tem eventos registados.' : 'Ajuste a pesquisa ou o filtro de estado para ver resultados.'}
-              />
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                {filteredAdminEvents.map((ev) => {
-                  const capacity = ev.ticketTypes.reduce((acc, tt) => acc + tt.availableQuantity + tt.soldQuantity, 0);
-                  const occupancy = capacity > 0 ? Math.min(100, Math.round((ev.totalTicketsSold / capacity) * 100)) : 0;
-                  const statusStyle: Record<EventItem['status'], { label: string; badge: string }> = {
-                    active: { label: 'Activo', badge: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
-                    draft: { label: 'Pendente', badge: 'bg-amber-100 text-amber-800 border-amber-200' },
-                    cancelled: { label: 'Cancelado', badge: 'bg-red-100 text-red-800 border-red-200' },
-                    ended: { label: 'Encerrado', badge: 'bg-slate-200 text-slate-600 border-slate-300' },
-                  };
-                  const status = statusStyle[ev.status];
-                  return (
-                    <div key={ev.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
-                      <div className="flex items-start gap-3">
-                        <img
-                          src={ev.coverImage}
-                          alt=""
-                          className="w-14 h-14 rounded-xl object-cover border border-slate-200 flex-shrink-0"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="font-bold text-slate-900 text-sm">{ev.title}</div>
-                            <span className={`flex-shrink-0 border px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${status.badge}`}>
-                              {status.label}
-                            </span>
-                          </div>
-                          <div className="text-slate-500 text-[11px] mt-0.5">
-                            <strong>{ev.organizerName}</strong> • {ev.location}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-slate-500 mt-1">
-                            <span className="inline-flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {ev.date} às {ev.time}
-                            </span>
-                            <span className="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold uppercase">{ev.category}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Ticket sales summary */}
-                      <div className="bg-white p-3 rounded-xl border border-slate-200/80 space-y-2">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-[10px] text-slate-400 uppercase font-bold">Bilhetes vendidos</span>
-                          <span className="font-mono font-bold text-slate-900">
-                            {ev.totalTicketsSold} / {capacity} <span className="text-slate-400 font-normal">({occupancy}%)</span>
-                          </span>
-                        </div>
-                        <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${occupancy >= 90 ? 'bg-red-500' : occupancy >= 60 ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                            style={{ width: `${occupancy}%` }}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-[10px] text-slate-400 uppercase font-bold">Receita</div>
-                            <div className="text-sm font-extrabold text-emerald-700 font-mono">{ev.totalRevenueXOF.toLocaleString('pt-PT')} XOF</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-[10px] text-slate-400 uppercase font-bold">Relação empresarial</div>
-                            <div className="text-sm font-extrabold text-slate-700">{ev.businessId ? 'Empresa registada' : 'Organização externa'}</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedEventDetail(ev)}
-                        className="w-full bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-slate-700 font-bold py-2 rounded-xl transition flex items-center justify-center gap-1.5 text-[11px]"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        Ver detalhe do evento
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {/* EVENT_DETAIL_MODAL */}
-            {selectedEventDetail && (
-              <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4" onClick={() => setSelectedEventDetail(null)}>
-                <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
-                    <div className="min-w-0">
-                      <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">Detalhe do evento</div>
-                      <h3 className="text-base font-black text-slate-900 mt-0.5">{selectedEventDetail.title}</h3>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        Organizado por <strong>{selectedEventDetail.organizerName}</strong>
-                        {selectedEventDetail.businessId ? ' · Empresa registada' : ' · Organização externa'}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedEventDetail(null)}
-                      aria-label="Fechar detalhe do evento"
-                      className="shrink-0 w-8 h-8 rounded-full border border-slate-200 bg-slate-50 text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition flex items-center justify-center"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px]">
-                    {[
-                      { label: 'Data', value: selectedEventDetail.date },
-                      { label: 'Hora', value: selectedEventDetail.time },
-                      { label: 'Local', value: selectedEventDetail.location },
-                      { label: 'Bairro', value: selectedEventDetail.neighborhood },
-                      { label: 'Categoria', value: selectedEventDetail.category },
-                      { label: 'Estado', value: selectedEventDetail.status === 'active' ? 'Activo' : selectedEventDetail.status === 'draft' ? 'Pendente' : selectedEventDetail.status === 'cancelled' ? 'Cancelado' : 'Encerrado' },
-                      { label: 'Bilhetes vendidos', value: String(selectedEventDetail.totalTicketsSold) },
-                      { label: 'Receita', value: `${selectedEventDetail.totalRevenueXOF.toLocaleString('pt-PT')} XOF` },
-                    ].map((item) => (
-                      <div key={item.label} className="bg-slate-50 border border-slate-200 rounded-xl p-2.5">
-                        <div className="text-[9px] text-slate-400 uppercase font-bold">{item.label}</div>
-                        <div className="font-bold text-slate-900 mt-0.5 break-words">{item.value}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {selectedEventDetail.description && (
-                    <div>
-                      <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Descrição</div>
-                      <p className="text-[11px] text-slate-600 leading-relaxed">{selectedEventDetail.description}</p>
-                    </div>
-                  )}
-
-                  <div>
-                    <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Tipos de bilhete</div>
-                    <div className="border border-slate-200 rounded-xl overflow-hidden">
-                      <table className="w-full text-[11px]">
-                        <thead>
-                          <tr className="bg-slate-50 text-[9px] text-slate-400 uppercase border-b border-slate-200">
-                            <th className="text-left px-3 py-2 font-bold">Tipo</th>
-                            <th className="text-right px-3 py-2 font-bold">Preço</th>
-                            <th className="text-right px-3 py-2 font-bold">Vendidos</th>
-                            <th className="text-right px-3 py-2 font-bold">Disponível</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {selectedEventDetail.ticketTypes.map((tt) => (
-                            <tr key={tt.id}>
-                              <td className="px-3 py-2 font-bold text-slate-900">{tt.name}</td>
-                              <td className="px-3 py-2 text-right font-mono">{tt.priceXOF.toLocaleString('pt-PT')} XOF</td>
-                              <td className="px-3 py-2 text-right font-mono">{tt.soldQuantity}</td>
-                              <td className="px-3 py-2 text-right font-mono">{tt.availableQuantity}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedEventDetail(null)}
-                      className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2 rounded-xl transition text-xs"
-                    >
-                      Fechar
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        <ManagementPage
+          title="Eventos & Bilhetes"
+          description="Agenda e bilhética das empresas organizadoras."
+          moduleLabel="Eventos & Bilhetes"
+          breadcrumbTail="Módulo"
+        >
+          <ModuleNav
+            items={[
+              { key: 'events', label: 'Eventos', icon: <Calendar className="h-4 w-4" />, count: events.length },
+              { key: 'tickets', label: 'Bilhetes', icon: <Receipt className="h-4 w-4" /> },
+            ]}
+            onSelect={(key) => setManagementPage(key === 'events' ? 'events' : 'tickets')}
+            ariaLabel="Submódulos de eventos"
+          />
+        </ManagementPage>
       )}
 
-      {/* TAB 5: Section 10 Payment Integration & Operator Reconciliation */}
+      {/* TAB: Financeiro — resumo e seis áreas independentes */}
       {activeTab === 'financials' && (
-        <div className="space-y-6 text-xs">
-          {/* Histórico real de pagamentos (PostgreSQL) — leitura */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-slate-100">
-              <div>
-                <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-emerald-600" />
-                  Histórico real de pagamentos (base de dados)
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {adminPaymentHistoryLoading
-                    ? 'A carregar transacções…'
-                    : `${adminPaymentHistory.length} transacção${adminPaymentHistory.length === 1 ? '' : 'ões'} registada${adminPaymentHistory.length === 1 ? '' : 's'} no PostgreSQL`}
-                </p>
-              </div>
-              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg font-mono">
-                {adminPaymentHistory.reduce((sum, t) => sum + t.amountXOF, 0).toLocaleString('pt-PT')} XOF
-              </span>
-            </div>
-            <div className="overflow-x-auto max-h-80">
-              <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-slate-50 text-slate-500 uppercase tracking-wider">
-                  <tr>
-                    <th className="text-left font-bold px-4 py-2">ID</th>
-                    <th className="text-left font-bold px-4 py-2">Utilizador</th>
-                    <th className="text-left font-bold px-4 py-2">Serviço</th>
-                    <th className="text-left font-bold px-4 py-2">Provider</th>
-                    <th className="text-right font-bold px-4 py-2">Valor</th>
-                    <th className="text-left font-bold px-4 py-2">Estado</th>
-                    <th className="text-left font-bold px-4 py-2">Data</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {!adminPaymentHistoryLoading && adminPaymentHistory.length === 0 && (
-                    <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">Nenhuma transacção encontrada na base de dados.</td></tr>
-                  )}
-                  {adminPaymentHistory.map((t) => (
-                    <tr key={t.id} className="hover:bg-slate-50/60 transition">
-                      <td className="px-4 py-2 font-mono text-slate-500">{t.id}</td>
-                      <td className="px-4 py-2 text-slate-700">{t.payerName || '—'}</td>
-                      <td className="px-4 py-2 text-slate-600">{t.useCaseLabel || t.useCase}</td>
-                      <td className="px-4 py-2 text-slate-600">{t.provider}</td>
-                      <td className="px-4 py-2 text-right font-mono font-bold text-slate-900">{t.amountXOF.toLocaleString('pt-PT')} XOF</td>
-                      <td className="px-4 py-2">
-                        <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-lg border ${t.status === 'confirmed_api' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                          {getPaymentStatusLabel(t)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2 text-slate-500 font-mono">{t.createdAt || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Section 10 Header Banner */}
-          <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white p-6 rounded-3xl border border-slate-800 shadow-md space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-3">
-              <div>
-                <span className="bg-emerald-400 text-slate-950 px-2.5 py-0.5 rounded font-black text-[10px] uppercase tracking-wider">
-                  Secção 10 - Integração de Pagamentos Telemóvel & Reconciliação
-                </span>
-                <h3 className="font-extrabold text-base sm:text-lg text-white mt-1 flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-emerald-400" />
-                  <span>Subscrições empresariais, planos e reconciliação da plataforma</span>
-                </h3>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button type="button"
-                  onClick={handleBatchReconcileConfirmed}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm text-xs"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Reconciliar Subscrições Confirmadas</span>
-                </button>
-
-                <button type="button"
-                  onClick={handleExportReconciliationReport}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-extrabold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 text-xs"
-                >
-                  <Download className="w-4 h-4 text-blue-400" />
-                  <span>Exportar Extrato (CSV)</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Operator Onboarding & API Window Notice */}
-            <div className="bg-slate-800/80 border border-slate-700 p-4 rounded-2xl space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <div className="font-bold text-slate-200 flex items-center gap-2">
-                  <Info className="w-4 h-4 text-amber-400" />
-                  <span>
-                    Janela Técnica de Negociação API/SDK com Operadoras: <strong>2 a 4 Meses</strong>
-                  </span>
-                </div>
-                <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-bold border border-amber-500/30">
-                  Modo MVP: Operação com Confirmação Manual Ativa
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-300 leading-relaxed">
-                Esta área é exclusiva para supervisão de pagamentos da plataforma, planos empresariais, renovações, extras e reconciliação financeira. Compras de bilhetes, dados de compradores e validação de QR pertencem exclusivamente à empresa organizadora.
-              </p>
-            </div>
-
-            {/* Operators Status Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-              {/* Orange Money */}
-              <div className="bg-amber-950/40 border border-amber-800/60 p-4 rounded-2xl space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Smartphone className="w-5 h-5 text-amber-400" />
-                    <div>
-                      <h4 className="font-black text-white text-sm">Orange Money</h4>
-                      <span className="text-[10px] text-amber-300">Número Dedicado Guigui: <strong>+245 955 00 00</strong></span>
-                    </div>
-                  </div>
-                  <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded uppercase">
-                    Negociação API
-                  </span>
-                </div>
-                <div className="flex items-center justify-between pt-2 border-t border-amber-900/60 text-[11px]">
-                  <span className="text-amber-200">Volume Total Processado:</span>
-                  <span className="font-mono font-bold text-amber-300">
-                    {platformPaymentTransactions
-                      .filter((t) => t.provider === 'orange_money')
-                      .reduce((acc, t) => acc + t.amountXOF, 0)
-                      .toLocaleString('pt-PT')}{' '}
-                    XOF
-                  </span>
-                </div>
-              </div>
-
-              {/* Telecel Teletaco */}
-              <div className="bg-blue-950/40 border border-blue-800/60 p-4 rounded-2xl space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Smartphone className="w-5 h-5 text-blue-400" />
-                    <div>
-                      <h4 className="font-black text-white text-sm">Telecel (Teletaco / Nova Operadora)</h4>
-                      <span className="text-[10px] text-blue-300">Número Dedicado Guigui: <strong>+245 966 00 00</strong></span>
-                    </div>
-                  </div>
-                  <span className="bg-blue-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded uppercase">
-                    Negociação API
-                  </span>
-                </div>
-                <div className="flex items-center justify-between pt-2 border-t border-blue-900/60 text-[11px]">
-                  <span className="text-blue-200">Volume Total Processado:</span>
-                  <span className="font-mono font-bold text-blue-300">
-                    {platformPaymentTransactions
-                      .filter((t) => t.provider === 'telecel')
-                      .reduce((acc, t) => acc + t.amountXOF, 0)
-                      .toLocaleString('pt-PT')}{' '}
-                    XOF
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Financial Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white border border-slate-200 p-4 rounded-2xl space-y-1 shadow-sm">
-              <span className="text-[10px] text-slate-500 uppercase font-bold block">Volume Total Registado</span>
-              <div className="text-xl font-black text-slate-900 font-mono">
-                {platformPaymentTransactions.reduce((acc, t) => acc + t.amountXOF, 0).toLocaleString('pt-PT')} XOF
-              </div>
-              <span className="text-[10px] text-slate-400">{platformPaymentTransactions.length} transações de plataforma</span>
-            </div>
-
-            <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl space-y-1 shadow-sm">
-              <span className="text-[10px] text-amber-800 uppercase font-bold block">Pendente Confirmação Manual</span>
-              <div className="text-xl font-black text-amber-900 font-mono">
-                {platformPaymentTransactions
-                  .filter((t) => t.status === 'pending_manual_confirmation')
-                  .reduce((acc, t) => acc + t.amountXOF, 0)
-                  .toLocaleString('pt-PT')}{' '}
-                XOF
-              </div>
-              <span className="text-[10px] text-amber-700 font-bold">
-                {platformPaymentTransactions.filter((t) => t.status === 'pending_manual_confirmation').length} pagamentos a validar
-              </span>
-            </div>
-
-            <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl space-y-1 shadow-sm">
-              <span className="text-[10px] text-emerald-800 uppercase font-bold block">Total Reconciliado (Extratos)</span>
-              <div className="text-xl font-black text-emerald-900 font-mono">
-                {platformPaymentTransactions
-                  .filter((t) => t.status === 'reconciled')
-                  .reduce((acc, t) => acc + t.amountXOF, 0)
-                  .toLocaleString('pt-PT')}{' '}
-                XOF
-              </div>
-              <span className="text-[10px] text-emerald-700">Verificado com o banco/operadora</span>
-            </div>
-
-            <div className="bg-purple-50 border border-purple-200 p-4 rounded-2xl space-y-1 shadow-sm">
-              <span className="text-[10px] text-purple-800 uppercase font-bold block">Reembolsos Efetuados</span>
-              <div className="text-xl font-black text-purple-900 font-mono">
-                {platformPaymentTransactions
-                  .filter((t) => t.status === 'refunded')
-                  .reduce((acc, t) => acc + t.amountXOF, 0)
-                  .toLocaleString('pt-PT')}{' '}
-                XOF
-              </div>
-              <span className="text-[10px] text-purple-700">Estornos de eventos cancelados</span>
-            </div>
-          </div>
-
-          {/* Transaction Filters Bar */}
-          <div className="bg-white border border-slate-200 p-4 rounded-2xl space-y-3 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="font-extrabold text-slate-900 text-xs flex items-center gap-2">
-                <Filter className="w-4 h-4 text-blue-600" />
-                <span>Filtros do Registo de Transações</span>
-              </div>
-              <span className="text-[10px] text-slate-400">
-                Mostrando {platformPaymentTransactions.length} transacções de plataforma (bilhetes excluídos)
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              {/* Search input */}
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">Pesquisar ID / Cliente / Tel</label>
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-                  <input
-                    type="text"
-                    placeholder="TXN-2026-..., Nome, +245..."
-                    value={paymentSearchQuery}
-                    onChange={(e) => setPaymentSearchQuery(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-900"
-                  />
-                </div>
-              </div>
-
-              {/* Use Case Filter */}
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">Caso de Uso</label>
-                <select
-                  value={paymentUseCaseFilter}
-                  onChange={(e) => setPaymentUseCaseFilter(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 font-medium"
-                >
-                  <option value="subscription_initial">Subscrição Inicial</option>
-                  <option value="subscription_renewal">Renovação de Subscrição</option>
-                  <option value="extra_posts">Posts Extra</option>
-                  <option value="extra_promotions">Promoções Extra</option>
-                </select>
-              </div>
-
-              {/* Status Filter */}
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">Estado do Pagamento</label>
-                <select
-                  value={paymentStatusFilter}
-                  onChange={(e) => setPaymentStatusFilter(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 font-medium"
-                >
-                  <option value="pending_manual_confirmation">Pendente Confirmação Manual (MVP)</option>
-                  <option value="confirmed_api">Confirmado via API Sandbox</option>
-                  <option value="confirmed_manual">Confirmado Manualmente</option>
-                  <option value="reconciled">Reconciliado no Extrato</option>
-                  <option value="refunded">Reembolsado</option>
-                </select>
-              </div>
-
-              {/* Provider Filter */}
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">Operadora / Canal</label>
-                <select
-                  value={paymentProviderFilter}
-                  onChange={(e) => setPaymentProviderFilter(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 font-medium"
-                >
-                  <option value="all">Todas as Operadoras</option>
-                  <option value="orange_money">Orange Money</option>
-                  <option value="telecel">Telecel (Teletaco)</option>
-                  <option value="manual_transfer">Transferência Manual / Balcão</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Transactions Table */}
-          <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <h4 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
-                <Receipt className="w-4 h-4 text-emerald-600" />
-                <span>Registo Único de Transações & Reconciliação com Extratos</span>
-              </h4>
-
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold text-slate-400">Exportar Transações:</span>
-                <button type="button"
-                  onClick={() => {
-                    const headers = ['ID', 'Data', 'Caso de Uso', 'Pagador', 'Telemóvel', 'Empresa/Evento', 'Valor (XOF)', 'Operadora', 'Estado'];
-                    const rows = platformPaymentTransactions.map(t => [
-                      t.id, t.createdAt, t.useCase, t.payerName, t.payerPhone, t.businessName || t.eventName || 'N/A', t.amountXOF, t.provider, t.status
-                    ]);
-                    downloadCSV('transacoes_financeiras_guigui.csv', headers, rows);
-                  }}
-                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-[11px] transition flex items-center gap-1.5"
-                  title="Exportar CSV"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>CSV</span>
-                </button>
-                <button type="button"
-                  onClick={() => {
-                    const headers = ['ID', 'Data', 'Caso de Uso', 'Pagador', 'Telemóvel', 'Empresa/Evento', 'Valor (XOF)', 'Operadora', 'Estado'];
-                    const rows = platformPaymentTransactions.map(t => [
-                      t.id, t.createdAt, t.useCase, t.payerName, t.payerPhone, t.businessName || t.eventName || 'N/A', t.amountXOF, t.provider, t.status
-                    ]);
-                    downloadExcel('transacoes_financeiras_guigui.xls', 'Transações', headers, rows);
-                  }}
-                  className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg text-[11px] transition flex items-center gap-1.5"
-                  title="Exportar Excel"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  <span>Excel</span>
-                </button>
-                <button type="button"
-                  onClick={() => {
-                    const headers = ['ID', 'Data', 'Pagador', 'Serviço', 'Valor (XOF)', 'Operadora', 'Estado'];
-                    const rows = platformPaymentTransactions.map(t => [
-                      t.id, t.createdAt.substring(0, 10), t.payerName, t.useCase, `${t.amountXOF.toLocaleString('pt-PT')} XOF`, t.provider, t.status
-                    ]);
-                    const totalVolume = platformPaymentTransactions.reduce((acc, t) => acc + t.amountXOF, 0);
-                    downloadPDFReport(
-                      'Relatório Financeiro & Reconciliação - Guigui.com',
-                      `Extrato de pagamentos e reconciliação com operadoras de Mobile Money (Orange Money / Telecel) e balcão em Bissau. Volume total: ${totalVolume.toLocaleString('pt-PT')} XOF.`,
-                      [
-                        { label: 'Transações', value: `${platformPaymentTransactions.length}` },
-                        { label: 'Volume Bruto', value: `${totalVolume.toLocaleString('pt-PT')} XOF` },
-                        { label: 'Comissão Estimada', value: `${(totalVolume * 0.1).toLocaleString('pt-PT')} XOF` },
-                      ],
-                      headers,
-                      rows
-                    );
-                  }}
-                  className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-800 font-bold rounded-lg text-[11px] transition flex items-center gap-1.5"
-                  title="Exportar PDF Financeiro"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>PDF</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 font-bold uppercase text-[10px] tracking-wider">
-                    <th className="py-3 px-4">ID & Data</th>
-                    <th className="py-3 px-4">Caso de Uso & Servico</th>
-                    <th className="py-3 px-4">Cliente / Empresa</th>
-                    <th className="py-3 px-4">Valor (XOF)</th>
-                    <th className="py-3 px-4">Operadora & Comprovativo</th>
-                    <th className="py-3 px-4">Estado</th>
-                    <th className="py-3 px-4 text-right">Ações de Gestão</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
-                  {(() => {
-                    const filteredTxns = platformPaymentTransactions.filter((item) => {
-                      if (paymentUseCaseFilter !== 'all' && item.useCase !== paymentUseCaseFilter) return false;
-                      if (paymentStatusFilter !== 'all' && item.status !== paymentStatusFilter) return false;
-                      if (paymentProviderFilter !== 'all' && item.provider !== paymentProviderFilter) return false;
-                      if (paymentSearchQuery.trim()) {
-                        const q = paymentSearchQuery.toLowerCase();
-                        const matchId = item.id.toLowerCase().includes(q);
-                        const matchPayer = item.payerName.toLowerCase().includes(q);
-                        const matchPhone = item.payerPhone.toLowerCase().includes(q);
-                        const matchBiz = (item.businessName || '').toLowerCase().includes(q);
-                        if (!matchId && !matchPayer && !matchPhone && !matchBiz) return false;
-                      }
-                      return true;
-                    });
-
-                    if (filteredTxns.length === 0) {
-                      return (
-                        <tr>
-                          <td colSpan={7} className="py-8 text-center text-slate-400">
-                            Nenhuma transação encontrada com os filtros selecionados.
-                          </td>
-                        </tr>
-                      );
-                    }
-
-                    return filteredTxns.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50/80 transition">
-                        {/* ID & Date */}
-                        <td className="py-3.5 px-4">
-                          <div className="font-mono font-bold text-slate-900">{item.id}</div>
-                          <div className="text-[10px] text-slate-400">{item.createdAt}</div>
-                        </td>
-
-                        {/* Use Case */}
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-slate-900">{item.useCaseLabel}</div>
-                          <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-mono">
-                            {item.useCase}
-                          </span>
-                        </td>
-
-                        {/* Customer */}
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-slate-800">{item.payerName}</div>
-                          <div className="text-[10px] text-slate-500 font-mono">{item.payerPhone}</div>
-                          {item.businessName && (
-                            <div className="text-[10px] text-blue-700 font-semibold">{item.businessName}</div>
-                          )}
-                        </td>
-
-                        {/* Amount XOF */}
-                        <td className="py-3.5 px-4 font-mono font-extrabold text-slate-900 text-sm">
-                          {item.amountXOF.toLocaleString('pt-PT')} XOF
-                        </td>
-
-                        {/* Provider & Proof */}
-                        <td className="py-3.5 px-4 space-y-1">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                              item.provider === 'orange_money'
-                                ? 'bg-amber-100 text-amber-900 border border-amber-200'
-                                : item.provider === 'telecel'
-                                ? 'bg-blue-100 text-blue-900 border border-blue-200'
-                                : 'bg-slate-100 text-slate-800 border border-slate-200'
-                            }`}
-                          >
-                            {item.provider === 'orange_money'
-                              ? 'Orange Money'
-                              : item.provider === 'telecel'
-                              ? 'Telecel'
-                              : 'Manual / Depósito'}
-                          </span>
-
-                          <div className="text-[10px] text-slate-500 font-mono line-clamp-1">
-                            {item.providerRef || item.manualProofReference || 'Aguardando comprovativo'}
-                          </div>
-                        </td>
-
-                        {/* Status */}
-                        <td className="py-3.5 px-4">
-                          {item.status === 'pending_manual_confirmation' && item.provider !== 'manual_transfer' && !item.manualProofReference && (
-                            <span className="bg-amber-100 text-amber-900 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-amber-300 animate-pulse">
-                              Pendente Confirmação MVP
-                            </span>
-                          )}
-                          {item.status === 'pending_manual_confirmation' && (item.provider === 'manual_transfer' || item.manualProofReference) && (
-                            <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-slate-300">
-                              Registo legado; não confirmar
-                            </span>
-                          )}
-                          {item.status === 'confirmed_api' && (
-                            <span className="bg-blue-100 text-blue-900 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-blue-200">
-                              {getPaymentStatusLabel(item)}
-                            </span>
-                          )}
-                          {item.status === 'pending_provider' && (
-                            <span className="bg-amber-100 text-amber-900 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-amber-300">
-                              {getPaymentStatusLabel(item)}
-                            </span>
-                          )}
-                          {item.status === 'confirmed_manual' && (
-                            <span className="bg-emerald-100 text-emerald-900 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-emerald-200">
-                              Confirmado Manual
-                            </span>
-                          )}
-                          {item.status === 'reconciled' && (
-                            <span className="bg-slate-900 text-emerald-400 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-slate-700">
-                              ✓ Reconciliado
-                            </span>
-                          )}
-                          {item.status === 'refunded' && (
-                            <span className="bg-purple-100 text-purple-900 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-purple-200">
-                              Reembolsado
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Action Buttons */}
-                        <td className="py-3.5 px-4 text-right space-y-1">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {item.status === 'pending_manual_confirmation' && item.provider !== 'manual_transfer' && !item.manualProofReference && (
-                              <button type="button"
-                                onClick={() => handleConfirmManualPayment(item.id)}
-                                className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-2.5 py-1 rounded-lg text-[10px] transition shadow-sm"
-                                title="Confirmar recebimento manual de 1-clique"
-                              >
-                                Confirmar Pagamento
-                              </button>
-                            )}
-
-                            {(item.status === 'confirmed_api' || item.status === 'confirmed_manual') && (
-                              <button type="button"
-                                onClick={() => handleReconcileTransaction(item.id)}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-2.5 py-1 rounded-lg text-[10px] transition shadow-sm flex items-center gap-1"
-                                title="Marcar como Reconciliado no Extrato da Operadora"
-                              >
-                                <CheckCircle2 className="w-3 h-3" />
-                                <span>Reconciliar Extrato</span>
-                              </button>
-                            )}
-
-                            {item.status !== 'refunded' && (
-                              <button type="button"
-                                onClick={() => handleRefundTransaction(item.id)}
-                                className="bg-slate-100 hover:bg-purple-100 text-slate-700 hover:text-purple-900 font-bold px-2 py-1 rounded-lg text-[10px] transition"
-                                title="Processar reembolso de evento cancelado ou contestação"
-                              >
-                                Reembolsar
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ));
-                  })()}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-        </div>
+        <FinanceModule
+          onOpenSection={(section) => {
+            const target = {
+              transactions: 'finance-transactions',
+              reconciliation: 'finance-reconciliation',
+              operators: 'finance-operators',
+              pending: 'finance-pending',
+              refunds: 'finance-refunds',
+              statements: 'finance-statements',
+            } as const;
+            setManagementPage(target[section]);
+          }}
+        />
       )}
 
-      {/* TAB: Reports & Exportação */}
+      {/* TAB: Suporte */}
       {activeTab === 'support' && onReplySupport && onUpdateSupportStatus && (
-        <AdminSupportHub
-          currentLang={currentLang}
+        <SupportManagementPage
           supportRequests={supportRequests}
-          businesses={businessesList}
+          onBack={() => navigateAdminTab('overview')}
           onReplySupport={onReplySupport}
           onUpdateSupportStatus={onUpdateSupportStatus}
-          focusSupportId={focusSupportId}
         />
       )}
 
       {activeTab === 'reports' && (
-        <AdminReportsHub
-          currentLang={currentLang}
-          businesses={businessesList}
-          events={events}
-          paymentTransactions={platformPaymentTransactions}
-        />
+        <ManagementPage
+          title="Relatórios e documentos"
+          description="Relatórios operacionais e financeiros gerados a partir dos dados reais da plataforma."
+          moduleLabel="Relatórios"
+          onBack={() => navigateAdminTab('overview')}
+        >
+          <AdminReportsHub
+            currentLang={currentLang}
+            businesses={businessesList}
+            events={events}
+            paymentTransactions={platformPaymentTransactions}
+          />
+        </ManagementPage>
       )}
 
       {/* TAB 6: Section 11 Technical Architecture & Infrastructure */}
       {activeTab === 'architecture' && (
-        <div className="space-y-6 text-xs">
+        <div className="space-y-4 text-xs">
           {/* Section 11 Header Banner */}
-          <div className="bg-slate-900 text-white p-6 rounded-3xl border border-slate-800 shadow-md space-y-4">
+          <div className="bg-slate-900 text-white p-6 rounded-2xl border border-slate-800 shadow-md space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-3">
               <div>
                 <span className="bg-emerald-400 text-slate-950 px-2.5 py-0.5 rounded font-black text-[10px] uppercase tracking-wider">
@@ -3830,7 +3200,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* Sub-section 11.4: Segurança, Privacidade (RGPD / Diáspora) & supervisão empresarial */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Ticket security architecture — no operational access */}
-            <div className="bg-white border border-slate-200 p-5 rounded-3xl space-y-4 shadow-sm">
+            <div className="bg-white border border-slate-200 p-5 rounded-2xl space-y-4 shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h4 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-blue-600" />
@@ -3854,7 +3224,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             {/* Password Security, 2FA & Consent Terms Log */}
-            <div className="bg-white border border-slate-200 p-5 rounded-3xl space-y-4 shadow-sm">
+            <div className="bg-white border border-slate-200 p-5 rounded-2xl space-y-4 shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h4 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-emerald-600" />
@@ -3902,7 +3272,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           {/* Cloud Backups Log Table */}
-          <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
               <h4 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
                 <Database className="w-4 h-4 text-indigo-600" />
@@ -3950,7 +3320,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           {/* Sub-section 11.5 Non-Functional Requirements Summary Grid */}
-          <div className="bg-slate-900 text-white p-6 rounded-3xl border border-slate-800 space-y-4">
+          <div className="bg-slate-900 text-white p-6 rounded-2xl border border-slate-800 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h4 className="font-extrabold text-sm text-white flex items-center gap-2">
                 <Wifi className="w-4 h-4 text-emerald-400" />
@@ -3989,8 +3359,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* TAB: Notification Management & Preferences */}
       {activeTab === 'notifications' && notificationPreferences && onNotificationPreferencesChange && (
-        <div className="space-y-6">
-          <form onSubmit={handleSendAdminAnnouncement} className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+        <div className="space-y-4">
+          <ModuleSubnav
+            panelLabel="Administração"
+            moduleLabel="Notificações"
+            activeId={notificationSection}
+            onChange={(id) => setNotificationSection(id as 'send' | 'preferences')}
+            items={[
+              { id: 'send', label: 'Enviar notificação', description: 'Anúncios e avisos' },
+              { id: 'preferences', label: 'Preferências', description: 'Canais e alertas recebidos' },
+            ]}
+          />
+
+          {notificationSection === 'send' && (
+          <form onSubmit={handleSendAdminAnnouncement} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
@@ -4059,13 +3441,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
             </div>
           </form>
+          )}
 
+          {notificationSection === 'preferences' && (
           <NotificationPreferencesPanel
             role="admin"
             value={notificationPreferences}
             onChange={onNotificationPreferencesChange}
           />
+          )}
         </div>
+      )}
+
+        </>
       )}
 
             </main>

@@ -3,6 +3,7 @@ import {
   Bell,
   Building2,
   CalendarDays,
+  ClipboardCheck,
   CircleUserRound,
   Compass,
   CreditCard,
@@ -10,7 +11,6 @@ import {
   HelpCircle,
   Home,
   LayoutDashboard,
-  Map,
   Megaphone,
   MessageCircle,
   ScanLine,
@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import type { NavigationGroup, NavigationItem } from '../utils/navigationTypes';
 
-export type CitizenPrimaryModule = 'feed' | 'directory' | 'events' | 'map' | 'messages' | 'account';
+export type CitizenPrimaryModule = 'feed' | 'directory' | 'promotions' | 'events' | 'map' | 'messages' | 'account';
 export type CitizenAccountModule =
   | 'overview'
   | 'tickets'
@@ -75,17 +75,27 @@ export type AdminModule =
   | 'reports'
   | 'pricing'
   | 'audit_logs'
+  | 'quality_audit'
   | 'categories'
   | 'notifications'
   | 'architecture'
   | 'capabilities'
   | 'profile';
 
+/**
+ * Destinos da navegação inferior do cidadão que só existem para sessões activas.
+ * O Feed, o Diretório, as Ofertas e a Agenda continuam públicos.
+ */
+export const CITIZEN_PRIVATE_PRIMARY_MODULES: readonly CitizenPrimaryModule[] = ['messages', 'account'];
+
+export const isCitizenPrimaryModulePrivate = (id: CitizenPrimaryModule): boolean =>
+  CITIZEN_PRIVATE_PRIMARY_MODULES.includes(id);
+
 export const CITIZEN_PRIMARY_NAVIGATION: NavigationItem<CitizenPrimaryModule>[] = [
   { id: 'feed', label: 'Feed', icon: Home, mobile: true, desktop: true },
-  { id: 'directory', label: 'Descobrir', icon: Compass, mobile: true, desktop: true },
-  { id: 'events', label: 'Eventos', icon: CalendarDays, mobile: true, desktop: true },
-  { id: 'map', label: 'Mapa', icon: Map, mobile: true, desktop: true },
+  { id: 'directory', label: 'Diretório', icon: Compass, mobile: true, desktop: true },
+  { id: 'promotions', label: 'Ofertas', icon: Tag, mobile: true, desktop: true },
+  { id: 'events', label: 'Agenda', icon: CalendarDays, mobile: true, desktop: true },
   { id: 'messages', label: 'Mensagens', icon: MessageCircle, badgeKey: 'unreadMessages', mobile: true, desktop: true },
   { id: 'account', label: 'Conta', icon: CircleUserRound, mobile: true, desktop: true },
 ];
@@ -169,57 +179,58 @@ export const ADMIN_NAVIGATION: NavigationGroup<AdminModule>[] = [
   {
     id: 'dashboard',
     label: 'Painel',
-    items: [{ id: 'overview', label: 'Visão Geral', icon: LayoutDashboard, help: 'Resumo executivo e KPIs' }],
+    items: [{ id: 'overview', label: 'Visão Geral', icon: LayoutDashboard }],
   },
   {
     id: 'management',
     label: 'Gestão',
     items: [
-      { id: 'businesses', label: 'Empresas & Negócios', icon: Building2, badgeKey: 'pendingBusinesses', help: 'Aprovação e estatísticas' },
-      { id: 'events', label: 'Eventos & Bilhetes', icon: Ticket, help: 'Agenda e validação' },
-      { id: 'users', label: 'Utilizadores', icon: Users, help: 'Contas e atividade' },
+      { id: 'businesses', label: 'Empresas & Negócios', icon: Building2, badgeKey: 'pendingBusinesses' },
+      { id: 'events', label: 'Eventos & Bilhetes', icon: Ticket },
+      { id: 'users', label: 'Utilizadores', icon: Users },
     ],
   },
   {
     id: 'finance',
     label: 'Financeiro',
     items: [
-      { id: 'financials', label: 'Financeiro', icon: CreditCard, help: 'Vendas e comissões' },
-      { id: 'pricing', label: 'Planos & Assinaturas', icon: WalletCards, help: 'Planos e pricing' },
+      { id: 'financials', label: 'Financeiro', icon: CreditCard },
+      { id: 'pricing', label: 'Planos & Assinaturas', icon: WalletCards },
     ],
   },
   {
     id: 'control',
     label: 'Controlo',
     items: [
-      { id: 'moderation', label: 'Moderação', icon: ShieldCheck, badgeKey: 'pendingModeration', help: 'Conteúdo pendente' },
-      { id: 'reports', label: 'Relatórios', icon: BarChart3, help: 'Estatísticas' },
+      { id: 'moderation', label: 'Moderação', icon: ShieldCheck, badgeKey: 'pendingModeration' },
+      { id: 'reports', label: 'Relatórios', icon: BarChart3 },
     ],
   },
   {
     id: 'support',
     label: 'Suporte',
     items: [
-      { id: 'support', label: 'Suporte', icon: HelpCircle, badgeKey: 'pendingAdminSupport', help: 'Pedidos e mensagens' },
-      { id: 'notifications', label: 'Notificações em Massa', icon: Bell, help: 'Avisos globais' },
+      { id: 'support', label: 'Suporte', icon: HelpCircle, badgeKey: 'pendingAdminSupport' },
+      { id: 'notifications', label: 'Notificações em Massa', icon: Bell },
     ],
   },
   {
     id: 'administration',
     label: 'Administração',
     items: [
-      { id: 'roles', label: 'Permissões', icon: ShieldCheck, help: 'Matriz da equipa' },
-      { id: 'admin_staff', label: 'Equipa Admin', icon: Users, help: 'Administradores' },
-      { id: 'categories', label: 'Categorias & Tags', icon: Tag, help: 'Taxonomia' },
-      { id: 'architecture', label: 'Sistema', icon: Settings, help: 'Infraestrutura' },
-      { id: 'capabilities', label: 'Configurações Globais', icon: SlidersHorizontal, help: 'Mapa de capacidades' },
+      { id: 'roles', label: 'Permissões', icon: ShieldCheck },
+      { id: 'admin_staff', label: 'Equipa Admin', icon: Users },
+      { id: 'categories', label: 'Categorias & Tags', icon: Tag },
+      { id: 'architecture', label: 'Sistema', icon: Settings },
+      { id: 'capabilities', label: 'Configurações Globais', icon: SlidersHorizontal },
     ],
   },
   {
     id: 'security',
     label: 'Segurança',
     items: [
-      { id: 'audit_logs', label: 'Auditoria', icon: FileText, help: 'Logs e segurança' },
+      { id: 'audit_logs', label: 'Auditoria', icon: FileText },
+      { id: 'quality_audit', label: 'Auditoria e Qualidade', icon: ClipboardCheck },
     ],
   },
 ];

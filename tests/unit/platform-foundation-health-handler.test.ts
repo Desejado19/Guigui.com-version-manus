@@ -6,9 +6,10 @@ import { createHealthHandler } from '../../server/modules/platform-foundation/ht
 
 async function requestHealth(
   dependencies: HealthDependencies,
+  detailed: boolean | ((request: express.Request) => boolean | Promise<boolean>) = true,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   const app = express();
-  app.get('/health', createHealthHandler(dependencies));
+  app.get('/health', createHealthHandler(dependencies, detailed));
   app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
     response.status(500).json({
       error: error instanceof Error ? error.message : 'unknown_error',
@@ -68,6 +69,27 @@ describe('createHealthHandler', () => {
       observability: { inProcess: true, persistent: false },
     });
     expect(result.body.timestamp).toBe('2026-10-21T12:00:00.000Z');
+  });
+
+  it('expõe apenas informação mínima quando o pedido é público', async () => {
+    const result = await requestHealth(createDependencies(), false);
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({
+      status: 'ok',
+      app: 'Guigui.com Bissau',
+      timestamp: '2026-10-21T12:00:00.000Z',
+    });
+  });
+
+  it('só inclui detalhes internos quando o chamador os autoriza', async () => {
+    const result = await requestHealth(createDependencies(), true);
+
+    expect(result.body).toMatchObject({
+      database: { configured: false, connected: false },
+      geminiActive: false,
+      observability: { inProcess: true, persistent: false },
+    });
   });
 
   it('forwards unexpected health failures to Express error middleware', async () => {

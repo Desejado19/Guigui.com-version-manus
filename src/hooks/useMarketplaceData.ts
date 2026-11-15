@@ -73,6 +73,41 @@ function businessFromRecord(record: PersistedBusinessProfile): Business {
   return { ...defaults, ...mergeStoredBusinessProfile(defaults, record) };
 }
 
+// Registos de eventos vindos da base de dados (ou do localStorage antigo) podem
+// trazer campos em falta: 57 dos 79 eventos semeados não têm `category`, e outros
+// não têm `ticketTypes`. Sem esta normalização o EventsView rebenta em
+// `event.category.toUpperCase()` e a tabela de eventos deixa de carregar.
+const KNOWN_EVENT_STATUSES: EventItem['status'][] = ['active', 'draft', 'cancelled', 'ended'];
+
+function eventFromRecord(record: EventItem): EventItem {
+  const ticketTypes = Array.isArray(record.ticketTypes) ? record.ticketTypes : [];
+  // A base de dados grava `published`, mas o contrato do cliente só conhece
+  // active|draft|cancelled|ended: sem este mapeamento a pesquisa de eventos
+  // (`status !== 'active'`) fica vazia e o painel de admin rebenta em
+  // `statusStyle[ev.status].label`.
+  const status: EventItem['status'] = KNOWN_EVENT_STATUSES.includes(record.status)
+    ? record.status
+    : 'active';
+  return {
+    ...record,
+    status,
+    title: record.title || 'Sem título',
+    organizerName: record.organizerName || '',
+    category: record.category || 'outros',
+    date: record.date || '',
+    time: record.time || '',
+    location: record.location || '',
+    neighborhood: record.neighborhood || '',
+    coverImage: record.coverImage || '',
+    description: record.description || '',
+    mediaType: record.mediaType === 'video' ? 'video' : 'image',
+    ticketTypes,
+    totalTicketsSold: Number(record.totalTicketsSold) || 0,
+    totalRevenueXOF: Number(record.totalRevenueXOF) || 0,
+    scannerDoorCode: record.scannerDoorCode || '',
+  };
+}
+
 function mergeLocalBusinesses(
   localBusinesses: Business[],
   storedBusinesses: PersistedBusinessProfile[],
@@ -155,7 +190,8 @@ export function useMarketplaceData(): MarketplaceData {
           const loadedCategories = arrayFromPayload<BusinessCategory>(categoryPayload, 'categories', '/api/categories');
           const loadedBusinesses = arrayFromPayload<PersistedBusinessProfile>(businessPayload, 'businesses', '/api/businesses')
             .map(businessFromRecord);
-          const loadedEvents = arrayFromPayload<EventItem>(eventPayload, 'events', '/api/events');
+          const loadedEvents = arrayFromPayload<EventItem>(eventPayload, 'events', '/api/events')
+            .map(eventFromRecord);
 
           if (cancelled) return;
           lastLoadedBusinesses.current = loadedBusinesses;
@@ -168,7 +204,7 @@ export function useMarketplaceData(): MarketplaceData {
           resolvedSource = 'local';
           setSource('local');
           const localBusinesses = readStoredValue<Business[]>(BUSINESS_STORAGE_KEY, []);
-          const localEvents = readStoredValue<EventItem[]>(EVENT_STORAGE_KEY, []);
+          const localEvents = readStoredValue<EventItem[]>(EVENT_STORAGE_KEY, []).map(eventFromRecord);
           setGroups(CATEGORY_GROUPS.map(({ id, name, description }) => ({ id, name, description })));
           setCategories(MAIN_CATEGORIES);
 
@@ -201,7 +237,7 @@ export function useMarketplaceData(): MarketplaceData {
           setEvents([]);
         } else if (resolvedSource === 'local') {
           const localBusinesses = readStoredValue<Business[]>(BUSINESS_STORAGE_KEY, []);
-          const localEvents = readStoredValue<EventItem[]>(EVENT_STORAGE_KEY, []);
+          const localEvents = readStoredValue<EventItem[]>(EVENT_STORAGE_KEY, []).map(eventFromRecord);
           lastLoadedBusinesses.current = localBusinesses;
           lastLoadedEvents.current = localEvents;
           setSource('local');
@@ -269,7 +305,18 @@ export function useMarketplaceData(): MarketplaceData {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(record),
             });
-            if (!response.ok) throw new Error(`${endpoint} rejeitou a alteração (${response.status}).`);
+            if (!response.ok) {
+              // 401/403 sao recusas permanentes: um cidadao ou visitante nao pode
+              // gravar o catalogo partilhado. Assumir o registo como sincronizado
+              // evita repetir o pedido a cada render (o que bloqueava o browser)
+              // e evita transformar uma recusa esperada num erro de sincronizacao.
+              if (response.status === 401 || response.status === 403) {
+                const currentBaseline = baseline.current ?? [];
+                baseline.current = [...currentBaseline.filter(({ id }) => id !== record.id), record];
+                return;
+              }
+              throw new Error(`${endpoint} rejeitou a alteração (${response.status}).`);
+            }
 
             const currentBaseline = baseline.current ?? [];
             baseline.current = [...currentBaseline.filter(({ id }) => id !== record.id), record];

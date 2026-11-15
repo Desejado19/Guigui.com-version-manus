@@ -1,7 +1,9 @@
 /**
  * Export Helpers for Guigui.com
- * Supports downloading CSV, Excel-compatible CSV/XML, formatted Print/PDF
+ * Supports downloading CSV, native XLSX, formatted Print/PDF
  */
+
+import writeXlsxFile, { type SheetData } from 'write-excel-file/browser';
 
 export function downloadCSV(filename: string, headers: string[], rows: (string | number)[][]) {
   const csvContent = [
@@ -27,56 +29,118 @@ export function downloadCSV(filename: string, headers: string[], rows: (string |
   URL.revokeObjectURL(url);
 }
 
-export function downloadExcel(filename: string, sheetTitle: string, headers: string[], rows: (string | number)[][]) {
-  // Generates an Excel-compatible XML Spreadsheet 2003 format
-  const xmlHeader = `<?xml version="1.0" encoding="UTF-8"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:o="urn:schemas-microsoft-com:office:office"
- xmlns:x="urn:schemas-microsoft-com:office:excel"
- xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
- <Styles>
-  <Style ss:ID="Header">
-   <Font ss:Bold="1" ss:Color="#FFFFFF"/>
-   <Interior ss:Color="#10B981" ss:Pattern="Solid"/>
-   <Alignment ss:Horizontal="Center"/>
-  </Style>
-  <Style ss:ID="Title">
-   <Font ss:Bold="1" ss:Size="14" ss:Color="#0F172A"/>
-  </Style>
- </Styles>
- <Worksheet ss:Name="${sheetTitle.replace(/[/\\?*[\]]/g, '')}">
-  <Table>
-   <Row><Cell ss:StyleID="Title"><Data ss:Type="String">Guigui.com - ${sheetTitle}</Data></Cell></Row>
-   <Row><Cell><Data ss:Type="String">Data de Emissão: ${new Date().toLocaleString('pt-PT')}</Data></Cell></Row>
-   <Row></Row>
-   <Row>
-    ${headers.map((h) => `<Cell ss:StyleID="Header"><Data ss:Type="String">${h}</Data></Cell>`).join('\n    ')}
-   </Row>
-   ${rows
-     .map(
-       (r) =>
-         `<Row>\n    ${r
-           .map((c) => {
-             const isNum = typeof c === 'number';
-             return `<Cell><Data ss:Type="${isNum ? 'Number' : 'String'}">${String(c ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Data></Cell>`;
-           })
-           .join('\n    ')}\n   </Row>`
-     )
-     .join('\n   ')}
-  </Table>
- </Worksheet>
-</Workbook>`;
+const EXCEL_HEADER_BACKGROUND = '#2F9E68';
+const EXCEL_ZEBRA_BACKGROUND = '#F5FAF8';
 
-  const blob = new Blob([xmlHeader], { type: 'application/vnd.ms-excel;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.setAttribute('href', url);
-  link.setAttribute('download', filename.endsWith('.xls') ? filename : `${filename}.xls`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+/** O Excel limita o nome da folha a 31 caracteres e proíbe estes símbolos. */
+function toSheetName(sheetTitle: string) {
+  const cleaned = sheetTitle
+    .replace(/[\\/?*[\]:]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return (cleaned || 'Relatório').slice(0, 31);
+}
+
+function toXlsxFilename(filename: string) {
+  return `${filename.replace(/\.xlsx?$/i, '')}.xlsx`;
+}
+
+/** Converte valores da tabela em células XLSX, preservando números como números. */
+function toExcelCell(value: string | number | null | undefined) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return { value, type: Number };
+  }
+  return { value: value == null ? '' : String(value), type: String };
+}
+
+function getColumnWidths(headers: string[], rows: (string | number)[][]) {
+  return headers.map((header, index) => {
+    const contentWidth = rows
+      .slice(0, 100)
+      .reduce((widest, row) => Math.max(widest, String(row[index] ?? '').length), 0);
+    return { width: Math.min(40, Math.max(14, header.length + 4, contentWidth + 4)) };
+  });
+}
+
+function buildSheetData(sheetTitle: string, headers: string[], rows: (string | number)[][]): SheetData {
+  const columnCount = Math.max(1, headers.length);
+  return [
+    [{
+      value: `Guigui.com - ${sheetTitle}`,
+      type: String,
+      fontWeight: 'bold',
+      fontSize: 14,
+      textColor: '#16221F',
+      height: 24,
+      columnSpan: columnCount,
+    }],
+    [{
+      value: `Data de Emissão: ${new Date().toLocaleString('pt-PT')}`,
+      type: String,
+      textColor: '#5B6B67',
+      columnSpan: columnCount,
+    }],
+    [],
+    headers.map((header) => ({
+      value: header,
+      type: String,
+      fontWeight: 'bold' as const,
+      textColor: '#FFFFFF',
+      backgroundColor: EXCEL_HEADER_BACKGROUND,
+      align: 'center' as const,
+      wrap: true,
+      borderColor: EXCEL_HEADER_BACKGROUND,
+      borderStyle: 'thin' as const,
+    })),
+    ...rows.map((row, rowIndex) => row.map((cell) => ({
+      ...toExcelCell(cell),
+      alignVertical: 'center' as const,
+      backgroundColor: rowIndex % 2 === 1 ? EXCEL_ZEBRA_BACKGROUND : undefined,
+      borderColor: '#E4DFD4',
+      borderStyle: 'thin' as const,
+    }))),
+  ];
+}
+
+/**
+ * Gera um ficheiro XLSX nativo (OOXML) no browser, com cabeçalho estilizado,
+ * colunas dimensionadas e linhas de dados com tipos preservados.
+ */
+export function downloadExcel(filename: string, sheetTitle: string, headers: string[], rows: (string | number)[][]) {
+  const sheetData = buildSheetData(sheetTitle, headers, rows);
+
+  void writeXlsxFile(sheetData, {
+    sheet: toSheetName(sheetTitle),
+    columns: getColumnWidths(headers, rows),
+    stickyRowsCount: 4,
+  })
+    .toFile(toXlsxFilename(filename))
+    .catch((error: unknown) => {
+      console.error('excel-export-failed', error);
+    });
+}
+
+export interface ExcelWorkbookSheet {
+  title: string;
+  headers: string[];
+  rows: (string | number)[][];
+}
+
+/** Livro Excel com uma folha por conjunto de dados da empresa. */
+export function downloadExcelWorkbook(filename: string, sheets: ExcelWorkbookSheet[]) {
+  if (sheets.length === 0) return;
+  const workbook = sheets.map((sheet) => ({
+    data: buildSheetData(sheet.title, sheet.headers, sheet.rows),
+    sheet: toSheetName(sheet.title),
+    columns: getColumnWidths(sheet.headers, sheet.rows),
+    stickyRowsCount: 4,
+  }));
+
+  void writeXlsxFile(workbook)
+    .toFile(toXlsxFilename(filename))
+    .catch((error: unknown) => {
+      console.error('excel-workbook-export-failed', error);
+    });
 }
 
 export function triggerPrintReport(title: string, htmlContent: string) {
@@ -92,7 +156,7 @@ export function triggerPrintReport(title: string, htmlContent: string) {
             <style>
               body {
                 font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-                color: #0f172a;
+                color: #16221F;
                 padding: 30px;
                 background: #fff;
               }
@@ -100,38 +164,38 @@ export function triggerPrintReport(title: string, htmlContent: string) {
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                border-bottom: 2px solid #059669;
+                border-bottom: 2px solid #176158;
                 padding-bottom: 16px;
                 margin-bottom: 24px;
               }
               .brand {
                 font-size: 24px;
                 font-weight: 700;
-                color: #059669;
+                color: #176158;
               }
               .brand span {
-                color: #f59e0b;
+                color: #C9852A;
               }
               .meta {
                 font-size: 12px;
-                color: #64748b;
+                color: #5B6B67;
                 text-align: right;
               }
               h1 {
                 font-size: 20px;
                 font-weight: 600;
                 margin: 0 0 4px 0;
-                color: #0f172a;
+                color: #16221F;
               }
               .badge {
                 display: inline-block;
-                background: #ecfdf5;
-                color: #065f46;
+                background: #EEF7F4;
+                color: #0F4A44;
                 font-size: 11px;
                 font-weight: 700;
                 padding: 4px 8px;
                 border-radius: 6px;
-                border: 1px solid #a7f3d0;
+                border: 1px solid #C2DFD4;
               }
               table {
                 width: 100%;
@@ -140,19 +204,19 @@ export function triggerPrintReport(title: string, htmlContent: string) {
                 font-size: 12px;
               }
               th {
-                background: #f1f5f9;
-                color: #334155;
+                background: #EEEAE2;
+                color: #34423E;
                 font-weight: 700;
                 text-align: left;
                 padding: 10px 12px;
-                border-bottom: 2px solid #cbd5e1;
+                border-bottom: 2px solid #DCD6C8;
               }
               td {
                 padding: 10px 12px;
-                border-bottom: 1px solid #e2e8f0;
+                border-bottom: 1px solid #E4DFD4;
               }
               tr:nth-child(even) {
-                background: #f8fafc;
+                background: #FCFBF8;
               }
               .kpi-grid {
                 display: grid;
@@ -161,29 +225,29 @@ export function triggerPrintReport(title: string, htmlContent: string) {
                 margin: 20px 0;
               }
               .kpi-card {
-                background: #f8fafc;
-                border: 1px solid #e2e8f0;
+                background: #FCFBF8;
+                border: 1px solid #E4DFD4;
                 border-radius: 8px;
                 padding: 12px;
               }
               .kpi-label {
                 font-size: 10px;
                 font-weight: 700;
-                color: #64748b;
+                color: #5B6B67;
                 text-transform: uppercase;
               }
               .kpi-val {
                 font-size: 18px;
                 font-weight: 600;
-                color: #0f172a;
+                color: #16221F;
                 margin-top: 4px;
               }
               .footer {
                 margin-top: 40px;
-                border-top: 1px solid #e2e8f0;
+                border-top: 1px solid #E4DFD4;
                 padding-top: 12px;
                 font-size: 10px;
-                color: #94a3b8;
+                color: #ABA79B;
                 text-align: center;
               }
               @media print {
@@ -196,7 +260,7 @@ export function triggerPrintReport(title: string, htmlContent: string) {
             <div class="header">
               <div>
                 <div class="brand">Guigui<span>.com</span></div>
-                <div style="font-size: 11px; color: #64748b; font-weight: 600;">Plataforma Comercial & Cultural de Bissau</div>
+                <div style="font-size: 11px; color: #5B6B67; font-weight: 600;">Plataforma Comercial & Cultural de Bissau</div>
               </div>
               <div class="meta">
                 <div>Documento Oficial de Relatório</div>
@@ -235,12 +299,12 @@ export function triggerPrintReport(title: string, htmlContent: string) {
     <meta charset="utf-8" />
     <title>${title} - Guigui.com</title>
     <style>
-      body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 25px; color: #0f172a; }
+      body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 25px; color: #16221F; }
       table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-      th, td { padding: 8px 12px; border: 1px solid #e2e8f0; text-align: left; }
-      th { background: #f1f5f9; }
-      .header { border-bottom: 2px solid #059669; padding-bottom: 12px; margin-bottom: 20px; }
-      .brand { font-size: 22px; font-weight: bold; color: #059669; }
+      th, td { padding: 8px 12px; border: 1px solid #E4DFD4; text-align: left; }
+      th { background: #EEEAE2; }
+      .header { border-bottom: 2px solid #176158; padding-bottom: 12px; margin-bottom: 20px; }
+      .brand { font-size: 22px; font-weight: bold; color: #176158; }
     </style>
   </head>
   <body>
@@ -294,7 +358,7 @@ export function downloadPDFReport(title: string, summary: string, kpis: { label:
 
   const fullContent = `
     <h1>${title}</h1>
-    <p style="font-size: 13px; color: #475569; line-height: 1.5;">${summary}</p>
+    <p style="font-size: 13px; color: #52615C; line-height: 1.5;">${summary}</p>
     ${kpisHtml}
     ${tableHtml}
   `;

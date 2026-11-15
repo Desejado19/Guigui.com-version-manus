@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Ticket,
   Calendar,
-  Clock,
-  MapPin,
   CheckCircle,
   Bell,
   BellRing,
   Trash2,
+  MessageCircle,
+  X,
+  ChevronDown,
+  Tag,
+  Search,
 } from 'lucide-react';
 import {
   EventItem,
@@ -21,13 +23,22 @@ import {
 } from '../types';
 import { getTranslation } from '../utils/i18n';
 import { translatePublishedText } from '../utils/contentTranslation';
-import { QRCodeDisplay } from './QRCodeDisplay';
+import { usePaginatedList } from '../hooks/usePaginatedList';
+import { isEventUpcoming } from '../utils/expiry';
+import { SubmoduleNavbar } from './navigation/SubmoduleNavbar';
+import { SectionHeader } from './ui/SectionHeader';
+import { EventCard } from './events/EventCard';
+import { EventDetailModal } from './events/EventDetailModal';
+import { TicketVoucher } from './events/TicketVoucher';
+import { AdminPagination } from './admin/AdminPagination';
 import { smsService } from '../services/smsService';
 import { usePersistentState } from '../utils/persistentState';
 import { TicketPurchaseModal } from './TicketPurchaseModal';
 import type { BusinessModelConfig, MonetizationCatalog } from '../types';
 import { DEFAULT_MONETIZATION_CATALOG, calculateTicketFees, normaliseMonetizationCatalog } from '../data/monetizationCatalog';
-import { Badge, Button, Card, EmptyState } from './ui';
+import { Badge, Button, Card, EmptyState, LocationFilter } from './ui';
+import { useLocationCatalog } from '../hooks/useLocationCatalog';
+import { locationMatches } from '../../shared/bissauLocations';
 
 interface EventsViewProps {
   events: EventItem[];
@@ -73,6 +84,9 @@ interface TicketPurchaseReceipt {
   delivery: TicketPurchaseDeliveryStatus;
 }
 
+// Comparação tolerante para o filtro de tipos de evento (ignora maiúsculas e espaços).
+const normaliseEventCategory = (value?: string) => (value || '').trim().toLowerCase();
+
 export const EventsView: React.FC<EventsViewProps> = ({
   events,
   currentLang,
@@ -100,17 +114,50 @@ export const EventsView: React.FC<EventsViewProps> = ({
   });
 
   const [activeTab, setActiveTab] = useState<'all' | 'reminders'>('all');
+  type AgendaTab = 'all' | 'week' | 'month';
+  const AGENDA_TABS: AgendaTab[] = ['all', 'week', 'month'];
+  const [agendaTab, setAgendaTab] = useState<AgendaTab>('all');
+  const AGENDA_LABELS: Record<Language, Record<AgendaTab, string>> = {
+    pt: { all: 'Todos os eventos', week: 'Esta semana', month: 'Este mês' },
+    en: { all: 'All events', week: 'This week', month: 'This month' },
+    fr: { all: 'Tous les événements', week: 'Cette semaine', month: 'Ce mois' },
+    es: { all: 'Todos los eventos', week: 'Esta semana', month: 'Este mes' },
+  };
+  const AGENDA_DESCRIPTIONS: Record<Language, Record<AgendaTab, string>> = {
+    pt: { all: 'Toda a agenda cultural publicada em Bissau.', week: 'Eventos que acontecem nos próximos sete dias.', month: 'Eventos marcados para o mês corrente.' },
+    en: { all: 'The full cultural agenda published in Bissau.', week: 'Events happening in the next seven days.', month: 'Events scheduled for the current month.' },
+    fr: { all: 'Toute l’agenda culturelle publiée à Bissau.', week: 'Événements des sept prochains jours.', month: 'Événements du mois en cours.' },
+    es: { all: 'Toda la agenda cultural publicada en Bissau.', week: 'Eventos de los próximos siete días.', month: 'Eventos del mes en curso.' },
+  };
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState<string | null>(null);
+  const { locations: bissauLocations } = useLocationCatalog();
+  const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
+  const categoryMenuRef = useRef<HTMLDivElement | null>(null);
   const [eventSearch, setEventSearch] = useState(searchQuery);
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
+  const [detailEvent, setDetailEvent] = useState<EventItem | null>(null);
+  const [purchaseSeed, setPurchaseSeed] = useState<{ ticketTypeId: string; quantity: number } | null>(null);
   const [selectedTicketType, setSelectedTicketType] = useState<EventTicketType | null>(null);
   const [ticketQuantity, setTicketQuantity] = useState<number>(1);
   const [reminderMenuOpenFor, setReminderMenuOpenFor] = useState<string | null>(null);
   const [notificationStatusNotice, setNotificationStatusNotice] = useState<string | null>(null);
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
 
-  const [monetizationCatalog] = usePersistentState<MonetizationCatalog>('guigui_monetization_catalog', DEFAULT_MONETIZATION_CATALOG);
+  const [monetizationCatalog, setMonetizationCatalog] = usePersistentState<MonetizationCatalog>('guigui_monetization_catalog', DEFAULT_MONETIZATION_CATALOG);
   const resolvedMonetizationCatalog = normaliseMonetizationCatalog(monetizationCatalog, businessModelConfig);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/commercial/public-catalog')
+      .then((response) => response.ok ? response.json() : null)
+      .then((catalog) => {
+        if (!active || !catalog?.ticketFeePolicy) return;
+        setMonetizationCatalog((previous) => ({ ...previous, ticketFeePolicy: catalog.ticketFeePolicy, updatedAt: catalog.updatedAt || previous.updatedAt }));
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [setMonetizationCatalog]);
   const ticketFeeBreakdown = calculateTicketFees(resolvedMonetizationCatalog, selectedTicketType?.priceXOF || 0, ticketQuantity);
 
   const [purchaseReceipt, setPurchaseReceipt] = useState<TicketPurchaseReceipt | null>(null);
@@ -136,6 +183,26 @@ export const EventsView: React.FC<EventsViewProps> = ({
   useEffect(() => {
     setEventSearch(searchQuery);
   }, [searchQuery]);
+
+  // O seletor de tipos de evento fecha ao clicar fora ou com Escape, como o
+  // filtro de localização, para não ficar aberto por cima da grelha.
+  useEffect(() => {
+    if (!categoryMenuOpen) return undefined;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (categoryMenuRef.current && !categoryMenuRef.current.contains(event.target as Node)) {
+        setCategoryMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setCategoryMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [categoryMenuOpen]);
 
   useEffect(() => {
     if (!focusEventId) return;
@@ -225,16 +292,17 @@ export const EventsView: React.FC<EventsViewProps> = ({
     chargedAmountXOF: number;
     holderName?: string;
     holderPhone?: string;
-  }) => {
+  }, eventOverride?: EventItem | null) => {
     if (!currentUser) {
       onRequireLogin?.('Inicie sessão ou crie uma conta para comprar bilhetes.');
       return;
     }
-    if (!selectedEvent) {
+    const event = eventOverride ?? selectedEvent;
+    if (!event) {
       setNotificationStatusNotice('Selecione um evento antes de comprar o bilhete.');
       return;
     }
-    const ticketType = selectedEvent.ticketTypes.find((type) => type.id === data.ticketTypeId);
+    const ticketType = event.ticketTypes.find((type) => type.id === data.ticketTypeId);
     if (!ticketType || ticketType.priceXOF !== data.categoryPriceXOF) {
       setNotificationStatusNotice('A categoria selecionada foi alterada. Feche e abra a compra novamente.');
       return;
@@ -253,11 +321,11 @@ export const EventsView: React.FC<EventsViewProps> = ({
           'Idempotency-Key': purchaseIdempotencyKeyRef.current,
         },
         body: JSON.stringify({
-          eventId: selectedEvent.id,
-          businessId: selectedEvent.businessId,
-          eventTitle: selectedEvent.title,
-          eventDate: selectedEvent.date,
-          eventTime: selectedEvent.time,
+          eventId: event.id,
+          businessId: event.businessId,
+          eventTitle: event.title,
+          eventDate: event.date,
+          eventTime: event.time,
           ticketTypeId: ticketType.id,
           ticketTypeName: ticketType.name,
           priceXOF: ticketType.priceXOF,
@@ -327,9 +395,9 @@ export const EventsView: React.FC<EventsViewProps> = ({
       if (currentUser?.role === 'user' && typeof result.transaction?.id === 'string') {
         onTicketPurchaseConfirmed?.({
           transactionId: result.transaction.id,
-          eventId: selectedEvent.id,
-          eventTitle: selectedEvent.title,
-          businessId: selectedEvent.businessId,
+          eventId: event.id,
+          eventTitle: event.title,
+          businessId: event.businessId,
           ticketId: issuedTickets[0].id,
           ticketIds: issuedTickets.map((ticket: TicketType) => ticket.id),
           ticketCodes: issuedTickets.map((ticket: TicketType) => ticket.ticketCode),
@@ -338,8 +406,8 @@ export const EventsView: React.FC<EventsViewProps> = ({
       setPurchaseReceipt({
         transactionId: typeof result.transaction?.id === 'string' ? result.transaction.id : '',
         providerMode: result.transaction?.providerMode,
-        eventId: issuedTickets[0].eventId || selectedEvent.id,
-        eventTitle: issuedTickets[0].eventTitle || selectedEvent.title,
+        eventId: issuedTickets[0].eventId || event.id,
+        eventTitle: issuedTickets[0].eventTitle || event.title,
         ticketTypeName: issuedTickets[0].ticketTypeName || ticketType.name,
         quantity: issuedTickets.length,
         feeBreakdown,
@@ -372,6 +440,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
       setIsLookingUp(false);
     }
   };
+
 
   const handleResendTicketSms = async () => {
     setIsResendingSms(true);
@@ -424,7 +493,9 @@ export const EventsView: React.FC<EventsViewProps> = ({
   };
 
   // Filter events based on search query & category
-  const filteredEvents = events.filter((ev) => {
+  const searchedEvents = events.filter((ev) => {
+    // Evento cuja data ja passou sai automaticamente da agenda publica.
+    if (!isEventUpcoming(ev)) return false;
     const query = eventSearch.trim().toLowerCase();
     const searchableValues = [
       ev.title,
@@ -437,18 +508,61 @@ export const EventsView: React.FC<EventsViewProps> = ({
     ];
 
     const matchesSearch = !query || searchableValues.some((value) => value.toLowerCase().includes(query));
-    const matchesCat = selectedCategory === 'all' || ev.category === selectedCategory;
-
-    return matchesSearch && matchesCat;
+    return matchesSearch && locationMatches(ev.neighborhood, selectedNeighborhood);
   });
 
+  // Se a pesquisa esconder o tipo escolhido, a agenda volta a mostrar tudo em
+  // vez de ficar vazia com o seletor a indicar "Todos os eventos".
+  const categoryIsAvailable = searchedEvents.some(
+    (ev) => normaliseEventCategory(ev.category) === selectedCategory,
+  );
+
+  const filteredEvents = searchedEvents.filter(
+    (ev) =>
+      selectedCategory === 'all' ||
+      !categoryIsAvailable ||
+      normaliseEventCategory(ev.category) === selectedCategory,
+  );
+
+  // Submodulos de agenda: cada um filtra a sua propria janela temporal.
+  const eventMatchesAgenda = (ev: EventItem, tab: AgendaTab): boolean => {
+    if (tab === 'all') return true;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const eventDate = new Date(`${ev.date}T${ev.time || '00:00'}`);
+    if (Number.isNaN(eventDate.getTime())) return false;
+    if (eventDate < startOfToday) return false;
+    const limit = new Date(startOfToday);
+    if (tab === 'week') limit.setDate(limit.getDate() + 7);
+    else limit.setMonth(limit.getMonth() + 1);
+    return eventDate <= limit;
+  };
+
+  const agendaCounts: Record<string, number> = {
+    all: filteredEvents.length,
+    week: filteredEvents.filter((ev) => eventMatchesAgenda(ev, 'week')).length,
+    month: filteredEvents.filter((ev) => eventMatchesAgenda(ev, 'month')).length,
+  };
+
+  const agendaEvents = filteredEvents.filter((ev) => eventMatchesAgenda(ev, agendaTab));
+  const eventsPagination = usePaginatedList(agendaEvents, {
+    resetKey: `${agendaTab}|${eventSearch}|${selectedCategory}|${selectedNeighborhood || 'all'}`,
+    persistKey: 'guigui_events_page_size',
+  });
+
+  // As categorias vêm dos próprios eventos, para que o filtro nunca mostre
+  // zero resultados por usar um rótulo que não existe na agenda.
   const categories = [
-    { id: 'all', label: t('events.all') },
-    { id: 'musica', label: 'Música & Festivais' },
-    { id: 'gastronomia', label: 'Gastronomia' },
-    { id: 'cultural', label: 'Cultura & Teatro' },
-    { id: 'negocios', label: 'Feiras & Negócios' },
+    { id: 'all', label: t('events.all'), count: searchedEvents.length },
+    ...Array.from(new Set(searchedEvents.map((ev) => ev.category).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b, 'pt'))
+      .map((label) => ({
+        id: normaliseEventCategory(label),
+        label,
+        count: searchedEvents.filter((ev) => normaliseEventCategory(ev.category) === normaliseEventCategory(label)).length,
+      })),
   ];
+  const activeCategory = categories.find((category) => category.id === selectedCategory) || categories[0];
 
   return (
     <>
@@ -472,11 +586,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
         <div className="relative z-10 mt-6 flex flex-wrap gap-2">
           <button type="button"
             onClick={() => setActiveTab('all')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
-              activeTab === 'all'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'bg-white/10 text-white hover:bg-white/20'
-            }`}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition ${ activeTab === 'all' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs' : 'bg-white/10 text-white hover:bg-white/20' }`}
           >
             Explorar Agenda ({events.length})
           </button>
@@ -484,11 +594,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
           {currentUser && (
             <button type="button"
               onClick={() => setActiveTab('reminders')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                activeTab === 'reminders'
-                  ? 'bg-amber-400 text-slate-950 shadow-xs'
-                  : 'bg-white/10 text-white hover:bg-white/20'
-              }`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${ activeTab === 'reminders' ? 'bg-amber-400 text-slate-950 shadow-xs' : 'bg-white/10 text-white hover:bg-white/20' }`}
             >
               <BellRing className="w-3.5 h-3.5" />
               <span>Meus Lembretes ({reminders.length})</span>
@@ -498,27 +604,27 @@ export const EventsView: React.FC<EventsViewProps> = ({
       </div>
 
       {!currentUser && (
-        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+        <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4 text-xs text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
           Faça login para comprar bilhetes, ativar alertas e guardar lembretes. Enquanto isso, pode apenas explorar a agenda.
         </div>
       )}
 
       {activeTab === 'all' && (
-        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <label htmlFor="event-search" className="mb-2 block text-xs font-black text-slate-900 dark:text-white">{t('events.search')}</label>
-          <div className="flex gap-2">
-            <input
-              id="event-search"
-              value={eventSearch}
-              onChange={(event) => setEventSearch(event.target.value)}
-              placeholder="Nome, local, organizador ou categoria..."
-              className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-            />
-            {eventSearch && (
-              <button type="button" onClick={() => setEventSearch('')} className="rounded-xl border border-slate-200 px-3 text-xs font-black text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300">Limpar</button>
-            )}
-          </div>
-          <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">{filteredEvents.length} evento(s) encontrado(s).</p>
+        <div className="space-y-3">
+          <SubmoduleNavbar
+            currentTab={agendaTab}
+            onTabChange={(tab) => setAgendaTab(tab as AgendaTab)}
+            tabs={AGENDA_TABS as string[]}
+            tabLabels={AGENDA_LABELS[currentLang]}
+            showCounts
+            counts={agendaCounts}
+            ariaLabel={t('events.title')}
+          />
+          <SectionHeader
+            title={AGENDA_LABELS[currentLang][agendaTab]}
+            description={AGENDA_DESCRIPTIONS[currentLang][agendaTab]}
+            metrics={[{ label: 'Eventos', value: agendaEvents.length }]}
+          />
         </div>
       )}
 
@@ -529,152 +635,148 @@ export const EventsView: React.FC<EventsViewProps> = ({
         </div>
       )}
 
-      {/* Category Filters (when in 'all' tab) */}
+      {/* Tipos de evento dentro de "Todos os eventos" (separador "all") */}
       {activeTab === 'all' && (
-        <div className="flex flex-wrap items-center gap-2 pb-1">
-          {categories.map((c) => (
-            <button type="button"
-              key={c.id}
-              onClick={() => setSelectedCategory(c.id)}
-              className={`guigui-filter-chip transition ${
-                selectedCategory === c.id
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
-              }`}
+        <div className="flex flex-col gap-2 pb-1 sm:flex-row sm:flex-wrap sm:items-center">
+          <label className="relative w-full sm:max-w-sm">
+            <span className="sr-only">{t('events.search')}</span>
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <input
+              id="event-search"
+              type="search"
+              value={eventSearch}
+              onChange={(event) => setEventSearch(event.target.value)}
+              placeholder="Pesquisar evento, local ou organizador"
+              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-9 text-xs font-semibold text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+            />
+            {eventSearch && (
+              <button
+                type="button"
+                onClick={() => setEventSearch('')}
+                aria-label="Limpar pesquisa de eventos"
+                className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </label>
+          <LocationFilter
+            locations={bissauLocations}
+            selectedLocation={selectedNeighborhood}
+            onSelect={setSelectedNeighborhood}
+            triggerLabel="Localização"
+            allLabel="Ver todos"
+            allowAll={false}
+          />
+          <div ref={categoryMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setCategoryMenuOpen((value) => !value)}
+              aria-haspopup="menu"
+              aria-expanded={categoryMenuOpen}
+              aria-label="Escolher tipo de evento"
+              className={`guigui-filter-chip transition flex items-center gap-1.5 ${selectedCategory === 'all' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50'}`}
             >
-              {c.label}
+              <Tag className="h-3 w-3" aria-hidden="true" />
+              <span>{activeCategory.label}</span>
+              <span className="text-[10px] font-black opacity-70">{activeCategory.count}</span>
+              <ChevronDown className={`h-3 w-3 transition ${categoryMenuOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
             </button>
-          ))}
+
+            {categoryMenuOpen && (
+              <div
+                role="menu"
+                aria-label="Tipos de eventos"
+                className="absolute left-0 top-full z-30 mt-1 max-h-72 min-w-[240px] overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-slate-900"
+              >
+                {categories.map((category, index) => (
+                  <React.Fragment key={category.id}>
+                    {index === 1 && <div className="my-1 border-t border-slate-100 dark:border-slate-800" />}
+                    <button
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={selectedCategory === category.id}
+                      onClick={() => {
+                        setSelectedCategory(category.id);
+                        setCategoryMenuOpen(false);
+                      }}
+                      className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-xs font-semibold ${
+                        selectedCategory === category.id
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+                          : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <span>{category.label}</span>
+                      <span className="text-[10px] font-black opacity-70">{category.count}</span>
+                    </button>
+                  </React.Fragment>
+                ))}
+              </div>
+            )}
+          </div>
+          {selectedNeighborhood && (
+            <button
+              type="button"
+              onClick={() => setSelectedNeighborhood(null)}
+              className="guigui-filter-chip bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50"
+            >
+              <X className="mr-1 inline h-3 w-3" aria-hidden="true" />
+              Limpar localização
+            </button>
+          )}
+          {selectedCategory !== 'all' && (
+            <button
+              type="button"
+              onClick={() => setSelectedCategory('all')}
+              className="guigui-filter-chip bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50"
+            >
+              <X className="mr-1 inline h-3 w-3" aria-hidden="true" />
+              Limpar tipo
+            </button>
+          )}
+          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 sm:ml-auto">
+            {agendaEvents.length} {agendaEvents.length === 1 ? 'evento' : 'eventos'}
+          </span>
         </div>
       )}
 
       {/* TAB 1: ALL EVENTS GRID */}
       {activeTab === 'all' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredEvents.map((event) => {
-            const hasReminder = isEventFavorited(event.id);
-            const rem = getEventReminder(event.id);
-
-            return (
-              <Card
-                key={event.id}
-                interactive
-                className="guigui-event-card overflow-hidden flex flex-col justify-between"
-              >
-                {/* Event Cover Image */}
-                <div className="relative h-48 bg-slate-100 overflow-hidden">
-                  {event.mediaType === 'video' ? (
-                    <video src={event.coverImage} controls muted className="w-full h-full object-cover" aria-label={event.title} />
-                  ) : (
-                    <img src={event.coverImage} alt={event.title} className="w-full h-full object-cover" />
-                  )}
-                  <Badge variant="neutral" className="absolute top-3 left-3 border-white/20 bg-slate-900/80 text-white backdrop-blur-xs">
-                    {event.category.toUpperCase()}
-                  </Badge>
-
-                  <Button type="button"
-                    variant={hasReminder ? 'accent' : 'primary'}
-                    size="icon"
-                    onClick={() => {
-                      if (onToggleReminder) onToggleReminder(event, '24h_before');
-                    }}
-                    className="absolute top-3 right-3 rounded-full bg-slate-900/60 text-white hover:bg-slate-900/80"
-                    title={hasReminder ? 'Lembrete ativo' : 'Ativar lembrete'}
-                    aria-label={hasReminder ? 'Lembrete ativo' : 'Ativar lembrete'}
-                  >
-                    <BellRing className="w-4 h-4" />
-                  </Button>
-                </div>
-
-                {/* Event Details */}
-                <div className="p-5 space-y-3 flex-1 flex flex-col justify-between">
-                  <div className="space-y-1.5">
-                    <div className="text-[10px] text-blue-700 font-extrabold uppercase tracking-wide">
-                      {event.organizerName}
-                    </div>
-                    <h3 className="font-extrabold text-base text-slate-900 leading-snug">{translatePublishedText(event.title, currentLang, 'title')}</h3>
-
-                    <div className="flex items-center gap-2 text-xs text-slate-600 pt-1">
-                      <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                      <span>{event.date}</span>
-                      <span>⬢</span>
-                      <Clock className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                      <span>{event.time}</span>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-xs text-slate-600">
-                      <MapPin className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                      <span>
-                        {event.location} ({event.neighborhood})
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-slate-600 line-clamp-2 pt-1">{translatePublishedText(event.description, currentLang, 'description')}</p>
-                  </div>
-
-                  {/* Pricing Tiers Table */}
-                  <div className="pt-3 border-t border-slate-100 space-y-2">
-                    <div className="text-[11px] font-bold text-slate-500 uppercase">Tipos de Bilhete & Preços</div>
-                    <div className="space-y-1">
-                      {event.ticketTypes.map((tt) => (
-                        <div
-                          key={tt.id}
-                          className="bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200 flex items-center justify-between text-xs"
-                        >
-                          <span className="font-bold text-slate-800">{tt.name}</span>
-                          <span className="font-mono font-extrabold text-emerald-700">
-                            {tt.priceXOF.toLocaleString('pt-PT')} XOF
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {currentUser && (
-                      <div className="grid grid-cols-2 gap-2 pt-2">
-                        <Button type="button"
-                          variant="primary"
-                          onClick={(clickEvent) => handleOpenBuyModal(event, clickEvent.currentTarget)}
-                          className="w-full bg-emerald-600 hover:bg-emerald-700"
-                        >
-                          <Ticket className="w-4 h-4" />
-                          <span>Comprar Bilhete</span>
-                        </Button>
-
-                        <Button type="button"
-                          variant="secondary"
-                          onClick={() => currentUser ? onTriggerTestAlert?.(event) : onRequireLogin?.('Inicie sessão ou crie uma conta para activar alertas.')}
-                          className="w-full"
-                        >
-                          <BellRing className="w-4 h-4 text-amber-500" />
-                          <span>Testar Alerta</span>
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {eventsPagination.pageItems.map((event) => (
+            <EventCard key={event.id} event={event} currentLang={currentLang} onOpen={setDetailEvent} canBuy={Boolean(currentUser)} />
+          ))}
         </div>
+      )}
+
+      {activeTab === 'all' && agendaEvents.length > 0 && (
+        <AdminPagination
+          currentLang={currentLang}
+          currentPage={eventsPagination.page}
+          pageSize={eventsPagination.pageSize}
+          totalItems={eventsPagination.totalItems}
+          onPageChange={eventsPagination.setPage}
+          onPageSizeChange={eventsPagination.setPageSize}
+        />
       )}
 
       {/* TAB 2: REMINDERS */}
       {activeTab === 'reminders' && (
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
             <div>
-              <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <h2 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
                 <BellRing className="w-5 h-5 text-amber-500" />
                 <span>Lembretes Ativos da Agenda ({reminders.length})</span>
               </h2>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Os eventos favoritados disparam avisos na plataforma para garantir que não perde a data.
               </p>
             </div>
 
             <button type="button"
               onClick={handleRequestBrowserNotifications}
-              className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition flex items-center gap-1.5"
+              className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 font-bold text-xs transition flex items-center gap-1.5"
             >
               <Bell className="w-3.5 h-3.5 text-blue-600" />
               <span>Ativar Notificações</span>
@@ -697,10 +799,10 @@ export const EventsView: React.FC<EventsViewProps> = ({
                 return (
                   <div
                     key={r.id}
-                    className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between gap-3"
+                    className="p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl flex flex-col justify-between gap-3"
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-slate-200 bg-slate-100">
+                      <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800">
                         <img src={r.eventCover} alt="" className="w-full h-full object-cover" />
                       </div>
 
@@ -709,20 +811,20 @@ export const EventsView: React.FC<EventsViewProps> = ({
                           <BellRing className="w-3 h-3 animate-pulse" />
                           <span>Lembrete Ativo</span>
                         </div>
-                        <h4 className="font-extrabold text-sm text-slate-900 truncate">{r.eventTitle}</h4>
-                        <p className="text-[11px] text-slate-600">
+                        <h4 className="font-extrabold text-sm text-slate-900 dark:text-white truncate">{r.eventTitle}</h4>
+                        <p className="text-[11px] text-slate-600 dark:text-slate-300">
                           📅 {r.eventDate} às {r.eventTime}
                         </p>
-                        <p className="text-[10px] text-slate-500 truncate">
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
                           📍 {r.eventLocation} ({r.eventNeighborhood})
                         </p>
                       </div>
                     </div>
 
                     {currentUser && (
-                      <div className="pt-2 border-t border-slate-200 flex items-center justify-between gap-2">
+                      <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1">
-                          <span className="text-[10px] font-bold text-slate-500">Avisar:</span>
+                          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Avisar:</span>
                           <select
                             value={r.timeframe}
                             onChange={(e) => {
@@ -730,7 +832,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
                                 onToggleReminder(ev, e.target.value as ReminderTimeframe);
                               }
                             }}
-                            className="bg-white border border-slate-200 text-slate-800 text-[11px] font-bold rounded-lg px-2 py-1 outline-none"
+                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 text-[11px] font-bold rounded-lg px-2 py-1 outline-none"
                           >
                             <option value="at_start">No próprio dia</option>
                             <option value="1h_before">1 hora antes</option>
@@ -767,6 +869,58 @@ export const EventsView: React.FC<EventsViewProps> = ({
         </div>
       )}
 
+      <EventDetailModal
+        event={detailEvent}
+        currentLang={currentLang}
+        currentUser={currentUser}
+        hasReminder={detailEvent ? isEventFavorited(detailEvent.id) : false}
+        onClose={() => setDetailEvent(null)}
+        onRequireLogin={onRequireLogin}
+        onToggleReminder={onToggleReminder}
+        onContactOrganizer={onContactOrganizer}
+        isSubmitting={isSubmitting}
+        monetizationCatalog={resolvedMonetizationCatalog}
+        onBuy={(payload) => {
+          if (!currentUser) {
+            onRequireLogin?.('Inicie sessão ou crie uma conta para comprar bilhetes.');
+            return;
+          }
+          const event = detailEvent;
+          if (!event) return;
+          const ticketType = event.ticketTypes.find((type) => type.id === payload.ticketTypeId);
+          if (!ticketType) {
+            setNotificationStatusNotice('A categoria selecionada foi alterada. Feche e abra a compra novamente.');
+            setTimeout(() => setNotificationStatusNotice(null), 4000);
+            return;
+          }
+          setPurchaseSeed({ ticketTypeId: payload.ticketTypeId, quantity: payload.quantity });
+          setSelectedEvent(event);
+          setDetailEvent(null);
+          setPurchaseReceipt(null);
+          setPaymentPending(null);
+          purchaseIdempotencyKeyRef.current = null;
+          void handleModalConfirm(
+            {
+              category: payload.category,
+              quantity: payload.quantity,
+              buyerName: payload.buyerName,
+              buyerPhone: payload.buyerPhone,
+              paymentMethod: payload.paymentMethod,
+              policyAccepted: payload.policyAccepted,
+              policyVersion: payload.policyVersion,
+              policyAcceptedAt: payload.policyAcceptedAt,
+              ticketTypeId: payload.ticketTypeId,
+              categoryPriceXOF: payload.categoryPriceXOF,
+              chargedAmountXOF: payload.chargedAmountXOF,
+              ...(payload.holderName && payload.holderPhone
+                ? { holderName: payload.holderName, holderPhone: payload.holderPhone }
+                : {}),
+            },
+            event,
+          );
+        }}
+      />
+
       {/* Ticket Purchase - novo modal */}
       <TicketPurchaseModal
         isOpen={isPurchaseModalOpen && purchasedTickets.length === 0 && !paymentPending}
@@ -776,6 +930,8 @@ export const EventsView: React.FC<EventsViewProps> = ({
         currentLang={currentLang}
         monetizationCatalog={resolvedMonetizationCatalog}
         isSubmitting={isSubmitting}
+        initialTicketTypeId={purchaseSeed?.ticketTypeId}
+        initialQuantity={purchaseSeed?.quantity}
         onClose={() => {
           setIsPurchaseModalOpen(false);
           setSelectedEvent(null);
@@ -790,27 +946,27 @@ export const EventsView: React.FC<EventsViewProps> = ({
           aria-modal="true"
           aria-label="Pagamento pendente"
         >
-          <div className="ticket-surface mt-8 w-full max-w-lg rounded-3xl border border-amber-200 bg-white p-5 text-slate-900 shadow-2xl sm:mt-16">
+          <div className="ticket-surface mt-8 w-full max-w-lg rounded-3xl border border-amber-200 bg-white dark:bg-slate-900 p-5 text-slate-900 dark:text-white shadow-2xl sm:mt-16">
             <div className="space-y-4">
               <div>
                 <h2 className="text-lg font-extrabold text-amber-700">Pagamento pendente</h2>
-                <p className="mt-2 text-sm text-slate-700">{paymentPending.message}</p>
+                <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">{paymentPending.message}</p>
                 {paymentPending.providerMode === 'simulated' && (
                   <p className="mt-2 text-xs font-semibold text-amber-800">{t('ticketPaymentPendingSimulated')}</p>
                 )}
               </div>
               {(paymentPending.providerRef || paymentPending.transactionId) && (
-                <p className="text-xs text-slate-600">
+                <p className="text-xs text-slate-600 dark:text-slate-300">
                   Referência: <strong>{paymentPending.providerRef || paymentPending.transactionId}</strong>
                 </p>
               )}
               {paymentPending.reservationExpiresAt && (
-                <p className="text-xs text-slate-600">
+                <p className="text-xs text-slate-600 dark:text-slate-300">
                   A reserva dos bilhetes expira em{' '}
                   <strong>{new Date(paymentPending.reservationExpiresAt).toLocaleString('pt-PT')}</strong>.
                 </p>
               )}
-              <p className="text-xs text-slate-600">O bilhete só será emitido depois da confirmação do pagamento.</p>
+              <p className="text-xs text-slate-600 dark:text-slate-300">O bilhete só será emitido depois da confirmação do pagamento.</p>
               <Button
                 type="button"
                 variant="primary"
@@ -831,7 +987,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
       {/* Comprovativo apos compra */}
       {purchasedTickets.length > 0 && selectedEvent && (
         <div
-          className="event-modal-overlay fixed inset-0 z-[300] flex items-start justify-center overflow-y-auto bg-slate-950/70 px-3 py-4 backdrop-blur-xs sm:items-center"
+          className="event-modal-overlay fixed inset-0 z-[300] flex items-start justify-center overflow-y-auto bg-[rgba(3,16,13,0.92)] px-3 py-4 sm:items-center"
           role="dialog"
           aria-modal="true"
           aria-label="Comprovativo da compra"
@@ -844,118 +1000,41 @@ export const EventsView: React.FC<EventsViewProps> = ({
             }
           }}
         >
-          <div
-            className="ticket-surface ticket-purchase-modal ticket-receipt-scroll mt-0 w-full max-w-3xl overflow-y-auto overscroll-contain rounded-3xl border border-slate-200 bg-white p-3 text-slate-900 shadow-2xl animate-in zoom-in-95 sm:p-5"
-            style={{ maxHeight: 'calc(100dvh - 2rem)' }}
-          >
-            <div className="space-y-3 sm:space-y-4">
-              <div className="ticket-success-notice flex items-start gap-3 rounded-2xl border p-3 text-sm sm:p-4" role="status" aria-live="polite">
-                <CheckCircle className="h-5 w-5 shrink-0" />
-                <div>
-                  <h2 className="font-extrabold">Compra concluída com sucesso</h2>
-                  <p className="mt-0.5 text-xs sm:text-sm">O seu bilhete digital está pronto. Apresente o QR Code ou o código à entrada.</p>
-                </div>
-              </div>
-              {purchaseReceipt?.delivery && (
-                <div className="ticket-delivery-status space-y-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100" role="status" aria-live="polite">
-                  {purchaseReceipt.delivery.paymentSimulated && <p>{t('ticketPaymentSimulated')}</p>}
-                  <p>
-                    {purchaseReceipt.delivery.email === 'sent' ? t('ticketEmailSent')
-                     : purchaseReceipt.delivery.email === 'simulated' ? t('ticketEmailSimulated')
-                      : purchaseReceipt.delivery.email === 'failed' ? t('ticketEmailFailed')
-                      : t('ticketEmailUnavailable')}
-                  </p>
-                  <p>
-                    {purchaseReceipt.delivery.sms === 'sent' ? t('ticketSmsSent')
-                      : purchaseReceipt.delivery.sms === 'simulated' ? t('ticketSmsSimulated')
-                      : t('ticketSmsFailed')}
-                  </p>
-                  {purchaseReceipt.delivery.notification !== 'unavailable' && (
-                    <p>{purchaseReceipt.delivery.notification === 'created' ? t('ticketNotificationSaved') : t('ticketNotificationFailed')}</p>
-                  )}
-                </div>
-              )}
-              <section className="ticket-receipt-order-summary grid min-w-0 gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm dark:border-emerald-800 dark:bg-emerald-950/50" aria-label="Resumo da compra">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-semibold text-emerald-900 dark:text-emerald-100">
-                  {purchasedTickets.length} bilhete{purchasedTickets.length === 1 ? '' : 's'} emitido{purchasedTickets.length === 1 ? '' : 's'}
-                  </span>
-                  <span className="min-w-0 break-all text-xs font-semibold text-emerald-900 dark:text-emerald-100">
-                    Referência da transação: <code>{purchaseReceipt?.transactionId || 'Não disponibilizada'}</code>
-                  </span>
-                </div>
-                <dl className="grid min-w-0 gap-x-4 gap-y-1 text-xs sm:grid-cols-2">
-                  <div className="flex min-w-0 justify-between gap-2">
-                    <dt className="text-emerald-800 dark:text-emerald-200">Evento</dt>
-                    <dd className="min-w-0 text-right font-semibold text-emerald-950 dark:text-emerald-50">{purchaseReceipt?.eventTitle}</dd>
-                  </div>
-                  <div className="flex min-w-0 justify-between gap-2">
-                    <dt className="text-emerald-800 dark:text-emerald-200">Categoria</dt>
-                    <dd className="min-w-0 text-right font-semibold text-emerald-950 dark:text-emerald-50">{purchaseReceipt?.ticketTypeName}</dd>
-                  </div>
-                </dl>
-                <dl className="ticket-receipt-financials grid min-w-0 gap-1 border-t border-emerald-200 pt-2 text-xs dark:border-emerald-800">
-                  <div className="flex justify-between gap-3">
-                    <dt>Subtotal dos bilhetes</dt>
-                    <dd className="font-semibold">{purchaseReceipt?.feeBreakdown?.grossTicketValue.toLocaleString('pt-PT') ?? 'Indisponível'} XOF</dd>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <dt>Taxa total da plataforma</dt>
-                    <dd className="font-semibold">{purchaseReceipt?.feeBreakdown?.platformRevenue.toLocaleString('pt-PT') ?? 'Indisponível'} XOF</dd>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <dt>Taxa paga pelo comprador</dt>
-                    <dd className="font-semibold">{purchaseReceipt?.feeBreakdown?.buyerShare.toLocaleString('pt-PT') ?? 'Indisponível'} XOF</dd>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <dt>Taxa suportada pelo organizador</dt>
-                    <dd className="font-semibold">{purchaseReceipt?.feeBreakdown?.organizerShare.toLocaleString('pt-PT') ?? 'Indisponível'} XOF</dd>
-                  </div>
-                  <div className="flex justify-between gap-3 border-t border-emerald-200 pt-2 text-sm font-extrabold dark:border-emerald-800">
-                    <dt>Total pago</dt>
-                    <dd>{purchaseReceipt?.buyerTotalXOF?.toLocaleString('pt-PT') ?? 'Indisponível'} XOF</dd>
-                  </div>
-                </dl>
-              </section>
-              <div className="space-y-3">
-                {purchasedTickets.map((ticket, index) => (
-                  <div key={ticket.id} className="ticket-receipt-ticket rounded-2xl border border-emerald-200/80 p-2 dark:border-emerald-900 sm:p-3">
-                    <QRCodeDisplay
-                      code={ticket.ticketCode}
-                      qrToken={ticket.qrToken || ticket.ticketCode}
-                      title={ticket.eventTitle}
-                      subtitle={`Bilhete ${ticket.ticketTypeName} (${index + 1}/${purchasedTickets.length})`}
-                      buyerName={ticket.buyerName}
-                      buyerPhone={ticket.buyerPhone}
-                      amountXOF={ticket.priceXOF}
-                      amountLabel="qrUnitPrice"
-                      pinCode={ticket.pinCode}
-                      validUntil={ticket.expiresAt}
-                      status={ticket.status}
-                      currentLang={currentLang}
-                      purchaseReceipt
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {onContactOrganizer && (
-                  <button type="button" onClick={() => onContactOrganizer(selectedEvent)} className="min-h-11 w-full rounded-xl bg-blue-600 px-4 py-3 text-xs font-bold text-white transition hover:bg-blue-700">
-                    Contactar organizador
-                  </button>
-                )}
+          <div className="guigui-voucher-modal w-full max-w-md">
+            <div className="guigui-voucher-stack">
+              {purchasedTickets.map((ticket, index) => (
+                <TicketVoucher
+                  key={ticket.id}
+                  ticket={ticket}
+                  index={index}
+                  total={purchasedTickets.length}
+                  currentLang={currentLang}
+                />
+              ))}
+            </div>
+            <div className="guigui-voucher-actions">
+              {onContactOrganizer && (
                 <button
                   type="button"
-                  ref={ticketReceiptCloseRef}
-                  onClick={() => {
-                    setPurchaseReceipt(null);
-                    setSelectedEvent(null);
-                  }}
-                  className="ticket-receipt-close min-h-11 w-full rounded-xl bg-emerald-700 px-4 py-3 text-xs font-bold text-white transition hover:bg-emerald-600"
+                  onClick={() => onContactOrganizer(selectedEvent)}
+                  className="guigui-voucher-action is-contact"
                 >
-                  {t('close')} comprovativo
+                  <MessageCircle className="h-4 w-4" aria-hidden="true" />
+                  Contactar organizador
                 </button>
-              </div>
+              )}
+              <button
+                type="button"
+                ref={ticketReceiptCloseRef}
+                onClick={() => {
+                  setPurchaseReceipt(null);
+                  setSelectedEvent(null);
+                }}
+                className="guigui-voucher-action is-close"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+                Fechar comprovativo
+              </button>
             </div>
           </div>
         </div>

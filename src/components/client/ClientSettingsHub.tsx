@@ -287,9 +287,9 @@ export const ClientSettingsHub: React.FC<ClientSettingsHubProps> = ({
   const [selectedModule, setSelectedModule] = useState<'conta' | 'preferencias' | 'configuracoes' | 'seguranca'>('conta');
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Module selector */}
-      <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-3 p-4 sm:p-5">
+      <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-3 p-3.5 sm:p-4">
         <div className="flex gap-2 border-b border-slate-100 pb-3">
           <button
             type="button"
@@ -324,7 +324,7 @@ export const ClientSettingsHub: React.FC<ClientSettingsHubProps> = ({
 
       {/* Module content - Dados e Conta */}
       {selectedModule === 'conta' && (
-        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
           <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
             <User className="w-4 h-4 text-emerald-600" />
             <span>{t('businessAccountData')}</span>
@@ -437,7 +437,7 @@ export const ClientSettingsHub: React.FC<ClientSettingsHubProps> = ({
       )}
 
       {selectedModule === 'preferencias' && (
-        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
           <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
             <Smartphone className="w-4 h-4 text-emerald-600" />
             <span>{t('profileAndPreferences')}</span>
@@ -449,7 +449,7 @@ export const ClientSettingsHub: React.FC<ClientSettingsHubProps> = ({
       )}
 
       {selectedModule === 'configuracoes' && (
-        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
           <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
             <Key className="w-4 h-4 text-emerald-600" />
             <span>{t('systemSettings')}</span>
@@ -461,7 +461,7 @@ export const ClientSettingsHub: React.FC<ClientSettingsHubProps> = ({
       )}
 
       {selectedModule === 'seguranca' && (
-        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-4 sm:p-5">
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
           <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
             <Shield className="w-4 h-4 text-red-600" />
             <span>{t('securityAndPrivacy')}</span>

@@ -49,7 +49,7 @@ test.describe('backend: APIs públicas e de plataforma', () => {
     }
   });
 
-  test('directório: 20 empresas seed activas e 30+ registos íntegros', async ({ page }) => {
+  test('directório: 20 empresas seed base activas e 30+ registos íntegros', async ({ page }) => {
     const response = await page.request.get('/api/businesses');
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
@@ -58,9 +58,17 @@ test.describe('backend: APIs públicas e de plataforma', () => {
     expect(businesses.length).toBeGreaterThanOrEqual(30);
 
     // Regressão: o directório nunca pode ser vítima da corrupção em massa
-    // (watchdog de subscrição + snapshot envenenado) — exactamente 20 activas.
-    const seedActive = businesses.filter((b) => b.id.startsWith('seed-co-') && b.status === 'active');
-    expect(seedActive.length, 'directório seed corrompido (activas != 20)').toBe(20);
+    // (watchdog de subscrição + snapshot envenenado). Os 20 registos base
+    // continuam activos; empresas 21-30 podem mudar de estado pelo admin.
+    const seedActiveIds = new Set(
+      businesses
+        .filter((b) => b.id.startsWith('seed-co-') && b.status === 'active')
+        .map((b) => b.id),
+    );
+    for (let index = 1; index <= 20; index += 1) {
+      const id = `seed-co-${String(index).padStart(2, '0')}`;
+      expect(seedActiveIds.has(id), `empresa seed base inactiva: ${id}`).toBe(true);
+    }
 
     // Shape mínimo de cada registo — o frontend depende destes campos.
     for (const business of businesses.slice(0, 50)) {
@@ -100,7 +108,7 @@ test.describe('backend: APIs públicas e de plataforma', () => {
   });
 
   test('cache: respostas da API nunca são cacheáveis', async ({ page }) => {
-    for (const path of ['/api/businesses', '/api/app-state/guigui_home']) {
+    for (const path of ['/api/businesses', '/api/app-state/guigui_businesses']) {
       const response = await page.request.get(path);
       expect(response.ok(), `${path} devolveu ${response.status()}`).toBeTruthy();
       const cacheControl = response.headers()['cache-control'] || '';

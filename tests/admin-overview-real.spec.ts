@@ -59,8 +59,9 @@ test.describe('Painel Admin — dados reais do banco', () => {
     await signInAdmin(page);
     await page.goto('/');
 
-    // A visao geral do admin deve aparecer
-    await expect(page.getByText('Visão Geral', { exact: false }).first()).toBeVisible({ timeout: 20000 });
+    // A visao geral do admin deve aparecer no conteudo, nao no item da navegacao
+    // inferior (que fica oculto em ecras largos).
+    await expect(page.getByRole('heading', { name: /Visão geral/i }).first()).toBeVisible({ timeout: 20000 });
 
     // Os KPIs reais devem aparecer — e NAO os numeros fabricados antigos.
     // Os totais sao lidos da API em tempo de execucao para que o teste nao
@@ -76,9 +77,11 @@ test.describe('Painel Admin — dados reais do banco', () => {
     await expect(body).not.toContainText('25.430');
     await expect(body).not.toContainText('3.820');
 
-    // Navegar para a aba Utilizadores
+    // Navegar para a aba Utilizadores e abrir a lista completa de contas
     await page.getByRole('button', { name: /Utilizadores/i }).first().click();
-    await expect(page.getByText('Utilizadores da plataforma')).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole('heading', { name: 'Utilizadores', exact: true }).first()).toBeVisible({ timeout: 20000 });
+    await page.getByRole('button', { name: /^Todas as contas/ }).first().click();
+    await expect(page.getByRole('heading', { name: 'Visão geral de utilizadores' })).toBeVisible({ timeout: 20000 });
     await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 20000 });
   });
 });

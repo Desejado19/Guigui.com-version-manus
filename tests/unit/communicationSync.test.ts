@@ -41,6 +41,44 @@ describe('communication synchronization', () => {
     await expect(syncCommunicationData('business')).rejects.toThrow('network offline');
   });
 
+  it('a administração pede os pedidos de suporte reais em vez de listas vazias', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ conversations: [], messages: [] }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ tickets: [{
+        id: 'SUP-1',
+        requester_user_id: 'u-1',
+        category: 'other',
+        subject: 'Preciso de ajuda',
+        description: 'Pedido enviado por um cidadão.',
+        status: 'open',
+        created_at: '2026-01-01T10:00:00.000Z',
+        updated_at: '2026-01-01T10:00:00.000Z',
+        replies: [],
+      }] }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await syncCommunicationData('admin');
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/conversations');
+    expect(fetchMock).toHaveBeenCalledWith('/api/support/tickets/mine');
+    expect(result).toMatchObject({
+      kind: 'updated',
+      supportRequests: [{ id: 'SUP-1', subject: 'Preciso de ajuda', requesterId: 'u-1', requesterRole: 'user' }],
+    });
+  });
+
+  it('marca o requerente empresa quando o pedido tem empresa associada', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ conversations: [], messages: [] }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ tickets: [{
+        id: 'SUP-2', requester_user_id: 'u-2', business_id: 'biz-1', category: 'other', subject: 'Conta da empresa',
+        status: 'open', created_at: '2026-01-01T10:00:00.000Z', updated_at: '2026-01-01T10:00:00.000Z', replies: [],
+      }] }) }));
+
+    const result = await syncCommunicationData('admin');
+    expect(result).toMatchObject({ supportRequests: [{ id: 'SUP-2', requesterRole: 'business' }] });
+  });
+
   it('maps conversations, messages, and support tickets', async () => {
     vi.stubGlobal('fetch', vi.fn()
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ conversations: [{ id: 'c-1', user_id: 'u-1', business_id: 'b-1', subject: 'Ajuda', last_message: 'Olá', created_at: '2026-01-01', updated_at: '2026-01-02', unread_for_user: true, unread_for_business: false }], messages: [] }) })

@@ -145,7 +145,7 @@ export const EventAlertsManager: React.FC<EventAlertsManagerProps> = ({
           <div className="font-bold text-emerald-400 mb-1">Simulação de SMS Local</div>
           <p>{smsSimulatedNotice}</p>
         </div>
-        <button type="button" onClick={() => setSmsSimulatedNotice(null)} className="text-slate-400 hover:text-white">
+        <button type="button" onClick={() => setSmsSimulatedNotice(null)} className="text-slate-400 dark:text-slate-500 hover:text-white">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -192,7 +192,7 @@ export const EventAlertsManager: React.FC<EventAlertsManagerProps> = ({
 
         {/* Event Summary Body */}
         <div className="py-3 flex gap-3 sm:gap-4 items-center">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100 dark:bg-slate-800">
             <img
               src={activeToast.eventCover}
               alt={activeToast.eventTitle}
@@ -216,7 +216,7 @@ export const EventAlertsManager: React.FC<EventAlertsManagerProps> = ({
               </span>
             </div>
 
-            <p className="text-[10px] text-slate-400 truncate">
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
               Organização: <strong>{activeToast.organizerName}</strong>
             </p>
           </div>

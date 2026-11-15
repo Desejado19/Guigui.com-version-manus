@@ -590,12 +590,242 @@ describe('registo público de contas e empresas', () => {
     expect(health.status).toBe(200);
   });
 
-  it('reports healthy local JSON mode when PostgreSQL is not configured', async () => {
+  it('publica apenas saúde mínima sem detalhes internos', async () => {
     const response = await getJson('/api/health', undefined);
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
+    const body = await response.json() as Record<string, unknown>;
+    expect(body).toMatchObject({
       status: 'ok',
-      database: { configured: false, connected: false },
+      app: 'Guigui.com Bissau',
     });
+    expect(body).not.toHaveProperty('database');
+    expect(body).not.toHaveProperty('observability');
+    expect(body).not.toHaveProperty('geminiActive');
+  });
+});
+
+describe('leitura do estado da plataforma sem sessão', () => {
+  it('não expõe a configuração do modelo de negócio a visitantes', async () => {
+    const response = await getJson('/api/app-state/guigui_admin_business_model_config', undefined);
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({ code: 'AUTHENTICATION_REQUIRED' });
+  });
+
+  it('nega a configuração do modelo de negócio a cidadãos e empresas', async () => {
+    const citizen = await login('cidadao-tres@test.guigui', 'CorrectHorse42');
+    const citizenResponse = await getJson('/api/app-state/guigui_admin_business_model_config', citizen);
+    expect(citizenResponse.status).toBe(403);
+    await expect(citizenResponse.json()).resolves.toMatchObject({ code: 'APP_STATE_READ_FORBIDDEN' });
+
+    const business = await login('empresa-um@test.guigui', 'CorrectHorse42');
+    const businessResponse = await getJson('/api/app-state/guigui_admin_business_model_config', business);
+    expect(businessResponse.status).toBe(403);
+    await expect(businessResponse.json()).resolves.toMatchObject({ code: 'APP_STATE_READ_FORBIDDEN' });
+  });
+
+  it('mantém a configuração do modelo de negócio legível e gravável pela administração', async () => {
+    const cookie = await login('admin-teste@test.guigui', 'CorrectHorse42');
+    const response = await getJson('/api/app-state/guigui_admin_business_model_config', cookie);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ key: 'guigui_admin_business_model_config' });
+  });
+
+  it('mantém públicos os catálogos e o directório sem sessão', async () => {
+    for (const key of ['guigui_businesses', 'guigui_events', 'guigui_promotions', 'guigui_subscription_plans', 'guigui_monetization_catalog']) {
+      const response = await getJson(`/api/app-state/${key}`, undefined);
+      expect(response.status, key).toBe(200);
+    }
+  });
+});
+
+describe('autorização antes da validação do corpo', () => {
+  it('nega uma empresa com corpo inválido em ficha de outra empresa (403, não 400)', async () => {
+    const cookie = await login('empresa-um@test.guigui', 'CorrectHorse42');
+    // Sem o campo `name`, o corpo é inválido — mas a posse deve ser decidida primeiro.
+    const response = await postJson('/api/businesses', cookie, { id: 'biz-2' });
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ code: 'BUSINESS_SCOPE_REQUIRED' });
+  });
+
+  it('nega um cidadão com corpo inválido em empresa (403, não 400)', async () => {
+    const cookie = await login('cidadao-tres@test.guigui', 'CorrectHorse42');
+    const response = await postJson('/api/businesses', cookie, {});
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ code: 'BUSINESS_WRITE_FORBIDDEN' });
+  });
+
+  it('nega um cidadão com corpo inválido em eventos (403, não 400)', async () => {
+    const cookie = await login('cidadao-tres@test.guigui', 'CorrectHorse42');
+    const response = await postJson('/api/events', cookie, {});
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ code: 'EVENT_WRITE_FORBIDDEN' });
+  });
+
+  it('mantém 400 para empresa com posse e corpo inválido', async () => {
+    const cookie = await login('empresa-um@test.guigui', 'CorrectHorse42');
+    // Empresa biz-1 a criar evento sem campos: autorizada, depois 400.
+    const event = await postJson('/api/events', cookie, {});
+    expect(event.status).toBe(400);
+    // Empresa biz-1 a gravar a sua ficha sem nome: autorizada, depois 400.
+    const profile = await postJson('/api/businesses', cookie, { id: 'biz-1' });
+    expect(profile.status).toBe(400);
+  });
+});
+
+describe('auditoria: autorização antes da validação do corpo (restantes rotas)', () => {
+  it('campanhas: empresa alheia com corpo inválido recebe 403 (não 400)', async () => {
+    const cookie = await login('empresa-um@test.guigui', 'CorrectHorse42');
+    // biz-2 não é desta empresa: deve ser 403 mesmo sem id/name.
+    const foreign = await postJson('/api/marketing/campaigns', cookie, { businessId: 'biz-2' });
+    expect(foreign.status).toBe(403);
+    await expect(foreign.json()).resolves.toMatchObject({ error: 'A campanha não pertence à empresa autenticada.' });
+    // Dona com corpo inválido: continua 400.
+    const own = await postJson('/api/marketing/campaigns', cookie, { businessId: 'biz-1' });
+    expect(own.status).toBe(400);
+    // Dona com corpo válido: sucesso.
+    const valid = await postJson('/api/marketing/campaigns', cookie, { businessId: 'biz-1', id: 'cmp-1', name: 'Campanha' });
+    expect(valid.status).toBe(201);
+  });
+
+  it('promoções: empresa alheia com corpo inválido recebe 403', async () => {
+    const cookie = await login('empresa-um@test.guigui', 'CorrectHorse42');
+    const foreign = await postJson('/api/marketing/promotions', cookie, { businessId: 'biz-2' });
+    expect(foreign.status).toBe(403);
+    await expect(foreign.json()).resolves.toMatchObject({ error: 'A promoção não pertence à empresa autenticada.' });
+    const own = await postJson('/api/marketing/promotions', cookie, { businessId: 'biz-1' });
+    expect(own.status).toBe(400);
+  });
+
+  it('agendamentos: não pode agendar itens para outra empresa (403 com corpo inválido)', async () => {
+    const cookie = await login('empresa-um@test.guigui', 'CorrectHorse42');
+    const foreign = await postJson('/api/marketing/scheduled-items', cookie, { businessId: 'biz-2' });
+    expect(foreign.status).toBe(403);
+    await expect(foreign.json()).resolves.toMatchObject({ error: 'O agendamento não pertence à empresa autenticada.' });
+    const own = await postJson('/api/marketing/scheduled-items', cookie, { businessId: 'biz-1' });
+    expect(own.status).toBe(400);
+  });
+
+  it('pedidos comerciais: empresa alheia com corpo inválido recebe 403', async () => {
+    const cookie = await login('empresa-um@test.guigui', 'CorrectHorse42');
+    const foreign = await postJson('/api/monetization/requests', cookie, { businessId: 'biz-2', kind: 'advertising' });
+    expect(foreign.status).toBe(403);
+    await expect(foreign.json()).resolves.toMatchObject({ error: 'O pedido não pertence à empresa autenticada.' });
+    const own = await postJson('/api/monetization/requests', cookie, { businessId: 'biz-1', kind: 'advertising' });
+    expect(own.status).toBe(400);
+  });
+
+  it('convites de equipa: empresa alheia com corpo inválido recebe 403', async () => {
+    const cookie = await login('empresa-um@test.guigui', 'CorrectHorse42');
+    const foreign = await postJson('/api/business/team/invitations', cookie, { businessId: 'biz-2' });
+    expect(foreign.status).toBe(403);
+    await expect(foreign.json()).resolves.toMatchObject({ code: 'BUSINESS_INVITATION_FORBIDDEN' });
+  });
+
+  it('resposta a avaliação: empresa sem negócio com corpo inválido recebe 403', async () => {
+    const cookie = await login('sem-empresa@test.guigui', 'CorrectHorse42');
+    const response = await postJson('/api/reviews/review-x/reply', cookie, { ownerReply: 'x' });
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ code: 'REVIEW_REPLY_FORBIDDEN' });
+  });
+
+  it('cancelamento de bilhetes: empresa sem negócio com corpo inválido recebe 403', async () => {
+    const cookie = await login('sem-empresa@test.guigui', 'CorrectHorse42');
+    const response = await postJson('/api/tickets/cancel', cookie, {});
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ code: 'BUSINESS_ACCOUNT_REQUIRED' });
+  });
+
+  it('compra de bilhetes: anónimo com corpo inválido recebe 401 (não 400)', async () => {
+    const response = await postJson('/api/tickets/purchase', undefined, {});
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({ code: 'AUTHENTICATION_REQUIRED' });
+    const cookie = await login('cidadao-tres@test.guigui', 'CorrectHorse42');
+    const invalid = await postJson('/api/tickets/purchase', cookie, {});
+    expect(invalid.status).toBe(400);
+  });
+
+  it('resposta de suporte: sem acesso com corpo inválido recebe 403 (não 400)', async () => {
+    // Nota: cidadao-um e cidadao-dois são mutados pelo bloco "account lifecycle
+    // security" acima (desactivação/eliminação) — usa contas estáveis aqui.
+    const ownerCookie = await login('cidadao-tres@test.guigui', 'CorrectHorse42');
+    const ticketResponse = await postJson('/api/support/tickets', ownerCookie, { subject: 'Problema', description: 'Detalhe' });
+    expect(ticketResponse.status).toBe(201);
+    const ticket = await ticketResponse.json() as { ticket: { id: string } };
+
+    const otherCookie = await login('cidadao-quatro@test.guigui', 'CorrectHorse42');
+    const foreign = await postJson(`/api/support/tickets/${ticket.ticket.id}/replies`, otherCookie, {});
+    expect(foreign.status).toBe(403);
+    await expect(foreign.json()).resolves.toMatchObject({ error: 'Sem acesso a este pedido de suporte.' });
+    const own = await postJson(`/api/support/tickets/${ticket.ticket.id}/replies`, ownerCookie, {});
+    expect(own.status).toBe(400);
+  });
+
+  it('scanner: código de portaria inválido com âmbito em falta recebe 403 (não 400)', async () => {
+    const cookie = await login('empresa-um@test.guigui', 'CorrectHorse42');
+    const wrongCode = await postJson('/api/tickets/scanner-auth', cookie, { doorCode: 'wrong-code' });
+    expect(wrongCode.status).toBe(403);
+    await expect(wrongCode.json()).resolves.toMatchObject({ code: 'SCANNER_UNAUTHORIZED' });
+    const wrongManifest = await postJson('/api/tickets/offline-manifest', cookie, { doorCode: 'wrong-code' });
+    expect(wrongManifest.status).toBe(403);
+    const wrongValidate = await postJson('/api/tickets/validate', cookie, { doorCode: 'wrong-code' });
+    expect(wrongValidate.status).toBe(403);
+  });
+
+  it('campanhas (PATCH): estado inválido continua 400 para a empresa dona', async () => {
+    const cookie = await login('empresa-um@test.guigui', 'CorrectHorse42');
+    const invalid = await fetch(`${baseUrl}/api/marketing/campaigns/camp-x`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ status: 'bogus' }),
+    });
+    expect(invalid.status).toBe(400);
+    const valid = await fetch(`${baseUrl}/api/marketing/campaigns/camp-x`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ status: 'draft' }),
+    });
+    expect(valid.status).toBe(200);
+    const asCitizen = await fetch(`${baseUrl}/api/marketing/campaigns/camp-x`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Cookie: await login('cidadao-tres@test.guigui', 'CorrectHorse42') },
+      body: JSON.stringify({ status: 'draft' }),
+    });
+    expect(asCitizen.status).toBe(403);
+  });
+
+  it('resposta a avaliação: a empresa só responde a avaliações suas (403 a outra empresa)', async () => {
+    const citizenCookie = await login('cidadao-tres@test.guigui', 'CorrectHorse42');
+    const phone = `+245955${String(Date.now()).slice(-7)}`;
+    const created = await postJson('/api/businesses/biz-1/reviews', citizenCookie, {
+      qualitativeScore: 'gostei',
+      comment: 'Prova de posse da resposta.',
+      authorName: 'Autor Prova',
+      authorPhone: phone,
+    });
+    expect(created.status).toBe(201);
+    const createdBody = await created.json() as { review: { id: string } };
+    const reviewId = createdBody.review.id;
+
+    // Empresa de outra ficha (biz-2) NÃO pode responder — 403, e a fila de
+    // reviews nunca é alterada (anti-escalação de resposta no troco).
+    const foreign = await postJson(`/api/reviews/${reviewId}/reply`, await login('empresa-dois@test.guigui', 'CorrectHorse42'), {
+      ownerReply: 'Queria responder aqui.',
+    });
+    expect(foreign.status).toBe(403);
+    await expect(foreign.json()).resolves.toMatchObject({ code: 'REVIEW_REPLY_FORBIDDEN' });
+
+    // Cidadão não pode responder (gate de papel).
+    const asCitizen = await postJson(`/api/reviews/${reviewId}/reply`, citizenCookie, {
+      ownerReply: 'Sou cidadã.',
+    });
+    expect(asCitizen.status).toBe(403);
+
+    // A empresa dona responde — 200.
+    const owner = await postJson(`/api/reviews/${reviewId}/reply`, await login('empresa-um@test.guigui', 'CorrectHorse42'), {
+      ownerReply: 'Obrigado pela avaliação.',
+    });
+    expect(owner.status).toBe(200);
+    const ownerBody = await owner.json() as { review: { ownerReply?: string } };
+    expect(ownerBody.review.ownerReply).toBe('Obrigado pela avaliação.');
   });
 });

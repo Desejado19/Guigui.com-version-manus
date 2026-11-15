@@ -113,7 +113,10 @@ test.describe('PostgreSQL marketplace', () => {
     await expect(directoryButton).toBeVisible();
     await directoryButton.click();
 
-    const categoryFilter = page.getByRole('button', { name: 'Restauração e Bebidas' });
+    const categoryMenu = page.getByRole('button', { name: /Filtrar por categoria/i });
+    await expect(categoryMenu).toBeVisible();
+    await categoryMenu.click();
+    const categoryFilter = page.getByRole('option', { name: 'Restauração e Bebidas' });
     await expect(categoryFilter).toBeVisible();
     await categoryFilter.click();
 

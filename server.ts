@@ -19,7 +19,9 @@ import {
 import {
   createIdentityAccess,
   createSessionAccessMiddleware,
+  listUserSessions,
   resolveSessionContext,
+  revokeUserSessionById,
   SESSION_COOKIE_NAME,
   type BusinessTeamPermissions,
   type BusinessTeamRole,
@@ -31,25 +33,84 @@ import { createPaymentAdapters } from './server/paymentService';
 import { localizeApiPayload, resolveRequestLanguage } from './server/i18n';
 import { LANGUAGE_CYCLE } from './src/utils/i18n';
 import { getBusinessProfileCompletion } from './src/utils/businessProfile';
+import {
+  accessFromLegacyPermissions,
+  canPerformAction,
+  legacyPermissionsFromAccess,
+  normalizeTeamAccess,
+  type TeamModuleAccess,
+} from './src/config/teamAccess';
+import {
+  createAdminStaff,
+  createCompanyMember,
+  findCompanyMember,
+  listAccessActivity,
+  listAdminStaff,
+  listCompanyMembers,
+  recordAccessChange,
+  removeAdminStaff,
+  removeCompanyMember,
+  updateAdminStaff,
+  updateCompanyMember,
+} from './server/teamAccessService';
 import { addSubscriptionPeriod } from './src/utils/subscriptions';
 import { checkDatabaseConnection, databaseConfigured, databasePool } from './server/db';
+import {
+  FinanceError,
+  authorizeRefund,
+  createReconciliation,
+  createRefund,
+  getFinanceStatements,
+  getFinanceSummary,
+  getFinanceTransaction,
+  getOperatorOverview,
+  listFinanceTransactions,
+  listOperationalAlerts,
+  listPendingPayments,
+  listReconciliations,
+  listRefunds,
+  processRefund,
+  recordPendingAction,
+  rejectRefund,
+  updateOperatorConfig,
+  updateReconciliation,
+} from './server/financeAdminService';
 import { createCategoryRouter } from './server/categoryRoutes';
+import { createStoryRouter } from './server/storyRoutes';
 import { createHealthHandler } from './server/modules/platform-foundation/http/healthHandler';
+import { createHttpCompressionMiddleware } from './server/httpCompression';
 import { loadPlatformRuntimeConfig } from './server/modules/platform-foundation/config/platformRuntimeConfig';
 import { BUSINESS_ROLE_PERMISSIONS } from './src/utils/businessPermissions';
 import { activatePostgresTicketReservations, findPostgresTicket, listPostgresTicketsForUser, markPostgresTicketUsed, persistPostgresTickets, releaseExpiredPostgresTicketReservations } from './server/postgresTicketService';
-import { listPostgresTicketsForCompany } from './server/postgresTicketLifecycleService';
+import { cancelPostgresTicket, findPostgresTicketForLifecycle, listPostgresTicketsForCompany } from './server/postgresTicketLifecycleService';
 import { buildOfflineManifest, syncOfflineValidations, type OfflineValidationRecord } from './server/offlineScannerService';
 import { listPostgresPayments, persistPostgresPayment, recordPostgresPaymentEvent } from './server/postgresPaymentService';
 import { persistPostgresAudit } from './server/postgresAuditService';
 import { findPostgresModeration, listPostgresModeration, persistPostgresModeration, persistPostgresModerationReview } from './server/postgresModerationService';
-import { createPostgresConversation, createPostgresConversationMessage, createPostgresSupportReply, listPostgresConversations, listPostgresNotifications, listPostgresSupportTickets, markPostgresConversationRead, markPostgresNotificationRead, persistPostgresNotification, persistPostgresSupportTicket, updatePostgresSupportStatus } from './server/postgresCommunicationService';
+import { canAccessSupportTicket, createPostgresConversation, createPostgresConversationMessage, createPostgresSupportReply, getConversationParticipants, getSupportTicketParticipants, listPostgresConversations, listPostgresNotifications, listPostgresSupportTickets, markPostgresConversationRead, markPostgresNotificationRead, persistPostgresNotification, persistPostgresSupportTicket, updatePostgresSupportStatus } from './server/postgresCommunicationService';
 import { markPostgresMonetizationRefunded, persistPostgresMonetization } from './server/postgresMonetizationService';
 import { persistPostgresCatalog } from './server/postgresCatalogService';
 import { createPostgresReview, flagPostgresReview, isReviewAllowed, listPostgresReviews, moderatePostgresReview, replyPostgresReview } from './server/postgresReviewService';
 import { normaliseReviewComment, validateReviewInput } from './src/utils/reviews';
-import { assignPostgresBusinessOwner, decidePostgresBusiness, deletePostgresBusiness, getAppState, InvalidFeaturedBusinessOrderError, listPendingPostgresBusinesses, listPostgresBusinesses, listPostgresEvents, persistPostgresBusiness, persistPostgresEvent, setAppState, setPostgresBusinessFeaturedOrder, updatePostgresBusinessProfile } from './server/postgresBusinessService';
+import { assignPostgresBusinessOwner, decidePostgresBusiness, deletePostgresBusiness, getAppState, getPostgresBusiness, InvalidFeaturedBusinessOrderError, listPendingPostgresBusinesses, listPostgresBusinesses, listPostgresEvents, persistPostgresBusiness, persistPostgresEvent, setAppState, setPostgresBusinessFeaturedOrder, updatePostgresBusinessProfile } from './server/postgresBusinessService';
 
+import {
+  addPostComment,
+  isPostReactionType,
+  listPostEngagements,
+  registerPostReply,
+  registerPostShare,
+  setPostReaction,
+} from './server/postEngagementService';
+import { onRealtimeEvent, publishRealtime, realtimeStatus, startRealtimeListener } from './server/realtimeBus';
+import { locationMatches } from './shared/bissauLocations';
+import {
+  LocationCatalogError,
+  createLocation,
+  listLocationCatalog,
+  setLocationActive,
+  updateLocation,
+} from './server/locationCatalogService';
 import { consumeDistributedRateLimit } from './server/rateLimitService';
 import { createPostgresObservabilityRepository } from './server/modules/platform-foundation/observability/adapters/postgresObservabilityRepository';
 import { createObservabilityHandlers } from './server/modules/platform-foundation/observability/http/observabilityHandlers';
@@ -58,7 +119,7 @@ import { HttpMetricsRegistry } from './server/modules/platform-foundation/observ
 import { getProductFunnel, persistProductEvent } from './server/productAnalyticsService';
 import { canViewTransaction, resolveTransactionAccess } from './server/paymentAccessService';
 import { listOwnedTickets } from './server/ticketAccessService';
-import { resolveAppStateValue, resolveAppStateWrite, resolveBusinessWrite, resolveEventWrite } from './server/platformWriteAccess';
+import { isPublicAppStateKey, readAppStateForSession, resolveAppStateValue, resolveAppStateWrite, resolveBusinessScope, resolveBusinessWrite, resolveEventWrite, visibleConversationIds } from './server/platformWriteAccess';
 import { startBackupScheduler, triggerLocalBackup } from './server/backupService';
 import { describeSmsGateway } from './server/smsGatewayService';
 import { deliverConfirmedTicketPurchase } from './server/ticketPurchaseDeliveryService';
@@ -78,13 +139,72 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const emailDelivery = createSimulatedEmailAdapter();
 const smsDelivery = createSimulatedSmsAdapter();
-const communicationStreams = new Set<import('express').Response>();
-const broadcastCommunication = (event: string, payload: Record<string, unknown>) => {
-  const data = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
-  communicationStreams.forEach((stream) => {
-    try { stream.write(data); } catch { communicationStreams.delete(stream); }
+type CommunicationSubscriber = {
+  userId: string;
+  role: 'user' | 'business' | 'admin';
+  businessId: string | null;
+};
+type CommunicationRecipients = { userId?: string | null; businessId?: string | null };
+// Cada ligação SSE pertence a um participante. Os sinais de conversas e tickets
+// só são escritos nas ligações de quem participa neles.
+const communicationStreams = new Map<import('express').Response, CommunicationSubscriber>();
+const communicationStreamReaches = (
+  subscriber: CommunicationSubscriber,
+  event: string,
+  recipients: CommunicationRecipients,
+) => {
+  if (recipients.userId && subscriber.userId === recipients.userId) return true;
+  if (recipients.businessId && subscriber.role === 'business' && subscriber.businessId === recipients.businessId) return true;
+  // A administração acompanha os pedidos de suporte, mas não as conversas comerciais.
+  return event === 'support' && subscriber.role === 'admin';
+};
+// Publica no canal partilhado; a entrega às ligações SSE locais é feita
+// pelo consumidor registado abaixo, em todas as instâncias.
+const broadcastCommunication = (event: string, payload: Record<string, unknown>, recipients: CommunicationRecipients) => {
+  void publishRealtime('communication', {
+    event,
+    payload,
+    userId: recipients.userId ?? null,
+    businessId: recipients.businessId ?? null,
   });
 };
+const postEngagementStreams = new Set<import('express').Response>();
+const broadcastPostEngagement = (payload: { postId: string }) => {
+  void publishRealtime('post_engagement', payload);
+};
+const writeRealtimeStream = (streams: Set<import('express').Response>, data: string) => {
+  streams.forEach((stream) => {
+    try { stream.write(data); } catch { streams.delete(stream); }
+  });
+};
+
+onRealtimeEvent((envelope) => {
+  if (envelope.type === 'post_engagement') {
+    writeRealtimeStream(postEngagementStreams, `event: engagements\ndata: ${JSON.stringify(envelope.payload)}\n\n`);
+    return;
+  }
+  if (envelope.type === 'communication') {
+    const wrapper = envelope.payload as {
+      event?: string;
+      payload?: Record<string, unknown>;
+      userId?: string | null;
+      businessId?: string | null;
+    };
+    if (!wrapper.event || !wrapper.payload) return;
+    // Sinal sem destinatários não é reencaminhado: sem isto voltaria a chegar a todos.
+    const recipients: CommunicationRecipients = {
+      userId: typeof wrapper.userId === 'string' ? wrapper.userId : null,
+      businessId: typeof wrapper.businessId === 'string' ? wrapper.businessId : null,
+    };
+    if (!recipients.userId && !recipients.businessId) return;
+    const data = `event: ${wrapper.event}\ndata: ${JSON.stringify(wrapper.payload)}\n\n`;
+    communicationStreams.forEach((subscriber, stream) => {
+      if (!communicationStreamReaches(subscriber, wrapper.event as string, recipients)) return;
+      try { stream.write(data); } catch { communicationStreams.delete(stream); }
+    });
+  }
+});
+
 const runtimeConfig = loadPlatformRuntimeConfig(process.env);
 const PORT = runtimeConfig.port;
 const isProduction = runtimeConfig.isProduction;
@@ -120,6 +240,12 @@ const observabilityHandlers = createObservabilityHandlers({
 });
 
 app.disable('x-powered-by');
+// gzip/brotli para JSON e outros corpos de texto; SSE e ficheiros em streaming passam intactos.
+app.use(createHttpCompressionMiddleware({
+  minBytes: 1024,
+  // Cache curta do corpo comprimido; TTL 0 desliga-a (útil para comparar).
+  cacheTtlMs: Number(process.env.HTTP_COMPRESSION_CACHE_TTL_MS ?? 5000),
+}));
 // Middleware anti-cache para forçar o navegador a buscar tudo novo (resolve tela branca por cache/Service Worker)
 app.use((req, res, next) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -191,11 +317,9 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 // 8 workers paralelos a carregar páginas e logins pelo mesmo IP) o limite
 // padrão gerava respostas 429 em cascata e pendurava os testes de e2e.
 const RATE_LIMIT_MAX_REQUESTS = isProduction ? 1000 : 30_000;
-// Endpoints de app-state são chamadas de leitura em lote da SPA; excluindo-os
-// do rate limit geral evitamos 429 em cascata no carregamento inicial.
-const APP_STATE_PREFIX = '/api/app-state/';
+// O prefixo /api/app-state/ não é excluído do rate limit: as leituras em
+// lote da SPA continuam sujeitas à mesma proteção que as restantes rotas /api.
 app.use('/api', async (req, res, next) => {
-  if (req.url.startsWith(APP_STATE_PREFIX)) return next();
   const key = req.ip || req.socket.remoteAddress || 'unknown';
   const now = Date.now();
   const current = requestWindows.get(key);
@@ -427,6 +551,113 @@ const { sessionContext, requireSession, requireRole } = createSessionAccessMiddl
   },
 });
 
+// ---------------------------------------------------------------------------
+// Autorização por módulo (RBAC): regras centralizadas para empresas e admin.
+// Aplicam-se apenas a contas restringidas; titulares e administradores sem
+// restrições definidas mantêm o acesso anterior.
+// ---------------------------------------------------------------------------
+type RouteRule = { pattern: RegExp; module: string; action?: Partial<Record<string, 'view' | 'create' | 'edit' | 'delete' | 'approve' | 'reject' | 'publish' | 'export' | 'manage'>> };
+
+const BUSINESS_API_RULES: RouteRule[] = [
+  { pattern: /^\/api\/marketing\/campaigns(\/|$)/, module: 'marketing', action: { GET: 'view', POST: 'create', PATCH: 'edit', PUT: 'edit', DELETE: 'delete' } },
+  { pattern: /^\/api\/marketing\/promotions(\/|$)/, module: 'marketing', action: { GET: 'view', POST: 'create', PATCH: 'edit', DELETE: 'delete' } },
+  { pattern: /^\/api\/marketing\/scheduled-items(\/|$)/, module: 'marketing', action: { GET: 'view', POST: 'create', PATCH: 'edit', DELETE: 'delete' } },
+  { pattern: /\/publish-now$/, module: 'marketing', action: { POST: 'publish' } },
+  { pattern: /\/api\/businesses\/[^/]+\/profile$/, module: 'my_business', action: { GET: 'view', PATCH: 'edit', PUT: 'edit' } },
+  { pattern: /^\/api\/businesses\/[^/]+\/post-metrics$/, module: 'marketing', action: { GET: 'view' } },
+  { pattern: /^\/api\/tickets\/sold$/, module: 'tickets', action: { GET: 'view' } },
+  { pattern: /^\/api\/tickets\/scanner-auth$/, module: 'tickets', action: { POST: 'view' } },
+  { pattern: /^\/api\/tickets\/offline-manifest$/, module: 'tickets', action: { POST: 'view' } },
+  { pattern: /^\/api\/tickets\/validate/, module: 'tickets', action: { POST: 'approve' } },
+  { pattern: /^\/api\/payments\/transactions$/, module: 'billing', action: { GET: 'view' } },
+  { pattern: /^\/api\/monetization\/wallet\/[^/]+$/, module: 'billing', action: { GET: 'view' } },
+  { pattern: /^\/api\/monetization\/requests$/, module: 'billing', action: { GET: 'view', POST: 'create' } },
+  { pattern: /^\/api\/business\/team(\/|$)/, module: 'team', action: { GET: 'view', POST: 'manage', PATCH: 'manage', PUT: 'manage', DELETE: 'manage' } },
+  { pattern: /^\/api\/security\/events$/, module: 'security', action: { GET: 'view' } },
+  { pattern: /^\/api\/auth\/sessions(\/|$)/, module: 'security', action: { GET: 'view', DELETE: 'manage', POST: 'manage' } },
+  { pattern: /^\/api\/exports?(\/|$)/, module: 'export', action: { GET: 'export', POST: 'export' } },
+];
+
+const ADMIN_API_RULES: RouteRule[] = [
+  { pattern: /^\/api\/admin\/users(\/|$)/, module: 'users', action: { GET: 'view', POST: 'edit', PATCH: 'edit', PUT: 'edit', DELETE: 'delete' } },
+  { pattern: /^\/api\/admin\/businesses(\/|$)/, module: 'businesses', action: { GET: 'view', POST: 'approve', PATCH: 'edit', PUT: 'approve', DELETE: 'delete' } },
+  { pattern: /^\/api\/admin\/audit-logs$/, module: 'audit_logs', action: { GET: 'view' } },
+  { pattern: /^\/api\/admin\/moderation-logs$/, module: 'moderation', action: { GET: 'view' } },
+  { pattern: /^\/api\/reviews\/[^/]+\/moderate$/, module: 'moderation', action: { POST: 'approve' } },
+  { pattern: /^\/api\/admin\/payments$/, module: 'financials', action: { GET: 'view' } },
+  { pattern: /^\/api\/admin\/stats$/, module: 'overview', action: { GET: 'view' } },
+  { pattern: /^\/api\/admin\/product-funnel$/, module: 'reports', action: { GET: 'view' } },
+  { pattern: /^\/api\/admin\/categories(\/|$)/, module: 'categories', action: { GET: 'view', POST: 'create', PATCH: 'edit', PUT: 'edit', DELETE: 'delete' } },
+  { pattern: /^\/api\/admin\/locations(\/|$)/, module: 'categories', action: { GET: 'view', POST: 'create', PATCH: 'edit', PUT: 'edit', DELETE: 'delete' } },
+  { pattern: /^\/api\/monetization\/catalog$/, module: 'pricing', action: { GET: 'view', PUT: 'manage' } },
+  { pattern: /^\/api\/admin\/team(\/|$)/, module: 'admin_staff', action: { GET: 'view', POST: 'create', PATCH: 'edit', DELETE: 'delete' } },
+];
+
+/** Acesso efectivo de um colaborador empresarial; `null` significa acesso total (titular). */
+async function effectiveBusinessAccess(userId: string): Promise<{ access: TeamModuleAccess | null; businessId?: string; status?: string }> {
+  const stored = await identityAccess.findById(userId);
+  if (!stored) return { access: {} };
+  const restricted = Boolean(stored.teamRole || stored.teamAccess || stored.teamPermissions);
+  if (!restricted) return { access: null, businessId: stored.businessId, status: stored.accessStatus };
+  const access = stored.teamAccess
+    || accessFromLegacyPermissions(stored.teamPermissions)
+    || {};
+  return { access, businessId: stored.businessId, status: stored.accessStatus };
+}
+
+async function effectiveAdminAccess(userId: string): Promise<TeamModuleAccess | null> {
+  const stored = await identityAccess.findById(userId);
+  if (!stored) return {};
+  return stored.adminAccess ? stored.adminAccess : null;
+}
+
+function ruleFor(rules: RouteRule[], method: string, path: string): RouteRule | undefined {
+  return rules.find((rule) => rule.pattern.test(path));
+}
+
+app.use('/api', async (req, res, next) => {
+  if (req.method === 'OPTIONS') return next();
+  const path = req.originalUrl.split('?')[0];
+  const rules = [...BUSINESS_API_RULES, ...ADMIN_API_RULES];
+  const rule = ruleFor(rules, req.method, path);
+  if (!rule) return next();
+  const context = await sessionContext(req);
+  if (!context) return next();
+
+  let allowed = true;
+  if (context.role === 'business') {
+    const effective = await effectiveBusinessAccess(context.userId);
+    if (effective.access) {
+      const action = rule.action?.[req.method] || 'view';
+      allowed = canPerformAction(effective.access, rule.module, action);
+      if (allowed && (effective.status === 'suspended' || effective.status === 'disabled')) allowed = false;
+    }
+  } else if (context.role === 'admin') {
+    const adminAccess = await effectiveAdminAccess(context.userId);
+    if (adminAccess) {
+      const action = rule.action?.[req.method] || 'view';
+      allowed = canPerformAction(adminAccess, rule.module, action);
+    }
+  }
+
+  if (allowed) return next();
+  recordAudit({
+    action: 'authorization_denied',
+    resource: rule.module,
+    resourceId: path,
+    actorRole: context.role === 'user' ? 'citizen' : context.role,
+    actorId: context.userId,
+    success: false,
+    requestId: requestIdFrom(req),
+    metadata: { requiredModule: rule.module, method: req.method },
+  });
+  return res.status(403).json({
+    error: 'Não tem autorização para acessar este módulo. Contacte o responsável da sua conta.',
+    code: 'MODULE_FORBIDDEN',
+    module: rule.module,
+  });
+});
+
 function recordAudit(entry: Omit<AuditEntry, 'id' | 'requestId' | 'createdAt'> & { requestId?: string }): AuditEntry {
   const auditEntry = createAuditEntry(entry);
   securityAuditLogs.unshift(auditEntry);
@@ -518,6 +749,9 @@ for (const ticket of ticketsDb.values() as Iterable<TicketForValidation>) {
 persistTickets();
 
 // API Routes
+// Saúde pública da plataforma: o marketplace usa `database.configured` para
+// escolher entre PostgreSQL e o modo local, e /metrics/system-health dependem
+// do mesmo formato. Apenas booleanos de estado são expostos, nunca credenciais.
 app.get('/api/health', createHealthHandler({
   databaseConfigured,
   checkDatabaseConnection,
@@ -528,20 +762,31 @@ app.get('/api/health', createHealthHandler({
 
 app.get('/api/marketing/scheduled-items', requireRole('business', 'admin'), async (req, res) => {
     const context = await sessionContext(req);
-    const businessId = typeof req.query.businessId === 'string' ? req.query.businessId : undefined;
-    if (context?.role === 'business' && !businessId) return res.status(400).json({ error: 'businessId é obrigatório.' });
+    if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+    const storedUser = await identityAccess.findById(context.userId) || undefined;
+    const sessionBusinessId = storedUser?.businessId;
+    let businessId = typeof req.query.businessId === 'string' ? req.query.businessId : undefined;
+    if (context.role === 'business') {
+      if (!sessionBusinessId) return res.status(403).json({ error: 'Conta empresarial sem empresa associada.', code: 'BUSINESS_ACCOUNT_REQUIRED' });
+      if (businessId && businessId !== sessionBusinessId) {
+        return res.status(403).json({ error: 'Não possui permissão para consultar esta empresa.', code: 'BUSINESS_SCOPE_REQUIRED' });
+      }
+      businessId = sessionBusinessId;
+    }
     res.json({ timezone: SCHEDULING_TIMEZONE, items: await listScheduledItems(businessId) });
   });
 
 app.post('/api/marketing/campaigns', requireRole('business'), async (req, res) => {
   const context = await sessionContext(req);
-  const campaign = req.body;
-  if (!context || !campaign?.id || !campaign?.businessId || !campaign?.name) {
-    return res.status(400).json({ error: 'id, businessId e name são obrigatórios.' });
-  }
-  const storedUser = await identityAccess.findById(context.userId) || undefined;
-  if (!storedUser?.businessId || storedUser.businessId !== String(campaign.businessId)) {
+  const campaign = req.body || {};
+  // Posse antes da validação: campanha de outra empresa = 403, não 400.
+  const storedUser = context ? await identityAccess.findById(context.userId) || undefined : undefined;
+  const campaignScope = resolveBusinessScope(context?.role, storedUser?.businessId, typeof campaign.businessId === 'string' ? campaign.businessId : undefined);
+  if (campaignScope.allowed === false) {
     return res.status(403).json({ error: 'A campanha não pertence à empresa autenticada.' });
+  }
+  if (!context || !campaign.id || !campaign.businessId || !campaign.name) {
+    return res.status(400).json({ error: 'id, businessId e name são obrigatórios.' });
   }
   const scheduledTimestamp = campaign.status === 'scheduled' && campaign.startsAt
     ? Date.parse(String(campaign.startsAt))
@@ -588,13 +833,15 @@ app.post('/api/marketing/campaigns', requireRole('business'), async (req, res) =
 
 app.post('/api/marketing/promotions', requireRole('business'), async (req, res) => {
   const context = await sessionContext(req);
-  const promotion = req.body;
-  if (!context || !promotion?.id || !promotion?.businessId || !promotion?.title) {
-    return res.status(400).json({ error: 'id, businessId e title são obrigatórios.' });
-  }
-  const storedUser = await identityAccess.findById(context.userId) || undefined;
-  if (!storedUser?.businessId || storedUser.businessId !== String(promotion.businessId)) {
+  const promotion = req.body || {};
+  // Posse antes da validação: promoção de outra empresa = 403, não 400.
+  const storedUser = context ? await identityAccess.findById(context.userId) || undefined : undefined;
+  const promotionScope = resolveBusinessScope(context?.role, storedUser?.businessId, typeof promotion.businessId === 'string' ? promotion.businessId : undefined);
+  if (promotionScope.allowed === false) {
     return res.status(403).json({ error: 'A promoção não pertence à empresa autenticada.' });
+  }
+  if (!context || !promotion.id || !promotion.businessId || !promotion.title) {
+    return res.status(400).json({ error: 'id, businessId e title são obrigatórios.' });
   }
   const startsTimestamp = promotion.status === 'scheduled' && promotion.startsAt ? Date.parse(String(promotion.startsAt)) : undefined;
   const endsTimestamp = promotion.validUntil ? Date.parse(String(promotion.validUntil)) : undefined;
@@ -675,6 +922,14 @@ app.post('/api/marketing/promotions', requireRole('business'), async (req, res) 
 app.post('/api/marketing/scheduled-items', requireRole('business'), async (req, res) => {
     const context = await sessionContext(req);
     const body = req.body as Partial<ScheduledItem>;
+    // A autorização de âmbito precede a validação do corpo: um pedido para
+    // outra empresa falha com 403 mesmo que os restantes campos sejam inválidos.
+    const requestedBusinessId = typeof body.businessId === 'string' ? body.businessId : undefined;
+    const storedBusinessUser = context ? await identityAccess.findById(context.userId) || undefined : undefined;
+    const scope = resolveBusinessScope(context?.role, storedBusinessUser?.businessId, requestedBusinessId);
+    if (scope.allowed === false) {
+      return res.status(scope.status).json({ error: 'O agendamento não pertence à empresa autenticada.', code: scope.code });
+    }
     if (!context || !body.businessId || !body.itemId || !body.itemType || !body.scheduledAt) {
       return res.status(400).json({ error: 'businessId, itemType, itemId e scheduledAt são obrigatórios.' });
     }
@@ -753,6 +1008,71 @@ function toPublicBusinessDto(business: Record<string, unknown>): Record<string, 
   return dto;
 }
 
+// Campos pesados que o directório não usa (posts, galeria, promoções, avaliações,
+// métricas e estado interno da subscrição). Ficam de fora do DTO resumido.
+const BUSINESS_SUMMARY_OMITTED_FIELDS = [
+  'posts', 'gallery', 'promotions', 'reviews', 'metrics', 'features', 'socialLinks',
+  'notApplicableFields', 'subscriptionAlertKeys', 'subscriptionPaymentId',
+  'subscriptionRenewDate', 'subscriptionStartedAt', 'subscriptionSuspendedAt',
+  'subscriptionAutoSuspended', 'subscriptionSuspensionReason', 'postsQuotaRemaining',
+];
+
+function toBusinessSummaryDto(business: Record<string, unknown>): Record<string, unknown> {
+  const dto = toPublicBusinessDto(business);
+  for (const field of BUSINESS_SUMMARY_OMITTED_FIELDS) delete dto[field];
+  return dto;
+}
+
+type CollectionPaging = { paginated: boolean; limit: number; offset: number };
+const MAX_COLLECTION_LIMIT = 200;
+
+/** `?limit=&offset=` opcional. Sem `limit` a resposta mantém-se completa (compatível). */
+function parseCollectionPaging(query: Record<string, unknown>): { paging: CollectionPaging } | { error: string } {
+  const rawLimit = query.limit;
+  const rawOffset = query.offset;
+  if (rawLimit === undefined && rawOffset === undefined) {
+    return { paging: { paginated: false, limit: 0, offset: 0 } };
+  }
+  const limit = Number(rawLimit ?? MAX_COLLECTION_LIMIT);
+  const offset = rawOffset === undefined ? 0 : Number(rawOffset);
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_COLLECTION_LIMIT) {
+    return { error: `limit deve ser um inteiro entre 1 e ${MAX_COLLECTION_LIMIT}.` };
+  }
+  if (!Number.isInteger(offset) || offset < 0) {
+    return { error: 'offset deve ser um inteiro não negativo.' };
+  }
+  return { paging: { paginated: true, limit, offset } };
+}
+
+function paginateCollection<T>(items: T[], paging: CollectionPaging) {
+  if (!paging.paginated) return { items, pagination: null };
+  const page = items.slice(paging.offset, paging.offset + paging.limit);
+  return {
+    items: page,
+    pagination: {
+      total: items.length,
+      limit: paging.limit,
+      offset: paging.offset,
+      hasMore: paging.offset + page.length < items.length,
+      nextOffset: paging.offset + page.length < items.length ? paging.offset + page.length : null,
+    },
+  };
+}
+
+const BOOTSTRAP_SECTIONS = ['businesses', 'events', 'posts', 'promotions', 'stories'] as const;
+type BootstrapSection = typeof BOOTSTRAP_SECTIONS[number];
+
+/** `?sections=businesses,events` opcional; sem parâmetro devolve todas. */
+function parseBootstrapSections(value: unknown): { sections: Set<BootstrapSection> } | { error: string } {
+  if (typeof value !== 'string' || !value.trim()) return { sections: new Set(BOOTSTRAP_SECTIONS) };
+  const requested = value.split(',').map((part) => part.trim().toLowerCase()).filter(Boolean);
+  const unknown = requested.filter((part) => !BOOTSTRAP_SECTIONS.includes(part as BootstrapSection));
+  if (!requested.length || unknown.length) {
+    return { error: `sections inválido. Use: ${BOOTSTRAP_SECTIONS.join(', ')}.` };
+  }
+  return { sections: new Set(requested as BootstrapSection[]) };
+}
+
 function toPublicBusinessCollection(value: unknown): unknown {
   if (!Array.isArray(value)) return value;
   return value.map((business) => {
@@ -762,10 +1082,41 @@ function toPublicBusinessCollection(value: unknown): unknown {
 
 app.get('/api/app-state/:key', async (req, res) => {
   try {
-    const value = await getAppState(req.params.key);
-    res.json({
-      key: req.params.key,
-      value: req.params.key === 'guigui_businesses' ? toPublicBusinessCollection(value) : value,
+    const key = req.params.key;
+    const value = await getAppState(key);
+
+    // Politica deny-by-default: chaves publicas podem ser lidas anonimamente;
+    // todas as restantes exigem sessao valida e sao filtradas por dono.
+    if (isPublicAppStateKey(key)) {
+      return res.json({
+        key,
+        value: key === 'guigui_businesses' ? toPublicBusinessCollection(value) : value,
+      });
+    }
+
+    const context = await sessionContext(req);
+    if (!context) {
+      return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+    }
+    const storedUser = await identityAccess.findById(context.userId) || undefined;
+    const identity = {
+      userId: context.userId,
+      businessId: storedUser?.businessId,
+      phone: storedUser?.phone,
+    };
+    const conversationState = key === 'guigui_conversation_messages'
+      ? await getAppState('guigui_conversations')
+      : undefined;
+    const conversationIds = conversationState
+      ? visibleConversationIds(conversationState, context.role, identity)
+      : undefined;
+    const decision = readAppStateForSession(key, context.role, identity, value, conversationIds);
+    if (decision.allowed === false) {
+      return res.status(decision.status).json({ error: 'Acesso negado.', code: decision.code });
+    }
+    return res.json({
+      key,
+      value: key === 'guigui_businesses' ? toPublicBusinessCollection(decision.value) : decision.value,
     });
   } catch (error) {
     res.status(500).json({ error: 'Erro ao obter estado do banco de dados.' });
@@ -829,23 +1180,53 @@ app.post('/api/app-state/:key', requireSession, async (req, res) => {
   }
 });
 
-app.get('/api/sync/bootstrap', async (_req, res) => {
+app.get('/api/sync/bootstrap', async (req, res) => {
+  const pagingResult = parseCollectionPaging(req.query as Record<string, unknown>);
+  if ('error' in pagingResult) {
+    return res.status(400).json({ error: pagingResult.error, code: 'INVALID_PAGINATION' });
+  }
+  const sectionsResult = parseBootstrapSections(req.query.sections);
+  if ('error' in sectionsResult) {
+    return res.status(400).json({ error: sectionsResult.error, code: 'INVALID_BOOTSTRAP_SECTIONS' });
+  }
+  const { paging } = pagingResult;
+  const sections = sectionsResult.sections;
+  const summary = req.query.view === 'summary';
   try {
-    const businesses = await listPostgresBusinesses();
-    const events = await listPostgresEvents();
-    const userPosts = await getAppState('guigui_user_posts');
-    const promotions = await getAppState('guigui_promotions');
-    const stories = await getAppState('guigui_stories');
+    // Só toca nas fontes das secções pedidas: `?sections=stories` evita ler
+    // empresas, eventos e publicações por completo.
+    const businesses = sections.has('businesses') ? await listPostgresBusinesses() : [];
+    const events = sections.has('events') ? await listPostgresEvents() : [];
+    const userPosts = sections.has('posts') ? await getAppState('guigui_user_posts') : null;
+    const promotions = sections.has('promotions') ? await getAppState('guigui_promotions') : null;
+    const stories = sections.has('stories') ? await getAppState('guigui_stories') : null;
+
+    const businessDtos = businesses.map(summary ? toBusinessSummaryDto : toPublicBusinessDto);
+    const businessesPage = paginateCollection(businessDtos, paging);
+    const eventsPage = paginateCollection(events, paging);
+    const storiesPage = Array.isArray(stories)
+      ? paginateCollection(stories, paging)
+      : { items: stories, pagination: null };
+
     res.json({
       success: true,
       database: { connected: Boolean(databasePool) },
       data: {
-        businesses: businesses.length > 0 ? businesses.map(toPublicBusinessDto) : null,
-        events: events.length > 0 ? events : null,
+        businesses: businesses.length > 0 ? businessesPage.items : null,
+        events: events.length > 0 ? eventsPage.items : null,
         userPosts,
         promotions,
-        stories,
-      }
+        stories: storiesPage.items,
+      },
+      meta: {
+        sections: [...sections],
+        view: summary ? 'summary' : 'full',
+        pagination: {
+          businesses: businessesPage.pagination,
+          events: eventsPage.pagination,
+          stories: storiesPage.pagination,
+        },
+      },
     });
   } catch (error) {
     res.status(500).json({ error: 'Erro ao sincronizar dados iniciais do banco.' });
@@ -853,11 +1234,23 @@ app.get('/api/sync/bootstrap', async (_req, res) => {
 });
 
 app.use('/api/categories', createCategoryRouter());
+app.use('/api', createStoryRouter({ sessionContext, requireSession, requireRole, logger: console }));
 
-app.get('/api/businesses', async (_req, res) => {
+app.get('/api/businesses', async (req, res) => {
+  const pagingResult = parseCollectionPaging(req.query as Record<string, unknown>);
+  if ('error' in pagingResult) {
+    return res.status(400).json({ error: pagingResult.error, code: 'INVALID_PAGINATION' });
+  }
+  const summary = req.query.view === 'summary';
   try {
     const businesses = await listPostgresBusinesses();
-    res.json({ businesses: businesses.map(toPublicBusinessDto) });
+    const dtos = businesses.map(summary ? toBusinessSummaryDto : toPublicBusinessDto);
+    const { items, pagination } = paginateCollection(dtos, pagingResult.paging);
+    res.json({
+      businesses: items,
+      ...(pagination ? { pagination } : {}),
+      ...(summary ? { view: 'summary' } : {}),
+    });
   } catch (error) {
     res.status(500).json({ error: 'Erro ao listar empresas.' });
   }
@@ -908,33 +1301,270 @@ app.get('/api/admin/businesses/pending', requireRole('admin'), async (_req, res)
 
 // CATEGORIES ENDPOINT
 // Returns categories from PostgreSQL (categories table: 5 groups + 13 primary categories)
-app.get('/api/admin/categories', async (_req, res) => {
-  try {
-    const pool = databasePool;
-    if (!pool) {
-      return res.status(503).json({ error: 'Database not configured.' });
-    }
-    const result = await pool.query(
+interface AdminCategoryRow {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  is_active: boolean;
+}
+
+type AdminCategory = {
+  id: string;
+  name: string;
+  groupId: string;
+  isActive: boolean;
+  subcategories: string[];
+};
+
+const CATEGORY_GROUPS = [
+  'restauracao',
+  'hotelaria_saude_educacao',
+  'corporativo_financeiro',
+  'ongs_artesãos',
+  'servicos_profissionais',
+];
+
+const CATEGORY_ORDER_SQL = `
+  ORDER BY
+    CASE
+      WHEN id IN ('cat-1','cat-2','cat-3','cat-4','cat-5') THEN 1
+      WHEN id IN ('cat-6','cat-7','cat-8') THEN 2
+      WHEN id IN ('cat-9','cat-10','cat-11','cat-12','cat-13') THEN 3
+      ELSE 4
+    END, name`;
+
+/** Categorias principais (filhas de um grupo, não de outra categoria) + subcategorias. */
+async function loadAdminCategories(): Promise<AdminCategory[]> {
+  const pool = databasePool;
+  if (!pool) throw new Error('DATABASE_REQUIRED');
+  // Hierarquia real: grupos (parent_id IS NULL) → categorias principais → subcategorias.
+  const primaries = await pool.query<AdminCategoryRow>(
+    `SELECT id, name, parent_id, is_active FROM categories
+      WHERE is_active = TRUE
+        AND parent_id IN (SELECT id FROM categories WHERE parent_id IS NULL)
+      ${CATEGORY_ORDER_SQL}`,
+  );
+  const ids = primaries.rows.map((row) => row.id);
+  const children = ids.length === 0
+    ? { rows: [] as AdminCategoryRow[] }
+    : await pool.query<AdminCategoryRow>(
       `SELECT id, name, parent_id, is_active FROM categories
-        WHERE parent_id IS NOT NULL
-        ORDER BY
-        CASE
-          WHEN id IN ('cat-1','cat-2','cat-3','cat-4','cat-5') THEN 1
-          WHEN id IN ('cat-6','cat-7','cat-8') THEN 2
-          WHEN id IN ('cat-9','cat-10','cat-11','cat-12','cat-13') THEN 3
-          ELSE 4
-        END, name`
+        WHERE parent_id = ANY($1::text[]) AND is_active = TRUE
+        ORDER BY name`,
+      [ids],
     );
-    const categories = result.rows.map((row: any) => ({
-      id: row.id,
-      name: row.name,
-      groupId: row.parent_id || null,
-      is_active: row.is_active,
-    }));
-    res.json({ categories });
+  return primaries.rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    groupId: row.parent_id || '',
+    isActive: Boolean(row.is_active),
+    subcategories: children.rows.filter((child) => child.parent_id === row.id).map((child) => child.name),
+  }));
+}
+
+function categorySlug(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40) || randomUUID().slice(0, 8);
+}
+
+function categoryNames(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(new Set(value
+    .filter((entry): entry is string => typeof entry === 'string')
+    .map((entry) => entry.trim())
+    .filter(Boolean)))
+    .slice(0, 40);
+}
+
+function categoryInputError(status: number, message: string, code: string) {
+  return Object.assign(new Error(message), { status, code });
+}
+
+function sendCategoryError(res: express.Response, error: unknown, fallback: string) {
+  const known = error as { status?: number; code?: string; message?: string };
+  if (known?.status === 400 || known?.status === 404 || known?.status === 409) {
+    return res.status(known.status).json({ error: known.message || fallback, code: known.code });
+  }
+  console.error('[Guigui.com] categorias:', error);
+  return res.status(500).json({ error: fallback });
+}
+
+app.get('/api/admin/categories', requireRole('admin'), async (_req, res) => {
+  try {
+    res.json({ categories: await loadAdminCategories() });
   } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message === 'DATABASE_REQUIRED') {
+      return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária para listar as categorias.', code: 'DATABASE_REQUIRED' });
+    }
     console.error('[Guigui.com] /api/admin/categories error:', error);
-    res.status(500).json({ error: 'Failed to load categories.' });
+    res.status(500).json({ error: 'Não foi possível carregar as categorias.' });
+  }
+});
+
+app.post('/api/admin/categories', requireRole('admin'), async (req, res) => {
+  const pool = databasePool;
+  if (!pool) {
+    return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária para criar categorias.', code: 'DATABASE_REQUIRED' });
+  }
+  try {
+    const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+    const groupId = typeof req.body?.groupId === 'string' ? req.body.groupId.trim() : '';
+    if (name.length < 2 || name.length > 80) {
+      return sendCategoryError(res, categoryInputError(400, 'O nome da categoria deve ter entre 2 e 80 caracteres.', 'CATEGORY_NAME_INVALID'), 'Nome inválido.');
+    }
+    if (!CATEGORY_GROUPS.includes(groupId)) {
+      return sendCategoryError(res, categoryInputError(400, 'Selecione um grupo de actividade válido.', 'CATEGORY_GROUP_INVALID'), 'Grupo inválido.');
+    }
+    const subcategories = categoryNames(req.body?.subcategories).filter((entry) => entry.length <= 80);
+    const id = `cat-${categorySlug(name)}-${randomUUID().slice(0, 6)}`;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO categories (id, parent_id, name, is_active) VALUES ($1, $2, $3, TRUE)`,
+        [id, groupId, name],
+      );
+      for (const [position, subcategory] of subcategories.entries()) {
+        await client.query(
+          `INSERT INTO categories (id, parent_id, name, is_active, sort_order)
+           VALUES ($1, $2, $3, TRUE, $4)
+           ON CONFLICT (parent_id, name) DO NOTHING`,
+          [`${id}-sub-${categorySlug(subcategory)}`, id, subcategory, position + 1],
+        );
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+    recordAudit({ action: 'category_created', resource: 'category', resourceId: id, actorRole: 'admin', requestId: requestIdFrom(req), success: true });
+    const categories = await loadAdminCategories();
+    res.status(201).json({ category: categories.find((entry) => entry.id === id) ?? null, categories });
+  } catch (error) {
+    const code = (error as { code?: string })?.code;
+    if (code === '23505') {
+      return res.status(409).json({ error: 'Já existe uma categoria com esse nome neste grupo.', code: 'CATEGORY_ALREADY_EXISTS' });
+    }
+    sendCategoryError(res, error, 'Não foi possível criar a categoria.');
+  }
+});
+
+app.patch('/api/admin/categories/:categoryId', requireRole('admin'), async (req, res) => {
+  const pool = databasePool;
+  if (!pool) {
+    return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária para editar categorias.', code: 'DATABASE_REQUIRED' });
+  }
+  const categoryId = req.params.categoryId;
+  try {
+    const existing = await pool.query<AdminCategoryRow>('SELECT id, name, parent_id, is_active FROM categories WHERE id = $1', [categoryId]);
+    if (!existing.rows[0]) {
+      return res.status(404).json({ error: 'Categoria não encontrada.', code: 'CATEGORY_NOT_FOUND' });
+    }
+    const nextName = typeof req.body?.name === 'string' ? req.body.name.trim() : existing.rows[0].name;
+    if (nextName.length < 2 || nextName.length > 80) {
+      return res.status(400).json({ error: 'O nome da categoria deve ter entre 2 e 80 caracteres.', code: 'CATEGORY_NAME_INVALID' });
+    }
+    const nextActive = typeof req.body?.isActive === 'boolean' ? req.body.isActive : Boolean(existing.rows[0].is_active);
+    await pool.query('UPDATE categories SET name = $2, is_active = $3 WHERE id = $1', [categoryId, nextName, nextActive]);
+
+    if (req.body?.subcategories !== undefined) {
+      const wanted = categoryNames(req.body.subcategories).filter((entry) => entry.length <= 80);
+      const children = await pool.query<AdminCategoryRow>('SELECT id, name, parent_id, is_active FROM categories WHERE parent_id = $1', [categoryId]);
+      // Remover = arquivar (os registos históricos que apontam para a subcategoria mantêm-se).
+      for (const child of children.rows) {
+        if (!wanted.includes(child.name) && child.is_active) {
+          await pool.query('UPDATE categories SET is_active = FALSE WHERE id = $1', [child.id]);
+        }
+      }
+      for (const [position, subcategory] of wanted.entries()) {
+        const match = children.rows.find((child) => child.name === subcategory);
+        if (match) {
+          if (!match.is_active) await pool.query('UPDATE categories SET is_active = TRUE WHERE id = $1', [match.id]);
+          continue;
+        }
+        await pool.query(
+          `INSERT INTO categories (id, parent_id, name, is_active, sort_order)
+           VALUES ($1, $2, $3, TRUE, $4)
+           ON CONFLICT (parent_id, name) DO UPDATE SET is_active = TRUE`,
+          [`${categoryId}-sub-${categorySlug(subcategory)}`, categoryId, subcategory, position + 1],
+        );
+      }
+    }
+    recordAudit({ action: 'category_updated', resource: 'category', resourceId: categoryId, actorRole: 'admin', requestId: requestIdFrom(req), success: true });
+    res.json({ categories: await loadAdminCategories() });
+  } catch (error) {
+    const code = (error as { code?: string })?.code;
+    if (code === '23505') {
+      return res.status(409).json({ error: 'Já existe uma categoria com esse nome neste grupo.', code: 'CATEGORY_ALREADY_EXISTS' });
+    }
+    sendCategoryError(res, error, 'Não foi possível actualizar a categoria.');
+  }
+});
+
+app.delete('/api/admin/categories/:categoryId', requireRole('admin'), async (req, res) => {
+  const pool = databasePool;
+  if (!pool) {
+    return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária para arquivar categorias.', code: 'DATABASE_REQUIRED' });
+  }
+  try {
+    const { rowCount } = await pool.query('UPDATE categories SET is_active = FALSE WHERE id = $1 OR parent_id = $1', [req.params.categoryId]);
+    if (!rowCount) return res.status(404).json({ error: 'Categoria não encontrada.', code: 'CATEGORY_NOT_FOUND' });
+    recordAudit({ action: 'category_archived', resource: 'category', resourceId: req.params.categoryId, actorRole: 'admin', requestId: requestIdFrom(req), success: true });
+    res.json({ success: true, categories: await loadAdminCategories() });
+  } catch (error) {
+    sendCategoryError(res, error, 'Não foi possível arquivar a categoria.');
+  }
+});
+
+app.get('/api/admin/locations', requireRole('admin'), async (_req, res) => {
+  try {
+    // O painel mostra também as localidades arquivadas para permitir reativá-las.
+    res.json(await listLocationCatalog({ includeInactive: true }));
+  } catch (error) {
+    if (error instanceof LocationCatalogError) {
+      return res.status(error.status).json({ error: error.message, code: error.code });
+    }
+    console.error('[Guigui.com] GET /api/admin/locations falhou:', error);
+    res.status(500).json({ error: 'Não foi possível carregar as localidades.' });
+  }
+});
+
+app.post('/api/admin/locations', requireRole('admin'), async (req, res) => {
+  try {
+    const location = await createLocation(req.body || {});
+    recordAudit({ action: 'location_created', resource: 'location', resourceId: location.id, actorRole: 'admin', requestId: requestIdFrom(req), success: true });
+    res.status(201).json({ location });
+  } catch (error) {
+    if (error instanceof LocationCatalogError) {
+      return res.status(error.status).json({ error: error.message, code: error.code });
+    }
+    console.error('[Guigui.com] POST /api/admin/locations falhou:', error);
+    res.status(500).json({ error: 'Não foi possível criar a localidade.' });
+  }
+});
+
+app.patch('/api/admin/locations/:locationId', requireRole('admin'), async (req, res) => {
+  try {
+    const isActive = req.body?.isActive;
+    const location = typeof isActive === 'boolean'
+      ? await setLocationActive(req.params.locationId, isActive)
+      : await updateLocation(req.params.locationId, req.body || {});
+    recordAudit({ action: 'location_updated', resource: 'location', resourceId: location.id, actorRole: 'admin', requestId: requestIdFrom(req), success: true });
+    res.json({ location });
+  } catch (error) {
+    if (error instanceof LocationCatalogError) {
+      return res.status(error.status).json({ error: error.message, code: error.code });
+    }
+    console.error('[Guigui.com] PATCH /api/admin/locations falhou:', error);
+    res.status(500).json({ error: 'Não foi possível actualizar a localidade.' });
   }
 });
 
@@ -1005,30 +1635,57 @@ app.get('/api/admin/users', requireRole('admin'), async (req, res) => {
   const pool = databasePool;
   const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
   const role = typeof req.query.role === 'string' ? req.query.role.trim() : '';
+  const status = typeof req.query.status === 'string' ? req.query.status.trim() : '';
+  const dateFrom = typeof req.query.dateFrom === 'string' ? req.query.dateFrom.trim() : '';
+  const dateTo = typeof req.query.dateTo === 'string' ? req.query.dateTo.trim() : '';
+  const sortKey = typeof req.query.sort === 'string' ? req.query.sort : 'createdAt';
+  const direction = req.query.direction === 'asc' ? 'ASC' : 'DESC';
   const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
   const offset = Math.max(Number(req.query.offset) || 0, 0);
   const params: any[] = [];
   const where: string[] = [];
   if (search) {
     params.push(`%${search.toLowerCase()}%`);
-    where.push(`(lower(u.name) LIKE $${params.length} OR lower(u.email) LIKE $${params.length})`);
+    where.push(`(lower(u.name) LIKE $${params.length} OR lower(u.email) LIKE $${params.length} OR lower(coalesce(u.phone, '')) LIKE $${params.length})`);
   }
   if (role && ['user', 'business', 'admin'].includes(role)) {
     params.push(role);
     where.push(`u.role = $${params.length}`);
   }
+  if (status === 'active' || status === 'deactivated') {
+    params.push(status);
+    where.push(`coalesce(u.account_status, 'active') = $${params.length}`);
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateFrom)) {
+    params.push(dateFrom);
+    where.push(`u.created_at >= $${params.length}::date`);
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateTo)) {
+    params.push(dateTo);
+    where.push(`u.created_at < ($${params.length}::date + INTERVAL '1 day')`);
+  }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const sortColumns: Record<string, string> = {
+    name: 'u.name',
+    email: 'u.email',
+    role: 'u.role',
+    status: 'u.account_status',
+    createdAt: 'u.created_at',
+  };
+  const orderBy = sortColumns[sortKey] || sortColumns.createdAt;
   try {
     const countResult = await pool.query(`SELECT count(*)::int AS total FROM users u ${whereSql}`, params);
     params.push(limit, offset);
     const rowsResult = await pool.query(
-      `SELECT u.id, u.name, u.email, u.phone, u.neighborhood, u.role, u.account_status, u.created_at,
+      `SELECT u.id, u.name, u.email, u.phone, u.neighborhood, u.avatar_url, u.role, u.account_status,
+              u.account_status_reason, u.status_changed_at, u.birth_date, u.email_verified_at,
+              u.phone_verified_at, u.created_at, u.updated_at,
               c.id AS company_id, c.name AS company_name
          FROM users u
          LEFT JOIN company_members cm ON cm.user_id = u.id
          LEFT JOIN companies c ON c.id = cm.company_id
          ${whereSql}
-         ORDER BY u.created_at DESC
+         ORDER BY ${orderBy} ${direction}, u.id ASC
          LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params
     );
@@ -1036,22 +1693,485 @@ app.get('/api/admin/users', requireRole('admin'), async (req, res) => {
       total: countResult.rows[0].total,
       limit,
       offset,
-      users: rowsResult.rows.map((row: any) => ({
-        id: row.id,
-        name: row.name,
-        email: row.email,
-        phone: row.phone,
-        neighborhood: row.neighborhood,
-        role: row.role,
-        accountStatus: row.account_status,
-        createdAt: row.created_at,
-        companyId: row.company_id,
-        companyName: row.company_name,
-      })),
+      users: rowsResult.rows.map(mapAdminUserRow),
     });
   } catch (error) {
     console.error('[Guigui.com] /api/admin/users error:', error);
     res.status(500).json({ error: 'Não foi possível carregar os utilizadores.', code: 'ADMIN_USERS_FAILED' });
+  }
+});
+
+function mapAdminUserRow(row: any) {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    phone: row.phone,
+    neighborhood: row.neighborhood,
+    avatarUrl: row.avatar_url,
+    role: row.role,
+    accountStatus: row.account_status === 'deactivated' ? 'deactivated' : 'active',
+    accountStatusReason: row.account_status_reason,
+    statusChangedAt: row.status_changed_at,
+    birthDate: row.birth_date,
+    emailVerifiedAt: row.email_verified_at,
+    phoneVerifiedAt: row.phone_verified_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    companyId: row.company_id ?? null,
+    companyName: row.company_name ?? null,
+  };
+}
+
+const ADMIN_USER_SELECT = `SELECT u.id, u.name, u.email, u.phone, u.neighborhood, u.avatar_url, u.role,
+       u.account_status, u.account_status_reason, u.status_changed_at, u.birth_date,
+       u.email_verified_at, u.phone_verified_at, u.created_at, u.updated_at,
+       c.id AS company_id, c.name AS company_name
+  FROM users u
+  LEFT JOIN company_members cm ON cm.user_id = u.id
+  LEFT JOIN companies c ON c.id = cm.company_id`;
+
+async function findAdminUser(userId: string) {
+  if (!databasePool) return null;
+  const result = await databasePool.query(`${ADMIN_USER_SELECT} WHERE u.id = $1 LIMIT 1`, [userId]);
+  return result.rows[0] ? mapAdminUserRow(result.rows[0]) : null;
+}
+
+function sendFinanceError(res: express.Response, error: unknown, context: string) {
+  if (error instanceof FinanceError) {
+    return res.status(error.status).json({ error: error.message, code: error.code });
+  }
+  console.error(`[Guigui.com] ${context}:`, error);
+  return res.status(500).json({ error: 'Não foi possível concluir a operação financeira.', code: 'FINANCE_OPERATION_FAILED' });
+}
+
+app.get('/api/admin/finance/summary', requireRole('admin'), async (_req, res) => {
+  try {
+    res.json(await getFinanceSummary());
+  } catch (error) {
+    sendFinanceError(res, error, 'GET /api/admin/finance/summary');
+  }
+});
+
+app.get('/api/admin/finance/alerts', requireRole('admin'), async (_req, res) => {
+  try {
+    res.json(await listOperationalAlerts());
+  } catch (error) {
+    sendFinanceError(res, error, 'GET /api/admin/finance/alerts');
+  }
+});
+
+app.get('/api/admin/finance/transactions', requireRole('admin'), async (req, res) => {
+  try {
+    const scope = req.query.scope === 'business' ? 'business' : 'platform';
+    res.json({ transactions: await listFinanceTransactions(scope) });
+  } catch (error) {
+    sendFinanceError(res, error, 'GET /api/admin/finance/transactions');
+  }
+});
+
+app.get('/api/admin/finance/transactions/:transactionId', requireRole('admin'), async (req, res) => {
+  if (!databasePool) return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária.', code: 'DATABASE_REQUIRED' });
+  try {
+    const transaction = await getFinanceTransaction(req.params.transactionId);
+    if (!transaction) return res.status(404).json({ error: 'Transação não encontrada.', code: 'TRANSACTION_NOT_FOUND' });
+    const [actions, refunds, events] = await Promise.all([
+      databasePool.query(
+        `SELECT a.id, a.action, a.reason, a.proof_reference, u.name AS actor_name, a.created_at
+           FROM payment_manual_actions a
+           LEFT JOIN users u ON u.id = a.actor_user_id
+          WHERE a.transaction_id = $1 ORDER BY a.created_at DESC`,
+        [req.params.transactionId],
+      ),
+      databasePool.query(
+        `SELECT id, amount_xof, reason, status, kind, provider_reference, created_at
+           FROM refunds WHERE transaction_id = $1 ORDER BY created_at DESC`,
+        [req.params.transactionId],
+      ),
+      databasePool.query(
+        `SELECT id, provider, event_reference, signature_valid, received_at
+           FROM payment_events WHERE transaction_id = $1 ORDER BY received_at DESC`,
+        [req.params.transactionId],
+      ),
+    ]);
+    res.json({ transaction, actions: actions.rows, refunds: refunds.rows, events: events.rows });
+  } catch (error) {
+    sendFinanceError(res, error, 'GET /api/admin/finance/transactions/:id');
+  }
+});
+
+app.get('/api/admin/finance/reconciliations', requireRole('admin'), async (_req, res) => {
+  try {
+    res.json(await listReconciliations());
+  } catch (error) {
+    sendFinanceError(res, error, 'GET /api/admin/finance/reconciliations');
+  }
+});
+
+app.post('/api/admin/finance/reconciliations', requireRole('admin'), async (req, res) => {
+  try {
+    const context = await sessionContext(req);
+    res.status(201).json(await createReconciliation(req.body || {}, context?.userId || 'system'));
+  } catch (error) {
+    sendFinanceError(res, error, 'POST /api/admin/finance/reconciliations');
+  }
+});
+
+app.patch('/api/admin/finance/reconciliations/:id', requireRole('admin'), async (req, res) => {
+  try {
+    const context = await sessionContext(req);
+    res.json(await updateReconciliation(req.params.id, req.body || {}, context?.userId || 'system'));
+  } catch (error) {
+    sendFinanceError(res, error, 'PATCH /api/admin/finance/reconciliations/:id');
+  }
+});
+
+app.get('/api/admin/finance/operators', requireRole('admin'), async (_req, res) => {
+  try {
+    res.json(await getOperatorOverview());
+  } catch (error) {
+    sendFinanceError(res, error, 'GET /api/admin/finance/operators');
+  }
+});
+
+app.patch('/api/admin/finance/operators/:provider', requireRole('admin'), async (req, res) => {
+  try {
+    const context = await sessionContext(req);
+    res.json(await updateOperatorConfig(req.params.provider, req.body || {}, context?.userId || 'system'));
+  } catch (error) {
+    sendFinanceError(res, error, 'PATCH /api/admin/finance/operators/:provider');
+  }
+});
+
+app.get('/api/admin/finance/pending', requireRole('admin'), async (_req, res) => {
+  try {
+    res.json({ items: await listPendingPayments() });
+  } catch (error) {
+    sendFinanceError(res, error, 'GET /api/admin/finance/pending');
+  }
+});
+
+app.post('/api/admin/finance/pending/:transactionId/:action', requireRole('admin'), async (req, res) => {
+  const action = req.params.action === 'request-proof' ? 'request_proof' : req.params.action;
+  if (!['confirm', 'reject', 'request_proof'].includes(action)) {
+    return res.status(400).json({ error: 'Ação de pagamento inválida.', code: 'INVALID_PENDING_ACTION' });
+  }
+  try {
+    const context = await sessionContext(req);
+    res.json(await recordPendingAction(req.params.transactionId, action as 'confirm' | 'reject' | 'request_proof', req.body || {}, context?.userId || 'system'));
+  } catch (error) {
+    sendFinanceError(res, error, 'POST /api/admin/finance/pending/:id/:action');
+  }
+});
+
+app.get('/api/admin/finance/refunds', requireRole('admin'), async (_req, res) => {
+  try {
+    res.json({ items: await listRefunds() });
+  } catch (error) {
+    sendFinanceError(res, error, 'GET /api/admin/finance/refunds');
+  }
+});
+
+app.post('/api/admin/finance/refunds', requireRole('admin'), async (req, res) => {
+  try {
+    const context = await sessionContext(req);
+    res.status(201).json(await createRefund(req.body || {}, context?.userId || 'system'));
+  } catch (error) {
+    sendFinanceError(res, error, 'POST /api/admin/finance/refunds');
+  }
+});
+
+app.post('/api/admin/finance/refunds/:id/:mode', requireRole('admin'), async (req, res) => {
+  const handlers = { authorize: authorizeRefund, process: processRefund, reject: rejectRefund } as const;
+  const handler = handlers[req.params.mode as keyof typeof handlers];
+  if (!handler) return res.status(400).json({ error: 'Ação de reembolso inválida.', code: 'INVALID_REFUND_ACTION' });
+  try {
+    const context = await sessionContext(req);
+    res.json(await handler(req.params.id, req.body || {}, context?.userId || 'system'));
+  } catch (error) {
+    sendFinanceError(res, error, 'POST /api/admin/finance/refunds/:id/:mode');
+  }
+});
+
+app.get('/api/admin/finance/statements', requireRole('admin'), async (req, res) => {
+  try {
+    res.json(await getFinanceStatements(req.query as Record<string, unknown>));
+  } catch (error) {
+    sendFinanceError(res, error, 'GET /api/admin/finance/statements');
+  }
+});
+
+app.get('/api/admin/sessions', requireRole('admin'), async (_req, res) => {
+  if (!databasePool) {
+    return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária.', code: 'DATABASE_REQUIRED' });
+  }
+  try {
+    const result = await databasePool.query(
+      `SELECT s.id, s.user_id, u.name AS user_name, u.email AS user_email, u.role AS user_role,
+              s.created_at, s.last_seen_at, s.expires_at, s.revoked_at, s.ip_address, s.user_agent
+         FROM sessions s
+         JOIN users u ON u.id = s.user_id
+        ORDER BY s.created_at DESC
+        LIMIT 200`,
+    );
+    res.json({
+      sessions: result.rows.map((row) => ({
+        id: row.id,
+        user_id: row.user_id,
+        user_name: row.user_name,
+        user_email: row.user_email,
+        user_role: row.user_role,
+        created_at: new Date(row.created_at).toISOString(),
+        last_seen_at: new Date(row.last_seen_at).toISOString(),
+        expires_at: new Date(row.expires_at).toISOString(),
+        revoked_at: row.revoked_at ? new Date(row.revoked_at).toISOString() : null,
+        ip_address: row.ip_address || null,
+        user_agent: row.user_agent || null,
+      })),
+    });
+  } catch (error) {
+    console.error('[Guigui.com] GET /api/admin/sessions error:', error);
+    res.status(500).json({ error: 'Não foi possível carregar as sessões.', code: 'ADMIN_SESSIONS_FAILED' });
+  }
+});
+
+app.delete('/api/admin/sessions/:sessionId', requireRole('admin'), async (req, res) => {
+  if (!databasePool) {
+    return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária.', code: 'DATABASE_REQUIRED' });
+  }
+  const requestId = requestIdFrom(req);
+  try {
+    const result = await databasePool.query(
+      'UPDATE sessions SET revoked_at = NOW() WHERE id = $1 AND revoked_at IS NULL RETURNING id, user_id',
+      [req.params.sessionId],
+    );
+    const revoked = result.rows[0];
+    if (!revoked) {
+      return res.status(404).json({ error: 'Sessão não encontrada ou já revogada.', code: 'SESSION_NOT_FOUND' });
+    }
+    recordAudit({
+      action: 'admin_session_revoked',
+      resource: 'session',
+      resourceId: String(revoked.id),
+      actorRole: 'admin',
+      requestId,
+      success: true,
+      metadata: { userId: revoked.user_id },
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[Guigui.com] DELETE /api/admin/sessions/:id error:', error);
+    res.status(500).json({ error: 'Não foi possível revogar a sessão.', code: 'ADMIN_SESSION_REVOKE_FAILED' });
+  }
+});
+
+app.get('/api/admin/users/:userId', requireRole('admin'), async (req, res) => {
+  if (!databasePool) {
+    return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária.', code: 'DATABASE_REQUIRED' });
+  }
+  try {
+    const user = await findAdminUser(req.params.userId);
+    if (!user) return res.status(404).json({ error: 'Conta não encontrada.', code: 'USER_NOT_FOUND' });
+    const [orders, notifications, sessions] = await Promise.all([
+      databasePool.query('SELECT count(*)::int AS total FROM orders WHERE user_id = $1', [req.params.userId]).catch(() => ({ rows: [{ total: 0 }] })),
+      databasePool.query('SELECT count(*)::int AS total FROM notifications WHERE user_id = $1', [req.params.userId]).catch(() => ({ rows: [{ total: 0 }] })),
+      databasePool.query(
+        'SELECT count(*)::int AS total FROM sessions WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > NOW()',
+        [req.params.userId],
+      ).catch(() => ({ rows: [{ total: 0 }] })),
+    ]);
+    res.json({
+      user,
+      company: user.companyId ? { id: user.companyId, name: user.companyName } : null,
+      counts: {
+        orders: Number(orders.rows[0]?.total || 0),
+        notifications: Number(notifications.rows[0]?.total || 0),
+        active_sessions: Number(sessions.rows[0]?.total || 0),
+      },
+    });
+  } catch (error) {
+    console.error('[Guigui.com] GET /api/admin/users/:id error:', error);
+    res.status(500).json({ error: 'Não foi possível abrir a ficha da conta.', code: 'ADMIN_USER_DETAIL_FAILED' });
+  }
+});
+
+app.get('/api/admin/users/:userId/activity', requireRole('admin'), async (req, res) => {
+  if (!databasePool) {
+    return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária.', code: 'DATABASE_REQUIRED' });
+  }
+  try {
+    const [audit, sessions] = await Promise.all([
+      databasePool.query(
+        `SELECT a.id, a.action, a.result, a.reason, a.actor_user_id, a.created_at, a.before_data, a.after_data,
+                u.name AS actor_name
+           FROM audit_logs a
+           LEFT JOIN users u ON u.id = a.actor_user_id
+          WHERE a.resource = 'user' AND a.resource_id = $1
+          ORDER BY a.created_at DESC
+          LIMIT 100`,
+        [req.params.userId],
+      ).catch(() => ({ rows: [] as any[] })),
+      databasePool.query(
+        `SELECT id, last_seen_at, ip_address, user_agent FROM sessions
+          WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > NOW()
+          ORDER BY last_seen_at DESC LIMIT 20`,
+        [req.params.userId],
+      ).catch(() => ({ rows: [] as any[] })),
+    ]);
+    res.json({
+      activity: audit.rows.map((row: any) => {
+        // `persistPostgresAudit` guarda o metadata em after_data; as rotas de
+        // utilizadores incluem aí o mapa `before`/`after` dos campos alterados.
+        const metadata = row.after_data && typeof row.after_data === 'object' ? row.after_data : {};
+        const before = (metadata.before && typeof metadata.before === 'object') ? metadata.before : null;
+        const after = (metadata.after && typeof metadata.after === 'object') ? metadata.after : null;
+        const changedFields = before && after
+          ? Object.keys(after)
+            .filter((key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]))
+            .map((key) => key.replace(/_([a-z])/g, (_match, letter: string) => letter.toUpperCase()))
+          : [];
+        return {
+          id: row.id,
+          timestamp: row.created_at,
+          action: row.action,
+          result: row.result,
+          reason: row.reason,
+          actorId: row.actor_user_id,
+          actorName: row.actor_name || 'Sistema',
+          changedFields,
+          before,
+          after,
+        };
+      }),
+      sessions: sessions.rows,
+    });
+  } catch (error) {
+    console.error('[Guigui.com] GET /api/admin/users/:id/activity error:', error);
+    res.status(500).json({ error: 'Não foi possível carregar o histórico da conta.', code: 'ADMIN_USER_ACTIVITY_FAILED' });
+  }
+});
+
+app.patch('/api/admin/users/:userId', requireRole('admin'), async (req, res) => {
+  if (!databasePool) {
+    return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária.', code: 'DATABASE_REQUIRED' });
+  }
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  const userId = req.params.userId;
+  try {
+    const current = await findAdminUser(userId);
+    if (!current) return res.status(404).json({ error: 'Conta não encontrada.', code: 'USER_NOT_FOUND' });
+
+    const updates: string[] = [];
+    const params: any[] = [];
+    const before: Record<string, unknown> = {};
+    const after: Record<string, unknown> = {};
+    const setField = (column: string, value: unknown, beforeValue: unknown) => {
+      params.push(value);
+      updates.push(`${column} = $${params.length}`);
+      before[column] = beforeValue;
+      after[column] = value;
+    };
+
+    if (typeof req.body?.name === 'string') {
+      const name = req.body.name.trim();
+      if (name.length < 2 || name.length > 120) {
+        return res.status(400).json({ error: 'O nome deve ter entre 2 e 120 caracteres.', code: 'USER_NAME_INVALID' });
+      }
+      if (name !== current.name) setField('name', name, current.name);
+    }
+    if (typeof req.body?.neighborhood === 'string') {
+      const neighborhood = req.body.neighborhood.trim();
+      if (!neighborhood) return res.status(400).json({ error: 'A localização é obrigatória.', code: 'USER_LOCATION_REQUIRED' });
+      if (neighborhood !== (current.neighborhood || '')) setField('neighborhood', neighborhood, current.neighborhood);
+    }
+    if (typeof req.body?.avatarUrl === 'string') {
+      const avatarUrl = req.body.avatarUrl.trim();
+      if (avatarUrl && !/^https?:\/\//i.test(avatarUrl) && !/^data:image\//i.test(avatarUrl)) {
+        return res.status(400).json({ error: 'A fotografia deve ser um URL de imagem válido.', code: 'USER_AVATAR_INVALID' });
+      }
+      if (avatarUrl !== (current.avatarUrl || '')) setField('avatar_url', avatarUrl || null, current.avatarUrl);
+    }
+    if (req.body?.birthDate !== undefined) {
+      const raw = String(req.body.birthDate || '').trim();
+      if (raw && !/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        return res.status(400).json({ error: 'A data de nascimento não é válida.', code: 'USER_BIRTHDATE_INVALID' });
+      }
+      if (raw && new Date(`${raw}T00:00:00Z`).getTime() > Date.now()) {
+        return res.status(400).json({ error: 'A data de nascimento não pode estar no futuro.', code: 'USER_BIRTHDATE_INVALID' });
+      }
+      const nextValue = raw || null;
+      if (nextValue !== (current.birthDate ? String(current.birthDate).slice(0, 10) : null)) {
+        setField('birth_date', nextValue, current.birthDate);
+      }
+    }
+    let suspendReason = '';
+    let statusChanged = false;
+    if (req.body?.accountStatus !== undefined) {
+      const nextStatus = req.body.accountStatus === 'deactivated' ? 'deactivated' : 'active';
+      suspendReason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+      if (nextStatus === 'deactivated' && suspendReason.length < 3) {
+        return res.status(400).json({ error: 'Indique o motivo da suspensão (mínimo 3 caracteres).', code: 'USER_REASON_REQUIRED' });
+      }
+      if (nextStatus !== current.accountStatus) {
+        setField('account_status', nextStatus, current.accountStatus);
+        params.push(nextStatus === 'deactivated' ? suspendReason : null);
+        updates.push(`account_status_reason = $${params.length}`);
+        before.account_status_reason = current.accountStatusReason;
+        after.account_status_reason = nextStatus === 'deactivated' ? suspendReason : null;
+        updates.push('status_changed_at = NOW()');
+        statusChanged = true;
+      }
+    }
+
+    if (updates.length === 0) {
+      return res.json({ success: true, user: current, changed: false });
+    }
+    params.push(userId);
+    await databasePool.query(
+      `UPDATE users SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${params.length}`,
+      params,
+    );
+    if (statusChanged && after.account_status === 'deactivated') {
+      await identityAccess.revokeAllSessions(userId).catch(() => 0);
+    }
+    recordAudit({
+      action: statusChanged ? 'admin_user_status_changed' : 'admin_user_updated',
+      resource: 'user',
+      resourceId: userId,
+      actorId: context.userId,
+      actorRole: 'admin',
+      success: true,
+      requestId: requestIdFrom(req),
+      metadata: { before, after, ...(suspendReason ? { reason: suspendReason } : {}) },
+    });
+    res.json({ success: true, changed: true, user: await findAdminUser(userId) });
+  } catch (error) {
+    console.error('[Guigui.com] PATCH /api/admin/users/:id error:', error);
+    res.status(500).json({ error: 'Não foi possível guardar as alterações.', code: 'ADMIN_USER_UPDATE_FAILED' });
+  }
+});
+
+app.post('/api/admin/users/:userId/request-password-reset', requireRole('admin'), async (req, res) => {
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  try {
+    const user = await findAdminUser(req.params.userId);
+    if (!user) return res.status(404).json({ error: 'Conta não encontrada.', code: 'USER_NOT_FOUND' });
+    await identityAccess.requestPasswordReset(user.email);
+    recordAudit({
+      action: 'admin_user_password_reset_requested',
+      resource: 'user',
+      resourceId: user.id,
+      actorId: context.userId,
+      actorRole: 'admin',
+      success: true,
+      requestId: requestIdFrom(req),
+    });
+    res.json({ success: true, message: 'Processo seguro de redefinição iniciado. O utilizador receberá as instruções no email registado.' });
+  } catch (error) {
+    console.error('[Guigui.com] reset de credenciais falhou:', error);
+    res.status(500).json({ error: 'Não foi possível iniciar a redefinição.', code: 'ADMIN_USER_RESET_FAILED' });
   }
 });
 
@@ -1257,7 +2377,10 @@ const businessProfileStringFields = new Set([
   'coverImage',
 ]);
 
-function validateBusinessProfileUpdate(input: unknown):
+function validateBusinessProfileUpdate(
+  input: unknown,
+  storedProfile?: Record<string, unknown> | null,
+):
   | { ok: true; profile: Record<string, unknown> }
   | { ok: false; error: { code: string; message: string } } {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -1283,6 +2406,14 @@ function validateBusinessProfileUpdate(input: unknown):
         return { ok: false, error: { code: 'INVALID_BUSINESS_PROFILE', message: `O campo ${field} deve ser texto.` } };
       }
       const normalized = value.trim();
+      // Um campo legado inválido que o cliente reenvia sem alterações não deve
+      // bloquear a gravação de outro campo; só uma alteração deliberada valida.
+      const unchangedLegacyValue = typeof storedProfile?.[field] === 'string'
+        && (storedProfile[field] as string).trim() === normalized;
+      if (unchangedLegacyValue) {
+        profile[field] = normalized;
+        continue;
+      }
       if (requiredBusinessProfileFields.has(field) && !normalized) {
         return { ok: false, error: { code: 'INVALID_BUSINESS_PROFILE', message: `O campo ${field} é obrigatório.` } };
       }
@@ -1355,31 +2486,32 @@ app.patch('/api/businesses/:id/profile', requireRole('business', 'admin'), async
   const context = await sessionContext(req);
   if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
 
+  const storedBusinessUser = context.role === 'business'
+    ? (await identityAccess.findById(context.userId) || undefined)
+    : null;
+  const decision = resolveBusinessWrite(context.role, storedBusinessUser?.businessId, req.params.id);
+  if (decision.allowed === false) {
+    recordAudit({
+      action: 'business_profile_update_denied',
+      resource: 'company',
+      resourceId: req.params.id,
+      actorRole: context.role === 'user' ? 'citizen' : context.role,
+      requestId,
+      success: false,
+      metadata: { code: decision.code },
+    });
+    return res.status(decision.status).json({
+      error: 'Não possui permissão para editar esta empresa.',
+      code: decision.code,
+    });
+  }
+
   const validation = validateBusinessProfileUpdate(req.body);
   if (validation.ok === false) {
     return res.status(400).json(validation.error);
   }
 
   try {
-    const storedBusinessUser = context.role === 'business'
-      ? (await identityAccess.findById(context.userId) || undefined)
-      : null;
-    const decision = resolveBusinessWrite(context.role, storedBusinessUser?.businessId, req.params.id);
-    if (decision.allowed === false) {
-      recordAudit({
-        action: 'business_profile_update_denied',
-        resource: 'company',
-        resourceId: req.params.id,
-        actorRole: context.role === 'user' ? 'citizen' : context.role,
-        requestId,
-        success: false,
-        metadata: { code: decision.code },
-      });
-      return res.status(decision.status).json({
-        error: 'Não possui permissão para editar esta empresa.',
-        code: decision.code,
-      });
-    }
 
     const business = await updatePostgresBusinessProfile(req.params.id, validation.profile);
     if (!business) {
@@ -1400,14 +2532,10 @@ app.post('/api/businesses', requireSession, async (req, res) => {
   const context = await sessionContext(req);
   if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
 
-  const business = req.body;
-  if (!business || !business.id || !business.name) {
-    return res.status(400).json({ error: 'id e name são obrigatórios para a empresa.' });
-  }
-
-  // A empresa nunca escolhe o seu próprio id: uma conta de negócio só pode
-  // gravar a ficha a que está associada, impedindo criação ou sequestro de fichas.
-  const targetBusinessId = String(context.role === 'admin' ? business.id : (business.businessId || business.id));
+  const business = req.body || {};
+  // A posse é decidida antes de validar o corpo: um pedido para uma ficha
+  // alheia responde 403 mesmo que os restantes campos estejam incompletos.
+  const targetBusinessId = String(context.role === 'admin' ? business.id : (business.businessId || business.id || ''));
   const storedBusinessUser = context.role === 'business'
     ? (await identityAccess.findById(context.userId) || undefined)
     : null;
@@ -1416,7 +2544,7 @@ app.post('/api/businesses', requireSession, async (req, res) => {
     recordAudit({
       action: 'business_write_denied',
       resource: 'company',
-      resourceId: String(business.id),
+      resourceId: targetBusinessId,
       actorRole: context.role === 'user' ? 'citizen' : context.role,
       requestId,
       success: false,
@@ -1425,11 +2553,16 @@ app.post('/api/businesses', requireSession, async (req, res) => {
     return res.status(decision.status).json({ error: 'Não possui permissão para gravar esta empresa.', code: decision.code });
   }
 
+  if (!business.id || !business.name) {
+    return res.status(400).json({ error: 'id e name são obrigatórios para a empresa.' });
+  }
+
   if (context.role === 'business') {
     const profileInput = Object.fromEntries(
       Object.entries(business).filter(([field]) => editableBusinessProfileFields.has(field)),
     );
-    const validation = validateBusinessProfileUpdate(profileInput);
+    const storedProfile = await getPostgresBusiness(targetBusinessId);
+    const validation = validateBusinessProfileUpdate(profileInput, storedProfile);
     if (validation.ok === false) {
       return res.status(400).json(validation.error);
     }
@@ -1473,11 +2606,7 @@ app.post('/api/events', requireSession, async (req, res) => {
   const context = await sessionContext(req);
   if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
 
-  const event = req.body;
-  if (!event || !event.id || !event.title) {
-    return res.status(400).json({ error: 'id e title são obrigatórios para o evento.' });
-  }
-
+  const event = req.body || {};
   // Um evento é sempre propriedade da empresa organizadora: o businessId vem da
   // sessão, nunca do corpo do pedido, para impedir eventos em nome de terceiros.
   const storedBusinessUser = context.role === 'business'
@@ -1493,13 +2622,17 @@ app.post('/api/events', requireSession, async (req, res) => {
     recordAudit({
       action: 'event_write_denied',
       resource: 'event',
-      resourceId: String(event.id),
+      resourceId: String(event.id || ''),
       actorRole: context.role === 'user' ? 'citizen' : context.role,
       requestId,
       success: false,
       metadata: { code: decision.code },
     });
     return res.status(decision.status).json({ error: 'Não possui permissão para gravar este evento.', code: decision.code });
+  }
+
+  if (!event.id || !event.title) {
+    return res.status(400).json({ error: 'id e title são obrigatórios para o evento.' });
   }
 
   try {
@@ -1579,18 +2712,37 @@ app.put('/api/monetization/catalog', requireRole('admin'), async (req, res) => {
 
 app.get('/api/monetization/ledger', requireRole('admin'), (_req, res) => res.json(monetizationLedger));
 app.get('/api/monetization/requests', requireRole('admin'), (_req, res) => res.json(monetizationRequests));
-app.post('/api/monetization/requests', requireRole('business'), (req, res) => {
+app.post('/api/monetization/requests', requireRole('business'), async (req, res) => {
   const { kind, businessId, businessName, serviceId, serviceName, productId, productCode, productName, notes } = req.body || {};
-  if (!['content_service', 'advertising'].includes(String(kind)) || typeof businessId !== 'string' || !businessId.trim() || typeof (serviceName || productName) !== 'string') {
+  const context = await sessionContext(req);
+  const requestedBusinessId = typeof businessId === 'string' && businessId.trim() ? businessId.trim() : undefined;
+  // Autorização antes da validação: a empresa alheia recebe 403, não 400.
+  const storedBusinessUser = context ? await identityAccess.findById(context.userId) || undefined : undefined;
+  const scope = resolveBusinessScope(context?.role, storedBusinessUser?.businessId, requestedBusinessId);
+  if (scope.allowed === false) {
+    return res.status(scope.status).json({ error: 'O pedido não pertence à empresa autenticada.', code: scope.code });
+  }
+  if (!['content_service', 'advertising'].includes(String(kind)) || !requestedBusinessId || typeof (serviceName || productName) !== 'string') {
     return res.status(400).json({ error: 'Pedido comercial inválido.', code: 'INVALID_MONETIZATION_REQUEST' });
   }
   const request = { id: `MON-REQ-${Date.now()}-${randomBytes(3).toString('hex').toUpperCase()}`, kind, businessId: businessId.trim(), businessName: String(businessName || ''), serviceId, serviceName, productId, productCode, productName, notes: String(notes || '').slice(0, 2000), status: 'requested', createdAt: new Date().toISOString() };
   monetizationRequests.unshift(request);
   persistMonetizationRequests();
-  recordAudit({ action: 'monetization_request_created', resource: 'monetization_request', resourceId: request.id, actorRole: 'business', success: true, metadata: { kind, businessId: request.businessId, serviceId, productCode } });
+  recordAudit({ action: 'monetization_request_created', resource: 'monetization_request', resourceId: request.id, actorRole: 'business', actorId: context?.userId, success: true, metadata: { kind, businessId: request.businessId, serviceId, productCode } });
   res.status(201).json({ success: true, request });
 });
-app.get('/api/monetization/wallet/:businessId', requireRole('admin', 'business'), (req, res) => res.json(monetizationWallets[req.params.businessId] || { postsExtraPurchased: 0, promotionsExtraPurchased: 0, postsExtraUsed: 0, promotionsExtraUsed: 0 }));
+app.get('/api/monetization/wallet/:businessId', requireRole('admin', 'business'), async (req, res) => {
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  if (context.role === 'business') {
+    const storedUser = await identityAccess.findById(context.userId) || undefined;
+    const sessionBusinessId = storedUser?.businessId;
+    if (!sessionBusinessId || sessionBusinessId !== req.params.businessId) {
+      return res.status(403).json({ error: 'Não possui permissão para consultar esta empresa.', code: 'BUSINESS_SCOPE_REQUIRED' });
+    }
+  }
+  return res.json(monetizationWallets[req.params.businessId] || { postsExtraPurchased: 0, promotionsExtraPurchased: 0, postsExtraUsed: 0, promotionsExtraUsed: 0 });
+});
 
 const demoUsers: Array<PublicIdentity & { password: string }> = [
   { id: 'demo-citizen', name: 'Malam Bacar', email: 'cidadao.teste@guigui.com', role: 'user', phone: '+245 955 12 34', neighborhood: 'Bissau Velho', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80', password: 'Guigui@2026!' },
@@ -1676,6 +2828,8 @@ app.post('/api/auth/login', async (req, res) => {
   });
   if (result.kind === 'rejected') {
     if (result.reason === 'deactivated') return res.status(403).json({ error: 'Esta conta está desativada. Contacte o suporte para reativá-la.' });
+    if (result.reason === 'suspended') return res.status(403).json({ error: 'O seu acesso está suspenso. Contacte o responsável da empresa.', code: 'ACCESS_SUSPENDED' });
+    if (result.reason === 'disabled') return res.status(403).json({ error: 'O acesso desta conta foi revogado.', code: 'ACCESS_DISABLED' });
     if (result.reason === 'mfa_required') return res.status(401).json({ error: 'Código MFA obrigatório.', code: 'MFA_REQUIRED' });
     if (result.reason === 'mfa_invalid') return res.status(401).json({ error: 'Código MFA inválido ou já utilizado.', code: 'MFA_INVALID' });
     return res.status(401).json({ error: 'E-mail ou palavra-passe incorretos.' });
@@ -1717,6 +2871,57 @@ app.post('/api/auth/sessions/revoke-all', requireSession, async (req, res) => {
   res.json({ success: true, revoked });
 });
 
+app.get('/api/auth/sessions', requireSession, async (req, res) => {
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  const sessions = await listUserSessions(context.userId, sessionTokenFromRequest(req));
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ sessions });
+});
+
+app.delete('/api/auth/sessions/:id', requireSession, async (req, res) => {
+  const requestId = requestIdFrom(req);
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  const revoked = await revokeUserSessionById(context.userId, String(req.params.id || ''));
+  if (!revoked) {
+    return res.status(404).json({ error: 'Sessão não encontrada nesta conta.', code: 'SESSION_NOT_FOUND' });
+  }
+  recordAudit({ action: 'session_revoked', resource: 'session', resourceId: String(req.params.id), actorRole: context.role === 'user' ? 'citizen' : context.role, requestId, success: true });
+  res.json({ success: true });
+});
+
+app.get('/api/security/events', requireSession, async (req, res) => {
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  if (!databasePool) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ events: [], source: 'Indisponível sem base de dados PostgreSQL.' });
+  }
+  const limit = Math.min(Math.max(Number(req.query.limit) || 40, 1), 200);
+  const result = await databasePool.query(
+    `SELECT id, action, resource, resource_id, result, reason, created_at
+       FROM audit_logs
+      WHERE actor_user_id = $1
+      ORDER BY created_at DESC
+      LIMIT $2`,
+    [context.userId, limit],
+  );
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    source: 'audit_logs',
+    events: result.rows.map((row) => ({
+      id: String(row.id),
+      action: String(row.action),
+      resource: row.resource ? String(row.resource) : null,
+      resourceId: row.resource_id ? String(row.resource_id) : null,
+      result: String(row.result || 'success'),
+      reason: row.reason ? String(row.reason) : null,
+      createdAt: new Date(row.created_at).toISOString(),
+    })),
+  });
+});
+
 app.get('/api/auth/session', async (req, res) => {
   const session = await identityAccess.getSession(sessionTokenFromRequest(req));
   res.json({ authenticated: Boolean(session && session.role), ...(session && session.role ? { userId: session.userId, role: session.role, expiresAt: session.expiresAt } : {}) });
@@ -1726,6 +2931,18 @@ app.post('/api/business/team/invitations', requireRole('business'), async (req, 
   const { recipientEmail, recipientName, businessId, businessName, role, permissions, roleLabel, token } = req.body || {};
   const context = await sessionContext(req);
   if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  // O convite é sempre da empresa da sessão; a validação de campos só corre
+  // depois de confirmar que o businessId indicado lhe pertence (403, não 400).
+  if (typeof businessId === 'string' && businessId.trim()) {
+    const storedInviter = await identityAccess.findById(context.userId) || undefined;
+    const invitationScope = resolveBusinessScope(context.role, storedInviter?.businessId, businessId);
+    if (invitationScope.allowed === false) {
+      return res.status(403).json({
+        error: 'Não tem permissão para convidar membros para esta empresa.',
+        code: 'BUSINESS_INVITATION_FORBIDDEN',
+      });
+    }
+  }
   if (
     typeof recipientEmail !== 'string'
     || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())
@@ -1804,6 +3021,232 @@ app.post('/api/business/team/invitations/accept', async (req, res) => {
     return res.status(409).json({ error: 'Não foi possível associar a conta à equipa empresarial.', code: 'TEAM_INVITATION_ASSOCIATION_FAILED' });
   }
   res.status(201).json({ success: true, user: result.user });
+});
+
+// ---------------------------------------------------------------------------
+// Equipa da empresa: contas individuais com acesso por módulos e acções.
+// ---------------------------------------------------------------------------
+
+async function teamScopeFor(req: Parameters<typeof sessionContext>[0]): Promise<{
+  context: Awaited<ReturnType<typeof sessionContext>>;
+  userId: string;
+  businessId: string;
+  canManage: boolean;
+} | null> {
+  const context = await sessionContext(req);
+  if (!context || context.role !== 'business') return null;
+  const stored = await identityAccess.findById(context.userId);
+  const businessId = stored?.businessId || '';
+  if (!businessId) return null;
+  const effective = await effectiveBusinessAccess(context.userId);
+  const canManage = effective.access === null || canPerformAction(effective.access, 'team', 'manage');
+  return { context, userId: context.userId, businessId, canManage };
+}
+
+app.get('/api/business/team/members', requireRole('business'), async (req, res) => {
+  const scope = await teamScopeFor(req);
+  if (!scope) return res.status(403).json({ error: 'A conta não está associada a uma empresa.', code: 'BUSINESS_ACCOUNT_REQUIRED' });
+  if (!databaseConfigured) return res.status(503).json({ error: 'A gestão de equipas exige a base de dados PostgreSQL.', code: 'TEAM_ACCESS_REQUIRES_DATABASE' });
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ members: await listCompanyMembers(scope.businessId) });
+});
+
+app.post('/api/business/team/members', requireRole('business'), async (req, res) => {
+  const requestId = requestIdFrom(req);
+  const scope = await teamScopeFor(req);
+  if (!scope) return res.status(403).json({ error: 'A conta não está associada a uma empresa.', code: 'BUSINESS_ACCOUNT_REQUIRED' });
+  if (!scope.canManage) return res.status(403).json({ error: 'Não tem permissão para gerir a equipa.', code: 'TEAM_MANAGE_FORBIDDEN' });
+  const body = req.body || {};
+  const result = await createCompanyMember({
+    companyId: scope.businessId,
+    name: typeof body.name === 'string' ? body.name : '',
+    email: typeof body.email === 'string' ? body.email : '',
+    password: typeof body.password === 'string' ? body.password : '',
+    phone: typeof body.phone === 'string' ? body.phone : '',
+    jobTitle: typeof body.jobTitle === 'string' ? body.jobTitle : '',
+    role: typeof body.role === 'string' ? body.role : 'custom',
+    access: body.access ?? body.modules ?? {},
+    status: body.status === 'pending' ? 'pending' : 'active',
+  }).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message === 'TEAM_ACCESS_REQUIRES_DATABASE') return null;
+    console.error('[team] Falha ao criar colaborador:', message);
+    return { kind: 'invalid' as const, reason: 'Não foi possível criar a conta do colaborador. Verifique os dados e tente novamente.' };
+  });
+  if (!result) return res.status(503).json({ error: 'A gestão de equipas exige a base de dados PostgreSQL.', code: 'TEAM_ACCESS_REQUIRES_DATABASE' });
+  if (result.kind === 'duplicate') return res.status(409).json({ error: 'Já existe uma conta com este e-mail.', code: 'TEAM_MEMBER_DUPLICATE' });
+  if (result.kind === 'invalid') return res.status(400).json({ error: result.reason, code: 'TEAM_MEMBER_INVALID' });
+  await recordAccessChange({ scope: 'business', companyId: scope.businessId, actorUserId: scope.userId, targetUserId: result.member.userId, action: 'member_created', after: { role: result.member.role, access: result.member.access, jobTitle: result.member.jobTitle } });
+  recordAudit({ action: 'team_member_created', resource: 'company_member', resourceId: result.member.userId, actorRole: 'business', actorId: scope.userId, success: true, requestId, metadata: { modules: Object.keys(result.member.access) } });
+  res.status(201).json({ member: result.member });
+});
+
+app.patch('/api/business/team/members/:userId', requireRole('business'), async (req, res) => {
+  const requestId = requestIdFrom(req);
+  const scope = await teamScopeFor(req);
+  if (!scope) return res.status(403).json({ error: 'A conta não está associada a uma empresa.', code: 'BUSINESS_ACCOUNT_REQUIRED' });
+  if (!scope.canManage) return res.status(403).json({ error: 'Não tem permissão para gerir a equipa.', code: 'TEAM_MANAGE_FORBIDDEN' });
+  const userId = String(req.params.userId || '');
+  const target = await findCompanyMember(scope.businessId, userId).catch(() => null);
+  if (!target) return res.status(404).json({ error: 'Colaborador não encontrado nesta empresa.', code: 'TEAM_MEMBER_NOT_FOUND' });
+  const targetUser = await identityAccess.findById(userId);
+  if (!targetUser?.teamRole && !targetUser?.teamAccess && !targetUser?.teamPermissions) {
+    return res.status(403).json({ error: 'A conta titular da empresa não pode ser alterada por esta via.', code: 'OWNER_PROTECTED' });
+  }
+  const body = req.body || {};
+  const updated = await updateCompanyMember({
+    companyId: scope.businessId,
+    userId,
+    role: typeof body.role === 'string' ? body.role : undefined,
+    access: body.access !== undefined ? body.access : undefined,
+    jobTitle: typeof body.jobTitle === 'string' ? body.jobTitle : undefined,
+    status: ['active', 'pending', 'suspended', 'disabled'].includes(String(body.status)) ? body.status : undefined,
+    password: typeof body.password === 'string' && body.password.length >= 8 ? body.password : undefined,
+  }).catch((error: unknown) => {
+    console.error('[team] Falha ao actualizar colaborador:', error instanceof Error ? error.message : String(error));
+    return null;
+  });
+  if (!updated) return res.status(404).json({ error: 'Colaborador não encontrado nesta empresa.' });
+  if (updated.status === 'suspended' || updated.status === 'disabled') {
+    await identityAccess.revokeAllSessions(userId);
+  }
+  await recordAccessChange({ scope: 'business', companyId: scope.businessId, actorUserId: scope.userId, targetUserId: userId, action: 'member_updated', before: { status: target.status, role: target.role, access: target.access }, after: { status: updated.status, role: updated.role, access: updated.access } });
+  recordAudit({ action: 'team_member_updated', resource: 'company_member', resourceId: userId, actorRole: 'business', actorId: scope.userId, success: true, requestId, metadata: { status: updated.status, modules: Object.keys(updated.access) } });
+  res.json({ member: updated });
+});
+
+app.delete('/api/business/team/members/:userId', requireRole('business'), async (req, res) => {
+  const requestId = requestIdFrom(req);
+  const scope = await teamScopeFor(req);
+  if (!scope) return res.status(403).json({ error: 'A conta não está associada a uma empresa.', code: 'BUSINESS_ACCOUNT_REQUIRED' });
+  if (!scope.canManage) return res.status(403).json({ error: 'Não tem permissão para gerir a equipa.', code: 'TEAM_MANAGE_FORBIDDEN' });
+  const userId = String(req.params.userId || '');
+  if (userId === scope.userId) return res.status(400).json({ error: 'Não pode remover a sua própria conta.', code: 'SELF_REMOVAL_FORBIDDEN' });
+  const targetUser = await identityAccess.findById(userId);
+  if (!targetUser?.teamRole && !targetUser?.teamAccess && !targetUser?.teamPermissions) {
+    return res.status(403).json({ error: 'A conta titular da empresa não pode ser removida.', code: 'OWNER_PROTECTED' });
+  }
+  const removed = await removeCompanyMember(scope.businessId, userId);
+  if (!removed) return res.status(404).json({ error: 'Colaborador não encontrado nesta empresa.' });
+  await identityAccess.revokeAllSessions(userId);
+  await recordAccessChange({ scope: 'business', companyId: scope.businessId, actorUserId: scope.userId, targetUserId: userId, action: 'member_removed' });
+  recordAudit({ action: 'team_member_removed', resource: 'company_member', resourceId: userId, actorRole: 'business', actorId: scope.userId, success: true, requestId });
+  res.json({ success: true });
+});
+
+app.get('/api/business/team/activity', requireRole('business'), async (req, res) => {
+  const scope = await teamScopeFor(req);
+  if (!scope) return res.status(403).json({ error: 'A conta não está associada a uma empresa.', code: 'BUSINESS_ACCOUNT_REQUIRED' });
+  if (!databaseConfigured) return res.json({ entries: [] });
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ entries: await listAccessActivity(scope.businessId, Number(req.query.limit) || 50) });
+});
+
+/** Acesso efectivo da conta autenticada (empresa ou administração). */
+app.get('/api/me/access', requireSession, async (req, res) => {
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.' });
+  const stored = await identityAccess.findById(context.userId);
+  res.setHeader('Cache-Control', 'no-store');
+  if (context.role === 'business') {
+    const effective = await effectiveBusinessAccess(context.userId);
+    return res.json({
+      scope: 'business',
+      businessId: stored?.businessId || null,
+      status: effective.status || 'active',
+      fullAccess: effective.access === null,
+      access: effective.access,
+      jobTitle: stored?.jobTitle || null,
+    });
+  }
+  if (context.role === 'admin') {
+    const access = await effectiveAdminAccess(context.userId);
+    return res.json({ scope: 'admin', fullAccess: access === null, status: stored?.accessStatus || 'active', access, jobTitle: stored?.jobTitle || null });
+  }
+  res.json({ scope: 'user', fullAccess: false, access: {}, status: 'active' });
+});
+
+// ---------------------------------------------------------------------------
+// Equipa administrativa (contas reais, com acesso por módulos).
+// ---------------------------------------------------------------------------
+
+async function adminCanManageTeam(req: Parameters<typeof sessionContext>[0]): Promise<boolean> {
+  const context = await sessionContext(req);
+  if (!context || context.role !== 'admin') return false;
+  const access = await effectiveAdminAccess(context.userId);
+  return access === null || canPerformAction(access, 'admin_staff', 'manage') || canPerformAction(access, 'admin_staff', 'create');
+}
+
+app.get('/api/admin/team/members', requireRole('admin'), async (_req, res) => {
+  if (!databaseConfigured) return res.status(503).json({ error: 'A gestão da equipa exige a base de dados PostgreSQL.', code: 'TEAM_ACCESS_REQUIRES_DATABASE' });
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ members: await listAdminStaff() });
+});
+
+app.post('/api/admin/team/members', requireRole('admin'), async (req, res) => {
+  const requestId = requestIdFrom(req);
+  if (!await adminCanManageTeam(req)) return res.status(403).json({ error: 'Não tem permissão para gerir a equipa administrativa.', code: 'TEAM_MANAGE_FORBIDDEN' });
+  const context = await sessionContext(req);
+  const body = req.body || {};
+  const result = await createAdminStaff({
+    name: typeof body.name === 'string' ? body.name : '',
+    email: typeof body.email === 'string' ? body.email : '',
+    password: typeof body.password === 'string' ? body.password : '',
+    phone: typeof body.phone === 'string' ? body.phone : '',
+    jobTitle: typeof body.jobTitle === 'string' ? body.jobTitle : '',
+    preset: typeof body.preset === 'string' ? body.preset : 'staff',
+    access: body.access ?? {},
+  }).catch((error: unknown) => {
+    if (error instanceof Error && error.message === 'TEAM_ACCESS_REQUIRES_DATABASE') return null;
+    throw error;
+  });
+  if (!result) return res.status(503).json({ error: 'A gestão da equipa exige a base de dados PostgreSQL.', code: 'TEAM_ACCESS_REQUIRES_DATABASE' });
+  if (result.kind === 'duplicate') return res.status(409).json({ error: 'Já existe uma conta com este e-mail.', code: 'TEAM_MEMBER_DUPLICATE' });
+  if (result.kind === 'invalid') return res.status(400).json({ error: result.reason, code: 'TEAM_MEMBER_INVALID' });
+  await recordAccessChange({ scope: 'admin', actorUserId: context?.userId || '', targetUserId: result.member.userId, action: 'admin_member_created', after: { access: result.member.access } });
+  recordAudit({ action: 'admin_team_member_created', resource: 'admin_member', resourceId: result.member.userId, actorRole: 'admin', actorId: context?.userId, success: true, requestId });
+  res.status(201).json({ member: result.staff || result.member });
+});
+
+app.patch('/api/admin/team/members/:userId', requireRole('admin'), async (req, res) => {
+  const requestId = requestIdFrom(req);
+  if (!await adminCanManageTeam(req)) return res.status(403).json({ error: 'Não tem permissão para gerir a equipa administrativa.', code: 'TEAM_MANAGE_FORBIDDEN' });
+  const context = await sessionContext(req);
+  const userId = String(req.params.userId || '');
+  const targetUser = await identityAccess.findById(userId);
+  if (!targetUser || targetUser.role !== 'admin') return res.status(404).json({ error: 'Membro da equipa não encontrado.', code: 'TEAM_MEMBER_NOT_FOUND' });
+  if (!targetUser.adminAccess) return res.status(403).json({ error: 'A conta do administrador principal não pode ser alterada por esta via.', code: 'OWNER_PROTECTED' });
+  const body = req.body || {};
+  const updated = await updateAdminStaff({
+    userId,
+    access: body.access !== undefined ? body.access : undefined,
+    preset: typeof body.preset === 'string' ? body.preset : undefined,
+    jobTitle: typeof body.jobTitle === 'string' ? body.jobTitle : undefined,
+    status: ['active', 'suspended', 'disabled'].includes(String(body.status)) ? body.status : undefined,
+    password: typeof body.password === 'string' && body.password.length >= 8 ? body.password : undefined,
+  });
+  if (!updated) return res.status(404).json({ error: 'Membro da equipa não encontrado.' });
+  if (updated.status === 'suspended' || updated.status === 'disabled') await identityAccess.revokeAllSessions(userId);
+  await recordAccessChange({ scope: 'admin', actorUserId: context?.userId || '', targetUserId: userId, action: 'admin_member_updated', after: { access: updated.access, status: updated.status } });
+  recordAudit({ action: 'admin_team_member_updated', resource: 'admin_member', resourceId: userId, actorRole: 'admin', actorId: context?.userId, success: true, requestId });
+  res.json({ member: updated });
+});
+
+app.delete('/api/admin/team/members/:userId', requireRole('admin'), async (req, res) => {
+  const requestId = requestIdFrom(req);
+  if (!await adminCanManageTeam(req)) return res.status(403).json({ error: 'Não tem permissão para gerir a equipa administrativa.', code: 'TEAM_MANAGE_FORBIDDEN' });
+  const context = await sessionContext(req);
+  const userId = String(req.params.userId || '');
+  if (userId === context?.userId) return res.status(400).json({ error: 'Não pode remover a sua própria conta.', code: 'SELF_REMOVAL_FORBIDDEN' });
+  const targetUser = await identityAccess.findById(userId);
+  if (!targetUser || targetUser.role !== 'admin') return res.status(404).json({ error: 'Membro da equipa não encontrado.' });
+  if (!targetUser.adminAccess) return res.status(403).json({ error: 'A conta do administrador principal não pode ser removida.', code: 'OWNER_PROTECTED' });
+  const removed = await removeAdminStaff(userId);
+  if (!removed) return res.status(404).json({ error: 'Membro da equipa não encontrado.' });
+  await identityAccess.revokeAllSessions(userId);
+  await recordAccessChange({ scope: 'admin', actorUserId: context?.userId || '', targetUserId: userId, action: 'admin_member_removed' });
+  recordAudit({ action: 'admin_team_member_removed', resource: 'admin_member', resourceId: userId, actorRole: 'admin', actorId: context?.userId, success: true, requestId });
+  res.json({ success: true });
 });
 
 app.post('/api/auth/change-password', async (req, res) => {
@@ -1905,7 +3348,14 @@ app.get('/api/conversations/events', requireSession, async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders?.();
   res.write(`event: ready\ndata: ${JSON.stringify({ connectedAt: new Date().toISOString() })}\n\n`);
-  communicationStreams.add(res);
+  const stored = context.role === 'business'
+    ? (await identityAccess.findById(context.userId) || undefined)
+    : null;
+  communicationStreams.set(res, {
+    userId: context.userId,
+    role: context.role,
+    businessId: stored?.businessId ?? null,
+  });
   const heartbeat = setInterval(() => { try { res.write(': heartbeat\n\n'); } catch { clearInterval(heartbeat); communicationStreams.delete(res); } }, 20000);
   req.on('close', () => { clearInterval(heartbeat); communicationStreams.delete(res); });
 });
@@ -1930,7 +3380,7 @@ app.post('/api/conversations', requireSession, async (req, res) => {
   if (context.role !== 'user' || !businessId || !subject || !text) return res.status(400).json({ error: 'Destinatário, assunto e mensagem são obrigatórios.' });
   const id = `CON-${randomUUID()}`;
   const conversationId = await createPostgresConversation({ id, userId: context.userId, businessId, subject, text, senderId: context.userId, senderRole: 'user' });
-  broadcastCommunication('conversation', { conversationId: conversationId || id, type: 'new_message' });
+  broadcastCommunication('conversation', { conversationId: conversationId || id, type: 'new_message' }, { userId: context.userId, businessId });
   res.status(201).json({ id: conversationId || id });
 });
 
@@ -1942,7 +3392,8 @@ app.post('/api/conversations/:id/read', requireSession, async (req, res) => {
     : null;
   const marked = await markPostgresConversationRead({ conversationId: req.params.id, userId: context.userId, role: context.role, businessId: stored?.businessId });
   if (!marked) return res.status(403).json({ error: 'Não participa nesta conversa.' });
-  broadcastCommunication('conversation', { conversationId: req.params.id, type: 'read' });
+  const participants = await getConversationParticipants(req.params.id);
+  broadcastCommunication('conversation', { conversationId: req.params.id, type: 'read' }, participants || {});
   res.json({ success: true });
 });
 
@@ -1963,7 +3414,8 @@ app.post('/api/conversations/:id/messages', requireSession, async (req, res) => 
     if (error instanceof Error && error.message === 'CONVERSATION_ACCESS_DENIED') return res.status(403).json({ error: 'Não participa nesta conversa.' });
     throw error;
   }
-  broadcastCommunication('conversation', { conversationId: req.params.id, type: 'new_message' });
+  const participants = await getConversationParticipants(req.params.id);
+  broadcastCommunication('conversation', { conversationId: req.params.id, type: 'new_message' }, participants || {});
   res.status(201).json({ success: true });
 });
 
@@ -1978,19 +3430,24 @@ app.get('/api/support/tickets/mine', requireSession, async (req, res) => {
 
 app.post('/api/support/tickets/:id/replies', requireSession, async (req, res) => {
   const context = await sessionContext(req);
-  const text = String(req.body?.text || '').trim();
   if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.' });
-  if (!text || !['user', 'business', 'admin'].includes(context.role)) return res.status(400).json({ error: 'Resposta inválida.' });
+  if (!['user', 'business', 'admin'].includes(context.role)) return res.status(400).json({ error: 'Resposta inválida.' });
   const stored = context.role === 'business'
     ? (await identityAccess.findById(context.userId) || undefined)
     : null;
+  // Acesso ao pedido decidido antes do corpo: sem acesso é 403, nunca 400.
+  const canReply = await canAccessSupportTicket(req.params.id, context.userId, context.role, stored?.businessId);
+  if (!canReply) return res.status(403).json({ error: 'Sem acesso a este pedido de suporte.' });
+  const text = String(req.body?.text || '').trim();
+  if (!text) return res.status(400).json({ error: 'Resposta inválida.' });
   try {
     await createPostgresSupportReply({ id: `REP-${randomUUID()}`, ticketId: req.params.id, senderId: context.userId, senderRole: context.role, businessId: stored?.businessId, text, status: context.role === 'admin' ? 'in_progress' : undefined });
   } catch (error) {
     if (error instanceof Error && error.message === 'SUPPORT_ACCESS_DENIED') return res.status(403).json({ error: 'Sem acesso a este pedido de suporte.' });
     throw error;
   }
-  broadcastCommunication('support', { ticketId: req.params.id, type: 'new_reply' });
+  const participants = await getSupportTicketParticipants(req.params.id);
+  broadcastCommunication('support', { ticketId: req.params.id, type: 'new_reply' }, participants || {});
   res.status(201).json({ success: true });
 });
 
@@ -2004,7 +3461,8 @@ app.post('/api/support/tickets/:id/status', requireSession, async (req, res) => 
   }
   const updated = await updatePostgresSupportStatus(req.params.id, status);
   if (!updated) return res.status(404).json({ error: 'Pedido de suporte não encontrado.' });
-  broadcastCommunication('support', { ticketId: req.params.id, type: 'status_changed', status });
+  const participants = await getSupportTicketParticipants(req.params.id);
+  broadcastCommunication('support', { ticketId: req.params.id, type: 'status_changed', status }, participants || {});
   res.json({ success: true });
 });
 
@@ -2020,6 +3478,326 @@ app.post('/api/notifications/:id/read', requireSession, async (req, res) => {
   const updated = await markPostgresNotificationRead(context.userId, req.params.id);
   if (!updated) return res.status(404).json({ error: 'Notificação não encontrada.', code: 'NOTIFICATION_NOT_FOUND' });
   res.json({ success: true });
+});
+
+// ---------------------------------------------------------------------------
+// Feed: publicações e interações
+// ---------------------------------------------------------------------------
+
+/** Localiza a publicação e a empresa/entidade responsável, na base de dados. */
+async function resolvePostOwner(postId: string): Promise<{
+  businessId: string;
+  businessName: string;
+  title: string;
+  ownerUserId?: string;
+} | null> {
+  const businesses = await listPostgresBusinesses();
+  for (const business of businesses) {
+    const posts = Array.isArray(business.posts) ? business.posts : [];
+        const post = posts.find((entry) => entry && entry.id === postId);
+    if (post) {
+      let ownerUserId = (business as { ownerUserId?: string }).ownerUserId;
+      if (!ownerUserId) {
+        // Empresas antigas não têm o dono na coluna `companies.owner_user_id`;
+        // nesse caso usa-se o membro da equipa ligado à empresa.
+        const membership = await databasePool.query<{ user_id: string }>(
+          'SELECT user_id FROM company_members WHERE company_id = $1 LIMIT 1',
+          [business.id],
+        ).catch(() => null);
+        ownerUserId = membership?.rows?.[0]?.user_id;
+      }
+      return {
+        businessId: business.id,
+        businessName: business.name,
+        title: post.title || post.content?.slice(0, 80) || 'publicação',
+        ownerUserId,
+      };
+    }
+  }
+  return null;
+}
+
+/** Notifica a empresa responsável, sem duplicar a mesma ação. */
+async function notifyPostInteraction(input: {
+  postId: string;
+  kind: 'like' | 'comment' | 'share';
+  actorId: string;
+  actorName: string;
+  dedupeKey: string;
+}): Promise<void> {
+  try {
+    const owner = await resolvePostOwner(input.postId);
+    if (!owner?.ownerUserId || owner.ownerUserId === input.actorId) return;
+    const existing = await listPostgresNotifications(owner.ownerUserId);
+    const duplicate = existing.some((notification) => {
+      const metadata = (notification as { metadata?: Record<string, unknown> } | null)?.metadata;
+      return metadata?.dedupeKey === input.dedupeKey;
+    });
+    if (duplicate) return;
+    const label = input.kind === 'like' ? 'gostou da' : input.kind === 'comment' ? 'comentou a' : 'partilhou a';
+    await persistPostgresNotification({
+      id: `post-ntf-${randomUUID()}`,
+      userId: owner.ownerUserId,
+      category: 'post_interaction',
+      title: 'Nova interação no feed',
+      message: `${input.actorName} ${label} publicação "${owner.title}".`,
+      metadata: {
+        dedupeKey: input.dedupeKey,
+        kind: input.kind,
+        postId: input.postId,
+        businessId: owner.businessId,
+        actorId: input.actorId,
+        actorName: input.actorName,
+        actionUrl: `/?post=${encodeURIComponent(input.postId)}`,
+      },
+      createdAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[Guigui.com] notifyPostInteraction falhou:', error);
+  }
+}
+
+app.get('/api/locations', async (_req, res) => {
+  try {
+    res.json(await listLocationCatalog());
+  } catch (error) {
+    console.error('[Guigui.com] GET /api/locations falhou:', error);
+    res.status(500).json({ error: 'Não foi possível carregar as localidades.' });
+  }
+});
+
+app.get('/api/posts', async (req, res) => {
+  const pagingResult = parseCollectionPaging(req.query as Record<string, unknown>);
+  if ('error' in pagingResult) {
+    return res.status(400).json({ error: pagingResult.error, code: 'INVALID_PAGINATION' });
+  }
+  try {
+    const neighborhood = typeof req.query.neighborhood === 'string' ? req.query.neighborhood.trim() : '';
+    const query = typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase() : '';
+    const businesses = await listPostgresBusinesses();
+    const companyPosts = businesses.flatMap((business) =>
+      (business.posts || []).map((post) => ({
+        ...post,
+        businessName: post.businessName || business.name,
+        businessLogo: post.businessLogo || business.logo,
+        // A localização da publicação é a que foi guardada ao publicar; os
+        // posts antigos que não a têm herdam a localização da própria empresa.
+        neighborhood: post.neighborhood || business.neighborhood,
+        ownerType: 'business',
+      })),
+    );
+    const storedUserPosts = await getAppState('guigui_user_posts');
+    const citizenPosts = Array.isArray(storedUserPosts) ? storedUserPosts : [];
+    const posts = [...citizenPosts, ...companyPosts]
+      .filter((post) => post && post.status === 'approved')
+      .filter((post) => !neighborhood || locationMatches(post.neighborhood, neighborhood))
+      .filter((post) => !query || [post.title, post.content, post.businessName, post.neighborhood]
+        .some((value) => String(value || '').toLowerCase().includes(query)))
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+    // Sem `limit` devolve o feed inteiro (compatível com os clientes antigos);
+    // com `limit`/`offset` devolve só a página pedida e o total disponível.
+    const { items, pagination } = paginateCollection(posts, pagingResult.paging);
+    res.json({
+      posts: items,
+      total: posts.length,
+      hasMore: pagination ? pagination.hasMore : false,
+      ...(pagination ? { limit: pagination.limit, offset: pagination.offset } : {}),
+      filter: { neighborhood: neighborhood || null, q: query || null },
+    });
+  } catch (error) {
+    console.error('[Guigui.com] GET /api/posts falhou:', error);
+    res.status(500).json({ error: 'Não foi possível carregar o feed.' });
+  }
+});
+
+app.get('/api/posts/engagements', async (req, res) => {
+  const context = await sessionContext(req);
+  try {
+    res.json({ engagements: await listPostEngagements(context?.userId) });
+  } catch (error) {
+    console.error('[Guigui.com] GET /api/posts/engagements falhou:', error);
+    res.status(500).json({ error: 'Não foi possível carregar as interações.' });
+  }
+});
+
+app.get('/api/posts/engagements/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+  res.write(`event: ready
+data: ${JSON.stringify({ connectedAt: new Date().toISOString() })}
+
+`);
+  postEngagementStreams.add(res);
+  const heartbeat = setInterval(() => { try { res.write(`: heartbeat
+
+`); } catch { clearInterval(heartbeat); postEngagementStreams.delete(res); } }, 20000);
+  req.on('close', () => { clearInterval(heartbeat); postEngagementStreams.delete(res); });
+});
+
+app.get('/api/realtime/status', requireRole('admin'), (_req, res) => {
+  res.json(realtimeStatus());
+});
+
+app.post('/api/posts/:postId/reaction', requireSession, async (req, res) => {
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  const reaction = req.body?.reaction ?? null;
+  if (reaction !== null && !isPostReactionType(reaction)) {
+    return res.status(400).json({ error: 'Reação inválida.', code: 'INVALID_REACTION' });
+  }
+  try {
+    const engagement = await setPostReaction({ postId: req.params.postId, userId: context.userId, reaction });
+    broadcastPostEngagement({ postId: req.params.postId });
+    if (reaction) {
+      const actor = await identityAccess.findById(context.userId);
+    await notifyPostInteraction({
+        postId: req.params.postId,
+        kind: 'like',
+        actorId: context.userId,
+        actorName: actor?.name || 'Um utilizador',
+        dedupeKey: `reaction:${req.params.postId}:${context.userId}:${reaction}`,
+      });
+    }
+    res.json({ engagement });
+  } catch (error) {
+    console.error('[Guigui.com] POST reaction falhou:', error);
+    res.status(500).json({ error: 'Não foi possível registar a reação.' });
+  }
+});
+
+app.post('/api/posts/:postId/comments', requireSession, async (req, res) => {
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  const text = String(req.body?.text ?? '').trim();
+  if (!text) return res.status(400).json({ error: 'O comentário não pode estar vazio.', code: 'EMPTY_COMMENT' });
+  if (text.length > 2000) return res.status(400).json({ error: 'O comentário excede 2000 caracteres.', code: 'COMMENT_TOO_LONG' });
+  try {
+    const actor = await identityAccess.findById(context.userId);
+    const { comment, engagement } = await addPostComment({
+      postId: req.params.postId,
+      authorId: context.userId,
+      authorName: actor?.name || 'Utilizador',
+      authorAvatar: actor?.avatarUrl,
+      content: text,
+    });
+    broadcastPostEngagement({ postId: req.params.postId });
+    await notifyPostInteraction({
+      postId: req.params.postId,
+      kind: 'comment',
+      actorId: context.userId,
+      actorName: actor?.name || 'Um utilizador',
+      dedupeKey: `comment:${comment.id}`,
+    });
+    res.status(201).json({ comment, engagement });
+  } catch (error) {
+    console.error('[Guigui.com] POST comment falhou:', error);
+    res.status(500).json({ error: 'Não foi possível guardar o comentário.' });
+  }
+});
+
+app.post('/api/posts/:postId/comments/reply', requireSession, async (req, res) => {
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  const text = String(req.body?.text ?? '').trim();
+  const parentId = String(req.body?.parentId ?? '').trim();
+  if (!text) return res.status(400).json({ error: 'A resposta não pode estar vazia.', code: 'EMPTY_REPLY' });
+  if (text.length > 2000) return res.status(400).json({ error: 'A resposta excede 2000 caracteres.', code: 'REPLY_TOO_LONG' });
+  if (!parentId) return res.status(400).json({ error: 'Comentário de origem em falta.', code: 'PARENT_COMMENT_REQUIRED' });
+  try {
+    const engagements = await listPostEngagements(context.userId);
+    const parent = (engagements[req.params.postId]?.comments ?? []).find((comment) => comment.id === parentId);
+    if (!parent) return res.status(404).json({ error: 'Comentário não encontrado nesta publicação.', code: 'COMMENT_NOT_FOUND' });
+    const actor = await identityAccess.findById(context.userId);
+    const { comment, engagement } = await registerPostReply({
+      postId: req.params.postId,
+      authorId: context.userId,
+      authorName: actor?.name || 'Utilizador',
+      authorAvatar: actor?.avatarUrl,
+      content: text,
+      parentId,
+    });
+    broadcastPostEngagement({ postId: req.params.postId });
+    await notifyPostInteraction({
+      postId: req.params.postId,
+      kind: 'comment',
+      actorId: context.userId,
+      actorName: actor?.name || 'Um utilizador',
+      dedupeKey: `reply:${comment.id}`,
+    });
+    res.status(201).json({ comment, engagement });
+  } catch (error) {
+    console.error('[Guigui.com] POST comment reply falhou:', error);
+    res.status(500).json({ error: 'Não foi possível guardar a resposta.' });
+  }
+});
+
+app.post('/api/posts/:postId/share', requireSession, async (req, res) => {
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  try {
+    const engagement = await registerPostShare({ postId: req.params.postId, userId: context.userId });
+    const actor = await identityAccess.findById(context.userId);
+    broadcastPostEngagement({ postId: req.params.postId });
+    await notifyPostInteraction({
+      postId: req.params.postId,
+      kind: 'share',
+      actorId: context.userId,
+      actorName: actor?.name || 'Um utilizador',
+      dedupeKey: `share:${req.params.postId}:${context.userId}:${engagement.shares}`,
+    });
+    res.json({ engagement });
+  } catch (error) {
+    console.error('[Guigui.com] POST share falhou:', error);
+    res.status(500).json({ error: 'Não foi possível registar a partilha.' });
+  }
+});
+
+/** Métricas reais das publicações, para o painel da empresa. */
+app.get('/api/businesses/:businessId/post-metrics', requireRole('business', 'admin'), async (req, res) => {
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  try {
+    const businesses = await listPostgresBusinesses();
+    const business = businesses.find((entry) => entry.id === req.params.businessId);
+    if (!business) return res.status(404).json({ error: 'Empresa não encontrada.', code: 'BUSINESS_NOT_FOUND' });
+    const storedBusinessUser = context.role === 'business'
+      ? (await identityAccess.findById(context.userId) || undefined)
+      : undefined;
+    const scope = resolveBusinessScope(context.role, storedBusinessUser?.businessId, req.params.businessId);
+    if (scope.allowed === false) {
+      return res.status(scope.status).json({ error: 'Sem permissão para consultar estas métricas.', code: scope.code });
+    }
+    const engagements = await listPostEngagements(context.userId);
+    const posts = (business.posts || []).map((post) => {
+      const engagement = engagements[post.id];
+      return {
+        id: post.id,
+        title: post.title || post.content?.slice(0, 80) || 'Publicação',
+        createdAt: post.createdAt,
+        status: post.status,
+        likes: engagement?.likes ?? 0,
+        comments: engagement?.comments.length ?? 0,
+        shares: engagement?.shares ?? 0,
+        latestComments: (engagement?.comments ?? []).slice(-20).map((comment) => ({
+          id: comment.id,
+          authorName: comment.authorName,
+          content: comment.content,
+          createdAt: comment.createdAt,
+        })),
+      };
+    }).sort((left, right) => (right.likes + right.comments + right.shares) - (left.likes + left.comments + left.shares));
+    const totals = posts.reduce((accumulator, post) => ({
+      likes: accumulator.likes + post.likes,
+      comments: accumulator.comments + post.comments,
+      shares: accumulator.shares + post.shares,
+    }), { likes: 0, comments: 0, shares: 0 });
+    res.json({ businessId: business.id, businessName: business.name, totals, posts, topPosts: posts.slice(0, 5) });
+  } catch (error) {
+    console.error('[Guigui.com] GET post-metrics falhou:', error);
+    res.status(500).json({ error: 'Não foi possível carregar as métricas.' });
+  }
 });
 
 app.post('/api/auth/register', async (req, res) => {
@@ -2258,8 +4036,11 @@ Responda ESTRITAMENTE em formato JSON com as chaves:
       }
     }
 
+    const storedModerationUser = await identityAccess.findById(moderationContext.userId) || undefined;
     const logEntry = {
       id: 'MOD-' + Date.now(),
+      authorId: moderationContext.userId,
+      businessId: storedModerationUser?.businessId,
       businessName: author || 'Utilizador Guigui',
       authorName: author || 'Utilizador',
       type,
@@ -2402,17 +4183,29 @@ app.post('/api/reviews/:reviewId/reply', requireSession, async (req, res) => {
   if (context.role === 'user') {
     return res.status(403).json({ error: 'Apenas a empresa proprietária ou a administração pode responder.', code: 'REVIEW_REPLY_FORBIDDEN' });
   }
-  const ownerReply = normaliseReviewComment(req.body?.ownerReply);
-  if (ownerReply.length < 2) {
-    return res.status(400).json({ error: 'Escreva a resposta pública.', code: 'REVIEW_REPLY_REQUIRED' });
-  }
+  // A empresa da sessão é a única autorizada a responder; a verificação de
+  // âmbito corre antes da validação do corpo.
+  let sessionBusinessId: string | undefined;
   if (context.role === 'business') {
     const storedBusinessUser = await identityAccess.findById(context.userId) || undefined;
     if (!storedBusinessUser?.businessId) {
       return res.status(403).json({ error: 'A sua conta não está associada a um negócio.', code: 'REVIEW_REPLY_FORBIDDEN' });
     }
+    sessionBusinessId = storedBusinessUser.businessId;
   }
-  const replied = await replyPostgresReview(req.params.reviewId, ownerReply);
+  const ownerReply = normaliseReviewComment(req.body?.ownerReply);
+  if (ownerReply.length < 2) {
+    return res.status(400).json({ error: 'Escreva a resposta pública.', code: 'REVIEW_REPLY_REQUIRED' });
+  }
+  let replied;
+  try {
+    replied = await replyPostgresReview(req.params.reviewId, ownerReply, sessionBusinessId);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'REVIEW_ACCESS_DENIED') {
+      return res.status(403).json({ error: 'A avaliação não pertence à sua empresa.', code: 'REVIEW_REPLY_FORBIDDEN' });
+    }
+    throw error;
+  }
   if (!replied) return res.status(404).json({ error: 'Avaliação não encontrada.', code: 'REVIEW_NOT_FOUND' });
   recordAudit({
     action: 'review_owner_replied', resource: 'review', resourceId: replied.id,
@@ -2453,8 +4246,11 @@ app.post('/api/moderation/review', requireSession, async (req, res) => {
 
   const { id, action, notes } = req.body;
   const isDecision = action === 'approve' || action === 'reject';
+  // A simulação de recurso é uma ferramenta de administração: fica separada do
+  // recurso real do titular (que exige titularidade) e é marcada como simulada.
+  const isSimulatedAppeal = action === 'simulate-appeal';
 
-  if (isDecision && context.role !== 'admin') {
+  if ((isDecision || isSimulatedAppeal) && context.role !== 'admin') {
     recordAudit({ action: 'authorization_denied', resource: req.path, actorRole: context.role === 'user' ? 'citizen' : context.role, requestId, success: false, metadata: { requiredRoles: ['admin'], attemptedAction: action } });
     return res.status(403).json({ error: 'Não possui permissão para esta operação.', code: 'PERMISSION_DENIED' });
   }
@@ -2493,7 +4289,24 @@ app.post('/api/moderation/review', requireSession, async (req, res) => {
       actor: actorLabel,
       notes: notes || 'Rejeitado por violação de políticas de conteúdo.',
     });
+  } else if (isSimulatedAppeal) {
+    log.status = 'appealed';
+    log.appealReason = `[SIMULAÇÃO] ${notes || 'Recurso simulado pela administração.'}`;
+    log.auditTrail.push({
+      timestamp: new Date().toISOString(),
+      action: 'appeal_simulated',
+      actor: actorLabel,
+      notes: 'Recurso SIMULADO pela administração; não foi submetido por um autor real.',
+    });
   } else if (action === 'appeal') {
+    // Apenas o titular do conteudo ou um representante da empresa pode apelar.
+    const storedUser = await identityAccess.findById(context.userId) || undefined;
+    const sessionBusinessId = storedUser?.businessId;
+    const isOwner = log.authorId === context.userId;
+    const isCompanyRepresentative = Boolean(sessionBusinessId) && log.businessId === sessionBusinessId;
+    if (!isOwner && !isCompanyRepresentative) {
+      return res.status(403).json({ error: 'Não possui permissão para apelar este conteúdo.', code: 'MODERATION_APPEAL_FORBIDDEN' });
+    }
     log.status = 'appealed';
     log.appealReason = notes;
     log.auditTrail.push({
@@ -2512,6 +4325,33 @@ app.post('/api/moderation/review', requireSession, async (req, res) => {
       resource: 'moderation',
       resourceId: String(id),
       actorRole: 'admin',
+      actorId: context.userId,
+      actorName: actorLabel,
+      requestId,
+      success: true,
+      metadata: { notes: notes || null },
+    });
+  } else if (isSimulatedAppeal) {
+    recordAudit({
+      action: 'moderation_appeal_simulated',
+      resource: 'moderation',
+      resourceId: String(id),
+      actorRole: 'admin',
+      actorId: context.userId,
+      actorName: actorLabel,
+      requestId,
+      success: true,
+      metadata: { notes: notes || null, simulated: true },
+    });
+  } else {
+    // O recurso também é uma decisão registada: fica na auditoria do servidor
+    // com a identidade da sessão e o request ID, não com dados do cliente.
+    recordAudit({
+      action: 'moderation_content_appealed',
+      resource: 'moderation',
+      resourceId: String(id),
+      actorRole: context.role === 'user' ? 'citizen' : context.role,
+      actorId: context.userId,
       actorName: actorLabel,
       requestId,
       success: true,
@@ -2641,6 +4481,12 @@ app.post('/api/tickets/purchase', async (req, res) => {
   let releaseIdempotencyLock: (() => void) | undefined;
   const requestId = requestIdFrom(req);
   try {
+    // A compra exige sessão de cidadão; sem ela a resposta é 401, mesmo com
+    // corpo inválido (a autenticação precede a validação).
+    const purchaseSession = await sessionContext(req);
+    if (!purchaseSession || purchaseSession.role !== 'user') {
+      return res.status(401).json({ error: 'Inicie sessão para comprar bilhetes.', code: 'AUTHENTICATION_REQUIRED', requestId });
+    }
     const validation = validatePurchaseInput({
       ...req.body,
       buyerName: 'Utilizador autenticado',
@@ -2664,10 +4510,6 @@ app.post('/api/tickets/purchase', async (req, res) => {
       });
     }
 
-    const purchaseSession = await sessionContext(req);
-    if (!purchaseSession || purchaseSession.role !== 'user') {
-      return res.status(401).json({ error: 'Inicie sessão para comprar bilhetes.', code: 'AUTHENTICATION_REQUIRED', requestId });
-    }
     const account = await identityAccess.findById(purchaseSession.userId) || findDemoUserById(purchaseSession.userId);
     if (!account) {
       return res.status(401).json({ error: 'A conta da sessão não está disponível.', code: 'AUTHENTICATION_REQUIRED', requestId });
@@ -3036,18 +4878,84 @@ app.get('/api/tickets/sold', requireRole('business', 'admin'), async (req, res) 
   }, { total: 0, valid: 0, used: 0, cancelled: 0, pending: 0, refunded: 0, revenueXOF: 0 });
   res.json({ tickets, totals });
 });
+// Cancelamento operacional pela empresa organizadora (ou administração).
+// A empresa vem da sessão; o id do bilhete no corpo só é lido depois de
+// confirmada a associação da conta a uma empresa.
+app.post('/api/tickets/cancel', requireRole('business', 'admin'), async (req, res) => {
+  const requestId = requestIdFrom(req);
+  const context = await sessionContext(req);
+  if (!context) {
+    return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  }
+
+  const stored = context.role === 'business'
+    ? (await identityAccess.findById(context.userId) || undefined)
+    : undefined;
+  const companyId = context.role === 'admin'
+    ? (typeof req.body?.companyId === 'string' ? req.body.companyId.trim() : '')
+    : stored?.businessId;
+  if (context.role === 'business' && !companyId) {
+    return res.status(403).json({ error: 'A sua conta não está associada a uma empresa.', code: 'BUSINESS_ACCOUNT_REQUIRED' });
+  }
+
+  const ticketReference = typeof req.body?.id === 'string' ? req.body.id.trim() : '';
+  if (!ticketReference) {
+    return res.status(400).json({ error: 'Indique o bilhete a cancelar.', code: 'TICKET_ID_REQUIRED', requestId });
+  }
+  if (!databaseConfigured) {
+    return res.status(503).json({ error: 'O cancelamento exige base de dados configurada.', code: 'DATABASE_REQUIRED', requestId });
+  }
+
+  const ticket = await findPostgresTicketForLifecycle(ticketReference);
+  if (!ticket) {
+    return res.status(404).json({ error: 'Bilhete não encontrado.', code: 'TICKET_NOT_FOUND', requestId });
+  }
+  if (context.role !== 'admin' && ticket.companyId !== companyId) {
+    recordAudit({ action: 'ticket_cancel_denied', resource: 'ticket', resourceId: ticket.id, actorRole: 'business', requestId, success: false });
+    return res.status(403).json({ error: 'O bilhete pertence a outra empresa.', code: 'PERMISSION_DENIED', requestId });
+  }
+
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+  const cancelled = await cancelPostgresTicket(
+    ticket.id,
+    reason || (context.role === 'admin' ? 'Cancelado pela administração.' : 'Cancelado pela empresa organizadora.'),
+  );
+  if (!cancelled) {
+    return res.status(409).json({ error: 'O bilhete já foi usado, cancelado ou não está válido.', code: 'TICKET_NOT_CANCELLABLE', requestId });
+  }
+
+  recordAudit({
+    action: 'ticket_cancelled',
+    resource: 'ticket',
+    resourceId: ticket.id,
+    actorRole: context.role === 'admin' ? 'admin' : 'business',
+    requestId,
+    success: true,
+    metadata: { reason: reason || null },
+  });
+  return res.json({ success: true, ticketId: ticket.id, status: 'cancelled', requestId });
+});
+
 // Scanner authorization endpoint. The frontend must not decide access locally.
-app.post('/api/tickets/scanner-auth', requireRole('business'), (req, res) => {
+app.post('/api/tickets/scanner-auth', requireRole('business'), async (req, res) => {
   const requestId = requestIdFrom(req);
   const eventId = typeof req.body?.eventId === 'string' ? req.body.eventId.trim() : '';
   const businessId = typeof req.body?.businessId === 'string' ? req.body.businessId.trim() : '';
+  // O código de portaria é a primeira barreira: inválido responde sempre 403.
+  if (!matchesScannerDoorCode(req.body?.doorCode)) {
+    recordAudit({ action: 'scanner_login_denied', resource: 'scanner', actorRole: 'scanner', requestId, success: false });
+    return res.status(403).json({ authorized: false, code: 'SCANNER_UNAUTHORIZED', message: 'Código de portaria inválido.', requestId });
+  }
   if (!eventId || !businessId) {
     recordAudit({ action: 'scanner_login_denied', resource: 'scanner', actorRole: 'scanner', requestId, success: false, metadata: { reason: 'missing_scope' } });
     return res.status(400).json({ authorized: false, code: 'SCANNER_SCOPE_REQUIRED', message: 'O scanner deve indicar o evento e a empresa organizadora.', requestId });
   }
-  if (!matchesScannerDoorCode(req.body?.doorCode)) {
-    recordAudit({ action: 'scanner_login_denied', resource: 'scanner', actorRole: 'scanner', requestId, success: false });
-    return res.status(403).json({ authorized: false, code: 'SCANNER_UNAUTHORIZED', message: 'Código de portaria inválido.', requestId });
+  const context = await sessionContext(req);
+  const storedBusinessUser = context ? await identityAccess.findById(context.userId) || undefined : undefined;
+  const scope = resolveBusinessScope(context?.role, storedBusinessUser?.businessId, businessId);
+  if (scope.allowed === false) {
+    recordAudit({ action: 'scanner_login_denied', resource: 'scanner', actorRole: 'scanner', actorId: context?.userId, requestId, success: false, metadata: { reason: scope.code } });
+    return res.status(scope.status).json({ authorized: false, code: 'BUSINESS_SCOPE_REQUIRED', message: 'A empresa indicada não pertence à conta autenticada.', requestId });
   }
   recordAudit({ action: 'scanner_login_authorized', resource: 'scanner', actorRole: 'scanner', requestId, success: true });
   return res.json({ authorized: true, code: 'SCANNER_AUTHORIZED', requestId });
@@ -3060,17 +4968,28 @@ app.post('/api/tickets/offline-manifest', requireRole('business'), async (req, r
   const requestId = requestIdFrom(req);
   const eventId = typeof req.body?.eventId === 'string' ? req.body.eventId.trim() : '';
   const doorCode = typeof req.body?.doorCode === 'string' ? req.body.doorCode : '';
-  if (!eventId) return res.status(400).json({ error: 'Indique o evento.', code: 'SCANNER_SCOPE_REQUIRED' });
-  if (!ticketSigningSecret) return res.status(503).json({ error: 'Assinatura de bilhetes n�o configurada.', code: 'TICKET_SIGNING_UNAVAILABLE' });
   if (!matchesScannerDoorCode(doorCode)) {
     recordAudit({ action: 'scanner_manifest_denied', resource: 'scanner', actorRole: 'scanner', requestId, success: false });
     return res.status(403).json({ error: 'Scanner n�o autorizado.', code: 'SCANNER_UNAUTHORIZED' });
   }
+  if (!eventId) return res.status(400).json({ error: 'Indique o evento.', code: 'SCANNER_SCOPE_REQUIRED' });
+  if (!ticketSigningSecret) return res.status(503).json({ error: 'Assinatura de bilhetes n�o configurada.', code: 'TICKET_SIGNING_UNAVAILABLE' });
 
   // A empresa organizadora vem da sess�o, nunca do corpo do pedido.
-  const stored = await identityAccess.findById((await sessionContext(req))?.userId || '') || undefined;
-  const manifest = await buildOfflineManifest(eventId, stored?.businessId || '', ticketSigningSecret);
-  recordAudit({ action: 'scanner_manifest_downloaded', resource: 'scanner', actorRole: 'scanner', requestId, success: true, metadata: { eventId, tickets: manifest.tickets.length } });
+  const context = await sessionContext(req);
+  const stored = context ? await identityAccess.findById(context.userId) || undefined : undefined;
+  const sessionBusinessId = stored?.businessId || '';
+  if (!sessionBusinessId) {
+    recordAudit({ action: 'scanner_manifest_denied', resource: 'scanner', actorRole: 'scanner', actorId: context?.userId, requestId, success: false, metadata: { reason: 'missing_business' } });
+    return res.status(403).json({ error: 'A conta não está associada a uma empresa.', code: 'BUSINESS_ACCOUNT_REQUIRED' });
+  }
+  const ownedEvent = (await listPostgresEvents()).find((candidate) => candidate.id === eventId && candidate.businessId === sessionBusinessId);
+  if (!ownedEvent) {
+    recordAudit({ action: 'scanner_manifest_denied', resource: 'scanner', actorRole: 'scanner', actorId: context?.userId, requestId, success: false, metadata: { reason: 'event_scope_mismatch', eventId } });
+    return res.status(403).json({ error: 'O evento indicado não pertence à sua empresa.', code: 'EVENT_SCOPE_REQUIRED' });
+  }
+  const manifest = await buildOfflineManifest(eventId, sessionBusinessId, ticketSigningSecret);
+  recordAudit({ action: 'scanner_manifest_downloaded', resource: 'scanner', actorRole: 'scanner', actorId: context?.userId, requestId, success: true, metadata: { eventId, tickets: manifest.tickets.length } });
   res.json({ manifest, requestId });
 });
 
@@ -3089,7 +5008,14 @@ app.post('/api/tickets/validate-batch', requireRole('business'), async (req, res
   if (records.length === 0) return res.json({ outcomes: [], duplicates: 0, requestId });
   if (records.length > 2000) return res.status(413).json({ error: 'Lote demasiado grande.', code: 'BATCH_TOO_LARGE' });
 
-  const outcomes = await syncOfflineValidations(records as OfflineValidationRecord[]);
+  // O lote só pode marcar bilhetes da empresa autenticada.
+  const context = await sessionContext(req);
+  const stored = context ? await identityAccess.findById(context.userId) || undefined : undefined;
+  if (!stored?.businessId) {
+    recordAudit({ action: 'scanner_batch_denied', resource: 'scanner', actorRole: 'scanner', actorId: context?.userId, requestId, success: false, metadata: { reason: 'missing_business' } });
+    return res.status(403).json({ error: 'A conta não está associada a uma empresa.', code: 'BUSINESS_ACCOUNT_REQUIRED' });
+  }
+  const outcomes = await syncOfflineValidations(records as OfflineValidationRecord[], stored.businessId);
   const duplicates = outcomes.filter((outcome) => outcome.result !== 'accepted').length;
   recordAudit({ action: 'scanner_batch_synced', resource: 'scanner', actorRole: 'scanner', requestId, success: true, metadata: { total: outcomes.length, duplicates } });
   res.json({ outcomes, duplicates, requestId });
@@ -3103,14 +5029,25 @@ app.post('/api/tickets/validate', requireRole('business'), async (req, res) => {
     const eventId = typeof req.body?.eventId === 'string' ? req.body.eventId.trim() : '';
     const businessId = typeof req.body?.businessId === 'string' ? req.body.businessId.trim() : '';
 
+    // O código de portaria é a primeira barreira: inválido responde sempre 403.
+    if (!matchesScannerDoorCode(doorCode)) {
+      recordAudit({ action: 'scanner_denied', resource: 'ticket', actorRole: 'scanner', requestId, success: false });
+      return res.status(403).json({ valid: false, status: 'unauthorized_scanner', code: 'SCANNER_UNAUTHORIZED', message: 'Scanner não autorizado para validar bilhetes.', requestId });
+    }
+
     if (!eventId || !businessId) {
       recordAudit({ action: 'scanner_denied', resource: 'ticket', actorRole: 'scanner', requestId, success: false, metadata: { reason: 'missing_scope' } });
       return res.status(400).json({ valid: false, status: 'unauthorized_scanner', code: 'SCANNER_SCOPE_REQUIRED', message: 'A validação exige o evento e a empresa organizadora.', requestId });
     }
 
-    if (!matchesScannerDoorCode(doorCode)) {
-      recordAudit({ action: 'scanner_denied', resource: 'ticket', actorRole: 'scanner', requestId, success: false });
-      return res.status(403).json({ valid: false, status: 'unauthorized_scanner', code: 'SCANNER_UNAUTHORIZED', message: 'Scanner não autorizado para validar bilhetes.', requestId });
+    // A empresa organizadora tem de ser a da sessão; o cliente não pode
+    // validar (nem consumir) bilhetes de outra empresa.
+    const context = await sessionContext(req);
+    const storedBusinessUser = context ? await identityAccess.findById(context.userId) || undefined : undefined;
+    const scope = resolveBusinessScope(context?.role, storedBusinessUser?.businessId, businessId);
+    if (scope.allowed === false) {
+      recordAudit({ action: 'scanner_denied', resource: 'ticket', actorRole: 'scanner', actorId: context?.userId, requestId, success: false, metadata: { reason: scope.code, eventId } });
+      return res.status(scope.status).json({ valid: false, status: 'unauthorized_scanner', code: 'BUSINESS_SCOPE_REQUIRED', message: 'A empresa indicada não pertence à conta autenticada.', requestId });
     }
     if (typeof codeOrToken !== 'string' || !codeOrToken.trim() || codeOrToken.length > 512) {
       recordAudit({ action: 'ticket_validation_rejected', resource: 'ticket', actorRole: 'scanner', requestId, success: false, metadata: { reason: 'invalid_input' } });
@@ -3563,6 +5500,8 @@ app.post('/api/payments/create', async (req, res) => {
     if (useCase === 'event_tickets' && paymentIntent.state !== 'confirmed') {
       const pendingResponse = {
         success: false,
+        simulated: paymentAdapter.mode !== 'live',
+        settlement: paymentAdapter.mode === 'live' ? 'provider' : 'simulated',
         paymentPending: paymentIntent.state === 'pending',
         transaction: newTxn,
         message: paymentIntent.instructions || 'Pagamento pendente. O bilhete será emitido depois da confirmação.',
@@ -3603,12 +5542,27 @@ app.post('/api/payments/create', async (req, res) => {
       newTxn.qrToken = newTicket.qrToken;
       persistTickets();
       persistPayments();
-      const successResponse = { success: true, transaction: newTxn, ticket: newTicket, requestId };
+      const successResponse = {
+        success: true,
+        simulated: paymentAdapter.mode !== 'live',
+        settlement: paymentAdapter.mode === 'live' ? 'provider' : 'simulated',
+        ...(paymentAdapter.mode !== 'live' ? { message: 'Pagamento confirmado em modo simulado; nenhuma operadora foi contactada e não houve liquidação real.' } : {}),
+        transaction: newTxn,
+        ticket: newTicket,
+        requestId,
+      };
       if (idempotencyKey) paymentIdempotency.set(idempotencyKey, { createdAt: Date.now(), response: successResponse });
       return res.json(successResponse);
     }
 
-    const successResponse = { success: true, transaction: newTxn, requestId };
+    const successResponse = {
+      success: true,
+      simulated: paymentAdapter.mode !== 'live',
+      settlement: paymentAdapter.mode === 'live' ? 'provider' : 'simulated',
+      ...(paymentAdapter.mode !== 'live' ? { message: 'Pagamento confirmado em modo simulado; nenhuma operadora foi contactada e não houve liquidação real.' } : {}),
+      transaction: newTxn,
+      requestId,
+    };
     if (idempotencyKey) paymentIdempotency.set(idempotencyKey, { createdAt: Date.now(), response: successResponse });
     res.json(successResponse);
   } catch (err: any) {
@@ -3870,6 +5824,12 @@ app.get('/sw.js', (_req, res) => {
   res.type('application/javascript').sendFile(path.join(process.cwd(), 'sw.js'));
 });
 
+// Ficheiros carregados em runtime (fotografias e vídeos das stories).
+app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads'), {
+  maxAge: '7d',
+  fallthrough: true,
+}));
+
 async function startServer() {
   // Vite middleware in dev mode
   if (!runtimeConfig.isProduction) {
@@ -3898,6 +5858,14 @@ async function startServer() {
     });
   } else if (!runtimeConfig.isVercel) {
     const distPath = path.join(process.cwd(), 'dist');
+    // Bloqueia exposição de fontes, sourcemaps e endpoints de desenvolvimento em produção.
+    app.use((req, res, next) => {
+      const p = req.path || '';
+      if (p.endsWith('.map') || p === '/server.ts' || p.startsWith('/src/') || p.startsWith('/@vite/') || p.startsWith('/@fs/')) {
+        return res.status(404).end();
+      }
+      next();
+    });
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
@@ -3914,6 +5882,7 @@ async function startServer() {
     void processDueScheduledItems().catch((error) => console.error('scheduled-items-processing-failed', error));
   }, 30_000);
 
+  await startRealtimeListener();
   app.listen(PORT, runtimeConfig.host, () => {
     console.log(`[Guigui.com] Servidor a rodar na porta ${PORT} em http://${runtimeConfig.host}:${PORT}`);
   });

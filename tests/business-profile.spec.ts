@@ -40,6 +40,13 @@ function createBusiness(overrides: Partial<Business> & Pick<Business, 'id' | 'na
 }
 
 async function mockBusinessData(page: Page, businesses: Business[]) {
+  // Pre-popula o localStorage com os negócios mockados para garantir que o
+  // useMarketplaceData use os dados mockados (o fetch pode ser sobrescrito pelo
+  // persistChanges do useMarketplaceData, que POSTs os negócios de volta ao servidor).
+  await page.addInitScript((businesses) => {
+    window.localStorage.setItem('guigui_businesses', JSON.stringify(businesses));
+    window.localStorage.setItem('guigui_events', JSON.stringify([]));
+  }, businesses);
   await page.route('**/api/businesses', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -172,8 +179,17 @@ test.describe('perfis empresariais e destaques públicos', () => {
 
   test('shows profile save failures without reporting success', async ({ page }) => {
     const user = await signInDemo(page, 'empresa.teste@guigui.com');
-    const businessId = String(user.businessId || `biz-${user.id}`);
-    await mockBusinessData(page, [createBusiness({ id: businessId, name: 'Empresa E2E' })]);
+    // Empresa dedicada ao teste: usar o id real faria a lista de empresas do
+    // arranque (com o plano já expirado na base de dados) sobrepor-se ao mock e
+    // o editor bloqueava com "renovar o plano" antes de tentar gravar.
+    const business = createBusiness({ id: 'e2e-profile-save', name: 'Empresa E2E' });
+    business.subscriptionRenewDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+    business.tier = 'professional';
+    business.subscriptionStatus = 'active';
+    await page.addInitScript((account) => {
+      window.localStorage.setItem('guigui_current_user', JSON.stringify(account));
+    }, { ...user, businessId: business.id });
+    await mockBusinessData(page, [business]);
     await page.route('**/api/businesses/*/profile', (route) => route.fulfill({
       status: 500,
       contentType: 'application/json',
@@ -187,6 +203,73 @@ test.describe('perfis empresariais e destaques públicos', () => {
 
     await expect(page.getByRole('alert')).toContainText('Falha de persistência simulada.');
     await expect(page.getByRole('status').filter({ hasText: 'Dados guardados.' })).toHaveCount(0);
+  });
+
+  test('saves the business profile, reports success and keeps the data after reload', async ({ page }) => {
+    const user = await signInDemo(page, 'empresa.teste@guigui.com');
+    // Empresa dedicada: o id real traria a empresa suspensa da base de dados e
+    // o editor bloquearia antes de gravar (ver o teste de falha abaixo).
+    let stored = createBusiness({ id: 'e2e-profile-success', name: 'Empresa E2E Antes' });
+    stored.subscriptionRenewDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+    stored.tier = 'professional';
+    stored.subscriptionStatus = 'active';
+
+    await page.addInitScript((account) => {
+      window.localStorage.setItem('guigui_current_user', JSON.stringify(account));
+    }, { ...user, businessId: stored.id });
+    await page.addInitScript((businesses) => {
+      window.localStorage.setItem('guigui_businesses', JSON.stringify(businesses));
+      window.localStorage.setItem('guigui_events', JSON.stringify([]));
+    }, [stored]);
+
+    // Servidor simulado: aceita o PATCH e passa a devolver os dados guardados,
+    // como faria a base de dados depois de uma gravação bem sucedida.
+    let patchPayload: Record<string, unknown> | undefined;
+    await page.route('**/api/businesses', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ businesses: [stored] }),
+    }));
+    await page.route('**/api/app-state/guigui_businesses', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ key: 'guigui_businesses', value: [stored] }),
+    }));
+    await page.route('**/api/businesses/*/profile', async (route) => {
+      patchPayload = route.request().postDataJSON() as Record<string, unknown>;
+      stored = { ...stored, ...(patchPayload as Partial<Business>) };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ business: patchPayload }),
+      });
+    });
+
+    await page.goto('/');
+    await openRoleDashboard(page, 'Área da Minha Empresa');
+    await page.getByRole('button', { name: 'Minha Empresa' }).first().click();
+
+    await page.locator('#business-name').fill('Empresa E2E Actualizada');
+    await page.locator('#business-phone').fill('+245 955 77 888');
+    await page.getByRole('button', { name: 'Actualizar dados da empresa' }).click();
+
+    // O aviso de sucesso aparece e o servidor recebeu os novos dados.
+    await expect(page.getByRole('status').filter({ hasText: 'Dados guardados.' })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect(patchPayload).toMatchObject({ name: 'Empresa E2E Actualizada', phone: '+245 955 77 888' });
+
+    // Os dados ficam no cache local da empresa.
+    await expect.poll(async () => page.evaluate(() => {
+      const list = JSON.parse(window.localStorage.getItem('guigui_businesses') || '[]') as Array<{ id: string; name: string }>;
+      return list.find((business) => business.id === 'e2e-profile-success')?.name;
+    })).toBe('Empresa E2E Actualizada');
+
+    // Depois de recarregar, o formulário continua com os valores guardados.
+    await page.reload();
+    await openRoleDashboard(page, 'Área da Minha Empresa');
+    await page.getByRole('button', { name: 'Minha Empresa' }).first().click();
+    await expect(page.locator('#business-name')).toHaveValue('Empresa E2E Actualizada');
+    await expect(page.locator('#business-phone')).toHaveValue('+245 955 77 888');
   });
 
   test('saves administrator ordering using active records only', async ({ page }) => {
@@ -210,9 +293,15 @@ test.describe('perfis empresariais e destaques públicos', () => {
     await page.goto('/');
     await openRoleDashboard(page, 'Administração Guigui.com');
     await page.getByRole('button', { name: 'Empresas & Negócios' }).click();
-    await expect(page.getByRole('heading', { name: 'Empresas em destaque na página inicial' })).toBeVisible();
-    await expect(page.getByLabel('Selecionar Empresa pendente')).toHaveCount(0);
-    await page.getByLabel('Selecionar Segundo destaque').check();
+    await page.getByRole('button', { name: /^Empresas em destaque/ }).first().click();
+    await expect(page.getByRole('heading', { name: 'Gestão de empresas em destaque' })).toBeVisible();
+    // Só empresas ativas entram na lista de destaques.
+    await expect(page.getByText('Empresa pendente')).toHaveCount(0);
+    await page
+      .locator('div.flex.items-center.justify-between', { hasText: 'Segundo destaque' })
+      .first()
+      .getByRole('button', { name: 'Adicionar' })
+      .click();
     await page.getByRole('button', { name: 'Guardar ordem' }).click();
 
     await expect.poll(() => savedIds).toEqual(['e2e-featured-first', 'e2e-featured-next']);

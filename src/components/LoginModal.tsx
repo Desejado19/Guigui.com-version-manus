@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { usePersistentState } from '../utils/persistentState';
 import { getBusinessProfileCompletion } from '../utils/businessProfile';
+import { useLocationCatalog } from '../hooks/useLocationCatalog';
 import { DEFAULT_SUBSCRIPTION_PLANS, getAnnualPlanPrice, getPlanById, limitLabel, normaliseSubscriptionPlans } from '../data/subscriptionCatalog';
 import { getTranslation } from '../utils/i18n';
 import { Button } from './ui';
@@ -102,6 +103,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   teamInviteToken,
 }) => {
   const t = (key: string, variables?: Record<string, string | number>) => getTranslation(currentLang, key, variables);
+  const { locations: bissauLocations } = useLocationCatalog();
   // Modal flow states: 'choice' (Step 0) -> 'login' (Step 1 Login) | 'register' (Step 1 Register)
   const [modalView, setModalView] = useState<'choice' | 'login' | 'register' | 'forgot' | 'team_invite'>('choice');
   const [chosenOption, setChosenOption] = useState<'login' | 'register'>('login');
@@ -333,7 +335,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           password: regPassword,
           role: 'business',
           phone: regPhone,
-          neighborhood: regNeighborhood || 'Bissau',
+          neighborhood: regNeighborhood || t('business.Todos'),
           businessName: regName,
           categoryId: regCategoryGroup,
           groupGroupId: regCategoryGroup,
@@ -391,7 +393,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: regName, email: regEmail, password: regPassword, role: 'user', phone: regPhone || '+245 955 00 00', neighborhood: regNeighborhood || 'Bissau' }),
+        body: JSON.stringify({ name: regName, email: regEmail, password: regPassword, role: 'user', phone: regPhone || '+245 955 00 00', neighborhood: regNeighborhood || t('business.Todos') }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload.user) throw new Error(payload.error || 'Não foi possível criar a conta.');
@@ -408,7 +410,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         if (e.target === e.currentTarget && onClose) onClose();
       }}
     >
-      <div className="relative flex max-h-[calc(100dvh-1rem)] w-full max-w-xl flex-col bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-200 overscroll-contain">
+      <div className="relative flex max-h-[calc(100dvh-1rem)] w-full max-w-xl flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl shadow-2xl overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-200 overscroll-contain">
         
         {/* Close Button for Guest / Visitor Exploration */}
         {onClose && (
@@ -451,7 +453,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50 p-5 sm:p-7 space-y-5">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50 dark:bg-slate-800 p-5 sm:p-7 space-y-5">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-semibold flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -466,13 +468,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 {invite && <div className="mt-1 text-emerald-700">{invite.email}</div>}
               </div>
               <label className="block text-xs font-bold text-slate-700">Telemóvel (opcional)
-                <input value={invitePhone} onChange={(event) => setInvitePhone(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-slate-900" placeholder="+245 ..." />
+                <input value={invitePhone} onChange={(event) => setInvitePhone(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 text-slate-900" placeholder="+245 ..." />
               </label>
               <label className="block text-xs font-bold text-slate-700">Nova palavra-passe
-                <input required minLength={6} type="password" value={invitePassword} onChange={(event) => setInvitePassword(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-slate-900" />
+                <input required minLength={6} type="password" value={invitePassword} onChange={(event) => setInvitePassword(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 text-slate-900" />
               </label>
               <label className="block text-xs font-bold text-slate-700">Confirmar palavra-passe
-                <input required minLength={6} type="password" value={inviteConfirm} onChange={(event) => setInviteConfirm(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-slate-900" />
+                <input required minLength={6} type="password" value={inviteConfirm} onChange={(event) => setInviteConfirm(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 text-slate-900" />
               </label>
               <button type="submit" disabled={!invite} className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-xs font-black text-white disabled:opacity-50">Aceitar convite e entrar</button>
             </form>
@@ -497,18 +499,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between space-y-3 select-none ${
                     chosenOption === 'login'
                       ? 'bg-blue-50/80 border-blue-600 ring-2 ring-blue-500/20 shadow-md'
-                      : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-slate-300 shadow-sm'
                   }`}
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                        chosenOption === 'login' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
+                        chosenOption === 'login' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700'
                       }`}>
                         <LogIn className="w-5 h-5" />
                       </div>
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        chosenOption === 'login' ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'
+                        chosenOption === 'login' ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 dark:border-slate-600'
                       }`}>
                         {chosenOption === 'login' && <Check className="w-3 h-3 stroke-[3]" />}
                       </div>
@@ -535,18 +537,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between space-y-3 select-none ${
                     chosenOption === 'register'
                       ? 'bg-blue-50/80 border-blue-600 ring-2 ring-blue-500/20 shadow-md'
-                      : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-slate-300 shadow-sm'
                   }`}
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                        chosenOption === 'register' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
+                        chosenOption === 'register' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700'
                       }`}>
                         <UserPlus className="w-5 h-5" />
                       </div>
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        chosenOption === 'register' ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'
+                        chosenOption === 'register' ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 dark:border-slate-600'
                       }`}>
                         {chosenOption === 'register' && <Check className="w-3 h-3 stroke-[3]" />}
                       </div>
@@ -625,13 +627,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-700 bg-slate-200/80 px-2.5 py-1 rounded-xl">
                     <Lock className="w-3 h-3 text-slate-600" />
                     <span>Senha das contas de teste:</span>
-                    <code className="bg-white px-1.5 py-0.5 rounded font-mono font-black text-blue-700 shadow-2xs">Guigui@2026!</code>
+                    <code className="bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded font-mono font-black text-blue-700 shadow-2xs">Guigui@2026!</code>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {/* Account 1: Cidadão */}
-                  <div className="bg-white border border-slate-200 hover:border-blue-500 rounded-2xl p-3.5 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3 group">
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-blue-500 rounded-2xl p-3.5 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3 group">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
@@ -657,7 +659,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
                       <div className="pt-1 text-[10px] text-slate-500 font-medium border-t border-slate-100 flex items-center justify-between">
                         <span>Senha de teste:</span>
-                        <code className="font-mono font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded">Guigui@2026!</code>
+                        <code className="font-mono font-bold text-slate-800 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">Guigui@2026!</code>
                       </div>
                     </div>
 
@@ -672,7 +674,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   </div>
 
                   {/* Account 2: Comerciante / Empresa */}
-                  <div className="bg-white border border-slate-200 hover:border-emerald-500 rounded-2xl p-3.5 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3 group">
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-emerald-500 rounded-2xl p-3.5 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3 group">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
@@ -698,7 +700,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
                       <div className="pt-1 text-[10px] text-slate-500 font-medium border-t border-slate-100 flex items-center justify-between">
                         <span>Senha de teste:</span>
-                        <code className="font-mono font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded">Guigui@2026!</code>
+                        <code className="font-mono font-bold text-slate-800 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">Guigui@2026!</code>
                       </div>
                     </div>
 
@@ -713,7 +715,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   </div>
 
                   {/* Account 3: Administrador do Sistema */}
-                  <div className="bg-white border-2 border-amber-300/80 hover:border-amber-500 rounded-2xl p-3.5 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3 group relative overflow-hidden">
+                  <div className="bg-white dark:bg-slate-900 border-2 border-amber-300/80 hover:border-amber-500 rounded-2xl p-3.5 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3 group relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-16 h-16 bg-amber-500/10 rounded-bl-full pointer-events-none" />
                     
                     <div className="space-y-2">
@@ -759,7 +761,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </div>
 
               {/* Manual Login Form */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
                 <div className="border-b border-slate-100 pb-2.5 flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
                     <Mail className="w-4 h-4 text-blue-600" />
@@ -773,7 +775,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         setEmail('cidadao.teste@guigui.com');
                         setPassword('Guigui@2026!');
                       }}
-                      className="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-blue-700 font-bold"
+                      className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-blue-700 font-bold"
                     >
                       Cidadão
                     </button>
@@ -783,7 +785,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         setEmail('empresa.teste@guigui.com');
                         setPassword('Guigui@2026!');
                       }}
-                      className="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-emerald-700 font-bold"
+                      className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-emerald-700 font-bold"
                     >
                       Coqueiro
                     </button>
@@ -813,7 +815,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="ex: admin.teste@guigui.com ou cidadao.teste@guigui.com"
-                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
@@ -830,7 +832,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="Guigui@2026!"
-                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
@@ -863,17 +865,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </div>
               <form onSubmit={handleRequestPasswordReset} className="space-y-3">
                 <label className="block text-xs font-bold text-slate-700">E-mail da conta
-                  <input type="email" required value={resetEmail} onChange={(event) => setResetEmail(event.target.value)} placeholder="ex: cidadao.teste@guigui.com" className="mt-1 w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input type="email" required value={resetEmail} onChange={(event) => setResetEmail(event.target.value)} placeholder="ex: cidadao.teste@guigui.com" className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </label>
                 <button type="submit" className="w-full px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl">Enviar código de recuperação</button>
               </form>
               {resetMessage && <p className="rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-700">{resetMessage}</p>}
-              {resetToken && <form onSubmit={handleResetPassword} className="space-y-3 border-t border-slate-200 pt-4">
+              {resetToken && <form onSubmit={handleResetPassword} className="space-y-3 border-t border-slate-200 dark:border-slate-700 pt-4">
                 <label className="block text-xs font-bold text-slate-700">Código de recuperação
-                  <input required value={resetToken} onChange={(event) => setResetToken(event.target.value)} className="mt-1 w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-900" />
+                  <input required value={resetToken} onChange={(event) => setResetToken(event.target.value)} className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-mono text-slate-900" />
                 </label>
-                <input type="password" required minLength={8} value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} placeholder="Nova palavra-passe (mínimo 8)" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900" />
-                <input type="password" required minLength={8} value={resetConfirmation} onChange={(event) => setResetConfirmation(event.target.value)} placeholder="Confirmar nova palavra-passe" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900" />
+                <input type="password" required minLength={8} value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} placeholder="Nova palavra-passe (mínimo 8)" className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900" />
+                <input type="password" required minLength={8} value={resetConfirmation} onChange={(event) => setResetConfirmation(event.target.value)} placeholder="Confirmar nova palavra-passe" className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900" />
                 <button type="submit" className="w-full px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl">Redefinir palavra-passe</button>
               </form>}
               {error && <p className="text-xs font-bold text-rose-600">{error}</p>}
@@ -908,7 +910,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
               {/* Step Bar for Business Registration */}
               {regType === 'business' && (
-                <div className="bg-slate-100 p-3 rounded-2xl border border-slate-200">
+                <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
                     <div className={`flex items-center gap-1.5 ${regStep >= 1 ? 'text-blue-600 font-extrabold' : ''}`}>
                       <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${regStep >= 1 ? 'bg-blue-600 text-white' : 'bg-slate-300 text-slate-700'}`}>1</span>
@@ -946,10 +948,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition ${
                           regType === 'user'
                             ? 'bg-blue-50 border-blue-600 text-blue-900 font-bold shadow-sm'
-                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 hover:bg-slate-100'
                         }`}
                       >
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${regType === 'user' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${regType === 'user' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600'}`}>
                           <User className="w-4 h-4" />
                         </div>
                         <div>
@@ -964,10 +966,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition ${
                           regType === 'business'
                             ? 'bg-blue-50 border-blue-600 text-blue-900 font-bold shadow-sm'
-                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 hover:bg-slate-100'
                         }`}
                       >
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${regType === 'business' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${regType === 'business' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600'}`}>
                           <Building2 className="w-4 h-4" />
                         </div>
                         <div>
@@ -989,7 +991,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         value={regName}
                         onChange={(e) => setRegName(e.target.value)}
                         placeholder={regType === 'business' ? 'ex: Restaurante Coqueiros' : 'ex: Manuel Fernandes'}
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
 
@@ -1001,7 +1003,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         <select
                           value={regCategoryGroup}
                           onChange={(e) => setRegCategoryGroup(e.target.value as CategoryGroupId)}
-                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                           <option value="restauracao">Restauração, Cafés e Pequeno Comércio</option>
                           <option value="hotelaria_saude_educacao">Hotelaria, Clínicas, Escolas e Comércio Médio</option>
@@ -1025,7 +1027,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                             value={regSubcategory}
                             onChange={(e) => setRegSubcategory(e.target.value)}
                             placeholder="ex: Costura, Padaria, Clínica"
-                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div className="sm:col-span-2">
@@ -1040,7 +1042,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                             value={regDescription}
                             onChange={(e) => setRegDescription(e.target.value)}
                             placeholder="Descreva os produtos ou serviços da empresa (mínimo 30 caracteres)."
-                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
@@ -1054,7 +1056,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                             value={regBusinessPhone}
                             onChange={(e) => setRegBusinessPhone(e.target.value)}
                             placeholder="ex: +245 955 88 99"
-                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
@@ -1066,16 +1068,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                             required
                             value={regBusinessNeighborhood}
                             onChange={(e) => setRegBusinessNeighborhood(e.target.value)}
-                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                           >
                             <option value="">Selecione o bairro da empresa</option>
-                            <option value="Bissau Velho">Bissau Velho</option>
-                            <option value="Praça dos Heróis">Praça dos Heróis (Centro)</option>
-                            <option value="Bandim">Bandim</option>
-                            <option value="Bairro do Cinto">Bairro do Cinto</option>
-                            <option value="Pinto">Pinto</option>
-                            <option value="Santa Luzia">Santa Luzia</option>
-                            <option value="Caracol">Caracol</option>
+                            {bissauLocations.map((entry) => (
+                              <option key={entry.id} value={entry.name}>{entry.name}</option>
+                            ))}
                           </select>
                         </div>
                         <div>
@@ -1088,7 +1086,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                             value={regPublicEmail}
                             onChange={(e) => setRegPublicEmail(e.target.value)}
                             placeholder="contacto@empresa.com"
-                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                       </>
@@ -1104,7 +1102,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         value={regEmail}
                         onChange={(e) => setRegEmail(e.target.value)}
                         placeholder="ex: contacto@exemplo.com"
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
 
@@ -1118,7 +1116,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         value={regPhone}
                         onChange={(e) => setRegPhone(e.target.value)}
                         placeholder="+245 955 88 99"
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
 
@@ -1129,15 +1127,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                       <select
                         value={regNeighborhood}
                         onChange={(e) => setRegNeighborhood(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
-                        <option value="Bissau Velho">Bissau Velho</option>
-                        <option value="Praça dos Heróis">Praça dos Heróis (Centro)</option>
-                        <option value="Bandim">Bandim</option>
-                        <option value="Bairro do Cinto">Bairro do Cinto</option>
-                        <option value="Pinto">Pinto</option>
-                        <option value="Santa Luzia">Santa Luzia</option>
-                        <option value="Caracol">Caracol</option>
+                        {bissauLocations.map((entry) => (
+                          <option key={entry.id} value={entry.name}>{entry.name}</option>
+                        ))}
                       </select>
                     </div>
 
@@ -1151,12 +1145,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
                         placeholder="⬢⬢⬢⬢⬢⬢⬢⬢"
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
 
-                  <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
+                  <div className="pt-3 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
                     <span className="text-[11px] text-slate-500 font-medium">
                       {regType === 'business'
                         ? 'Irá escolher o escalão no próximo passo.'
@@ -1186,7 +1180,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                     </div>
 
                     {/* Monthly vs Annual Toggle */}
-                    <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-blue-200">
+                    <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-blue-200">
                       <button
                         type="button"
                         onClick={() => setBillingCycle('monthly')}
@@ -1224,7 +1218,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                       const isSelected = selectedPlanId === plan.id;
                       const monthlyPrice = plan.price > 0 ? plan.price : getMonthlyPrice(regCategoryGroup, plan.legacyTier || selectedTier);
                       return (
-                        <div key={plan.id} onClick={() => { setSelectedPlanId(plan.id); if (plan.legacyTier) setSelectedTier(plan.legacyTier); }} className={`p-3.5 rounded-2xl border-2 cursor-pointer transition space-y-1.5 relative select-none ${isSelected ? 'bg-blue-50/80 border-blue-600 ring-2 ring-blue-500/20 shadow-md' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
+                        <div key={plan.id} onClick={() => { setSelectedPlanId(plan.id); if (plan.legacyTier) setSelectedTier(plan.legacyTier); }} className={`p-3.5 rounded-2xl border-2 cursor-pointer transition space-y-1.5 relative select-none ${isSelected ? 'bg-blue-50/80 border-blue-600 ring-2 ring-blue-500/20 shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}>
                           <div className="flex items-center justify-between"><span className="font-black text-slate-900 text-sm">{plan.name}</span>{isSelected && <CheckCircle2 className="w-5 h-5 text-blue-600" />}</div>
                           <div className="font-mono text-base font-black text-slate-900">{monthlyPrice > 0 ? `${monthlyPrice.toLocaleString('pt-PT')} ${plan.currency}` : 'Preço negociado'}<span className="text-[10px] text-slate-500 font-normal"> /mês</span></div>
                           <ul className="space-y-1 text-[11px] text-slate-600"><li className="flex items-center gap-1.5 font-bold text-blue-700"><Check className="w-3.5 h-3.5 text-blue-600" /><span>{limitLabel(plan.postsPerMonth)} posts/mês</span></li><li className="flex items-center gap-1.5 font-bold text-amber-700"><Check className="w-3.5 h-3.5 text-amber-600" /><span>{limitLabel(plan.promotionsPerMonth)} promoções/mês</span></li><li className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-600" /><span>{limitLabel(plan.maxCategories)} categoria(s) · {plan.featureSlugs.slice(0, 2).join(', ').replaceAll('_', ' ')}</span></li></ul>
@@ -1233,7 +1227,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                     })}
                   </div>
 
-                  <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
+                  <div className="pt-3 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
                     <button
                       type="button"
                       onClick={() => setRegStep(1)}
@@ -1294,7 +1288,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 transition ${
                           paymentMethod === 'orange_money'
                             ? 'bg-amber-500/10 border-amber-500 text-amber-950 font-black shadow-sm ring-2 ring-amber-500'
-                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 hover:bg-slate-50'
                         }`}
                       >
                         <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black shrink-0">
@@ -1312,7 +1306,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 transition ${
                           paymentMethod === 'telecel'
                             ? 'bg-yellow-500/10 border-yellow-500 text-yellow-950 font-black shadow-sm ring-2 ring-yellow-500'
-                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 hover:bg-slate-50'
                         }`}
                       >
                         <div className="w-8 h-8 rounded-xl bg-yellow-400 text-slate-950 flex items-center justify-center font-black shrink-0">
@@ -1328,7 +1322,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
                   {/* Phone Input for Orange Money Payment */}
                   {paymentStatus === 'idle' && (
-                    <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-3">
+                    <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
                       <div>
                         <label htmlFor="payment-phone" className="block text-xs font-bold text-slate-800 mb-1">
                           Número para Débito ({paymentMethod === 'orange_money' ? 'Orange Money +245 95...' : 'Telecel +245 96...'})
@@ -1342,7 +1336,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                             value={paymentPhone}
                             onChange={(e) => setPaymentPhone(e.target.value)}
                             placeholder="+245 955 88 99"
-                            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                       </div>
@@ -1411,7 +1405,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                           <span className="text-slate-500">Escalão:</span>
                           <span className="font-bold text-blue-700 uppercase">{selectedTier} (3 posts/mês)</span>
                         </div>
-                        <div className="flex justify-between border-t pt-1 border-slate-200">
+                        <div className="flex justify-between border-t pt-1 border-slate-200 dark:border-slate-700">
                           <span className="text-slate-500">Valor Pago:</span>
                           <span className="font-black text-emerald-700">{calculateFinalAmount().toLocaleString('pt-PT')} XOF</span>
                         </div>
