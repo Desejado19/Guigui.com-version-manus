@@ -73,7 +73,7 @@ import { FeaturedHomepageBanner } from './components/FeaturedHomepageBanner';
 import { PromotionsView } from './components/PromotionsView';
 import { EventsView } from './components/EventsView';
 import { TicketScannerView } from './components/TicketScannerView';
-import type { BusinessDashboardTab } from './components/BusinessDashboard';
+import { BusinessDashboard, type BusinessDashboardTab } from './components/BusinessDashboard';
 import { CommunicationHub } from './components/CommunicationHub';
 import { InstitutionalPages } from './components/InstitutionalPages';
 import { Footer } from './components/Footer';
@@ -84,7 +84,6 @@ import { SmsSimulatorToast } from './components/SmsSimulatorToast';
 const APP_TAB_IDS = ['feed', 'directory', 'map', 'promotions', 'events', 'scanner', 'client', 'messages', 'support', 'admin', 'institutional'] as const;
 const isAppTab = (value: string): value is typeof APP_TAB_IDS[number] => (APP_TAB_IDS as readonly string[]).includes(value);
 
-const BusinessDashboard = lazy(() => import('./components/BusinessDashboard').then((module) => ({ default: module.BusinessDashboard })));
 const CitizenDashboard = lazy(() => import('./components/CitizenDashboard').then((module) => ({ default: module.CitizenDashboard })));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard').then((module) => ({ default: module.AdminDashboard })));
 
@@ -339,8 +338,8 @@ export default function App() {
   const [currentRole, setCurrentRole] = useState<UserRole>('user');
   const [currentTab, setCurrentTab] = useState<
     'feed' | 'directory' | 'map' | 'promotions' | 'events' | 'scanner' | 'client' | 'messages' | 'support' | 'admin' | 'institutional'
-  >('feed');
-  const [navigationStack, setNavigationStack] = useState<Array<typeof currentTab>>(['feed']);
+  >(() => getRoleLandingTab(currentUser?.role || null));
+  const [navigationStack, setNavigationStack] = useState<Array<typeof currentTab>>(() => [getRoleLandingTab(currentUser?.role || null)]);
   const [feedRefreshToken, setFeedRefreshToken] = useState(0);
   const [businessDashboardStartTab, setBusinessDashboardStartTab] = useState<BusinessDashboardTab>('overview');
   const [adminDashboardStartTab, setAdminDashboardStartTab] = useState<
@@ -1636,6 +1635,9 @@ export default function App() {
   // Último pedido da primeira página (filtros + instante) para não repetir
   // pedidos idênticos quando várias colecções locais chegam no arranque.
   const feedFirstPageRef = React.useRef<{ query: string; at: number } | null>(null);
+  // Cada consulta distinta invalida respostas antigas, mas os efeitos repetidos
+  // da mesma consulta não podem cancelar o pedido que já está em curso.
+  const feedFirstPageRequestRef = React.useRef(0);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -1652,24 +1654,30 @@ export default function App() {
     // Agrupa as actualizações que chegam juntas no arranque (publicações locais,
     // empresas, sessão) num único pedido da primeira página.
     const previous = feedFirstPageRef.current;
-    if (previous && previous.query === params.toString() && Date.now() - previous.at < 2000) {
+    const query = params.toString();
+    const duplicateRequest = Boolean(previous && previous.query === query && Date.now() - previous.at < 2000);
+    // Uma consulta nova invalida imediatamente a resposta anterior; um efeito
+    // repetido da mesma consulta reaproveita o pedido já em curso.
+    if (!duplicateRequest) feedFirstPageRequestRef.current += 1;
+    if (duplicateRequest) {
       return () => { cancelled = true; };
     }
+    const requestId = feedFirstPageRequestRef.current;
     const timer = window.setTimeout(() => {
       // Só conta como pedido feito quando parte mesmo: no StrictMode o
       // primeiro agendamento é cancelado antes de disparar.
-      feedFirstPageRef.current = { query: params.toString(), at: Date.now() };
-      fetch(`/api/posts?${params.toString()}`, { credentials: 'include', cache: 'no-store' })
+      feedFirstPageRef.current = { query, at: Date.now() };
+      fetch(`/api/posts?${query}`, { credentials: 'include', cache: 'no-store' })
         .then((response) => (response.ok ? response.json() : null))
         .then((payload: { posts?: BusinessPost[]; total?: number; hasMore?: boolean } | null) => {
-          if (cancelled) return;
+          if (requestId !== feedFirstPageRequestRef.current) return;
           setServerFeedPosts(Array.isArray(payload?.posts) ? payload.posts : null);
           setFeedTotal(typeof payload?.total === 'number' ? payload.total : null);
           setFeedHasMore(Boolean(payload?.hasMore));
         })
         .catch(() => {
+          if (requestId !== feedFirstPageRequestRef.current) return;
           feedFirstPageRef.current = null;
-          if (cancelled) return;
           setServerFeedPosts(null);
           setFeedTotal(null);
           setFeedHasMore(false);
@@ -3170,6 +3178,7 @@ export default function App() {
                   business={activeBusiness}
                   currentUser={currentUser}
                   businesses={businesses}
+                  events={events}
                   categories={marketplaceCategories}
                   followerCount={getFollowerIdsForBusiness(followedBusinessIdsByUser, activeBusiness.id).length}
                   audienceReach={getBusinessAudienceReach(activeBusiness)}

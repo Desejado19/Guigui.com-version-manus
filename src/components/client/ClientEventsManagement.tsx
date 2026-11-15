@@ -49,6 +49,10 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
     events.filter((e) => e.businessId === business.id || e.organizer?.toLowerCase().includes(business.name.toLowerCase()))
   );
 
+  React.useEffect(() => {
+    setMyEvents(events.filter((e) => e.businessId === business.id || e.organizer?.toLowerCase().includes(business.name.toLowerCase())));
+  }, [events, business.id, business.name]);
+
   // New Event Form State
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');

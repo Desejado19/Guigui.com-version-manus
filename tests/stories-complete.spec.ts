@@ -31,6 +31,21 @@ async function signIn(page: Page, email: string) {
   const response = await page.request.post('/api/auth/login', { data: { email, password: PASSWORD } });
   expect(response.ok(), await response.text()).toBeTruthy();
   const payload = await response.json();
+  const setCookie = response.headers()['set-cookie'];
+  if (setCookie) {
+    const cookieString = Array.isArray(setCookie) ? setCookie.join('; ') : String(setCookie);
+    const match = cookieString.match(/guigui_session=([^;]+)/);
+    if (match) {
+      await page.context().addCookies([{
+        name: 'guigui_session',
+        value: match[1],
+        url: test.info().project.use.baseURL ?? 'http://127.0.0.1:3000',
+        httpOnly: true,
+        sameSite: 'Lax',
+        secure: false,
+      }]);
+    }
+  }
   await page.addInitScript((user: any) => {
     window.localStorage.setItem('guigui_current_user', JSON.stringify(user));
     window.localStorage.setItem('guigui_current_lang', JSON.stringify('pt'));
@@ -58,11 +73,13 @@ async function removeStory(page: Page, id: string) {
 }
 
 async function clearBusinessStories(page: Page) {
-  const mine = await (await page.request.get('/api/stories/mine?scope=all')).json();
-  for (const story of mine.stories || []) {
-    await page.request.delete(`/api/stories/${encodeURIComponent(story.id)}`).catch(() => undefined);
+  for (const scope of ['all', 'archive', 'drafts'] as const) {
+    const mine = await (await page.request.get(`/api/stories/mine?scope=${scope}`)).json().catch(() => ({ stories: [] }));
+    for (const story of mine.stories || []) {
+      await page.request.delete(`/api/stories/${encodeURIComponent(story.id)}`).catch(() => undefined);
+    }
   }
-  const highlights = await (await page.request.get('/api/story-highlights?businessId=biz-1')).json();
+  const highlights = await (await page.request.get('/api/story-highlights?businessId=biz-1')).json().catch(() => ({ highlights: [] }));
   for (const highlight of highlights.highlights || []) {
     if (String(highlight.title).startsWith('PW ')) {
       await page.request.delete(`/api/story-highlights/${encodeURIComponent(highlight.id)}`).catch(() => undefined);
@@ -72,9 +89,22 @@ async function clearBusinessStories(page: Page) {
 
 async function openStories(page: Page) {
   await page.goto('/');
-  const feed = page.getByRole('button', { name: /Feed Bissau/i }).first();
-  if (await feed.isVisible().catch(() => false)) await feed.click();
-  await expect(page.getByRole('region', { name: 'Stories' })).toBeVisible({ timeout: 20000 });
+  const stories = page.getByRole('region', { name: 'Stories' });
+  // O admin aterra no painel de administração; é preciso voltar ao feed antes
+  // de procurar a faixa de stories. Tentar mais do que uma vez cobre o clique
+  // que se perde enquanto a SPA ainda está a hidratar.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (await stories.isVisible().catch(() => false)) return;
+    const backToFeed = page.getByRole('button', { name: /Voltar para o Feed/i }).first();
+    if (await backToFeed.isVisible().catch(() => false)) {
+      await backToFeed.click();
+    } else {
+      const feed = page.getByRole('button', { name: /Feed Bissau/i }).first();
+      if (await feed.isVisible().catch(() => false)) await feed.click();
+    }
+    await page.waitForTimeout(1500);
+  }
+  await expect(stories).toBeVisible({ timeout: 20000 });
 }
 
 test('1. cidadão vê Stories mas não pode criar nem publicar', async ({ page }) => {
@@ -157,14 +187,13 @@ test('5. visualizador navega, curte, reage, vota e responde', async ({ page }) =
   await clearBusinessStories(page);
   const story = await createStory(page, {
     caption: 'PW interações',
-    durationMs: 8000,
+    durationMs: 300000,
     elements: [{ type: 'poll', content: { question: 'Gostas?', options: ['Sim', 'Não'] } }],
   });
   await signIn(page, ACCOUNTS.citizen);
-  await openStories(page);
-  await page.getByTestId('story-ring').filter({ hasText: 'Coqueiros' }).first().click();
-  const viewer = page.getByRole('dialog', { name: /Story de Coqueiros/ }).first();
-  await expect(viewer).toBeVisible();
+  await page.goto(`/?story=${encodeURIComponent(story.shareToken)}`);
+  const viewer = page.getByRole('dialog', { name: /Story de .*Coqueiros/ }).first();
+  await expect(viewer).toBeVisible({ timeout: 20000 });
   await viewer.getByRole('button', { name: 'Gostar' }).click();
   await expect(viewer.getByRole('button', { name: 'Remover gosto' })).toBeVisible();
   await viewer.getByRole('button', { name: 'Reagir com emoji' }).click();
@@ -189,9 +218,11 @@ test('6. temporizador pausa enquanto o cidadão escreve', async ({ page }) => {
   await clearBusinessStories(page);
   const story = await createStory(page, { caption: 'PW pausa ao escrever', durationMs: 1200 });
   await signIn(page, ACCOUNTS.citizen);
-  await openStories(page);
-  await page.getByTestId('story-ring').filter({ hasText: 'Coqueiros' }).first().click();
-  const viewer = page.getByRole('dialog', { name: /Story de Coqueiros/ }).first();
+  // Abrir pelo share token garante que é esta story (e não uma órfã da faixa)
+  // que fica em análise — o mesmo motivo que levou o teste 5 a usar o token.
+  await page.goto(`/?story=${encodeURIComponent(story.shareToken)}`);
+  const viewer = page.getByRole('dialog', { name: /Story de .*Coqueiros/ }).first();
+  await expect(viewer).toBeVisible({ timeout: 20000 });
   await viewer.getByLabel('Responder ao story').fill('Estou a escrever');
   await page.waitForTimeout(2600);
   await expect(viewer).toBeVisible();

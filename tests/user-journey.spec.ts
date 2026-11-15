@@ -86,6 +86,12 @@ test.describe('jornada do visitante: descobrir e contactar empresas', () => {
     });
     await page.goto('/');
     await expect(page.getByRole('heading', { name: /Encontre tudo o que precisa/i })).toBeVisible({ timeout: 20_000 });
+    // A pesquisa resolve contra as empresas já carregadas. Passar pelo
+    // directório garante que esse estado existe antes de submeter a pesquisa.
+    await page.getByRole('button', { name: /Diretório de Empresas/i }).first().click();
+    await expect(page.getByText('Cantina Sabores de Bandim').first()).toBeVisible({ timeout: 20_000 });
+    await page.getByRole('button', { name: /Feed Bissau/i }).first().click();
+    await expect(page.getByRole('heading', { name: /Encontre tudo o que precisa/i })).toBeVisible({ timeout: 20_000 });
 
     // Pesquisar "Coqueiros" deve encontrar "Restaurante Coqueiros" e abrir a
     // ficha (BusinessDetailModal) — o comportamento real da pesquisa unificada.
@@ -96,8 +102,9 @@ test.describe('jornada do visitante: descobrir e contactar empresas', () => {
     const modal = page.locator('div.fixed.inset-0.z-50').first();
     await expect(modal).toBeVisible({ timeout: 15_000 });
     await expect(modal).toContainText(/Restaurante Coqueiros/i);
-    // A ficha expõe o canal de contacto directo (WhatsApp wa.me).
-    await expect(modal.locator('a[href*="wa.me"]').first()).toBeVisible({ timeout: 10_000 });
+    // A ficha expõe canais de contacto directo: telefone e mensagem interna.
+    await expect(modal.locator('a[href^="tel:"]').first()).toBeVisible({ timeout: 10_000 });
+    await expect(modal.getByRole('button', { name: /Mensagem dentro do sistema/i })).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: 'test-results/journey-ficha-pesquisa.png', fullPage: false });
   });
 
@@ -133,11 +140,12 @@ test.describe('jornada do visitante: descobrir e contactar empresas', () => {
     await page.waitForLoadState('domcontentloaded');
     await openCleanDirectory(page);
 
-    // Abrir a ficha clicando no card do directório.
-    await page.getByText('Restaurante Coqueiros').first().click();
+    // A ficha só mostra o botão de WhatsApp quando a empresa tem número
+    // configurado; a Cantina seed tem (Restaurante Coqueiros não tem).
+    await page.getByText('Cantina Sabores de Bandim').first().click();
     const modal = page.locator('div.fixed.inset-0.z-50').first();
     await expect(modal).toBeVisible({ timeout: 15_000 });
-    await expect(modal).toContainText(/Restaurante Coqueiros/i);
+    await expect(modal).toContainText(/Cantina Sabores de Bandim/i);
     await expect(modal.locator('a[href*="wa.me"]').first()).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: 'test-results/journey-ficha-directorio.png', fullPage: false });
 

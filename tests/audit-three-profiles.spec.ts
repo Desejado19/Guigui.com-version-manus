@@ -451,17 +451,17 @@ test.describe('2. Cidadão', () => {
     await expect(buyButton, 'deve existir um evento com compra disponível na página pública').toBeVisible({ timeout: 15_000 });
     await buyButton.click();
 
-    const dialog = page.getByRole('dialog', { name: 'Compra de bilhete' }).first();
-    await expect(dialog).toBeVisible({ timeout: 20_000 });
-
-    const policy = dialog.getByRole('checkbox').first();
-    await policy.check();
-
-    const confirm = dialog
-      .getByRole('button')
-      .filter({ hasText: /confirmar|pagar|finalizar|comprar/i })
-      .last();
-    await expect(confirm, 'o modal deve ter um botão de confirmação de compra').toBeVisible({ timeout: 10_000 });
+    // O cartão abre a ficha do evento, onde se escolhem categoria, quantidade
+    // e dados do comprador. A confirmação nessa ficha chama directamente a API
+    // e abre o comprovativo.
+    const detail = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Bilhetes' }) }).first();
+    await expect(detail, 'a ficha do evento deve abrir com a área de bilhetes').toBeVisible({ timeout: 20_000 });
+    const phone = detail.getByLabel('Telemóvel de quem compra');
+    await expect(phone).toBeVisible({ timeout: 10_000 });
+    if (!(await phone.inputValue()).trim()) await phone.fill('+245955000000');
+    await detail.getByRole('checkbox').check();
+    const confirm = detail.getByRole('button', { name: /comprar bilhete/i }).last();
+    await expect(confirm, 'a ficha deve ter um botão de confirmação de compra').toBeVisible({ timeout: 10_000 });
     const apiCalls: string[] = [];
     page.on('request', (request) => {
       if (request.url().includes('/api/')) apiCalls.push(`→ ${request.method()} ${new URL(request.url()).pathname}`);
@@ -472,8 +472,9 @@ test.describe('2. Cidadão', () => {
     await confirm.click();
     await page.waitForTimeout(6000);
 
-    const dialogAlert = await dialog.getByRole('alert').first().innerText().catch(() => '');
-    const dialogStillOpen = await dialog.isVisible().catch(() => false);
+    const receipt = page.getByRole('dialog', { name: 'Comprovativo da compra' }).first();
+    const receiptVisible = await receipt.isVisible().catch(() => false);
+    const detailAlert = await detail.getByRole('alert').first().innerText().catch(() => '');
 
     const afterResponse = await page.request.get('/api/tickets/mine?pageSize=1');
     expect(afterResponse.ok(), `a API de bilhetes deve responder: ${afterResponse.status()}`).toBeTruthy();
@@ -484,11 +485,12 @@ test.describe('2. Cidadão', () => {
       kind: 'citizen-purchase',
       ticketsBefore: beforeTotal,
       ticketsAfter: afterTotal,
-      dialogClosed: !dialogStillOpen,
-      dialogAlert,
+      receiptVisible,
+      detailAlert,
       apiCalls: apiCalls.slice(-10),
     });
-    expect(afterTotal, `a compra deve aumentar os bilhetes do cidadão (alerta: ${dialogAlert || 'nenhum'})`).toBeGreaterThan(beforeTotal);
+    expect(receiptVisible, `a compra deve abrir o comprovativo (alerta: ${detailAlert || 'nenhum'})`).toBeTruthy();
+    expect(afterTotal, `a compra deve aumentar os bilhetes do cidadão (alerta: ${detailAlert || 'nenhum'})`).toBeGreaterThan(beforeTotal);
   });
 });
 
@@ -537,7 +539,7 @@ test.describe('3. Empresa', () => {
         id: `evt-audit-${Date.now()}`,
         businessId: companyId,
         title,
-        status: 'draft',
+        status: 'published',
         date: '2026-12-20',
         time: '20:00',
         category: 'Concertos & Festivais',
@@ -565,15 +567,22 @@ test.describe('3. Empresa', () => {
     await openDashboard(page, 'business');
     await openSection(page, /equipa|equipe/i);
 
+    await page.getByRole('button', { name: 'Criar colaborador' }).click();
     const emailInput = page.locator('input[type="email"]').first();
-    await expect(emailInput, 'o módulo de equipa deve ter um campo de e-mail').toBeVisible({ timeout: 15_000 });
+    await expect(emailInput, 'o formulário de equipa deve ter um campo de e-mail').toBeVisible({ timeout: 15_000 });
+    await page.locator('label').filter({ hasText: 'Nome completo' }).locator('input').fill('Colaborador Inválido');
     await emailInput.fill('nao-e-um-email');
-    const invite = page.getByRole('button', { name: /convidar|enviar convite|adicionar/i }).first();
+    await page.locator('label').filter({ hasText: 'Palavra-passe inicial' }).locator('input').fill('Guigui2026!');
+    // A validação nativa do browser impediria o submit antes de chegar ao
+    // servidor; o objectivo do teste é confirmar que a API também recusa e
+    // que o erro é mostrado ao utilizador.
+    await emailInput.evaluate((element) => { (element as HTMLInputElement).form!.noValidate = true; });
+    const invite = page.getByRole('button', { name: 'Criar conta' }).first();
     await expect(invite).toBeVisible({ timeout: 10_000 });
     await invite.click();
     await page.waitForTimeout(1500);
 
-    const feedback = page.getByText(/inválid|obrigat|correto|erro/i).first();
+    const feedback = page.getByRole('alert').filter({ hasText: /válid|obrigat|correto|erro/i }).first();
     await expect(feedback, 'e-mail inválido deve produzir feedback explícito').toBeVisible({ timeout: 10_000 });
     record({ kind: 'business-team-validation', invalidEmailRejected: true });
   });
@@ -909,14 +918,7 @@ test.describe('7. Responsividade', () => {
 
       for (const viewport of VIEWPORTS) {
         await page.setViewportSize({ width: viewport.width, height: viewport.height });
-        await page.goto('/');
-        const entry = page.locator('button').filter({ hasText: ENTRY_LABEL[role] }).first();
-        if (await page.getByTitle('Sessão Iniciada').isVisible().catch(() => false)) {
-          await page.getByTitle('Sessão Iniciada').click();
-        }
-        await expect(entry).toBeVisible({ timeout: 20_000 });
-        await entry.click();
-        await expect(page.locator('.guigui-profile-dashboard')).toBeVisible({ timeout: 25_000 });
+        await openDashboard(page, role);
         await page.waitForTimeout(1200);
 
         const metrics = await page.evaluate(() => ({

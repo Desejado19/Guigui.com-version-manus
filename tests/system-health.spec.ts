@@ -79,6 +79,10 @@ test.describe('backend: APIs públicas e de plataforma', () => {
   });
 
   test('categorias: 13 categorias primárias servidas pela API', async ({ page }) => {
+    const login = await page.request.post('/api/auth/login', {
+      data: { email: 'admin.teste@guigui.com', password: 'Guigui@2026!' },
+    });
+    expect(login.ok(), 'a API de categorias exige sessão administrativa').toBeTruthy();
     const response = await page.request.get('/api/admin/categories');
     expect(response.ok()).toBeTruthy();
     const body = await response.json();

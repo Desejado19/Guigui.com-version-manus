@@ -77,10 +77,8 @@ test.describe('Business Dashboard Reorganização - Playwright Tests', () => {
     ];
 
     for (const ind of indicators) {
-      const element = page.locator(ind.selector);
-      const isVisible = await element.isVisible();
-      console.log(`Indicador "${ind.label}": ${isVisible ? 'visível' : 'NÃO visível'}`);
-      expect(isVisible).toBeTruthy();
+      const element = page.locator(ind.selector).first();
+      await expect(element, `Indicador "${ind.label}" não ficou visível`).toBeVisible();
     }
   });
 
@@ -110,10 +108,7 @@ test.describe('Business Dashboard Reorganização - Playwright Tests', () => {
 
     // Verificar a estrutura do novo grid
     const grid = page.locator('.grid.grid-cols-2.md\\:grid-cols-6.gap-4.mb-6');
-    const gridExists = await grid.isVisible();
-    console.log(`Grid de 6 indicadores existe e é visível: ${gridExists}`);
-
-    expect(gridExists, 'Grid de 6 indicadores reorganizados não encontrado').toBeTruthy();
+    await expect(grid, 'Grid de 6 indicadores reorganizados não encontrado').toBeVisible();
 
     // Verificar se os cards dos 6 indicadores estão presentes
     const indicatorCards = [
@@ -127,9 +122,7 @@ test.describe('Business Dashboard Reorganização - Playwright Tests', () => {
 
     for (const indicator of indicatorCards) {
       const card = page.locator(`span:has-text("${indicator}")`).first().locator('..').locator('..'); // navigate up to Card
-      const cardExists = await card.isVisible();
-      console.log(`Card "${indicator}": ${cardExists ? 'presente' : 'NÃO presente'}`);
-      expect(cardExists, `Card "${indicator}" não encontrado`).toBeTruthy();
+      await expect(card, `Card "${indicator}" não encontrado`).toBeVisible();
     }
   });
 
@@ -141,15 +134,13 @@ test.describe('Business Dashboard Reorganização - Playwright Tests', () => {
     const secondaryIndicators = [
       { text: 'Chamadas', area: 'chart area' },
       { text: 'Mapa', area: 'chart area' },
-      { text: 'Alcance dos Anúncios', area: 'statistics area' },
+      { text: 'Atividade comercial', area: 'statistics area' },
     ];
 
     for (const sec of secondaryIndicators) {
-      const element = page.locator(`:has-text("${sec.text}")`);
-      const isVisible = await element.isVisible();
-      console.log(`Secundário "${sec.text}" (${sec.area}): ${isVisible ? 'presente' : 'NÃO presente'}`);
-      // These should still be present in their respective areas, not in the new grid
-      expect(isVisible, `Indicador secundário "${sec.text}" foi removido indevidamente`).toBeTruthy();
+      const element = page.locator(`:has-text("${sec.text}")`).first();
+      // Estes indicadores vivem em gráficos que só montam depois dos dados.
+      await expect(element, `Indicador secundário "${sec.text}" foi removido indevidamente`).toBeVisible();
     }
   });
 
@@ -160,9 +151,7 @@ test.describe('Business Dashboard Reorganização - Playwright Tests', () => {
     await page.goto('/');
 
     const dashboard = page.locator('.grid.grid-cols-2.md\\:grid-cols-6.gap-4.mb-6');
-    const isVisible = await dashboard.isVisible();
-    console.log(`Dashboard visível em 1440x900: ${isVisible}`);
-    expect(isVisible).toBeTruthy();
+    await expect(dashboard, 'Dashboard não visível em 1440x900').toBeVisible();
   });
 
   test('D2. Testar responsividade - tablet', async ({ page }) => {
@@ -171,9 +160,7 @@ test.describe('Business Dashboard Reorganização - Playwright Tests', () => {
     await page.goto('/');
 
     const dashboard = page.locator('.grid.grid-cols-2.md\\:grid-cols-6.gap-4.mb-6');
-    const isVisible = await dashboard.isVisible();
-    console.log(`Dashboard visível em 768x1024: ${isVisible}`);
-    expect(isVisible).toBeTruthy();
+    await expect(dashboard, 'Dashboard não visível em 768x1024').toBeVisible();
   });
 
   test('D3. Testar responsividade - móvel', async ({ page }) => {
@@ -182,9 +169,7 @@ test.describe('Business Dashboard Reorganização - Playwright Tests', () => {
     await page.goto('/');
 
     const dashboard = page.locator('.grid.grid-cols-2.md\\:grid-cols-6.gap-4.mb-6');
-    const isVisible = await dashboard.isVisible();
-    console.log(`Dashboard visível em 375x667: ${isVisible}`);
-    expect(isVisible).toBeTruthy();
+    await expect(dashboard, 'Dashboard não visível em 375x667').toBeVisible();
   });
 
   // ==================== E. Testes técnicos ====================
@@ -257,13 +242,13 @@ test.describe('Business Dashboard Reorganização - Playwright Tests', () => {
     
     // Verificar se o grid está correto
     const grid = page.locator('.grid.grid-cols-2.md\\:grid-cols-6.gap-4.mb-6');
-    expect(await grid.isVisible()).toBeTruthy();
+    await expect(grid).toBeVisible();
     
     // Verificar indicadores
     const indicators = ['Receita Total', 'Visualizações', 'Seguidores', 'Eventos Ativos', 'WhatsApp Leads', 'Bilhetes Vendidos'];
     for (const ind of indicators) {
       const found = page.locator(`span:has-text("${ind}")`).first();
-      expect(await found.isVisible()).toBeTruthy();
+      await expect(found).toBeVisible();
     }
   });
 });

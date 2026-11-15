@@ -344,7 +344,14 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 // Em produção o limite protege a API. Em desenvolvimento/teste (Playwright com
 // 8 workers paralelos a carregar páginas e logins pelo mesmo IP) o limite
 // padrão gerava respostas 429 em cascata e pendurava os testes de e2e.
-const RATE_LIMIT_MAX_REQUESTS = isProduction ? 1000 : 30_000;
+// O limite pode ser elevado por ambiente (RATE_LIMIT_MAX_REQUESTS) para
+// corridas de e2e contra um servidor de produção local, sem alterar o valor
+// por omissão que protege a API em produção.
+const RATE_LIMIT_MAX_REQUESTS = (() => {
+  const override = Number(process.env.RATE_LIMIT_MAX_REQUESTS);
+  if (Number.isFinite(override) && override > 0) return Math.floor(override);
+  return isProduction ? 1000 : 30_000;
+})();
 // O prefixo /api/app-state/ não é excluído do rate limit: as leituras em
 // lote da SPA continuam sujeitas à mesma proteção que as restantes rotas /api.
 app.use('/api', async (req, res, next) => {

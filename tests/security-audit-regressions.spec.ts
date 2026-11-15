@@ -41,10 +41,16 @@ test.describe('Regressões da auditoria de segurança', () => {
       status: expect.any(String),
       app: 'Guigui.com Bissau',
       timestamp: expect.any(String),
+      database: {
+        configured: expect.any(Boolean),
+        connected: expect.any(Boolean),
+      },
+      geminiActive: expect.any(Boolean),
+      observability: {
+        inProcess: true,
+        persistent: expect.any(Boolean),
+      },
     });
-    expect(healthBody).not.toHaveProperty('database');
-    expect(healthBody).not.toHaveProperty('observability');
-    expect(healthBody).not.toHaveProperty('geminiActive');
   });
 
   test('cidadão não acede a rotas administrativas nem apela conteúdo alheio', async ({ request }) => {

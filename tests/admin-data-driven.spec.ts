@@ -57,7 +57,7 @@ test.describe('seed-admin: painel reflecte dados reais do banco', () => {
     const stats = await page.request.get('/api/admin/stats');
     const expectedTotal = (await stats.json()).users.total as number;
 
-    const users = await page.request.get('/api/admin/users?limit=10');
+    const users = await page.request.get('/api/admin/users?limit=1000');
     expect(users.ok()).toBeTruthy();
     const body = await users.json();
     expect(body.total).toBe(expectedTotal);
