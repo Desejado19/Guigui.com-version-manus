@@ -286,6 +286,24 @@ export interface TicketFeePolicy {
   updatedAt: string;
 }
 
+export interface TicketFeeSnapshot {
+  /** Momento em que a taxa foi calculada (compra do bilhete). */
+  calculatedAt: string;
+  commissionPercentage: number;
+  fixedFeeXOF: number;
+  billingModel: TicketFeePolicy['billingModel'];
+  feePayer: FeePayer;
+  currency: string;
+  grossTicketValueXOF: number;
+  percentageFeeXOF: number;
+  fixedFeeAmountXOF: number;
+  platformFeeXOF: number;
+  buyerShareXOF: number;
+  organizerShareXOF: number;
+  buyerTotalXOF: number;
+  organizerNetXOF: number;
+}
+
 export interface MonetizationWallet {
   postsExtraPurchased: number;
   promotionsExtraPurchased: number;
@@ -752,6 +770,8 @@ export interface Ticket {
   expiresAt?: string;
   validatedAt?: string;
   paymentMethod: 'orange_money' | 'telecel' | 'manual_admin';
+  /** Taxa de bilheteira aplicada no momento da compra. */
+  fee?: TicketFeeSnapshot;
 }
 
 export interface PurchaseOrder {
@@ -774,6 +794,8 @@ export interface PurchaseOrder {
   paymentMethod: string;
   purchasedAt: string;
   status: 'pending' | 'valid' | 'redeemed' | 'cancelled';
+  /** Taxa de bilheteira aplicada no momento da compra. */
+  fee?: TicketFeeSnapshot;
   redeemedAt?: string;
   redeemedBy?: string;
   /** Credenciais individuais quando quantity > 1; o primeiro mantém qrToken/ticketPin por compatibilidade. */

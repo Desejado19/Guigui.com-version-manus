@@ -1,7 +1,7 @@
-import type { MonetizationCatalog } from '../src/types';
+import type { MonetizationCatalog, TicketFeeSnapshot } from '../src/types';
 import type { PaymentProvider, PaymentProviderAdapter } from './integrations/ports';
 import type { TicketForValidation } from './validationService';
-import { quoteTicketPurchase, type TicketOffer, type TicketPurchaseQuote } from './ticketPurchaseDomain';
+import { buildTicketFeeSnapshot, quoteTicketPurchase, type TicketOffer, type TicketPurchaseQuote } from './ticketPurchaseDomain';
 import type {
   TicketCatalogPort,
   TicketInventoryPort,
@@ -25,6 +25,8 @@ export interface TicketPurchaseTransaction {
   payerPhone: string;
   ticketBaseAmountXOF: number;
   platformFeeXOF: number;
+  /** Política de taxas aplicada no momento da compra. */
+  feeSnapshot: TicketFeeSnapshot;
   provider: PaymentProvider;
   productId: 'product-ticket-fee';
   productCode: 'TICKET_FEE';
@@ -47,6 +49,8 @@ export interface TicketPurchaseTransaction {
     eventDate?: string;
     eventTime?: string;
     quantity: number;
+    /** Taxa calculada no checkout, usada se a emissão acontecer na confirmação. */
+    feeSnapshot?: TicketFeeSnapshot;
   };
   createdAt: string;
   confirmedAt?: string;
@@ -95,6 +99,7 @@ export interface TicketFactoryInput {
   holderPhone?: string;
   paymentMethod: PaymentProvider;
   purchasedAt: string;
+  feeSnapshot: TicketFeeSnapshot;
 }
 
 export interface TicketPurchaseUseCasePorts {
@@ -141,6 +146,7 @@ function createTransaction(input: {
   buyer: TicketPurchaseCommand['buyer'];
   paymentMethod: PaymentProvider;
   quote: TicketPurchaseQuote;
+  feeSnapshot: TicketFeeSnapshot;
   quantity: number;
   createdAt: string;
   checkoutUrl?: string;
@@ -161,6 +167,7 @@ function createTransaction(input: {
     payerPhone: input.buyer.phone,
     ticketBaseAmountXOF: input.offer.unitPriceXOF * input.quantity,
     platformFeeXOF: input.quote.feeBreakdown.platformRevenue,
+    feeSnapshot: input.feeSnapshot,
     provider: input.paymentMethod,
     productId: 'product-ticket-fee',
     productCode: 'TICKET_FEE',
@@ -215,6 +222,7 @@ export async function executeTicketPurchase(
   const offer = await runPurchaseStage('catalog', undefined, () => ports.catalog.getOffer(command.eventId, command.ticketTypeId));
   if (!offer) return rejection('invalid_offer', 'O evento ou tipo de bilhete já não está disponível.');
 
+  const purchaseTime = ports.now();
   const quoteResult = quoteTicketPurchase({
     offer,
     quantity: command.quantity,
@@ -225,6 +233,10 @@ export async function executeTicketPurchase(
     if (quoteResult.reason === 'sales_closed') return rejection('sales_closed', 'As vendas deste tipo de bilhete estão encerradas.');
     return rejection('inventory_unavailable', 'Não há bilhetes suficientes disponíveis.');
   }
+
+  // A taxa é calculada com a política em vigor agora e fica gravada na ordem,
+  // para que alterações futuras ao catálogo não reescrevam vendas antigas.
+  const feeSnapshot = buildTicketFeeSnapshot(ports.catalogSettings, quoteResult.quote.feeBreakdown, purchaseTime);
 
   const transactionId = ports.createTransactionId();
   const reservedUntil = new Date(ports.now().getTime() + ports.reservationTtlMs).toISOString();
@@ -270,6 +282,7 @@ export async function executeTicketPurchase(
     buyer: command.buyer,
     paymentMethod: command.paymentMethod,
     quote: quoteResult.quote,
+    feeSnapshot,
     quantity: command.quantity,
     createdAt: now,
     checkoutUrl: paymentIntent.checkoutUrl,
@@ -296,6 +309,7 @@ export async function executeTicketPurchase(
       eventDate: offer.eventDate,
       eventTime: offer.eventTime,
       quantity: command.quantity,
+      feeSnapshot,
     };
     await runPurchaseStage('pending-transaction-persist', transactionId, () => ports.transactions.persist(transaction));
     return storeResult(command.idempotencyKey, { status: 'pending', transaction, reservationExpiresAt: reservedUntil }, ports.idempotency);
@@ -313,6 +327,7 @@ export async function executeTicketPurchase(
       holderPhone: command.holderPhone,
       paymentMethod: command.paymentMethod,
       purchasedAt: now,
+      feeSnapshot,
     });
   } catch (error) {
     console.error('ticket-purchase-stage-failed', {

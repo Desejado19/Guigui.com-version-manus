@@ -364,11 +364,11 @@ export async function getCommercialOverview() {
     dbc.query(planConfigsQuery()),
     dbc.query(`SELECT plan_id, COUNT(*)::int AS n FROM subscriptions GROUP BY plan_id`),
     dbc.query(`SELECT id, version, old_values, new_values, changed_by, reason, created_at FROM ticket_fee_history ORDER BY version DESC LIMIT 100`),
-    // A receita de taxas tem de refletir o que é efetivamente cobrado. A coluna
-    // orders.fee_amount_xof nunca é preenchida no checkout (fica a zero), pelo que
-    // somá-la devolvia sempre zero. Cada ordem é um bilhete, logo a taxa aplicada é
-    // a mesma fórmula do checkout: percentagem sobre o valor bruto + taxa fixa por
-    // unidade, conforme o modelo em vigor. Valores já registados na ordem prevalecem.
+    // A receita de taxas tem de refletir o que é efetivamente cobrado. O checkout
+    // grava agora em orders.fee_amount_xof a taxa calculada com a política em vigor
+    // nesse momento, e esse valor prevalece. Ordens antigas (sem taxa registada)
+    // continuam a ser estimadas com a fórmula do checkout — percentagem sobre o valor
+    // bruto + taxa fixa por unidade, conforme o modelo atual.
     dbc.query(`WITH policy AS (
                  SELECT commission_percentage, fixed_fee_xof, billing_model, is_active
                    FROM ticket_fee_settings WHERE id = 'default'

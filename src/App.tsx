@@ -1066,6 +1066,7 @@ export default function App() {
         paymentMethod: String(ticket.paymentMethod || 'orange_money') as PurchaseOrder['paymentMethod'],
         purchasedAt: String(ticket.purchasedAt || new Date().toISOString()),
         status: ticket.status === 'used' ? 'redeemed' : ticket.status === 'cancelled' ? 'cancelled' : 'pending',
+        ...(ticket.fee && typeof ticket.fee === 'object' ? { fee: ticket.fee as PurchaseOrder['fee'] } : {}),
         ticketCredentials: [{ id: String(ticket.id), ticketCode: String(ticket.ticketCode || ''), qrToken: String(ticket.qrToken || '') }],
       }));
       setPurchaseOrders((previous) => {

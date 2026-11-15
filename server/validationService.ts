@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual, randomUUID } from 'crypto';
+import type { TicketFeeSnapshot } from '../src/types';
 import type { PaymentProvider } from './integrations/ports';
 
 export type GuiguiRole = 'citizen' | 'business' | 'scanner' | 'admin';
@@ -93,6 +94,8 @@ export interface TicketForValidation {
   reservedUntil?: string;
   signature?: string;
   paymentMethod?: PaymentMethod;
+  /** Política de taxa de bilheteira aplicada no momento da compra. */
+  fee?: TicketFeeSnapshot;
   /** Cancelamento operacional — preenchido pelo /api/tickets/cancel. */
   cancelledAt?: string;
   cancelReason?: string;

@@ -175,7 +175,19 @@ export async function persistPostgresTickets(tickets: TicketForValidation[], buy
       const typeName = ticket.ticketTypeName || 'Entrada Geral';
       await client.query(`INSERT INTO companies (id,name,status) VALUES ($1,$2,'active') ON CONFLICT (id) DO NOTHING`, [businessId, `Empresa ${businessId}`]);
       await client.query(`INSERT INTO events (id,company_id,title,status) VALUES ($1,$2,$3,'published') ON CONFLICT (id) DO NOTHING`, [eventId, businessId, ticket.eventTitle || 'Evento Guigui']);
-      await client.query(`INSERT INTO orders (id,buyer_user_id,event_id,status,gross_amount_xof,net_amount_xof,created_at,updated_at) VALUES ($1,$2,$3,'paid',$4,$4,$5,$5) ON CONFLICT (id) DO UPDATE SET buyer_user_id=COALESCE(EXCLUDED.buyer_user_id,orders.buyer_user_id)`, [orderId, buyerUserId || null, eventId, ticket.priceXOF, ticket.purchasedAt || new Date().toISOString()]);
+      // A taxa calculada no checkout fica gravada na ordem, para que a receita
+      // histórica reflicta a política em vigor nesse momento.
+      const grossAmount = Math.max(0, Number(ticket.priceXOF) || 0);
+      const feeAmount = ticket.fee ? Math.max(0, ticket.fee.platformFeeXOF) : 0;
+      const netAmount = ticket.fee ? Math.max(0, ticket.fee.organizerNetXOF) : grossAmount;
+      await client.query(
+        `INSERT INTO orders (id,buyer_user_id,event_id,status,gross_amount_xof,fee_amount_xof,net_amount_xof,fee_policy,created_at,updated_at)
+         VALUES ($1,$2,$3,'paid',$4,$5,$6,$7,$8,$8)
+         ON CONFLICT (id) DO UPDATE SET buyer_user_id=COALESCE(EXCLUDED.buyer_user_id,orders.buyer_user_id),
+           fee_amount_xof=EXCLUDED.fee_amount_xof, net_amount_xof=EXCLUDED.net_amount_xof,
+           fee_policy=COALESCE(EXCLUDED.fee_policy,orders.fee_policy)`,
+        [orderId, buyerUserId || null, eventId, grossAmount, feeAmount, netAmount, ticket.fee ? JSON.stringify(ticket.fee) : null, ticket.purchasedAt || new Date().toISOString()],
+      );
       const storedTicketTypeId = await resolveTicketTypeId(client, {
         eventId,
         ticketTypeId: ticket.ticketTypeId,
@@ -206,7 +218,7 @@ export async function listPostgresTicketsForUser(userId: string): Promise<Ticket
   if (!databasePool) return [];
   const result = await databasePool.query(
     `SELECT t.*, e.title AS event_title, e.starts_at::text AS event_starts_at, e.data AS event_data,
-            tt.name AS ticket_type_name, tt.price_xof
+            tt.name AS ticket_type_name, tt.price_xof, o.fee_policy
      FROM tickets t
      JOIN orders o ON o.id=t.order_id
      LEFT JOIN events e ON e.id=t.event_id
@@ -234,6 +246,7 @@ export async function listPostgresTicketsForUser(userId: string): Promise<Ticket
       buyerName: row.buyer_name || '', buyerPhone: row.buyer_phone || '', holderName: row.holder_name || undefined,
       holderPhone: row.holder_phone || undefined, status: row.status, purchasedAt: row.created_at?.toISOString?.() || row.created_at,
       expiresAt: row.expires_at?.toISOString?.() || row.expires_at, signature: row.signature, paymentMethod: row.payment_method,
+      ...(row.fee_policy && typeof row.fee_policy === 'object' ? { fee: row.fee_policy } : {}),
     };
   });
 }

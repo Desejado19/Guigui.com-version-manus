@@ -153,7 +153,7 @@ import { describeSmsGateway } from './server/smsGatewayService';
 import { deliverConfirmedTicketPurchase } from './server/ticketPurchaseDeliveryService';
 import { getTicketOffer } from './server/ticketCatalogService';
 import { ticketInventory } from './server/ticketInventoryService';
-import { quoteTicketPurchase } from './server/ticketPurchaseDomain';
+import { quoteTicketPurchase, ticketFeeSnapshotForUnit } from './server/ticketPurchaseDomain';
 import { executeTicketPurchase, type TicketPurchaseResult } from './server/ticketPurchaseUseCase';
 import { createSimulatedEmailAdapter, createSimulatedSmsAdapter } from './server/integrations/simulatedAdapters';
 import { createScheduledItem, ensureDemoScheduledItems, listScheduledItems, processDueScheduledItems, updateScheduledItem, SCHEDULING_TIMEZONE } from './server/schedulingService';
@@ -4930,7 +4930,7 @@ app.post('/api/tickets/purchase', async (req, res) => {
         },
       },
       payments: paymentAdapters,
-      ticketFactory({ offer: purchaseOffer, buyer, quantity, holderName: purchaseHolderName, holderPhone: purchaseHolderPhone, paymentMethod: purchasePaymentMethod, purchasedAt }) {
+      ticketFactory({ offer: purchaseOffer, buyer, quantity, holderName: purchaseHolderName, holderPhone: purchaseHolderPhone, paymentMethod: purchasePaymentMethod, purchasedAt, feeSnapshot }) {
         return Array.from({ length: quantity }, (_, index) => {
           const { ticketCode, qrToken, pinCode } = generateTicketIdentifiers();
           const ticket: TicketForValidation = {
@@ -4954,6 +4954,7 @@ app.post('/api/tickets/purchase', async (req, res) => {
             purchasedAt,
             expiresAt: calculateTicketExpiry(purchaseOffer.eventDate, purchaseOffer.eventTime),
             paymentMethod: purchasePaymentMethod,
+            fee: ticketFeeSnapshotForUnit(feeSnapshot, index, quantity),
           };
           if (ticketSigningSecret) ticket.signature = signTicket(ticket, ticketSigningSecret);
           return ticket;
@@ -5532,6 +5533,9 @@ async function issueTicketForConfirmedTransaction(transaction: any, requestId: s
       purchasedAt: new Date().toISOString(),
       expiresAt: calculateTicketExpiry(draft.eventDate, draft.eventTime),
       paymentMethod: transaction.provider,
+      // A taxa é a que foi calculada no checkout, mesmo que a confirmação
+      // do pagamento aconteça depois de uma alteração à política.
+      ...(draft.feeSnapshot ? { fee: ticketFeeSnapshotForUnit(draft.feeSnapshot, index, quantity) } : {}),
     };
     if (ticketSigningSecret) ticket.signature = signTicket(ticket, ticketSigningSecret);
     ticketsDb.set(ticket.qrToken, ticket);
