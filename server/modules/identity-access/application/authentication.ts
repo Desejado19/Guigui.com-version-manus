@@ -11,16 +11,28 @@ import type {
 } from './identityAccessPorts';
 
 export interface AuthenticationInput {
-  email: string;
-  password: string;
+  email?: string;
+  password?: string;
   mfaCode?: string;
   ipAddress?: string;
   userAgent?: string;
+  googleIdToken?: string;
 }
 
 export type AuthenticationResult =
   | { kind: 'authenticated'; user: PublicIdentity; sessionToken: string }
-  | { kind: 'rejected'; reason: 'invalid_credentials' | 'deactivated' | 'suspended' | 'disabled' | 'mfa_required' | 'mfa_invalid' };
+  | { kind: 'rejected'; reason: 'invalid_credentials' | 'deactivated' | 'suspended' | 'disabled' | 'mfa_required' | 'mfa_invalid' | 'google_failed' };
+
+/** Identidade devolvida depois de o ID token do Google ser verificado na assinatura e nas claims. */
+export interface VerifiedGoogleIdentity {
+  googleId: string;
+  email: string;
+  name?: string;
+  avatarUrl?: string;
+}
+
+/** Verificador de ID tokens do Google. Devolve null quando o token não é válido. */
+export type GoogleIdTokenVerifier = (idToken: string) => Promise<VerifiedGoogleIdentity | null>;
 
 export interface BusinessRegistrationProfile {
   name: string;
@@ -60,6 +72,8 @@ export interface AuthenticationDependencies {
   demoAccountsEnabled: boolean;
   authenticateDemoAccount(email: string, password: string): Promise<PublicIdentity | null>;
   persistDemoAccount?(user: PublicIdentity, password: string): Promise<PublicIdentity>;
+  /** Sem verificador configurado, o login Google é recusado. */
+  verifyGoogleIdToken?: GoogleIdTokenVerifier;
 }
 
 export interface RegistrationDependencies {
@@ -78,7 +92,51 @@ export async function authenticateUser(
   input: AuthenticationInput,
   dependencies: AuthenticationDependencies,
 ): Promise<AuthenticationResult> {
-  const email = input.email.trim().toLowerCase();
+  // Login com Google: a assinatura e as claims do ID token são verificadas pelo
+  // adaptador injectado; sem verificador configurado não há autenticação.
+  if (input.googleIdToken) {
+    const identity = dependencies.verifyGoogleIdToken
+      ? await dependencies.verifyGoogleIdToken(input.googleIdToken)
+      : null;
+    if (!identity) return { kind: 'rejected', reason: 'google_failed' };
+
+    let account = await dependencies.accounts.findByEmail(identity.email);
+    if (account?.accountStatus === 'deactivated') return { kind: 'rejected', reason: 'deactivated' };
+    if (account?.accessStatus === 'suspended') return { kind: 'rejected', reason: 'suspended' };
+    if (account?.accessStatus === 'disabled') return { kind: 'rejected', reason: 'disabled' };
+
+    // Conta nova criada como cidadã, com uma palavra-passe aleatória que nunca é
+    // revelada: o acesso passa a ser feito pela própria Google.
+    if (!account) {
+      const name = identity.name || identity.email.split('@')[0];
+      account = await dependencies.accounts.create({
+        name,
+        email: identity.email,
+        password: randomBytes(32).toString('hex'),
+        role: 'user',
+        phone: '',
+        neighborhood: 'Bissau',
+        ...(identity.avatarUrl ? { avatarUrl: identity.avatarUrl } : {}),
+      });
+      if (!account) return { kind: 'rejected', reason: 'google_failed' };
+    }
+
+    // MFA obrigatório para administradores, tal como no login por palavra-passe.
+    if (account.role === 'admin' && await dependencies.mfa.hasEnabledMfa(account.id)) {
+      if (!input.mfaCode) return { kind: 'rejected', reason: 'mfa_required' };
+      if (!await dependencies.mfa.verifyUserMfa(account.id, input.mfaCode)) {
+        return { kind: 'rejected', reason: 'mfa_invalid' };
+      }
+    }
+    const sessionToken = await dependencies.sessions.createSession({
+      userId: account.id,
+      role: account.role,
+      ipAddress: input.ipAddress,
+      userAgent: input.userAgent,
+    });
+    return { kind: 'authenticated', user: toPublicIdentity(account), sessionToken };
+  }
+  const email = (input.email || '').trim().toLowerCase();
   const account = await dependencies.accounts.findByEmail(email);
 
   if (account?.accountStatus === 'deactivated') {
@@ -91,7 +149,7 @@ export async function authenticateUser(
     return { kind: 'rejected', reason: 'disabled' };
   }
 
-  if (account && dependencies.verifyPassword(input.password, account.passwordHash)) {
+  if (account && dependencies.verifyPassword(input.password || '', account.passwordHash)) {
     if (account.role === 'admin' && await dependencies.mfa.hasEnabledMfa(account.id)) {
       if (!input.mfaCode) return { kind: 'rejected', reason: 'mfa_required' };
       if (!await dependencies.mfa.verifyUserMfa(account.id, input.mfaCode)) {
@@ -108,12 +166,12 @@ export async function authenticateUser(
   }
 
   const demoUser = dependencies.demoAccountsEnabled
-    ? await dependencies.authenticateDemoAccount(email, input.password)
+    ? await dependencies.authenticateDemoAccount(email, input.password || '')
     : null;
   if (!demoUser) return { kind: 'rejected', reason: 'invalid_credentials' };
 
   const user = dependencies.persistDemoAccount
-    ? await dependencies.persistDemoAccount(demoUser, input.password)
+    ? await dependencies.persistDemoAccount(demoUser, input.password || '')
     : demoUser;
   const sessionToken = await dependencies.sessions.createSession({
     userId: user.id,

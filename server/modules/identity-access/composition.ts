@@ -10,6 +10,7 @@ import {
   type AuthenticationInput,
   type AuthenticationResult,
   type BusinessProvisioningPort,
+  type GoogleIdTokenVerifier,
   type RegistrationInput,
   type RegistrationResult,
 } from './application/authentication';
@@ -75,6 +76,8 @@ export interface IdentityAccessOptions {
   createBusinessInvitationAccess(
     readers: IdentityAccessAccountReaders,
   ): BusinessInvitationAccess;
+  /** Quando ausente, o login com Google é recusado. */
+  verifyGoogleIdToken?: GoogleIdTokenVerifier;
 }
 
 export interface IdentityAccess {
@@ -138,6 +141,7 @@ function asPublicIdentity(account: IdentityAccount | null): PublicIdentity | nul
       mfa,
       verifyPassword,
       demoAccountsEnabled: options.demoAccountsEnabled,
+      verifyGoogleIdToken: options.verifyGoogleIdToken,
       authenticateDemoAccount: async (email, password) => {
         const demo = options.demoUsers.find((user) => (
           user.email === email && verifyDemoPassword(user.email, password, user.password)

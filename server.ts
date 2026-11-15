@@ -28,6 +28,7 @@ import {
   type IdentityAccess,
   type PublicIdentity,
 } from './server/modules/identity-access';
+import { createGoogleIdTokenVerifier } from './server/modules/identity-access/infrastructure/googleIdTokenVerifier';
 import { loadJson, saveJson } from './server/runtimeStore';
 import { createPaymentAdapters } from './server/paymentService';
 import { localizeApiPayload, resolveRequestLanguage } from './server/i18n';
@@ -299,7 +300,9 @@ app.use((req, res, next) => {
       "base-uri 'self'",
       "frame-ancestors 'self'",
       "form-action 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      // O botão "Continuar com Google" carrega o script e o iframe oficiais.
+      "script-src 'self' 'unsafe-inline' https://accounts.google.com",
+      "frame-src https://accounts.google.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: https:",
       "font-src 'self' data: https: https://fonts.gstatic.com",
@@ -3023,6 +3026,11 @@ identityAccess = createIdentityAccess({
   databaseConfigured,
   demoAccountsEnabled,
   demoUsers,
+  // O mesmo client ID público usado pelo botão no browser; sem ele o login
+  // Google fica desactivado em vez de aceitar tokens por verificar.
+  verifyGoogleIdToken: createGoogleIdTokenVerifier({
+    clientId: process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '',
+  }),
   businessProvisioning: {
     validateProfile: (profile) => ({
       missingFields: getBusinessProfileCompletion(profile).missingFields,
@@ -3077,8 +3085,28 @@ identityAccess = createIdentityAccess({
 });
 
 app.post('/api/auth/login', async (req, res) => {
+  const googleIdToken = typeof req.body?.googleIdToken === 'string' ? req.body.googleIdToken : undefined;
   const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  if (googleIdToken) {
+    const result = await identityAccess.authenticate({
+      googleIdToken,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+    if (result.kind === 'rejected') {
+      if (result.reason === 'google_failed') return res.status(401).json({ error: 'Token Google inválido.' });
+      if (result.reason === 'deactivated') return res.status(403).json({ error: 'Esta conta foi desativada.', code: 'ACCOUNT_DEACTIVATED' });
+      if (result.reason === 'suspended') return res.status(403).json({ error: 'O seu acesso está suspenso. Contacte o responsável da empresa.', code: 'ACCESS_SUSPENDED' });
+      if (result.reason === 'disabled') return res.status(403).json({ error: 'O acesso desta conta foi revogado.', code: 'ACCESS_DISABLED' });
+      if (result.reason === 'mfa_required') return res.status(401).json({ error: 'Código MFA obrigatório.', code: 'MFA_REQUIRED' });
+      if (result.reason === 'mfa_invalid') return res.status(401).json({ error: 'Código MFA inválido ou já utilizado.', code: 'MFA_INVALID' });
+      return res.status(401).json({ error: 'Falha na autenticação Google.' });
+    }
+    setSessionCookie(res, result.sessionToken);
+    res.json({ success: true, user: result.user });
+    return;
+  }
   if (!email || password.length < 6) return res.status(400).json({ error: 'Indique um e-mail e uma palavra-passe válida.' });
 
   const result = await identityAccess.authenticate({
