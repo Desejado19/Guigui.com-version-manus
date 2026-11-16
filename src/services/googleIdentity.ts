@@ -40,7 +40,13 @@ const SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
 
 export const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim();
 
-export const isGoogleSignInConfigured = () => googleClientId.length > 0;
+// Um Client ID real termina em .apps.googleusercontent.com. Valores de exemplo
+// (000000000000-placeholder…) fazem o Google devolver invalid_client 401, por isso
+// são tratados como "por configurar" em vez de abrir um popup condenado a falhar.
+const PLACEHOLDER_CLIENT_ID = /(placeholder|example|your[-_]?client|changeme)/i;
+
+export const isGoogleSignInConfigured = () =>
+  /\.apps\.googleusercontent\.com$/i.test(googleClientId) && !PLACEHOLDER_CLIENT_ID.test(googleClientId);
 
 let scriptPromise: Promise<void> | null = null;
 

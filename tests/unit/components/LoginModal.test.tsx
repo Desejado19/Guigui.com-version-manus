@@ -5,10 +5,33 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LoginModal } from '../../../src/components/LoginModal';
 
 function enterBusinessRegistration() {
-  fireEvent.click(screen.getByText('Criar Nova Conta'));
-  fireEvent.click(screen.getByRole('button', { name: /Próximo Passo/ }));
+  fireEvent.click(screen.getByRole('tab', { name: /Criar Conta/ }));
   fireEvent.click(screen.getByRole('button', { name: /Empresa/ }));
 }
+
+describe('citizen registration', () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('requires a matching password confirmation and only asks for contact', () => {
+    render(<LoginModal isOpen currentLang="pt" onLogin={vi.fn()} />);
+    fireEvent.click(screen.getByRole('tab', { name: /Criar Conta/ }));
+
+    expect(screen.queryByText('Localização em Bissau')).toBeNull();
+    expect(screen.getByLabelText('Confirme a Palavra-passe *')).toBeTruthy();
+
+    fireEvent.change(screen.getByPlaceholderText('ex: Manuel Fernandes'), { target: { value: 'Malam Bacar' } });
+    fireEvent.change(screen.getByPlaceholderText('ex: contacto@exemplo.com'), { target: { value: 'malam@example.test' } });
+    fireEvent.change(screen.getByLabelText('Contacto Telefónico *'), { target: { value: '+245 955 12 34' } });
+    fireEvent.change(screen.getByPlaceholderText('⬢⬢⬢⬢⬢⬢⬢⬢'), { target: { value: 'CorrectHorse42' } });
+    fireEvent.change(screen.getByPlaceholderText('Repita a palavra-passe'), { target: { value: 'DifferentHorse42' } });
+    fireEvent.click(screen.getByRole('button', { name: /Concluir Registo e Entrar/ }));
+
+    expect(screen.getByText('As palavras-passe não coincidem.')).toBeTruthy();
+  });
+});
 
 describe('business registration profile collection', () => {
   afterEach(() => {
@@ -23,6 +46,7 @@ describe('business registration profile collection', () => {
     fireEvent.change(screen.getByPlaceholderText('ex: Restaurante Coqueiros'), { target: { value: 'Atelier Nô Pintcha' } });
     fireEvent.change(screen.getByPlaceholderText('ex: contacto@exemplo.com'), { target: { value: 'owner@atelier.test' } });
     fireEvent.change(screen.getByPlaceholderText('⬢⬢⬢⬢⬢⬢⬢⬢'), { target: { value: 'CorrectHorse42' } });
+    fireEvent.change(screen.getByPlaceholderText('Repita a palavra-passe'), { target: { value: 'CorrectHorse42' } });
     fireEvent.click(screen.getByRole('button', { name: /Próximo Passo \(Escalão\)/ }));
 
     expect(screen.getByText(/Empresa \(Passo 1\/3\)/)).toBeTruthy();
@@ -80,6 +104,7 @@ describe('business registration profile collection', () => {
     fireEvent.change(screen.getByLabelText('Bairro da Empresa *'), { target: { value: 'Bandim' } });
     fireEvent.change(screen.getByLabelText('E-mail Público'), { target: { value: 'contacto@atelier.test' } });
     fireEvent.change(screen.getByPlaceholderText('⬢⬢⬢⬢⬢⬢⬢⬢'), { target: { value: 'CorrectHorse42' } });
+    fireEvent.change(screen.getByPlaceholderText('Repita a palavra-passe'), { target: { value: 'CorrectHorse42' } });
     fireEvent.click(screen.getByRole('button', { name: /Próximo Passo \(Escalão\)/ }));
     fireEvent.click(screen.getByRole('button', { name: /Próximo Passo \(Pagamento:/ }));
     fireEvent.change(screen.getByLabelText(/Número para Débito/), { target: { value: '+245 977 000 000' } });

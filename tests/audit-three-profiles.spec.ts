@@ -232,18 +232,7 @@ test.describe('1. Autenticação (interface real)', () => {
     await page.getByRole('button', { name: /^entrar$/i }).first().click();
     await page.waitForTimeout(600);
 
-    // O ecrã de escolha usa cartões clicáveis (div), não botões.
-    await page.getByText('Entrar na Conta', { exact: true }).first().click();
-    await page.waitForTimeout(300);
-    const nextStep = page.getByRole('button', { name: /próximo passo/i }).first();
-    if (await nextStep.isVisible().catch(() => false)) {
-      await nextStep.click();
-    } else {
-      // Alternativa: cartão de conta rápida de cidadão.
-      await page.getByRole('button', { name: /cidadão/i }).first().click();
-    }
-    await page.waitForTimeout(800);
-
+    // O modal abre diretamente no formulário de credenciais.
     const email = page.locator('input[type="email"]').first();
     const password = page.locator('input[type="password"]').first();
     await expect(email, 'o formulário de login deve expor um campo de e-mail').toBeVisible({ timeout: 15_000 });

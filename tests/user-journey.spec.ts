@@ -169,9 +169,7 @@ test.describe('jornada do cidadão', () => {
     await expect(loginButton).toBeVisible({ timeout: 15_000 });
     await loginButton.click();
 
-    // Modal em duas fases: "Acesso à Plataforma" → "Próximo Passo" → formulário de credenciais.
-    await page.getByRole('button', { name: 'Próximo Passo', exact: true }).click();
-
+    // O modal abre diretamente no formulário de credenciais.
     const email = page.locator('input[type="email"]').first();
     await expect(email).toBeVisible({ timeout: 10_000 });
     await email.fill(ACCOUNTS.citizen);

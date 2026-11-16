@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserProfile, UserRole, SubscriptionTier, CategoryGroupId, SubscriptionPlan, BusinessModelConfig, Language } from '../types';
 import type { Business } from '../types';
 import {
@@ -8,7 +8,6 @@ import {
   Key,
   Mail,
   Lock,
-  Sparkles,
   ArrowRight,
   ArrowLeft,
   AlertCircle,
@@ -22,7 +21,13 @@ import {
   Zap,
   Loader2,
   Award,
+  Eye,
+  EyeOff,
+  CalendarDays,
+  Store,
+  Drama,
 } from 'lucide-react';
+import { GuiguiStar } from './GuiguiStar';
 import { usePersistentState } from '../utils/persistentState';
 import { getBusinessProfileCompletion } from '../utils/businessProfile';
 import { useLocationCatalog } from '../hooks/useLocationCatalog';
@@ -95,6 +100,25 @@ export const DEMO_ACCOUNTS: UserProfile[] = [
   },
 ];
 
+const GoogleSignInSlot: React.FC<{ onCredential: (credential: string) => void; onError: (message: string) => void }> = ({ onCredential, onError }) => {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const callbacks = React.useRef({ onCredential, onError });
+  callbacks.current = { onCredential, onError };
+
+  React.useEffect(() => {
+    const node = containerRef.current;
+    if (!node || !isGoogleSignInConfigured()) return;
+    void mountGoogleSignInButton(node, {
+      locale: 'pt-PT',
+      onCredential: (credential) => callbacks.current.onCredential(credential),
+    }).catch((error) => {
+      callbacks.current.onError(error instanceof Error ? error.message : 'Não foi possível carregar o início de sessão da Google.');
+    });
+  }, []);
+
+  return <div ref={containerRef} className="flex w-full justify-center [&>div]:!w-full [&_iframe]:!w-full [&_iframe]:!max-w-full" />;
+};
+
 export const LoginModal: React.FC<LoginModalProps> = ({
   isOpen,
   currentLang,
@@ -106,21 +130,22 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const t = (key: string, variables?: Record<string, string | number>) => getTranslation(currentLang, key, variables);
   const { locations: bissauLocations } = useLocationCatalog();
   // Modal flow states: 'choice' (Step 0) -> 'login' (Step 1 Login) | 'register' (Step 1 Register)
-  const [modalView, setModalView] = useState<'choice' | 'login' | 'register' | 'forgot' | 'team_invite'>('choice');
-  const [chosenOption, setChosenOption] = useState<'login' | 'register'>('login');
+  const [modalView, setModalView] = useState<'login' | 'register' | 'forgot' | 'team_invite'>('login');
   const [mfaCode, setMfaCode] = useState<string | null>(null);
   const [mfaRequired, setMfaRequired] = useState<boolean>(false);
-  const [googleConfigured, setGoogleConfigured] = useState(isGoogleSignInConfigured());
-  const buttonContainer = useRef<HTMLDivElement>(null);
+  const [googleMountError, setGoogleMountError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
   useEffect(() => {
     if (isOpen) {
       const prevOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
       document.body.classList.add('modal-open');
-      setModalView(teamInviteToken ? 'team_invite' : 'choice');
-      setChosenOption('login');
+      setModalView(teamInviteToken ? 'team_invite' : 'login');
       setError(null);
+      setMfaRequired(false);
+      setMfaCode('');
       return () => {
         document.body.style.overflow = prevOverflow;
         document.body.classList.remove('modal-open');
@@ -185,6 +210,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const [regDescription, setRegDescription] = useState('');
   const [regPublicEmail, setRegPublicEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
+  const [regPasswordConfirm, setRegPasswordConfirm] = useState('');
 
   // Business Subscription & Payment State
   const [regStep, setRegStep] = useState<1 | 2 | 3>(1);
@@ -201,7 +227,29 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     ticketCommissionPercent: 10, ticketFixedFeeXOF: 200, extraPostPriceXOF: 5000, extraPromotionPriceXOF: 10000, bannerWeeklyPriceXOF: 50000, annualDiscountPercent: 15, includedPostsPerMonth: 3, automaticSubscriptionSuspensionEnabled: true,
   });
 
+  const formScrollRef = React.useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (formScrollRef.current) formScrollRef.current.scrollTop = 0;
+  }, [isOpen, modalView, regStep]);
+
   if (!isOpen) return null;
+
+  const authTitle = modalView === 'register'
+    ? 'Crie a sua conta'
+    : modalView === 'forgot'
+      ? 'Recuperar acesso'
+      : modalView === 'team_invite'
+        ? 'Aceitar convite'
+        : 'Acesse a sua conta';
+  const authSubtitle = modalView === 'register'
+    ? 'Registe-se como cidadão ou empresa'
+    : modalView === 'forgot'
+      ? 'Recupere o acesso à sua conta'
+      : modalView === 'team_invite'
+        ? 'Conclua o convite da sua empresa'
+        : 'Entre com o seu email, senha ou Google';
 
   const availablePlans = normaliseSubscriptionPlans(subscriptionPlans).filter((plan) => plan.isActive && plan.isPublic);
   const selectedPlan = getPlanById(availablePlans.length > 0 ? availablePlans : DEFAULT_SUBSCRIPTION_PLANS, selectedPlanId, selectedTier);
@@ -270,16 +318,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setResetConfirmation('');
   };
 
-  const handleProceedFromChoice = () => {
-    setError(null);
-    if (chosenOption === 'login') {
-      setModalView('login');
-    } else {
-      setModalView('register');
-      setRegStep(1);
-    }
-  };
-
   const handleMfaSubmit = () => {
     if (!mfaCode?.trim()) {
       setError('Indique o código MFA.');
@@ -331,56 +369,22 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       .catch(() => setError('Erro de conexão com o servidor'));
   };
 
-  const renderUnconfiguredGoogleButton = () => {
-    if (!isGoogleSignInConfigured()) {
-      return <div className="text-center text-sm text-slate-500">Continuar com Google ainda não está configurado. Configure VITE_GOOGLE_CLIENT_ID.</div>;
-    }
-    return (
-      <div className="pt-3 border-t border-slate-200/80 flex items-center gap-3">
-        <span className="text-xs font-semibold text-slate-500">ou&nbsp;Continuar com Google</span>
-        <button
-          onClick={() => {
-            setError(null);
-            mountGoogleSignInButton(buttonContainer.current, { locale: 'pt-PT', onCredential: handleGoogleCredential })
-          }}
-          className="rounded-xl border border-slate-300 hover:border-slate-400 bg-white dark:bg-slate-900 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-50 transition"
-        >
-          Continuar com Google
-        </button>
-      </div>
-    );
-  };
-
-  const renderMfaCodeInput = () => {
-    return (
-      <div className="pt-3 border-t border-slate-200/80 space-y-2">
-        <div className="text-center text-xs text-rose-600">
-          <p>{t('auth.mfaRequired')}:</p>
-          <input
-            type="text"
-            value={mfaCode || ''}
-            onChange={(e) => setMfaCode(e.target.value)}
-            maxLength={8}
-            className="border rounded w-24 px-2 text-center"
-            placeholder="000000"
-          />
-          <button
-            type="button"
-            onClick={handleMfaSubmit}
-            className="ml-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 text-xs font-bold">
-            Verificar
-          </button>
-        </div>
-      </div>
-    );
+  const passwordConfirmationError = () => {
+    if (regPassword.length < 6) return 'Indique uma palavra-passe com pelo menos 6 carateres.';
+    if (!regPasswordConfirm) return 'Confirme a palavra-passe.';
+    if (regPassword !== regPasswordConfirm) return 'As palavras-passe não coincidem.';
+    return null;
   };
 
   const handleNextToStep2 = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     const emailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regEmail.trim());
-    if (!regName.trim() || !emailIsValid || regPassword.length < 6) {
-      setError('Indique um nome, um e-mail válido e uma palavra-passe com pelo menos 6 carateres.');
+    const passwordError = passwordConfirmationError();
+    if (!regName.trim() || !emailIsValid || passwordError) {
+      setError(!regName.trim() || !emailIsValid
+        ? 'Indique um nome e um e-mail válido.'
+        : passwordError as string);
       return;
     }
     setRegStep(2);
@@ -484,8 +488,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     }
 
     const emailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regEmail.trim());
-    if (!regName.trim() || !emailIsValid || regPassword.length < 6) {
-      setError('Indique um nome, um e-mail válido e uma palavra-passe com pelo menos 6 carateres.');
+    const passwordError = passwordConfirmationError();
+    if (!regName.trim() || !emailIsValid || passwordError) {
+      setError(!regName.trim() || !emailIsValid
+        ? 'Indique um nome e um e-mail válido.'
+        : passwordError as string);
       return;
     }
 
@@ -505,55 +512,133 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto overscroll-contain no-scrollbar"
+      className="fixed inset-0 z-[200] flex items-stretch justify-center overflow-y-auto overscroll-contain bg-slate-950/80 p-0 backdrop-blur-md no-scrollbar sm:items-center sm:p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget && onClose) onClose();
       }}
     >
-      <div className="relative flex max-h-[calc(100dvh-1rem)] w-full max-w-xl flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl shadow-2xl overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-200 overscroll-contain">
-        
-        {/* Close Button for Guest / Visitor Exploration */}
-        {onClose && (
-          <button type="button"
-            onClick={onClose}
-            className="absolute top-4 right-4 z-20 guigui-close-button !border-white/20 !bg-white/10 !text-white hover:!bg-white/20 hover:!text-white"
-            title={`${t('close')} / Navegar como Visitante`}
-            aria-label={`${t('close')} janela de autenticação`}
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )}
+      <div className="relative flex h-[100dvh] max-h-[100dvh] w-full max-w-6xl flex-col overflow-hidden bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-200 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-3xl lg:h-auto lg:max-h-[min(900px,calc(100dvh-3rem))] lg:flex-row">
 
-        {/* Modal Header */}
-        <div className="bg-slate-900 text-white p-6 sm:p-7 border-b border-slate-800 relative">
-          <div className="space-y-1.5 pr-8">
-            <div className="inline-flex items-center gap-1.5 bg-slate-800 text-slate-300 text-xs px-3 py-1 rounded-full border border-slate-700 font-bold">
-              <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-              <span>Guigui.com</span>
+        {/* Brand hero panel */}
+        <div className="relative hidden shrink-0 flex-col justify-between overflow-hidden p-10 text-white lg:flex lg:w-[53%]">
+          <img
+            src="https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=1400&q=80"
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#0B3B37]/95 via-[#0F4A44]/90 to-[#071f1d]/98" />
+
+          <div className="relative flex items-center gap-3">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white shadow-lg">
+              <GuiguiStar className="h-9 w-9" />
             </div>
-            
-            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2">
-              Acesso à Plataforma
-            </h2>
-            
-            <p className="text-xs text-slate-300 leading-relaxed">
-              {modalView === 'choice' && 'Escolha se deseja entrar na sua conta existente ou criar uma nova conta.'}
-              {modalView === 'login' && 'Selecione uma conta de teste rápida ou introduza o seu e-mail e palavra-passe.'}
-              {modalView === 'register' && 'Registe-se como Cidadão ou Empresário para usufruir de todas as funcionalidades.'}
-              {modalView === 'team_invite' && 'Aceite o convite da sua empresa e crie a sua conta individual.'}
-            </p>
-
-            {messageNotice && (
-              <div className="mt-2.5 p-3 bg-blue-950/90 border border-blue-700/80 rounded-2xl text-blue-200 text-xs font-semibold flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-blue-400 shrink-0" />
-                <span>{messageNotice}</span>
+            <div>
+              <div className="text-3xl font-black leading-none tracking-tight">
+                Guigui<span className="text-[#F0B65B]">.com</span>
               </div>
-            )}
+              <div className="mt-1.5 text-xs font-semibold text-white/80">Diretório &amp; Agenda Cultural de Bissau</div>
+            </div>
+          </div>
+
+          <div className="relative space-y-6">
+            <h2 className="text-4xl font-black leading-[1.05] xl:text-5xl">
+              Bem-vindo ao<br /><span className="text-[#F0B65B]">Guigui.com!</span>
+            </h2>
+            <p className="max-w-md text-sm font-medium leading-relaxed text-white/85">
+              Descubra eventos, empresas, serviços e muito mais em Bissau. Faça parte da nossa comunidade!
+            </p>
+            <ul className="space-y-3">
+              {[
+                { icon: CalendarDays, title: 'Eventos e Bilhetes', text: 'Não perca os melhores eventos' },
+                { icon: Store, title: 'Empresas e Negócios', text: 'Encontre o que precisa' },
+                { icon: Drama, title: 'Cultura e Entretenimento', text: 'Viva a cultura guineense' },
+              ].map((item) => (
+                <li key={item.title} className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15 backdrop-blur-sm">
+                    <item.icon className="h-5 w-5 text-[#F0B65B]" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-bold text-white">{item.title}</span>
+                    <span className="block text-xs text-white/70">{item.text}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="relative">
+            <p className="font-serif text-2xl italic leading-none text-white/95">Guigui.com</p>
+            <p className="mt-1.5 font-serif text-sm italic text-white/75">… a nossa cidade, a nossa vida!</p>
+            <div className="mt-2.5 h-1 w-24 rounded-full bg-[#F0B65B]" />
           </div>
         </div>
 
-        {/* Modal Body */}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50 dark:bg-slate-800 p-5 sm:p-7 space-y-5">
+        {/* Form panel */}
+        <div className="relative flex h-full min-h-0 w-full flex-col bg-white dark:bg-[#0B2320] sm:h-auto lg:w-[47%]">
+          {onClose && (
+                          <button type="button"
+                onClick={onClose}
+                className="absolute right-3 top-3 z-20 rounded-full border border-slate-200 bg-white/90 p-2 text-slate-500 shadow-sm transition hover:bg-slate-100 hover:text-slate-900 dark:border-[#1f4a44] dark:bg-[#102d2b] dark:text-[#EEF7F4] dark:hover:bg-[#16332f] dark:hover:text-white sm:right-4 sm:top-4"
+              title={`${t('close')} / Navegar como Visitante`}
+              aria-label={`${t('close')} janela de autenticação`}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+
+          <div ref={formScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-5 no-scrollbar sm:px-10 sm:py-10">
+
+            {/* Compact brand on small screens */}
+            <div className="mb-4 flex items-center gap-2.5 pr-12 lg:hidden sm:mb-6">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0B3B37] shadow-sm sm:h-11 sm:w-11">
+                <GuiguiStar className="h-6 w-6 sm:h-7 sm:w-7" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-lg font-black leading-none text-slate-900 dark:text-[#EEF7F4] sm:text-xl">
+                  Guigui<span className="text-[#176158]">.com</span>
+                </div>
+                <div className="mt-1 truncate text-[10px] font-semibold text-slate-500 dark:text-[#9BCDBB] sm:text-[11px]">Diretório &amp; Agenda Cultural de Bissau</div>
+              </div>
+            </div>
+
+            {(modalView === 'login' || modalView === 'register' || modalView === 'forgot') && (
+              <div role="tablist" aria-label="Entrar ou criar conta" className="grid grid-cols-2 gap-1 rounded-2xl bg-[#EEF7F4] p-1.5 dark:bg-[#102d2b]">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={modalView !== 'register'}
+                  onClick={() => { setModalView('login'); setError(null); setResetMessage(''); }}
+                  className={`flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${modalView !== 'register' ? 'bg-[#0B3B37] text-white shadow-md shadow-[#0B3B37]/25 dark:bg-[#3FAE80] dark:text-[#071f1d]' : 'text-[#176158] hover:text-[#0B3B37] dark:text-[#C2DFD4] dark:hover:text-white'}`}
+                >
+                  <LogIn className="h-4 w-4" />
+                  Entrar
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={modalView === 'register'}
+                  onClick={() => { setModalView('register'); setRegStep(1); setError(null); }}
+                  className={`flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${modalView === 'register' ? 'bg-[#0B3B37] text-white shadow-md shadow-[#0B3B37]/25 dark:bg-[#3FAE80] dark:text-[#071f1d]' : 'text-[#176158] hover:text-[#0B3B37] dark:text-[#C2DFD4] dark:hover:text-white'}`}
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Criar Conta
+                </button>
+              </div>
+            )}
+
+            <div className="mt-5 space-y-1 text-center sm:mt-6">
+              <h2 className="text-xl font-black tracking-tight text-[#0B3B37] dark:text-[#EEF7F4] sm:text-2xl">{authTitle}</h2>
+              <p className="text-xs text-[#176158]/80 dark:text-[#9BCDBB] sm:text-sm">{authSubtitle}</p>
+            </div>
+
+            {messageNotice && (
+              <div className="mt-4 flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 p-3 text-xs font-semibold text-blue-800">
+                <AlertCircle className="h-4 w-4 shrink-0 text-blue-500" />
+                <span>{messageNotice}</span>
+              </div>
+            )}
+
+            <div className="mt-4 space-y-4 sm:mt-5 sm:space-y-5">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-semibold flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -580,401 +665,170 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             </form>
           )}
 
-          {/* VIEW 0: SELECTION SCREEN (Entrar ou Criar Conta) */}
-          {modalView === 'choice' && (
-            <div className="space-y-5 py-1">
-              <div className="text-center sm:text-left">
-                <h3 className="text-base font-black text-slate-900">
-                  O que deseja fazer?
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Escolha uma opção e clique em <strong>Próximo Passo</strong>.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                {/* Option 1: Entrar */}
-                <div
-                  onClick={() => setChosenOption('login')}
-                  className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between space-y-3 select-none ${
-                    chosenOption === 'login'
-                      ? 'bg-blue-50/80 border-blue-600 ring-2 ring-blue-500/20 shadow-md'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-slate-300 shadow-sm'
-                  }`}
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                        chosenOption === 'login' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700'
-                      }`}>
-                        <LogIn className="w-5 h-5" />
-                      </div>
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        chosenOption === 'login' ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 dark:border-slate-600'
-                      }`}>
-                        {chosenOption === 'login' && <Check className="w-3 h-3 stroke-[3]" />}
-                      </div>
-                    </div>
-
-                    <div>
-                      <h4 className="font-extrabold text-sm text-slate-900">
-                        Entrar na Conta
-                      </h4>
-                      <p className="text-[11px] text-slate-500 leading-relaxed mt-1">
-                        Já tenho uma conta ou quero aceder rapidamente com uma conta de teste.
-                      </p>
-                    </div>
-                  </div>
-
-                  <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">
-                    Acesso Imediato
-                  </span>
+          {/* VIEW 1: LOGIN FLOW */}
+          {modalView === 'login' && (
+            <div className="space-y-5">
+              {isGoogleSignInConfigured() ? (
+                <div className="space-y-2">
+                  <GoogleSignInSlot onCredential={handleGoogleCredential} onError={setGoogleMountError} />
+                  {googleMountError && (
+                    <p className="text-center text-[11px] font-semibold text-[#A86516]">{googleMountError}</p>
+                  )}
                 </div>
-
-                {/* Option 2: Criar Conta */}
-                <div
-                  onClick={() => setChosenOption('register')}
-                  className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between space-y-3 select-none ${
-                    chosenOption === 'register'
-                      ? 'bg-blue-50/80 border-blue-600 ring-2 ring-blue-500/20 shadow-md'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-slate-300 shadow-sm'
-                  }`}
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                        chosenOption === 'register' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700'
-                      }`}>
-                        <UserPlus className="w-5 h-5" />
-                      </div>
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        chosenOption === 'register' ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 dark:border-slate-600'
-                      }`}>
-                        {chosenOption === 'register' && <Check className="w-3 h-3 stroke-[3]" />}
-                      </div>
-                    </div>
-
-                    <div>
-                      <h4 className="font-extrabold text-sm text-slate-900">
-                        Criar Nova Conta
-                      </h4>
-                      <p className="text-[11px] text-slate-500 leading-relaxed mt-1">
-                        Registar novo Cidadão ou Registar Empresa com Ficha e Publicações.
-                      </p>
-                    </div>
-                  </div>
-
-                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
-                    Novo Registo
-                  </span>
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-center text-[11px] font-semibold text-slate-500 dark:border-[#1f4a44] dark:bg-[#0b2320] dark:text-[#9BCDBB]">
+                  Login com Google indisponível. Configure VITE_GOOGLE_CLIENT_ID.
                 </div>
-              </div>
+              )}
 
-              {renderUnconfiguredGoogleButton()}
+              <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-[#9BCDBB]">
+                <span className="h-px flex-1 bg-slate-200 dark:bg-[#1f4a44]" />
+                <span>ou</span>
+                <span className="h-px flex-1 bg-slate-200 dark:bg-[#1f4a44]" />
+              </div>
 
               {mfaRequired && (
-                <div className="pt-3 border-t border-slate-200/80 space-y-2">
-                  <div className="text-center text-xs text-rose-600">
-                    <p>{t('auth.mfaRequired')}:</p>
+                <div className="space-y-2 rounded-2xl border border-[#F8D18C] bg-[#FFF9ED] p-4">
+                  <p className="text-xs font-bold text-[#6B3F0D]">
+                    {t('auth.mfaRequired')}: introduza o código de 8 dígitos
+                  </p>
+                  <div className="flex gap-2">
                     <input
                       type="text"
+                      inputMode="numeric"
                       value={mfaCode || ''}
-                      onChange={(e) => setMfaCode(e.target.value)}
+                      onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
                       maxLength={8}
-                      className="border rounded w-24 px-2 text-center"
-                      placeholder="000000"
+                      placeholder="00000000"
+                      aria-label="Código MFA"
+                      className="w-full rounded-xl border border-[#F0B65B] bg-white px-3 py-2.5 text-center font-mono text-base font-bold tracking-[0.3em] text-[#0B3B37] focus:outline-none focus:ring-2 focus:ring-[#E8A23A] sm:text-sm"
                     />
                     <button
                       type="button"
                       onClick={handleMfaSubmit}
-                      className="ml-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 text-xs font-bold">
+                      className="shrink-0 rounded-xl bg-[#0B3B37] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#0F4A44]"
+                    >
                       Verificar
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* Next Step Primary Button */}
-              <div className="pt-3 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3">
-                {onClose ? (
+              <form onSubmit={handleManualLogin} className="space-y-4">
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-[#DCEAE6]">Endereço de email</span>
+                  <div className="relative">
+                    <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="o.seu.email@exemplo.com"
+                      className="w-full rounded-xl border border-[#C2DFD4] bg-[#F7F5F1] dark:border-[#1f4a44] dark:bg-[#0b2320] py-3 pl-11 pr-4 text-base font-semibold text-slate-900 transition placeholder:text-slate-400 focus:border-[#0B3B37] focus:bg-white dark:text-[#EEF7F4] dark:placeholder:text-[#5f7f78] dark:focus:border-[#66BE9C] dark:focus:bg-[#102d2b] focus:outline-none focus:ring-2 focus:ring-[#0B3B37]/20 sm:text-sm"
+                    />
+                  </div>
+                </label>
+
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-[#DCEAE6]">Senha</span>
+                  <div className="relative">
+                    <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Introduza a sua senha"
+                      className="w-full rounded-xl border border-[#C2DFD4] bg-[#F7F5F1] dark:border-[#1f4a44] dark:bg-[#0b2320] py-3 pl-11 pr-12 text-base font-semibold text-slate-900 transition placeholder:text-slate-400 focus:border-[#0B3B37] focus:bg-white dark:text-[#EEF7F4] dark:placeholder:text-[#5f7f78] dark:focus:border-[#66BE9C] dark:focus:bg-[#102d2b] focus:outline-none focus:ring-2 focus:ring-[#0B3B37]/20 sm:text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((value) => !value)}
+                      aria-label={showPassword ? 'Esconder senha' : 'Mostrar senha'}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 transition hover:text-slate-700 dark:text-[#9BCDBB] dark:hover:text-white"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </label>
+
+                <div className="flex items-center justify-between gap-3">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-[#C2DFD4]">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 accent-[#0B3B37]"
+                    />
+                    Lembrar-me
+                  </label>
                   <button
                     type="button"
-                    onClick={onClose}
-                    className="text-xs font-bold text-slate-500 hover:text-slate-800 transition"
+                    onClick={() => { setModalView('forgot'); setError(null); setResetMessage(''); }}
+                    className="text-xs font-bold text-[#0B3B37] hover:underline dark:text-[#F0B65B]"
                   >
-                    Navegar como visitante
+                    Esqueceu a senha?
                   </button>
-                ) : <div />}
+                </div>
 
-                <Button
-                  variant="primary"
-                  size="lg"
-                  onClick={handleProceedFromChoice}
-                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
+                <button
+                  type="submit"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0B3B37] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-[#0B3B37]/20 transition hover:bg-[#0F4A44] dark:bg-[#E8A23A] dark:text-[#071f1d] dark:shadow-[#E8A23A]/20 dark:hover:bg-[#C9852A]"
                 >
-                  <span>Próximo Passo</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                </Button>
-              </div>
-            </div>
-          )}
+                  <LogIn className="h-4 w-4" />
+                  Entrar
+                </button>
+              </form>
 
-          {/* VIEW 1: LOGIN FLOW */}
-          {modalView === 'login' && (
-            <div className="space-y-5">
-              {/* Back to Choice button */}
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
+              <p className="text-center text-xs font-semibold text-slate-500 dark:text-[#9BCDBB]">
+                Ainda não tem conta?{' '}
                 <button
                   type="button"
-                  onClick={() => {
-                    setModalView('choice');
-                    setError(null);
-                  }}
-                  className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 transition px-2 py-1 rounded-lg hover:bg-slate-200/60"
+                  onClick={() => { setModalView('register'); setRegStep(1); setError(null); }}
+                  className="font-bold text-[#0B3B37] hover:underline dark:text-[#F0B65B]"
                 >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>{t('back')} à escolha anterior</span>
+                  Criar conta agora →
                 </button>
+              </p>
 
-                <span className="text-[11px] font-bold text-slate-500">
-                  Modo: <strong>Entrar</strong>
-                </span>
-              </div>
-
-              {/* Quick Select Public Accounts */}
-              <div className="space-y-3">
+              <div className="space-y-3 rounded-2xl border border-[#C2DFD4] bg-[#EEF7F4] p-4 dark:border-[#1f4a44] dark:bg-[#0b2320]">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <Key className="w-4 h-4 text-blue-600" />
-                    <span>Contas Rápidas de Teste e Demonstração (1-Clique)</span>
+                  <h3 className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-[#0B3B37] dark:text-[#F0B65B]">
+                    <Key className="h-3.5 w-3.5 text-[#0B3B37]" />
+                    Contas de demonstração
                   </h3>
-                  <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-700 bg-slate-200/80 px-2.5 py-1 rounded-xl">
-                    <Lock className="w-3 h-3 text-slate-600" />
-                    <span>Senha das contas de teste:</span>
-                    <code className="bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded font-mono font-black text-blue-700 shadow-2xs">Guigui@2026!</code>
-                  </div>
+                  <code className="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-700 shadow-sm dark:bg-[#102d2b] dark:text-[#DCEAE6]">Guigui@2026!</code>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* Account 1: Cidadão */}
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-blue-500 rounded-2xl p-3.5 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3 group">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
-                          <User className="w-4 h-4" />
-                        </div>
-                        <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full border border-blue-200">
-                          Cidadão
-                        </span>
-                      </div>
-
-                      <div>
-                        <h4 className="font-extrabold text-sm text-slate-900 group-hover:text-blue-600 transition">
-                          Malam Bacar
-                        </h4>
-                        <p className="text-[11px] text-slate-500 font-mono mt-0.5 break-all">
-                          cidadao.teste@guigui.com
-                        </p>
-                      </div>
-
-                      <p className="text-[11px] text-slate-600 leading-relaxed">
-                        Explorar feed, curtir, comentar, comprar bilhetes via SMS e seguir empresas.
-                      </p>
-
-                      <div className="pt-1 text-[10px] text-slate-500 font-medium border-t border-slate-100 flex items-center justify-between">
-                        <span>Senha de teste:</span>
-                        <code className="font-mono font-bold text-slate-800 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">Guigui@2026!</code>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => void handleDemoLogin(DEMO_ACCOUNTS[0])}
-                      className="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-sm"
-                    >
-                      <span>Entrar como Cidadão</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Account 2: Comerciante / Empresa */}
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-emerald-500 rounded-2xl p-3.5 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3 group">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
-                          <Building2 className="w-4 h-4" />
-                        </div>
-                        <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200">
-                          Empresa
-                        </span>
-                      </div>
-
-                      <div>
-                        <h4 className="font-extrabold text-sm text-slate-900 group-hover:text-emerald-600 transition">
-                          Coqueiros Bissau
-                        </h4>
-                        <p className="text-[11px] text-slate-500 font-mono mt-0.5 break-all">
-                          empresa.teste@guigui.com
-                        </p>
-                      </div>
-
-                      <p className="text-[11px] text-slate-600 leading-relaxed">
-                        Gerir ficha de empresa, menus, promoções, relatórios e validar bilhetes.
-                      </p>
-
-                      <div className="pt-1 text-[10px] text-slate-500 font-medium border-t border-slate-100 flex items-center justify-between">
-                        <span>Senha de teste:</span>
-                        <code className="font-mono font-bold text-slate-800 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">Guigui@2026!</code>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => void handleDemoLogin(DEMO_ACCOUNTS[1])}
-                      className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-sm"
-                    >
-                      <span>Entrar como Coqueiro</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Account 3: Administrador do Sistema */}
-                  <div className="bg-white dark:bg-slate-900 border-2 border-amber-300/80 hover:border-amber-500 rounded-2xl p-3.5 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3 group relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-16 h-16 bg-amber-500/10 rounded-bl-full pointer-events-none" />
-                    
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center font-bold">
-                          <ShieldCheck className="w-4 h-4 text-amber-800" />
-                        </div>
-                        <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-amber-100 text-amber-900 rounded-full border border-amber-300">
-                          🛡️ Super Admin
-                        </span>
-                      </div>
-
-                      <div>
-                        <h4 className="font-extrabold text-sm text-slate-900 group-hover:text-amber-700 transition">
-                          Administração Guigui
-                        </h4>
-                        <p className="text-[11px] text-slate-500 font-mono mt-0.5 break-all">
-                          admin.teste@guigui.com
-                        </p>
-                      </div>
-
-                      <p className="text-[11px] text-slate-600 leading-relaxed">
-                        Acesso total: moderação do feed, verificação de empresas e configurações.
-                      </p>
-
-                      <div className="pt-1 text-[10px] text-slate-500 font-medium border-t border-slate-100 flex items-center justify-between">
-                        <span className="font-bold text-amber-900">Senha de Admin:</span>
-                        <code className="font-mono font-black text-amber-900 bg-amber-100/80 px-1.5 py-0.5 rounded border border-amber-200">Guigui@2026!</code>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => void handleDemoLogin(DEMO_ACCOUNTS[2])}
-                      className="w-full py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-900 text-amber-400 font-black text-xs transition flex items-center justify-center gap-1.5 shadow-sm border border-amber-500/30"
-                    >
-                      <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Entrar como Admin</span>
-                      <ArrowRight className="w-3.5 h-3.5 text-amber-400" />
-                    </button>
-                  </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleDemoLogin(DEMO_ACCOUNTS[0])}
+                    className="flex flex-col items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-2 text-[11px] font-bold text-[#0B3B37] transition hover:border-[#0B3B37] hover:text-[#0B3B37] sm:flex-row sm:gap-2 sm:text-xs"
+                  >
+                    <User className="h-4 w-4" />
+                    Cidadão
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDemoLogin(DEMO_ACCOUNTS[1])}
+                    className="flex flex-col items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-2 text-[11px] font-bold text-[#0B3B37] transition hover:border-[#176158] hover:text-[#176158] sm:flex-row sm:gap-2 sm:text-xs"
+                  >
+                    <Building2 className="h-4 w-4" />
+                    Empresa
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDemoLogin(DEMO_ACCOUNTS[2])}
+                    className="flex flex-col items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-2 text-[11px] font-bold text-[#0B3B37] transition hover:border-[#C9852A] hover:text-[#A86516] sm:flex-row sm:gap-2 sm:text-xs"
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                    Admin
+                  </button>
                 </div>
-              </div>
-
-              {/* Manual Login Form */}
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
-                <div className="border-b border-slate-100 pb-2.5 flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                    <Mail className="w-4 h-4 text-blue-600" />
-                    <span>Ou entre com credenciais manuais</span>
-                  </h3>
-                  <div className="flex items-center gap-1 text-[11px] text-slate-500">
-                    <span>Preencher rápido:</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEmail('cidadao.teste@guigui.com');
-                        setPassword('Guigui@2026!');
-                      }}
-                      className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-blue-700 font-bold"
-                    >
-                      Cidadão
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEmail('empresa.teste@guigui.com');
-                        setPassword('Guigui@2026!');
-                      }}
-                      className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-emerald-700 font-bold"
-                    >
-                      Coqueiro
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEmail('admin.teste@guigui.com');
-                        setPassword('Guigui@2026!');
-                      }}
-                      className="px-1.5 py-0.5 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold"
-                    >
-                      Admin (Guigui@2026!)
-                    </button>
-                  </div>
-                </div>
-
-                <form onSubmit={handleManualLogin} className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Endereço de E-mail
-                    </label>
-                    <div className="relative">
-                      <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                      <input
-                        type="email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="ex: admin.teste@guigui.com ou cidadao.teste@guigui.com"
-                        className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Palavra-passe (Senha)
-                    </label>
-                    <div className="relative">
-                      <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                      <input
-                        type="password"
-                        required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Guigui@2026!"
-                        className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="sm:col-span-2 flex items-center justify-between pt-1">
-                    <span className="text-[11px] text-slate-500 font-medium">
-                      Senha das contas de teste: <strong className="text-slate-800 font-mono">Guigui@2026!</strong>
-                    </span>
-
-                    <div className="flex items-center gap-3">
-                      <button type="button" onClick={() => { setModalView('forgot'); setError(null); setResetMessage(''); }} className="text-[11px] font-bold text-blue-700 hover:underline">Esqueci-me da palavra-passe</button>
-                      <Button type="submit" variant="primary" size="md" className="bg-slate-900 hover:bg-slate-800">
-                        <span>Entrar Agora</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </form>
+                <p className="text-[10px] leading-relaxed text-slate-500 dark:text-[#9BCDBB]">
+                  Acesso rápido de teste ao cidadão, empresa e administração com a senha indicada acima.
+                </p>
               </div>
             </div>
           )}
@@ -982,10 +836,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           {modalView === 'forgot' && (
             <div className="space-y-5">
               <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
-                <button type="button" onClick={() => { setModalView('login'); setError(null); }} className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-slate-200/60">
+                <button type="button" onClick={() => { setModalView('login'); setError(null); }} className="text-xs font-bold text-[#176158] hover:text-[#0B3B37] flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-slate-200/60">
                   <ArrowLeft className="w-4 h-4" /> Voltar ao login
                 </button>
-                <span className="text-[11px] font-bold text-slate-500">Recuperar acesso</span>
+                <span className="text-[11px] font-bold text-slate-500 dark:text-[#9BCDBB]">Recuperar acesso</span>
               </div>
               <form onSubmit={handleRequestPasswordReset} className="space-y-3">
                 <label className="block text-xs font-bold text-slate-700">E-mail da conta
@@ -1017,35 +871,35 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                     if (regStep > 1) {
                       setRegStep((prev) => (prev - 1) as 1 | 2 | 3);
                     } else {
-                      setModalView('choice');
+                      setModalView('login');
                     }
                     setError(null);
                   }}
-                  className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 transition px-2 py-1 rounded-lg hover:bg-slate-200/60"
+                  className="text-xs font-bold text-[#176158] hover:text-[#0B3B37] flex items-center gap-1.5 transition px-2 py-1 rounded-lg hover:bg-slate-200/60"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  <span>{regStep > 1 ? `${t('back')} ao passo anterior` : `${t('back')} à escolha anterior`}</span>
+                  <span>{regStep > 1 ? `${t('back')} ao passo anterior` : `${t('back')} ao login`}</span>
                 </button>
 
-                <span className="text-[11px] font-bold text-slate-500">
+                <span className="text-[11px] font-bold text-slate-500 dark:text-[#9BCDBB]">
                   Registo: <strong>{regType === 'business' ? `Empresa (Passo ${regStep}/3)` : 'Cidadão'}</strong>
                 </span>
               </div>
 
               {/* Step Bar for Business Registration */}
               {regType === 'business' && (
-                <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+                <div className="rounded-2xl border border-slate-200 bg-slate-100 p-2.5 dark:border-slate-700 dark:bg-slate-800 sm:p-3">
+                  <div className="flex items-center justify-between gap-1 text-[10px] font-bold text-slate-600 sm:text-[11px]">
                     <div className={`flex items-center gap-1.5 ${regStep >= 1 ? 'text-blue-600 font-extrabold' : ''}`}>
                       <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${regStep >= 1 ? 'bg-blue-600 text-white' : 'bg-slate-300 text-slate-700'}`}>1</span>
                       <span>Dados</span>
                     </div>
-                    <div className="h-0.5 w-8 bg-slate-300" />
+                    <div className="h-0.5 w-4 bg-slate-300 sm:w-8" />
                     <div className={`flex items-center gap-1.5 ${regStep >= 2 ? 'text-blue-600 font-extrabold' : ''}`}>
                       <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${regStep >= 2 ? 'bg-blue-600 text-white' : 'bg-slate-300 text-slate-700'}`}>2</span>
                       <span>Escalão</span>
                     </div>
-                    <div className="h-0.5 w-8 bg-slate-300" />
+                    <div className="h-0.5 w-4 bg-slate-300 sm:w-8" />
                     <div className={`flex items-center gap-1.5 ${regStep >= 3 ? 'text-blue-600 font-extrabold' : ''}`}>
                       <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${regStep >= 3 ? 'bg-blue-600 text-white' : 'bg-slate-300 text-slate-700'}`}>3</span>
                       <span>Pagamento</span>
@@ -1069,16 +923,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                           setRegType('user');
                           setRegStep(1);
                         }}
-                        className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition ${
+                        className={`flex items-center gap-2.5 rounded-2xl border p-2.5 text-left transition sm:gap-3 sm:p-3 ${
                           regType === 'user'
-                            ? 'bg-blue-50 border-blue-600 text-blue-900 font-bold shadow-sm'
+                            ? 'bg-blue-50 border-blue-600 text-blue-900 font-bold shadow-sm dark:border-[#3FAE80] dark:bg-[#102d2b] dark:text-[#EEF7F4]'
                             : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 hover:bg-slate-100'
                         }`}
                       >
                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${regType === 'user' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600'}`}>
                           <User className="w-4 h-4" />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <div className="text-xs font-extrabold">Cidadão</div>
                           <div className="text-[10px] opacity-75">Perfil Pessoal Grátis</div>
                         </div>
@@ -1087,16 +941,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setRegType('business')}
-                        className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition ${
+                        className={`flex items-center gap-2.5 rounded-2xl border p-2.5 text-left transition sm:gap-3 sm:p-3 ${
                           regType === 'business'
-                            ? 'bg-blue-50 border-blue-600 text-blue-900 font-bold shadow-sm'
+                            ? 'bg-blue-50 border-blue-600 text-blue-900 font-bold shadow-sm dark:border-[#3FAE80] dark:bg-[#102d2b] dark:text-[#EEF7F4]'
                             : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 hover:bg-slate-100'
                         }`}
                       >
                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${regType === 'business' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600'}`}>
                           <Building2 className="w-4 h-4" />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <div className="text-xs font-extrabold">Empresa</div>
                           <div className="text-[10px] opacity-75">Com Ficha & Posts</div>
                         </div>
@@ -1115,7 +969,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         value={regName}
                         onChange={(e) => setRegName(e.target.value)}
                         placeholder={regType === 'business' ? 'ex: Restaurante Coqueiros' : 'ex: Manuel Fernandes'}
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                       />
                     </div>
 
@@ -1127,7 +981,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         <select
                           value={regCategoryGroup}
                           onChange={(e) => setRegCategoryGroup(e.target.value as CategoryGroupId)}
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                         >
                           <option value="restauracao">Restauração, Cafés e Pequeno Comércio</option>
                           <option value="hotelaria_saude_educacao">Hotelaria, Clínicas, Escolas e Comércio Médio</option>
@@ -1151,7 +1005,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                             value={regSubcategory}
                             onChange={(e) => setRegSubcategory(e.target.value)}
                             placeholder="ex: Costura, Padaria, Clínica"
-                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                           />
                         </div>
                         <div className="sm:col-span-2">
@@ -1166,7 +1020,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                             value={regDescription}
                             onChange={(e) => setRegDescription(e.target.value)}
                             placeholder="Descreva os produtos ou serviços da empresa (mínimo 30 caracteres)."
-                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                           />
                         </div>
                         <div>
@@ -1180,7 +1034,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                             value={regBusinessPhone}
                             onChange={(e) => setRegBusinessPhone(e.target.value)}
                             placeholder="ex: +245 955 88 99"
-                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                           />
                         </div>
                         <div>
@@ -1192,7 +1046,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                             required
                             value={regBusinessNeighborhood}
                             onChange={(e) => setRegBusinessNeighborhood(e.target.value)}
-                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                           >
                             <option value="">Selecione o bairro da empresa</option>
                             {bissauLocations.map((entry) => (
@@ -1210,7 +1064,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                             value={regPublicEmail}
                             onChange={(e) => setRegPublicEmail(e.target.value)}
                             placeholder="contacto@empresa.com"
-                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                           />
                         </div>
                       </>
@@ -1226,55 +1080,76 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         value={regEmail}
                         onChange={(e) => setRegEmail(e.target.value)}
                         placeholder="ex: contacto@exemplo.com"
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                       />
                     </div>
 
                     <div>
                       <label htmlFor="registration-account-phone" className="block text-xs font-bold text-slate-700 mb-1">
-                        Contacto Telefónico da Conta / Pagamento
+                        {regType === 'business' ? 'Contacto Telefónico da Conta / Pagamento' : 'Contacto Telefónico *'}
                       </label>
                       <input
                         id="registration-account-phone"
                         type="text"
+                        required={regType === 'user'}
                         value={regPhone}
                         onChange={(e) => setRegPhone(e.target.value)}
                         placeholder="+245 955 88 99"
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
+                      />
+                    </div>
+
+                    {regType === 'business' && (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Localização em Bissau
+                        </label>
+                        <select
+                          value={regNeighborhood}
+                          onChange={(e) => setRegNeighborhood(e.target.value)}
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
+                        >
+                          {bissauLocations.map((entry) => (
+                            <option key={entry.id} value={entry.name}>{entry.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <div>
+                      <label htmlFor="registration-password" className="block text-xs font-bold text-slate-700 mb-1">
+                        Crie uma Palavra-passe *
+                      </label>
+                      <input
+                        id="registration-password"
+                        type="password"
+                        required
+                        minLength={6}
+                        value={regPassword}
+                        onChange={(e) => setRegPassword(e.target.value)}
+                        placeholder="⬢⬢⬢⬢⬢⬢⬢⬢"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Localização em Bissau
-                      </label>
-                      <select
-                        value={regNeighborhood}
-                        onChange={(e) => setRegNeighborhood(e.target.value)}
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        {bissauLocations.map((entry) => (
-                          <option key={entry.id} value={entry.name}>{entry.name}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className={regType === 'business' ? 'sm:col-span-1' : 'sm:col-span-2'}>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Crie uma Palavra-passe *
+                      <label htmlFor="registration-password-confirm" className="block text-xs font-bold text-slate-700 mb-1">
+                        Confirme a Palavra-passe *
                       </label>
                       <input
+                        id="registration-password-confirm"
                         type="password"
                         required
-                        value={regPassword}
-                        onChange={(e) => setRegPassword(e.target.value)}
-                        placeholder="⬢⬢⬢⬢⬢⬢⬢⬢"
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        minLength={6}
+                        value={regPasswordConfirm}
+                        onChange={(e) => setRegPasswordConfirm(e.target.value)}
+                        placeholder="Repita a palavra-passe"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                       />
                     </div>
                   </div>
 
-                  <div className="pt-3 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                  <div className="flex flex-col gap-3 border-t border-slate-200 pt-3 dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-[11px] text-slate-500 font-medium">
                       {regType === 'business'
                         ? 'Irá escolher o escalão no próximo passo.'
@@ -1283,7 +1158,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
                     <button
                       type="submit"
-                      className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl shadow-md transition flex items-center gap-2"
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-xs font-black text-white shadow-md transition hover:bg-blue-700 sm:w-auto"
                     >
                       <span>{regType === 'business' ? 'Próximo Passo (Escalão) →' : 'Concluir Registo e Entrar'}</span>
                       <ArrowRight className="w-4 h-4" />
@@ -1295,23 +1170,23 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               {/* STEP 2: Tier Selection (Básico, Profissional, Premium, Enterprise) */}
               {regStep === 2 && regType === 'business' && (
                 <div className="space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2 bg-blue-50/80 p-3 rounded-2xl border border-blue-200 text-xs">
-                    <div>
-                      <span className="text-slate-500 font-medium">Sector da Empresa:</span>
-                      <div className="font-extrabold text-blue-900">
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-blue-200 bg-blue-50/80 p-3 text-xs dark:border-[#1f4a44] dark:bg-[#102d2b]">
+                    <div className="min-w-0">
+                      <span className="text-slate-500 font-medium dark:text-[#9BCDBB]">Sector da Empresa:</span>
+                      <div className="break-words font-extrabold text-blue-900 dark:text-[#EEF7F4]">
                         {CATEGORY_GROUP_PRICES[regCategoryGroup]?.name}
                       </div>
                     </div>
 
                     {/* Monthly vs Annual Toggle */}
-                    <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-blue-200">
+                    <div className="flex shrink-0 items-center gap-1 rounded-xl border border-blue-200 bg-white p-1 dark:bg-slate-900">
                       <button
                         type="button"
                         onClick={() => setBillingCycle('monthly')}
                         className={`px-3 py-1 rounded-lg font-bold text-[11px] transition ${
                           billingCycle === 'monthly'
                             ? 'bg-blue-600 text-white shadow-sm'
-                            : 'text-slate-600 hover:text-slate-900'
+                            : 'text-[#176158] hover:text-[#0B3B37] dark:text-[#C2DFD4] dark:hover:text-white'
                         }`}
                       >
                         Mensal
@@ -1322,7 +1197,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         className={`px-3 py-1 rounded-lg font-bold text-[11px] transition flex items-center gap-1 ${
                           billingCycle === 'annual'
                             ? 'bg-emerald-600 text-white shadow-sm'
-                            : 'text-slate-600 hover:text-slate-900'
+                            : 'text-[#176158] hover:text-[#0B3B37] dark:text-[#C2DFD4] dark:hover:text-white'
                         }`}
                       >
                         <span>Anual</span>
@@ -1332,7 +1207,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   </div>
 
                   {/* Configurable plan catalogue */}
-                  <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-2.5 text-[11px] text-indigo-950 flex items-center gap-2">
+                  <div className="flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 p-2.5 text-[11px] text-indigo-950 dark:border-[#2b4a63] dark:bg-[#12273a] dark:text-[#D6E9F7]">
                     <Award className="w-4 h-4 text-indigo-600 shrink-0" />
                     <span><strong>Planos configuráveis:</strong> limites, benefícios e preços sincronizados com a Administração. Desconto anual actual: <strong>{businessModelConfig.annualDiscountPercent}%</strong>.</span>
                   </div>
@@ -1342,8 +1217,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                       const isSelected = selectedPlanId === plan.id;
                       const monthlyPrice = plan.price > 0 ? plan.price : getMonthlyPrice(regCategoryGroup, plan.legacyTier || selectedTier);
                       return (
-                        <div key={plan.id} onClick={() => { setSelectedPlanId(plan.id); if (plan.legacyTier) setSelectedTier(plan.legacyTier); }} className={`p-3.5 rounded-2xl border-2 cursor-pointer transition space-y-1.5 relative select-none ${isSelected ? 'bg-blue-50/80 border-blue-600 ring-2 ring-blue-500/20 shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}>
-                          <div className="flex items-center justify-between"><span className="font-black text-slate-900 text-sm">{plan.name}</span>{isSelected && <CheckCircle2 className="w-5 h-5 text-blue-600" />}</div>
+                        <div key={plan.id} onClick={() => { setSelectedPlanId(plan.id); if (plan.legacyTier) setSelectedTier(plan.legacyTier); }} className={`p-3.5 rounded-2xl border-2 cursor-pointer transition space-y-1.5 relative select-none ${isSelected ? 'bg-blue-50/80 border-blue-600 ring-2 ring-blue-500/20 shadow-md dark:border-[#3FAE80] dark:bg-[#123a34] dark:ring-[#3FAE80]/25' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}>
+                          <div className="flex items-center justify-between"><span className="min-w-0 break-words pr-2 font-black text-slate-900 text-sm">{plan.name}</span>{isSelected && <CheckCircle2 className="w-5 h-5 text-blue-600" />}</div>
                           <div className="font-mono text-base font-black text-slate-900">{monthlyPrice > 0 ? `${monthlyPrice.toLocaleString('pt-PT')} ${plan.currency}` : 'Preço negociado'}<span className="text-[10px] text-slate-500 font-normal"> /mês</span></div>
                           <ul className="space-y-1 text-[11px] text-slate-600"><li className="flex items-center gap-1.5 font-bold text-blue-700"><Check className="w-3.5 h-3.5 text-blue-600" /><span>{limitLabel(plan.postsPerMonth)} posts/mês</span></li><li className="flex items-center gap-1.5 font-bold text-amber-700"><Check className="w-3.5 h-3.5 text-amber-600" /><span>{limitLabel(plan.promotionsPerMonth)} promoções/mês</span></li><li className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-600" /><span>{limitLabel(plan.maxCategories)} categoria(s) · {plan.featureSlugs.slice(0, 2).join(', ').replaceAll('_', ' ')}</span></li></ul>
                         </div>
@@ -1351,11 +1226,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                     })}
                   </div>
 
-                  <div className="pt-3 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                  <div className="flex flex-col gap-3 border-t border-slate-200 pt-3 dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
                     <button
                       type="button"
                       onClick={() => setRegStep(1)}
-                      className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded-xl transition flex items-center gap-1.5"
+                      className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-slate-200 px-4 py-2 text-xs font-bold text-slate-800 transition hover:bg-slate-300 sm:w-auto"
                     >
                       <ArrowLeft className="w-3.5 h-3.5" />
                       <span>{t('back')} aos Dados</span>
@@ -1364,7 +1239,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                     <button
                       type="button"
                       onClick={handleNextToStep3}
-                      className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl shadow-md transition flex items-center gap-2"
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-xs font-black text-white shadow-md transition hover:bg-blue-700 sm:w-auto"
                     >
                       <span>Próximo Passo (Pagamento: {calculateFinalAmount().toLocaleString('pt-PT')} XOF) →</span>
                     </button>
@@ -1377,13 +1252,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 <div className="space-y-4">
                   {/* Subscription Summary */}
                   <div className="bg-slate-900 text-white p-4 sm:p-5 rounded-3xl space-y-3">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-                      <div>
+                    <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-2.5">
+                      <div className="min-w-0">
                         <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Empresa</span>
-                        <h4 className="text-sm font-extrabold text-white">{regName}</h4>
+                        <h4 className="break-words text-sm font-extrabold text-white">{regName}</h4>
                       </div>
 
-                      <div className="text-right">
+                      <div className="shrink-0 text-right">
                         <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Escalão</span>
                         <span className="text-xs font-black uppercase text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
                           {selectedTier} ({billingCycle === 'annual' ? 'Anual' : 'Mensal'})
@@ -1391,7 +1266,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="text-xs text-slate-300">Total a Pagar:</span>
                       <span className="text-xl font-black text-emerald-400 font-mono">
                         {calculateFinalAmount().toLocaleString('pt-PT')} XOF
@@ -1401,7 +1276,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
                   {/* Payment Method Selector */}
                   <div className="space-y-2.5">
-                    <label className="block text-xs font-black uppercase text-slate-700 tracking-wider">
+                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-[#DCEAE6]">
                       Método de Pagamento Digital
                     </label>
 
@@ -1409,9 +1284,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setPaymentMethod('orange_money')}
-                        className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 transition ${
+                        className={`flex items-center gap-2 rounded-2xl border p-2.5 text-left transition sm:gap-2.5 sm:p-3 ${
                           paymentMethod === 'orange_money'
-                            ? 'bg-amber-500/10 border-amber-500 text-amber-950 font-black shadow-sm ring-2 ring-amber-500'
+                            ? 'bg-amber-500/10 border-amber-500 text-amber-950 font-black shadow-sm ring-2 ring-amber-500 dark:bg-amber-500/15 dark:text-amber-50'
                             : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 hover:bg-slate-50'
                         }`}
                       >
@@ -1419,17 +1294,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                           <Smartphone className="w-4 h-4" />
                         </div>
                         <div>
-                          <div className="text-xs font-black text-amber-900">Orange Money</div>
-                          <div className="text-[10px] text-amber-700 font-medium">#144#</div>
+                          <div className="text-xs font-black text-amber-900 dark:text-amber-200">Orange Money</div>
+                          <div className="text-[10px] text-amber-700 font-medium dark:text-amber-300">#144#</div>
                         </div>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setPaymentMethod('telecel')}
-                        className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 transition ${
+                        className={`flex items-center gap-2 rounded-2xl border p-2.5 text-left transition sm:gap-2.5 sm:p-3 ${
                           paymentMethod === 'telecel'
-                            ? 'bg-yellow-500/10 border-yellow-500 text-yellow-950 font-black shadow-sm ring-2 ring-yellow-500'
+                            ? 'bg-yellow-500/10 border-yellow-500 text-yellow-950 font-black shadow-sm ring-2 ring-yellow-500 dark:bg-yellow-500/15 dark:text-yellow-50'
                             : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 hover:bg-slate-50'
                         }`}
                       >
@@ -1437,8 +1312,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                           <Smartphone className="w-4 h-4" />
                         </div>
                         <div>
-                          <div className="text-xs font-black text-yellow-900">MTN MoMo</div>
-                          <div className="text-[10px] text-yellow-700 font-medium">*177#</div>
+                          <div className="text-xs font-black text-yellow-900 dark:text-yellow-200">MTN MoMo</div>
+                          <div className="text-[10px] text-yellow-700 font-medium dark:text-yellow-300">*177#</div>
                         </div>
                       </button>
                     </div>
@@ -1460,7 +1335,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                             value={paymentPhone}
                             onChange={(e) => setPaymentPhone(e.target.value)}
                             placeholder="+245 955 88 99"
-                            className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full rounded-xl border border-slate-300 bg-slate-50 py-2.5 pl-9 pr-3 text-base font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800 sm:text-xs"
                           />
                         </div>
                       </div>
@@ -1469,11 +1344,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         Ao clicar em confirmar, receberá uma notificação USSD para introduzir o seu código PIN e autorizar o débito de <strong>{calculateFinalAmount().toLocaleString('pt-PT')} XOF</strong>.
                       </div>
 
-                      <div className="pt-2 flex items-center justify-between">
+                      <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
                         <button
                           type="button"
                           onClick={() => setRegStep(2)}
-                          className="px-3.5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded-xl transition"
+                          className="w-full rounded-xl bg-slate-200 px-3.5 py-2 text-xs font-bold text-slate-800 transition hover:bg-slate-300 sm:w-auto"
                         >
                           ← Alterar Escalão
                         </button>
@@ -1481,7 +1356,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         <button
                           type="button"
                           onClick={handleExecuteOrangeMoneyPayment}
-                          className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl shadow-md transition flex items-center gap-2"
+                          className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-xs font-black text-slate-950 shadow-md transition hover:bg-amber-600 sm:w-auto"
                         >
                           <Zap className="w-4 h-4 text-slate-950" />
                           <span>Pagar {calculateFinalAmount().toLocaleString('pt-PT')} XOF</span>
@@ -1551,16 +1426,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           )}
 
           {/* Guest / Visitor Option Footer when in login or register */}
-          {onClose && modalView !== 'choice' && (
-            <div className="text-center pt-1 border-t border-slate-200/80">
+          {onClose && (
+            <div className="pt-4 text-center">
               <button type="button"
                 onClick={onClose}
-                className="text-xs font-bold text-slate-500 hover:text-slate-800 underline transition"
+                className="text-xs font-bold text-slate-500 underline transition hover:text-slate-800 dark:text-[#9BCDBB] dark:hover:text-white"
               >
                 Continuar apenas a visualizar conteúdos (Visitante sem conta)
               </button>
             </div>
           )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
