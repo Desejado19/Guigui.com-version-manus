@@ -108,6 +108,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   // Modal flow states: 'choice' (Step 0) -> 'login' (Step 1 Login) | 'register' (Step 1 Register)
   const [modalView, setModalView] = useState<'choice' | 'login' | 'register' | 'forgot' | 'team_invite'>('choice');
   const [chosenOption, setChosenOption] = useState<'login' | 'register'>('login');
+  const [mfaCode, setMfaCode] = useState<string | null>(null);
+  const [mfaRequired, setMfaRequired] = useState<boolean>(false);
   const [googleConfigured, setGoogleConfigured] = useState(isGoogleSignInConfigured());
   const buttonContainer = useRef<HTMLDivElement>(null);
 
@@ -278,6 +280,32 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     }
   };
 
+  const handleMfaSubmit = () => {
+    if (!mfaCode?.trim()) {
+      setError('Indique o código MFA.');
+      return;
+    }
+    fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ googleIdToken: '' })
+    })
+      .then(async (res) => {
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(payload.error || 'Falha na verificação MFA.');
+          setMfaRequired(false);
+          setMfaCode('');
+          return;
+        }
+        const { user } = payload;
+        onLogin(user, user.business || undefined);
+        setMfaRequired(false);
+        setMfaCode('');
+      })
+      .catch(() => setError('Erro de conexão com o servidor'));
+  };
+
   const handleGoogleCredential = (credential: string) => {
     setError(null);
     // Send Google ID token to backend /api/auth/login
@@ -289,7 +317,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       .then(async (res) => {
         if (!res.ok) {
           const err = await res.json();
-          setError(err.error || 'Falha ao fazer login com Google');
+          if (err.error === 'MFA_REQUIRED') {
+            setMfaRequired(true);
+            setMfaCode('');
+          } else {
+            setError(err.error || 'Falha ao fazer login com Google');
+          }
           return;
         }
         const { user } = await res.json();
@@ -314,6 +347,30 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         >
           Continuar com Google
         </button>
+      </div>
+    );
+  };
+
+  const renderMfaCodeInput = () => {
+    return (
+      <div className="pt-3 border-t border-slate-200/80 space-y-2">
+        <div className="text-center text-xs text-rose-600">
+          <p>{t('auth.mfaRequired')}:</p>
+          <input
+            type="text"
+            value={mfaCode || ''}
+            onChange={(e) => setMfaCode(e.target.value)}
+            maxLength={8}
+            className="border rounded w-24 px-2 text-center"
+            placeholder="000000"
+          />
+          <button
+            type="button"
+            onClick={handleMfaSubmit}
+            className="ml-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 text-xs font-bold">
+            Verificar
+          </button>
+        </div>
       </div>
     );
   };
@@ -614,6 +671,28 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </div>
 
               {renderUnconfiguredGoogleButton()}
+
+              {mfaRequired && (
+                <div className="pt-3 border-t border-slate-200/80 space-y-2">
+                  <div className="text-center text-xs text-rose-600">
+                    <p>{t('auth.mfaRequired')}:</p>
+                    <input
+                      type="text"
+                      value={mfaCode || ''}
+                      onChange={(e) => setMfaCode(e.target.value)}
+                      maxLength={8}
+                      className="border rounded w-24 px-2 text-center"
+                      placeholder="000000"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleMfaSubmit}
+                      className="ml-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 text-xs font-bold">
+                      Verificar
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Next Step Primary Button */}
               <div className="pt-3 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3">
