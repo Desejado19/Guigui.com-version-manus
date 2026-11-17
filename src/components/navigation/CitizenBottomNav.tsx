@@ -20,10 +20,11 @@ interface CitizenBottomNavProps {
 
 /**
  * Navegação principal do cidadão: os mesmos destinos e permissões de sempre,
- * apresentados numa barra flutuante de vidro (ver `GlassBottomNav`).
+ * apresentados numa barra flutuante de fundo sólido (ver `GlassBottomNav`).
  *
  * Visitantes (ou sessões por confirmar) vêem Feed, Diretório, Ofertas e Agenda;
  * Mensagens e Conta só aparecem depois de a sessão ser validada no servidor.
+ * O Suporte fica de fora desta barra: vive no menu principal e no menu do painel.
  */
 export const CitizenBottomNav: React.FC<CitizenBottomNavProps> = ({
   activeId,

@@ -1847,7 +1847,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
         ].filter((item) => canTab(item.id as BusinessDashboardTab))}
       />
       <div className="flex min-h-[calc(100vh-72px)] w-full bg-[var(--color-bg-surface)]">
-        <div className={`${mobileSidebarOpen ? 'block' : 'hidden'} fixed inset-0 z-40 bg-[var(--color-bg-surface-dark)]/35 backdrop-blur-[1px] md:hidden`} onClick={() => setMobileSidebarOpen(false)} />
+        <div className={`${mobileSidebarOpen ? 'block' : 'hidden'} fixed inset-0 z-40 bg-[var(--color-bg-surface)]/60 backdrop-blur-[1px] md:hidden`} onClick={() => setMobileSidebarOpen(false)} />
 
         <aside
           style={{ width: sidebarCollapsed ? 72 : 248 }}
@@ -1868,16 +1868,27 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
               </div>
 
               {!sidebarCollapsed && (
-                <IconButton
-                  label={t('collapseMenu')}
-                  variant="secondary"
-                  size="sm"
-                  className="h-8 w-8 rounded-full border-0 bg-transparent text-[#8fb3ac] shadow-none hover:bg-white/10 hover:text-white"
-                  onClick={() => setSidebarCollapsed(true)}
-                  title={t('collapseMenu')}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </IconButton>
+                <div className="flex items-center gap-1">
+                  <IconButton
+                    label={t('collapseMenu')}
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 w-8 rounded-full border-0 bg-transparent text-[#8fb3ac] shadow-none hover:bg-white/10 hover:text-white"
+                    onClick={() => setSidebarCollapsed(true)}
+                    title={t('collapseMenu')}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </IconButton>
+                  <IconButton
+                    label={`Fechar menu lateral`}
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 w-8 rounded-full border-0 bg-transparent text-[#8fb3ac] shadow-none hover:bg-white/10 hover:text-white md:hidden"
+                    onClick={() => setMobileSidebarOpen(false)}
+                  >
+                    <X className="h-4 w-4" />
+                  </IconButton>
+                </div>
               )}
               {sidebarCollapsed && (
                 <IconButton
@@ -2041,7 +2052,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
 
           <div className={`space-y-5 text-[var(--color-text-strong)] ${activeTabAllowed ? '' : 'hidden'}`}>
             {isMarketingTab && (
-              <div className="sticky top-[70px] z-20 overflow-x-auto rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)]/95 p-1.5 shadow-sm backdrop-blur md:top-[80px]">
+              <div className="sticky top-[70px] z-20 overflow-x-auto rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-1.5 shadow-sm md:top-[80px]">
                 <div className="flex min-w-max gap-1" role="tablist" aria-label={t('business.SeccoesMarketing')}>
                   {MARKETING_TABS.map(({ id, label, icon: TabIcon }) => {
                     const selected = activeTab === 'marketing_calendar'

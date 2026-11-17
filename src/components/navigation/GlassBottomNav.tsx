@@ -2,7 +2,7 @@ import React from 'react';
 import type { LucideProps } from 'lucide-react';
 
 /**
- * Barra de navegação inferior flutuante com efeito de vidro (glassmorphism).
+ * Barra de navegação inferior flutuante, com fundo sólido (sem glassmorphism).
  *
  * Componente puramente visual: recebe os itens e o item ativo de quem o usa e
  * devolve apenas o evento de seleção. Nenhuma rota, permissão ou módulo é

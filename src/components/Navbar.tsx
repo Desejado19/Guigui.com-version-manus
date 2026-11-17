@@ -629,8 +629,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <>
-      {/* Clean Minimalist Top Header with Facebook-Style Navigation */}
-      <header className="guigui-navbar glass-navbar">
+      {/* Topo minimalista, de fundo sólido */}
+      <header className="guigui-navbar">
         <div className="guigui-navbar-inner">
           
           {/* Left: 3 Tracinhos + Botão {t('back')} + Logo + Search Bar */}
@@ -750,7 +750,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                   {/* Hover Tooltip displaying Title & Subtitle */}
                   <div className="pointer-events-none absolute left-1/2 top-full z-50 mt-1.5 hidden -translate-x-1/2 flex max-w-[260px] flex-col items-center whitespace-normal text-center animate-in fade-in zoom-in-95 duration-150 hidden">
-                    <div className="flex max-w-[260px] flex-col items-center rounded-xl border border-slate-800 bg-slate-900/95 px-3 py-1.5 text-center text-[11px] leading-snug text-white shadow-xl backdrop-blur-xs">
+                    <div className="flex max-w-[260px] flex-col items-center rounded-xl border border-slate-800 bg-slate-900/95 px-3 py-1.5 text-center text-[11px] leading-snug text-white shadow-xl">
                       <span className="font-extrabold text-emerald-400 text-xs">{tabItem.label}</span>
                       <span className="text-[10px] text-slate-300 font-medium">{tabItem.subtitle}</span>
                     </div>
@@ -1065,9 +1065,9 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Facebook-Style Left Navigation Menu Drawer (Lista dos 3 Tracinhos) */}
       {leftMenuOpen && (
         <div className="fixed inset-0 z-[120] flex">
-          {/* Backdrop Blur */}
+          {/* Fundo do menu (sem desfoque) */}
           <div
-            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity animate-in fade-in"
+            className="fixed inset-0 bg-slate-950/60 transition-opacity animate-in fade-in"
             onClick={() => setLeftMenuOpen(false)}
           />
 
@@ -1187,6 +1187,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                                setLeftMenuOpen(false);
                                if (currentRole === 'user' && item.id === 'account') {
                                  onTabChange('client');
+                                 return;
+                               }
+                               // O Suporte vive aqui, no menu principal do cidadão.
+                               if (currentRole === 'user' && item.id === 'support') {
+                                 onTabChange('support');
                                  return;
                                }
                                if (item.action === 'theme') {

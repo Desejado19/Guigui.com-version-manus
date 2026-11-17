@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import type { NavigationGroup, NavigationItem } from '../utils/navigationTypes';
 
-export type CitizenPrimaryModule = 'feed' | 'directory' | 'promotions' | 'events' | 'map' | 'messages' | 'account';
+export type CitizenPrimaryModule = 'feed' | 'directory' | 'promotions' | 'events' | 'map' | 'messages' | 'support' | 'account';
 export type CitizenAccountModule =
   | 'overview'
   | 'tickets'
@@ -80,13 +80,14 @@ export type AdminModule =
   | 'notifications'
   | 'architecture'
   | 'capabilities'
-  | 'profile';
+  | 'profile'
+  | 'sobre-nos';
 
 /**
  * Destinos da navegação inferior do cidadão que só existem para sessões activas.
  * O Feed, o Diretório, as Ofertas e a Agenda continuam públicos.
  */
-export const CITIZEN_PRIVATE_PRIMARY_MODULES: readonly CitizenPrimaryModule[] = ['messages', 'account'];
+export const CITIZEN_PRIVATE_PRIMARY_MODULES: readonly CitizenPrimaryModule[] = ['messages', 'support', 'account'];
 
 export const isCitizenPrimaryModulePrivate = (id: CitizenPrimaryModule): boolean =>
   CITIZEN_PRIVATE_PRIMARY_MODULES.includes(id);
@@ -223,6 +224,7 @@ export const ADMIN_NAVIGATION: NavigationGroup<AdminModule>[] = [
       { id: 'categories', label: 'Categorias & Tags', icon: Tag },
       { id: 'architecture', label: 'Sistema', icon: Settings },
       { id: 'capabilities', label: 'Configurações Globais', icon: SlidersHorizontal },
+      { id: 'sobre-nos', label: 'Sobre Nós', icon: Building2, help: 'Gerencie a identidade visual, informações institucionais e apresentação pública da sua empresa.' },
     ],
   },
   {
