@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "touch scripts/dev.mjs && GUIGUI_DEV_REEXEC=1 node -r tsx/esm scripts/dev.mjs",
     "dev.pinned": "cross-env NODE_ENV=development PORT=3000 node scripts/dev.mjs",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server.mjs && esbuild server/modules/platform-foundation/hosting/runPlatformEntrypoint.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/platform-preflight.mjs && node scripts/check-no-dev-exposure.mjs",
+    "build": "node scripts/build.mjs",
     "verify:deploy": "node scripts/verify-production-surface.mjs",
     "start": "node scripts/start-production.mjs",
     "preview": "vite preview",
