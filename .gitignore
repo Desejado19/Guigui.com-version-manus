@@ -17,6 +17,11 @@ data/
 src/data/*
 !src/data/initialData.ts
 !src/data/categoryCatalog.ts
+!src/data/adminStaffData.ts
+!src/data/auditLogsData.ts
+!src/data/monetizationCatalog.ts
+!src/data/notificationsData.ts
+!src/data/subscriptionCatalog.ts
 backups/
 playwright-report/
 test-results/
