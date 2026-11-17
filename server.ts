@@ -1342,6 +1342,210 @@ app.put('/api/admin/businesses/featured', requireRole('admin'), async (req, res)
   }
 });
 
+/* ------------------------------------------------------------------ *
+ * Sobre Nós (página institucional do Guigui.com)
+ * Um único registo (slug fixo) com rascunho + versão publicada + histórico.
+ * ------------------------------------------------------------------ */
+const SOBRE_NOS_SLUG = 'guigui-com';
+
+let sobreNosSchemaReady: Promise<void> | null = null;
+function ensureSobreNosSchema(): Promise<void> {
+  if (!databasePool) return Promise.reject(new Error('DATABASE_REQUIRED'));
+  if (!sobreNosSchemaReady) {
+    sobreNosSchemaReady = (async () => {
+      await databasePool.query(`
+        CREATE TABLE IF NOT EXISTS sobre_nos (
+          id BIGSERIAL PRIMARY KEY,
+          slug TEXT NOT NULL UNIQUE,
+          payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+          published_payload JSONB,
+          is_draft BOOLEAN NOT NULL DEFAULT TRUE,
+          published_at TIMESTAMPTZ,
+          created_by TEXT,
+          updated_by TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `);
+      await databasePool.query(`
+        CREATE TABLE IF NOT EXISTS sobre_nos_history (
+          id BIGSERIAL PRIMARY KEY,
+          slug TEXT NOT NULL,
+          payload JSONB NOT NULL,
+          action TEXT NOT NULL,
+          changed_by TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `);
+    })().catch((error) => {
+      sobreNosSchemaReady = null;
+      throw error;
+    });
+  }
+  return sobreNosSchemaReady;
+}
+
+async function readSobreNosRow() {
+  const result = await databasePool!.query(
+    `SELECT slug, payload, published_payload, is_draft, published_at, updated_at, updated_by
+       FROM sobre_nos WHERE slug = $1`,
+    [SOBRE_NOS_SLUG]
+  );
+  return result.rows[0] || null;
+}
+
+async function recordSobreNosHistory(action: string, payload: unknown, changedBy: string | null) {
+  await databasePool!.query(
+    `INSERT INTO sobre_nos_history (slug, payload, action, changed_by) VALUES ($1, $2::jsonb, $3, $4)`,
+    [SOBRE_NOS_SLUG, JSON.stringify(payload ?? {}), action, changedBy]
+  );
+}
+
+async function saveSobreNosPayload(payload: unknown, options: { publish?: boolean; changedBy: string | null }) {
+  const now = new Date().toISOString();
+  const publish = options.publish === true;
+  const result = await databasePool!.query(
+    `INSERT INTO sobre_nos (slug, payload, published_payload, is_draft, published_at, created_by, updated_by, created_at, updated_at)
+     VALUES ($1, $2::jsonb, $3::jsonb, $4, $5, $6, $6, $7, $7)
+     ON CONFLICT (slug) DO UPDATE SET
+       payload = EXCLUDED.payload,
+       published_payload = CASE WHEN $8 THEN EXCLUDED.payload ELSE sobre_nos.published_payload END,
+       is_draft = EXCLUDED.is_draft,
+       published_at = CASE WHEN $8 THEN EXCLUDED.published_at ELSE sobre_nos.published_at END,
+       updated_by = EXCLUDED.updated_by,
+       updated_at = EXCLUDED.updated_at
+     RETURNING slug, payload, published_payload, is_draft, published_at, updated_at, updated_by`,
+    [
+      SOBRE_NOS_SLUG,
+      JSON.stringify(payload ?? {}),
+      publish ? JSON.stringify(payload ?? {}) : null,
+      !publish,
+      publish ? now : null,
+      options.changedBy,
+      now,
+      publish,
+    ]
+  );
+  return result.rows[0];
+}
+
+app.get('/api/admin/sobre-nos', requireRole('admin'), async (_req, res) => {
+  if (!databaseConfigured) return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária para o módulo Sobre Nós.', code: 'DATABASE_REQUIRED' });
+  try {
+    await ensureSobreNosSchema();
+    const row = await readSobreNosRow();
+    const history = (await databasePool!.query(
+      `SELECT id, action, changed_by, created_at, payload FROM sobre_nos_history WHERE slug = $1 ORDER BY id DESC LIMIT 20`,
+      [SOBRE_NOS_SLUG]
+    )).rows;
+    return res.json({
+      data: row?.payload || {},
+      published: row?.published_payload || null,
+      isDraft: row ? row.is_draft !== false : true,
+      publishedAt: row?.published_at || null,
+      updatedAt: row?.updated_at || null,
+      updatedBy: row?.updated_by || null,
+      history,
+    });
+  } catch (error) {
+    console.error('[Guigui.com] sobre-nos load failed:', error);
+    return res.status(500).json({ error: 'Não foi possível carregar o Sobre Nós.', code: 'SOBRE_NOS_LOAD_FAILED' });
+  }
+});
+
+app.put('/api/admin/sobre-nos', requireRole('admin'), async (req, res) => {
+  if (!databaseConfigured) return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária para o módulo Sobre Nós.', code: 'DATABASE_REQUIRED' });
+  const payload = req.body?.data;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return res.status(400).json({ error: 'Os dados do Sobre Nós são inválidos.', code: 'INVALID_SOBRE_NOS_PAYLOAD' });
+  }
+  try {
+    await ensureSobreNosSchema();
+    const changedBy = (await sessionContext(req))?.userId || null;
+    const row = await saveSobreNosPayload(payload, { publish: false, changedBy });
+    await recordSobreNosHistory('save', payload, changedBy);
+    return res.json({ success: true, isDraft: row.is_draft, updatedAt: row.updated_at });
+  } catch (error) {
+    console.error('[Guigui.com] sobre-nos save failed:', error);
+    return res.status(500).json({ error: 'Não foi possível guardar o Sobre Nós.', code: 'SOBRE_NOS_SAVE_FAILED' });
+  }
+});
+
+app.post('/api/admin/sobre-nos/publish', requireRole('admin'), async (req, res) => {
+  if (!databaseConfigured) return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária para o módulo Sobre Nós.', code: 'DATABASE_REQUIRED' });
+  const payload = req.body?.data;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return res.status(400).json({ error: 'Os dados do Sobre Nós são inválidos.', code: 'INVALID_SOBRE_NOS_PAYLOAD' });
+  }
+  try {
+    await ensureSobreNosSchema();
+    const changedBy = (await sessionContext(req))?.userId || null;
+    const row = await saveSobreNosPayload(payload, { publish: true, changedBy });
+    await recordSobreNosHistory('publish', payload, changedBy);
+    return res.json({ success: true, publishedAt: row.published_at, updatedAt: row.updated_at });
+  } catch (error) {
+    console.error('[Guigui.com] sobre-nos publish failed:', error);
+    return res.status(500).json({ error: 'Não foi possível publicar o Sobre Nós.', code: 'SOBRE_NOS_PUBLISH_FAILED' });
+  }
+});
+
+app.post('/api/admin/sobre-nos/draft', requireRole('admin'), async (req, res) => {
+  if (!databaseConfigured) return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária para o módulo Sobre Nós.', code: 'DATABASE_REQUIRED' });
+  try {
+    await ensureSobreNosSchema();
+    const current = await readSobreNosRow();
+    const payload = req.body?.data ?? current?.payload ?? {};
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return res.status(400).json({ error: 'Os dados do Sobre Nós são inválidos.', code: 'INVALID_SOBRE_NOS_PAYLOAD' });
+    }
+    const changedBy = (await sessionContext(req))?.userId || null;
+    const row = await saveSobreNosPayload(payload, { publish: false, changedBy });
+    await recordSobreNosHistory('draft', payload, changedBy);
+    return res.json({ success: true, isDraft: true, updatedAt: row.updated_at });
+  } catch (error) {
+    console.error('[Guigui.com] sobre-nos draft failed:', error);
+    return res.status(500).json({ error: 'Não foi possível guardar o rascunho do Sobre Nós.', code: 'SOBRE_NOS_DRAFT_FAILED' });
+  }
+});
+
+app.post('/api/admin/sobre-nos/restore/:historyId', requireRole('admin'), async (req, res) => {
+  if (!databaseConfigured) return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária para o módulo Sobre Nós.', code: 'DATABASE_REQUIRED' });
+  const historyId = Number(req.params.historyId);
+  if (!Number.isInteger(historyId) || historyId <= 0) {
+    return res.status(400).json({ error: 'Versão inválida.', code: 'INVALID_SOBRE_NOS_VERSION' });
+  }
+  try {
+    await ensureSobreNosSchema();
+    const version = (await databasePool!.query(
+      `SELECT payload FROM sobre_nos_history WHERE id = $1 AND slug = $2`,
+      [historyId, SOBRE_NOS_SLUG]
+    )).rows[0];
+    if (!version) {
+      return res.status(404).json({ error: 'Versão não encontrada.', code: 'SOBRE_NOS_VERSION_NOT_FOUND' });
+    }
+    const changedBy = (await sessionContext(req))?.userId || null;
+    const row = await saveSobreNosPayload(version.payload, { publish: false, changedBy });
+    await recordSobreNosHistory('restore', version.payload, changedBy);
+    return res.json({ success: true, data: row.payload, isDraft: true, updatedAt: row.updated_at });
+  } catch (error) {
+    console.error('[Guigui.com] sobre-nos restore failed:', error);
+    return res.status(500).json({ error: 'Não foi possível restaurar a versão.', code: 'SOBRE_NOS_RESTORE_FAILED' });
+  }
+});
+
+app.get('/api/sobre-nos', async (_req, res) => {
+  if (!databaseConfigured) return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária.', code: 'DATABASE_REQUIRED' });
+  try {
+    await ensureSobreNosSchema();
+    const row = await readSobreNosRow();
+    if (!row?.published_payload) return res.status(404).json({ error: 'Sobre Nós ainda não publicado.', code: 'SOBRE_NOS_NOT_PUBLISHED' });
+    return res.json({ data: row.published_payload, publishedAt: row.published_at });
+  } catch (error) {
+    console.error('[Guigui.com] public sobre-nos failed:', error);
+    return res.status(500).json({ error: 'Não foi possível carregar o Sobre Nós.', code: 'SOBRE_NOS_PUBLIC_LOAD_FAILED' });
+  }
+});
+
 app.get('/api/admin/businesses/pending', requireRole('admin'), async (_req, res) => {
   if (!databaseConfigured) return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária para consultar empresas pendentes.', code: 'DATABASE_REQUIRED' });
   try {

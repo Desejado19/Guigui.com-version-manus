@@ -87,6 +87,7 @@ import type { CommercialSection } from './admin/management/commercialApi';
 import { BusinessesModule } from './admin/management/BusinessesModule';
 import { BusinessesManagementPage } from './admin/management/BusinessesManagementPage';
 import { FeaturedBusinessesManagementPage } from './admin/management/FeaturedBusinessesManagementPage';
+import { SobreNosManagementPage } from './admin/management/SobreNosManagementPage';
 import { EventsManagementPage } from './admin/management/EventsManagementPage';
 import { TicketsManagementPage } from './admin/management/TicketsManagementPage';
 import { TransactionsManagementPage } from './admin/management/TransactionsManagementPage';
@@ -171,7 +172,7 @@ interface AdminDashboardProps {
   onReplySupport?: (requestId: string, text: string) => void;
   onUpdateSupportStatus?: (requestId: string, status: SupportRequest['status']) => void;
   focusSupportId?: string | null;
-  initialTab?: 'capabilities' | 'profile' | 'overview' | 'businesses' | 'moderation' | 'pricing' | 'categories' | 'roles' | 'admin_staff' | 'audit_logs' | 'events' | 'financials' | 'architecture' | 'reports' | 'notifications' | 'support';
+  initialTab?: 'capabilities' | 'profile' | 'overview' | 'businesses' | 'moderation' | 'pricing' | 'categories' | 'roles' | 'admin_staff' | 'audit_logs' | 'events' | 'financials' | 'architecture' | 'reports' | 'notifications' | 'support' | 'sobre-nos';
   currentUser?: UserProfile | null;
   onLogout?: () => void;
   sidebarCollapsed?: boolean;
@@ -333,6 +334,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         { label: t('adminNavCategories'), tab: 'categories', icon: Tag, help: t('adminNavCategoriesHelp') },
         { label: t('adminNavSystem'), tab: 'architecture', icon: Server, help: t('adminNavSystemHelp') },
         { label: t('adminNavGlobal'), tab: 'capabilities', icon: SlidersHorizontal, help: t('adminNavGlobalHelp') },
+        { label: 'Sobre Nós', tab: 'sobre-nos', icon: Building2, help: 'Identidade visual e informações institucionais do Guigui.com.' },
       ],
     },
     {
@@ -350,7 +352,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const allAdminItems = adminNavigationGroups.flatMap((group) => group.items);
   const configuredAdminNavigation = ADMIN_NAVIGATION;
-  const [activeTab, setActiveTab] = useState<'capabilities' | 'profile' | 'overview' | 'businesses' | 'moderation' | 'pricing' | 'categories' | 'users' | 'roles' | 'admin_staff' | 'audit_logs' | 'events' | 'financials' | 'architecture' | 'reports' | 'notifications' | 'support'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'capabilities' | 'profile' | 'overview' | 'businesses' | 'moderation' | 'pricing' | 'categories' | 'users' | 'roles' | 'admin_staff' | 'audit_logs' | 'events' | 'financials' | 'architecture' | 'reports' | 'notifications' | 'support' | 'sobre-nos'>(initialTab);
   const [commercialView, setCommercialView] = useState<'summary' | CommercialSection>('summary');
   // Submódulos que antes apareciam empilhados na mesma página.
   const [moderationSection, setModerationSection] = useState<'stories' | 'pipeline' | 'queue'>('pipeline');
@@ -2565,6 +2567,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {commercialView === 'rules' && <CommercialRulesPage onBack={() => setCommercialView('summary')} />}
           {commercialView === 'audit' && <CommercialAuditPage onBack={() => setCommercialView('summary')} />}
         </div>
+      )}
+
+      {/* TAB: Sobre Nós */}
+      {activeTab === 'sobre-nos' && (
+        <SobreNosManagementPage onBack={() => setActiveTab('capabilities')} />
       )}
 
       {/* TAB: Categories Structure Management (Section 5) */}
