@@ -11,6 +11,7 @@
     "dev.pinned": "cross-env NODE_ENV=development PORT=3000 node scripts/dev.mjs",
     "build": "node scripts/build.mjs",
     "verify:deploy": "node scripts/verify-production-surface.mjs",
+    "prestart": "npm run db:migrate",
     "start": "node scripts/start-production.mjs",
     "preview": "vite preview",
     "clean": "node scripts/clean.mjs",
