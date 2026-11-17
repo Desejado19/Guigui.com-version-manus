@@ -87,7 +87,7 @@ export type AdminModule =
  * Destinos da navegação inferior do cidadão que só existem para sessões activas.
  * O Feed, o Diretório, as Ofertas e a Agenda continuam públicos.
  */
-export const CITIZEN_PRIVATE_PRIMARY_MODULES: readonly CitizenPrimaryModule[] = ['messages', 'support', 'account'];
+export const CITIZEN_PRIVATE_PRIMARY_MODULES: readonly CitizenPrimaryModule[] = ['messages', 'account'];
 
 export const isCitizenPrimaryModulePrivate = (id: CitizenPrimaryModule): boolean =>
   CITIZEN_PRIVATE_PRIMARY_MODULES.includes(id);

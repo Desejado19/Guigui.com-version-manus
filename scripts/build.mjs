@@ -8,29 +8,32 @@
  * um diretório curto (temporário) e apontamos `ESBUILD_BINARY_PATH` para essa
  * cópia — é o mesmo workaround que era feito à mão, agora automático.
  *
- * Corre as mesmas etapas do antigo `npm run build`:
+ * Etapas (as mesmas do antigo `npm run build`):
  *   1. vite build
- *   2. esbuild server.ts   -> dist/server.mjs
+ *   2. esbuild server.ts -> dist/server.mjs
  *   3. esbuild .../runPlatformEntrypoint.ts -> dist/platform-preflight.mjs
  *   4. node scripts/check-no-dev-exposure.mjs
  */
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const isWindows = process.platform === 'win32';
-
 const log = (message) => console.log(`[build] ${message}`);
 
-const walk = (directory) => {
-  if (!existsSync(directory)) return [];
-  return readdirSync(directory, { withFileTypes: true }).map((entry) => path.join(directory, entry.name));
+/** Versão do esbuild instalada, para escolher o binário correspondente no store do pnpm. */
+const esbuildVersion = () => {
+  try {
+    return JSON.parse(readFileSync(path.join(root, 'node_modules', 'esbuild', 'package.json'), 'utf8')).version;
+  } catch {
+    return null;
+  }
 };
 
-/** Localiza o binário do esbuild para a plataforma atual (segue o install do pnpm). */
+/** Localiza o esbuild.exe da plataforma atual (install direto ou via pnpm). */
 const findEsbuildBinary = () => {
   if (!isWindows) return null;
 
@@ -39,32 +42,23 @@ const findEsbuildBinary = () => {
   const direct = path.join(root, 'node_modules', '@esbuild', packageName, 'esbuild.exe');
   if (existsSync(direct)) return direct;
 
-  let version = null;
-  try {
-    version = JSON.parse(readFileSync(path.join(root, 'node_modules', 'esbuild', 'package.json'), 'utf8')).version;
-  } catch {
-    // Sem a versão exata, aceita a primeira que encontrar abaixo.
-  }
-
   const storeRoot = path.join(root, 'node_modules', '.pnpm');
-  const prefix = `@esbuild+${packageName}@`;
-  const candidates = walk(storeRoot)
-    .filter((entry) => path.basename(entry).startsWith(prefix))
-    .map((entry) => ({
-      entry,
-      version: path.basename(entry).slice(prefix.length),
-      binary: path.join(entry, 'node_modules', '@esbuild', packageName, 'esbuild.exe'),
-    }))
-    .filter((candidate) => existsSync(candidate.binary))
-    .sort((a, b) => (a.version === version ? -1 : b.version === version ? 1 : 0));
+  if (!existsSync(storeRoot)) return null;
 
-  return candidates[0]?.binary ?? null;
+  const prefix = `@esbuild+${packageName}@`;
+  const version = esbuildVersion();
+  const candidates = readdirSync(storeRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith(prefix))
+    .map((entry) => ({
+      version: entry.name.slice(prefix.length),
+      binary: path.join(storeRoot, entry.name, 'node_modules', '@esbuild', packageName, 'esbuild.exe'),
+    }))
+    .filter((candidate) => existsSync(candidate.binary));
+
+  return (candidates.find((candidate) => candidate.version === version) ?? candidates[0])?.binary ?? null;
 };
 
-/**
- * Copia o binário para um diretório curto e devolve o caminho da cópia.
- * Devolve `null` quando não é preciso (ou não é possível) aplicar o workaround.
- */
+/** Copia o esbuild.exe para um caminho curto; devolve a cópia ou `null` se não for preciso. */
 const stageShortBinary = () => {
   if (!isWindows) return null;
 
@@ -74,16 +68,13 @@ const stageShortBinary = () => {
     return null;
   }
 
-  const shortDir = path.join(tmpdir(), 'guigui-esbuild');
-  const target = path.join(shortDir, 'esbuild.exe');
+  const target = path.join(tmpdir(), 'guigui-esbuild', 'esbuild.exe');
   try {
-    mkdirSync(shortDir, { recursive: true });
-    if (!existsSync(target) || statSync(target).size !== statSync(source).size) {
-      copyFileSync(source, target);
-    }
+    mkdirSync(path.dirname(target), { recursive: true });
+    copyFileSync(source, target);
     return target;
   } catch (error) {
-    log(`aviso: não foi possível copiar o esbuild para ${shortDir} (${error.message}); a continuar sem workaround.`);
+    log(`aviso: não foi possível copiar o esbuild (${error.message}); a continuar sem workaround.`);
     return null;
   }
 };
@@ -100,20 +91,17 @@ const cleanup = () => {
   try {
     rmSync(path.dirname(stagedBinary), { recursive: true, force: true });
   } catch {
-    // A cópia é temporária; se não puder ser apagada agora, fica para o sistema.
+    // A cópia é temporária; se ficar bloqueada, o sistema limpa-a depois.
   }
 };
 
+const esbuild = path.join(root, 'node_modules', 'esbuild', 'bin', 'esbuild');
 const steps = [
   ['vite build', path.join(root, 'node_modules', 'vite', 'bin', 'vite.js'), ['build']],
+  ['dist/server.mjs', esbuild, ['server.ts', '--bundle', '--platform=node', '--format=esm', '--packages=external', '--outfile=dist/server.mjs']],
   [
-    'esbuild dist/server.mjs',
-    path.join(root, 'node_modules', 'esbuild', 'bin', 'esbuild'),
-    ['server.ts', '--bundle', '--platform=node', '--format=esm', '--packages=external', '--outfile=dist/server.mjs'],
-  ],
-  [
-    'esbuild dist/platform-preflight.mjs',
-    path.join(root, 'node_modules', 'esbuild', 'bin', 'esbuild'),
+    'dist/platform-preflight.mjs',
+    esbuild,
     [
       'server/modules/platform-foundation/hosting/runPlatformEntrypoint.ts',
       '--bundle',
@@ -129,15 +117,10 @@ const steps = [
 for (const [label, script, args] of steps) {
   log(label);
   const result = spawnSync(process.execPath, [script, ...args], { cwd: root, env, stdio: 'inherit' });
-  if (result.error) {
+  if (result.error || result.status !== 0) {
     cleanup();
-    console.error(`[build] falhou a iniciar ${label}: ${result.error.message}`);
-    process.exit(1);
-  }
-  if (result.status !== 0) {
-    cleanup();
-    console.error(`[build] ${label} terminou com código ${result.status}`);
-    process.exit(result.status ?? 1);
+    console.error(`[build] falhou em ${label}: ${result.error?.message ?? `código ${result.status}`}`);
+    process.exit(result.status || 1);
   }
 }
 
