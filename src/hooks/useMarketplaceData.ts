@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type
 import { CATEGORY_GROUPS, MAIN_CATEGORIES } from '../data/categoryCatalog';
 import type { Business, BusinessCategory, CategoryGroupSummary, EventItem } from '../types';
 import { mergeStoredBusinessProfile } from '../utils/businessProfile';
-import { readStoredValue } from '../utils/persistentState';
+import { COLLECTION_CACHE_TTL_MS, readCachedValue, readOrMigrateCachedValue, writeCachedValue } from '../utils/browserStorage';
 
 type PersistedBusinessProfile = Partial<Omit<Business, 'email'>> & Pick<Business, 'id' | 'name'> & {
   createdAt?: string;
@@ -25,6 +25,22 @@ interface MarketplaceData {
 
 const BUSINESS_STORAGE_KEY = 'guigui_businesses';
 const EVENT_STORAGE_KEY = 'guigui_events';
+
+/** Cache offline em IndexedDB; nunca no localStorage (quota pequena). */
+async function readCachedArray<T>(key: string): Promise<T[]> {
+  const cached = await readOrMigrateCachedValue<T[]>(key);
+  return cached.found && Array.isArray(cached.value) ? cached.value : [];
+}
+
+/**
+ * Apenas cache já confirmada (nunca migra localStorage antigo). Usada quando a
+ * base de dados está configurada mas falhou: dados antigos do browser não
+ * podem parecer dados actuais do servidor.
+ */
+async function readServerCacheArray<T>(key: string): Promise<T[]> {
+  const cached = await readCachedValue<T[]>(key);
+  return cached.found && Array.isArray(cached.value) ? cached.value : [];
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -203,8 +219,8 @@ export function useMarketplaceData(): MarketplaceData {
         } else {
           resolvedSource = 'local';
           setSource('local');
-          const localBusinesses = readStoredValue<Business[]>(BUSINESS_STORAGE_KEY, []);
-          const localEvents = readStoredValue<EventItem[]>(EVENT_STORAGE_KEY, []).map(eventFromRecord);
+          const localBusinesses = await readCachedArray<Business>(BUSINESS_STORAGE_KEY);
+          const localEvents = (await readCachedArray<EventItem>(EVENT_STORAGE_KEY)).map(eventFromRecord);
           setGroups(CATEGORY_GROUPS.map(({ id, name, description }) => ({ id, name, description })));
           setCategories(MAIN_CATEGORIES);
 
@@ -229,15 +245,29 @@ export function useMarketplaceData(): MarketplaceData {
         const message = errorMessage(loadError);
         setError(message);
         if (resolvedSource === 'postgres') {
-          lastLoadedBusinesses.current = [];
-          lastLoadedEvents.current = [];
-          setGroups([]);
-          setCategories([]);
-          setBusinesses([]);
-          setEvents([]);
+          // Sem rede, usa a última cache IndexedDB em vez de mostrar o site
+          // vazio. A cache é apenas de leitura; nenhuma operação comercial é
+          // confirmada localmente.
+          const cachedBusinesses = await readServerCacheArray<Business>(BUSINESS_STORAGE_KEY);
+          const cachedEvents = (await readServerCacheArray<EventItem>(EVENT_STORAGE_KEY)).map(eventFromRecord);
+          if (cachedBusinesses.length > 0 || cachedEvents.length > 0) {
+            lastLoadedBusinesses.current = cachedBusinesses;
+            lastLoadedEvents.current = cachedEvents;
+            setSource('local');
+            setBusinesses(cachedBusinesses);
+            setEvents(cachedEvents);
+            setStatus('ready');
+          } else {
+            lastLoadedBusinesses.current = [];
+            lastLoadedEvents.current = [];
+            setGroups([]);
+            setCategories([]);
+            setBusinesses([]);
+            setEvents([]);
+          }
         } else if (resolvedSource === 'local') {
-          const localBusinesses = readStoredValue<Business[]>(BUSINESS_STORAGE_KEY, []);
-          const localEvents = readStoredValue<EventItem[]>(EVENT_STORAGE_KEY, []).map(eventFromRecord);
+          const localBusinesses = await readCachedArray<Business>(BUSINESS_STORAGE_KEY);
+          const localEvents = (await readCachedArray<EventItem>(EVENT_STORAGE_KEY)).map(eventFromRecord);
           lastLoadedBusinesses.current = localBusinesses;
           lastLoadedEvents.current = localEvents;
           setSource('local');
@@ -266,17 +296,15 @@ export function useMarketplaceData(): MarketplaceData {
   useEffect(() => {
     if (status !== 'ready' && !(source === 'local' && status === 'error')) return;
 
-    const persistLocal = <T,>(key: string, value: T) => {
-      try {
-        window.localStorage.setItem(key, JSON.stringify(value));
-        window.dispatchEvent(new CustomEvent(`guigui:persistent-state:${key}`, { detail: { value } }));
-      } catch (storageError) {
-        setError(`Não foi possível guardar ${key} no armazenamento local: ${errorMessage(storageError)}`);
-      }
+    const persistCache = <T,>(key: string, value: T) => {
+      // Escrita assíncrona em IndexedDB: não bloqueia o browser e não consome
+      // a quota do localStorage. Falhas ficam registadas no monitor.
+      void writeCachedValue(key, value, { ttlMs: COLLECTION_CACHE_TTL_MS });
+      window.dispatchEvent(new CustomEvent(`guigui:persistent-state:${key}`, { detail: { value } }));
     };
 
-    persistLocal(BUSINESS_STORAGE_KEY, businesses);
-    persistLocal(EVENT_STORAGE_KEY, events);
+    persistCache(BUSINESS_STORAGE_KEY, businesses);
+    persistCache(EVENT_STORAGE_KEY, events);
   }, [businesses, events, source, status]);
 
   useEffect(() => {

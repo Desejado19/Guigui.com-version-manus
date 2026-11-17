@@ -1,4 +1,11 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type SetStateAction } from 'react';
+import {
+  COLLECTION_CACHE_TTL_MS,
+  isLargeStateKey,
+  readOrMigrateCachedValue,
+  writeCachedValue,
+} from './browserStorage';
+import { reportStorageIssue } from './storageMonitor';
 
 export function readStoredValue<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback;
@@ -119,9 +126,13 @@ export function usePersistentState<T>(key: string, fallback: T) {
   fallbackRef.current = fallback;
 
   const accountScoped = ACCOUNT_SCOPED_STATE_KEYS.has(key);
+  const largeState = isLargeStateKey(key);
   const scope = useSyncExternalStore(subscribeScope, () => currentScope, () => 'anon');
+  const storageKey = cacheKeyFor(key, scope);
   const [state, setState] = useState<ScopedValue<T>>(() => ({
     scope: currentScope,
+    // Uma chave grande pode ter um valor legado no localStorage: é lido uma
+    // única vez e migrado para IndexedDB pelo efeito de hidratação.
     value: accountScoped
       ? readStoredValue(cacheKeyFor(key, currentScope), fallbackRef.current)
       : readStoredValue(key, fallbackRef.current),
@@ -131,6 +142,12 @@ export function usePersistentState<T>(key: string, fallback: T) {
   const eventName = `guigui:persistent-state:${key}`;
   const valueRef = useRef(value);
   valueRef.current = value;
+  const hydratedRef = useRef(!largeState);
+  const [hydratedTick, setHydratedTick] = useState(0);
+  const [retryTick, setRetryTick] = useState(0);
+  const retryAttemptRef = useRef(0);
+  const retryTimeoutRef = useRef<number | null>(null);
+  const remoteAppliedRef = useRef(false);
 
   // Estado da sincronização: só se grava depois da leitura inicial, e uma
   // resposta antiga nunca substitui uma alteração local ainda por confirmar.
@@ -161,17 +178,56 @@ export function usePersistentState<T>(key: string, fallback: T) {
     lastServerUpdatedAtRef.current = null;
     setState({
       scope,
-      value: accountScoped
-        ? readStoredValue(cacheKeyFor(key, scope), fallbackRef.current)
-        : readStoredValue(key, fallbackRef.current),
+      value: largeState
+        ? fallbackRef.current
+        : accountScoped
+          ? readStoredValue(cacheKeyFor(key, scope), fallbackRef.current)
+          : readStoredValue(key, fallbackRef.current),
     });
-  }, [accountScoped, key, scope, state.scope]);
+    remoteAppliedRef.current = false;
+  }, [accountScoped, key, largeState, scope, state.scope]);
+
+  // Hidratação das colecções a partir de IndexedDB. Migra uma vez o valor
+  // legado do localStorage e só remove a chave antiga após a escrita ter êxito.
+  useEffect(() => {
+    if (!largeState) {
+      hydratedRef.current = true;
+      return;
+    }
+    let cancelled = false;
+    hydratedRef.current = false;
+    void readOrMigrateCachedValue<T>(storageKey)
+      .then((result) => {
+        if (cancelled) return;
+        if (result.found && !remoteAppliedRef.current && !dirtyRef.current) {
+          setState({ scope, value: result.value as T });
+        }
+        // Carrega o valor pendente e mantém a alteração local marcada para
+        // reenvio assim que houver rede (mesmo depois de reiniciar o browser).
+        if (result.found && result.pending) dirtyRef.current = true;
+        if (!result.found) {
+          void writeCachedValue(storageKey, valueRef.current, { ttlMs: COLLECTION_CACHE_TTL_MS });
+        }
+      })
+      .catch((error: unknown) => {
+        reportStorageIssue('read_failed', storageKey, error);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        hydratedRef.current = true;
+        setHydratedTick((tick) => tick + 1);
+      });
+    return () => { cancelled = true; };
+  }, [largeState, scope, storageKey]);
 
   // Leitura inicial + polling. Só aplica valores remotos mais recentes e nunca
   // atropela alterações locais pendentes.
   useEffect(() => {
     if (!SYNCABLE_STATE_KEYS.has(key)) return;
     if (!canReadKeyForScope(key, scope)) return;
+    // Em chaves grandes espera pela cache IndexedDB: se houver uma alteração
+    // pendente, a resposta inicial do servidor não a pode atropelar.
+    if (largeState && hydratedTick === 0) return;
 
     let cancelled = false;
     const fetchScope = scope;
@@ -205,6 +261,7 @@ export function usePersistentState<T>(key: string, fallback: T) {
         if (sameValue) return;
         // Valor veio do servidor: não deve ser reenviado como alteração local.
         dirtyRef.current = false;
+        remoteAppliedRef.current = true;
         setState({ scope: fetchScope, value: result.value as T });
       } catch {
         // Fallback gracioso para o cache local.
@@ -225,7 +282,7 @@ export function usePersistentState<T>(key: string, fallback: T) {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [key, scope]);
+  }, [hydratedTick, key, largeState, scope]);
 
   // Eventos locais entre componentes que usam a mesma chave.
   useEffect(() => {
@@ -254,10 +311,21 @@ export function usePersistentState<T>(key: string, fallback: T) {
     if (state.scope !== scope) return;
 
     try {
-      window.localStorage.setItem(cacheKeyFor(key, scope), JSON.stringify(state.value));
+      if (largeState) {
+        if (hydratedRef.current) {
+          void writeCachedValue(storageKey, state.value, {
+            ttlMs: COLLECTION_CACHE_TTL_MS,
+            ...(dirtyRef.current && SYNCABLE_STATE_KEYS.has(key) ? { pending: true } : {}),
+          });
+        }
+      } else {
+        window.localStorage.setItem(cacheKeyFor(key, scope), JSON.stringify(state.value));
+      }
       window.dispatchEvent(new CustomEvent(eventName, { detail: { value: state.value } }));
-    } catch {
-      // A aplicação continua funcional mesmo quando o armazenamento não está disponível.
+    } catch (error) {
+      // Uma preferência pequena pode continuar apenas em memória; uma colecção
+      // grande nunca depende do localStorage.
+      reportStorageIssue('quota_exceeded', largeState ? storageKey : cacheKeyFor(key, scope), error);
     }
 
     if (!SYNCABLE_STATE_KEYS.has(key)) return;
@@ -289,7 +357,16 @@ export function usePersistentState<T>(key: string, fallback: T) {
         if (revisionRef.current !== revisionAtSave) return;
 
         dirtyRef.current = false;
+        retryAttemptRef.current = 0;
+        if (retryTimeoutRef.current) {
+          window.clearTimeout(retryTimeoutRef.current);
+          retryTimeoutRef.current = null;
+        }
         lastServerUpdatedAtRef.current = result.updatedAt || null;
+        if (largeState) {
+          // A cache deixa de estar pendente; não é uma nova alteração local.
+          void writeCachedValue(storageKey, result.value ?? valueRef.current, { ttlMs: COLLECTION_CACHE_TTL_MS });
+        }
 
         // O servidor pode devolver o valor já filtrado/merged; essa é a versão
         // autoritativa e deve substituir o snapshot local.
@@ -303,10 +380,19 @@ export function usePersistentState<T>(key: string, fallback: T) {
           if (!sameValue) setState({ scope: scopeAtSave, value: result.value });
         }
       } catch {
-        // Erro de rede: dirtyRef permanece true para nova tentativa na próxima alteração.
+        // Erro de rede: mantém a alteração pendente e tenta de novo com
+        // backoff exponencial (1s, 2s, 4s... até 60s), sem perder dados.
+        retryAttemptRef.current += 1;
+        const delay = Math.min(60_000, 1_000 * 2 ** Math.min(6, retryAttemptRef.current));
+        if (retryTimeoutRef.current) window.clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = window.setTimeout(() => setRetryTick((tick) => tick + 1), delay);
       }
     }, 400);
-  }, [eventName, key, remoteReadyTick, scope, state]);
+  }, [eventName, hydratedTick, key, largeState, remoteReadyTick, retryTick, scope, state, storageKey]);
+
+  useEffect(() => () => {
+    if (retryTimeoutRef.current) window.clearTimeout(retryTimeoutRef.current);
+  }, []);
 
   // Listener do storage de outras janelas (chave já isolada por conta).
   useEffect(() => {

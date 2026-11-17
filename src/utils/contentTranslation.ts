@@ -51,7 +51,15 @@ function readStorage(): Record<string, string> {
 
 function writeStorage(values: Record<string, string>) {
   if (typeof window === 'undefined') return;
-  try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(values)); } catch { /* storage is optional */ }
+  try {
+    // Cache de traduções é auxiliar e pode crescer com conteúdo novo. Limita
+    // entradas e bytes para nunca competir com os dados funcionais do site.
+    const entries = Object.entries(values);
+    const trimmed = entries.length > 500 ? Object.fromEntries(entries.slice(-500)) : values;
+    const serialized = JSON.stringify(trimmed);
+    if (serialized.length > 200_000) return;
+    window.localStorage.setItem(STORAGE_KEY, serialized);
+  } catch { /* storage is optional */ }
 }
 
 /** Translate display text without changing the published/original object. */

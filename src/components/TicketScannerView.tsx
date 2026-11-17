@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { EventItem, Language, PurchaseOrder } from '../types';
 import { getTranslation } from '../utils/i18n';
+import { COLLECTION_CACHE_TTL_MS, readOrMigrateCachedValue, writeCachedValue } from '../utils/browserStorage';
 import jsQR from 'jsqr';
 
 declare global {
@@ -106,16 +107,18 @@ const deviceId = (): string => {
   }
 };
 
-const readJson = <T,>(key: string, fallback: T): T => {
+// Manifesto e fila offline podem ser grandes (milhares de bilhetes): ficam em
+// IndexedDB, nunca no localStorage. A migração do valor antigo é automática.
+const readJson = async <T,>(key: string, fallback: T): Promise<T> => {
   try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
+    const cached = await readOrMigrateCachedValue<T>(key);
+    return cached.found ? (cached.value as T) : fallback;
   } catch {
     return fallback;
   }
 };
 const writeJson = (key: string, value: unknown) => {
-  try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* sem armazenamento */ }
+  void writeCachedValue(key, value, { ttlMs: COLLECTION_CACHE_TTL_MS });
 };
 
 const manifestKey = (eventId: string) => `guigui_scanner_manifest_${eventId}`;
@@ -377,11 +380,18 @@ export const TicketScannerView: React.FC<TicketScannerViewProps> = ({
       setOfflineQueue([]);
       return;
     }
-    const manifest = readJson<OfflineManifest | null>(manifestKey(eventId), null);
-    const usable = manifest && Date.parse(manifest.expiresAt) > Date.now() ? manifest : null;
-    setOfflineManifest(usable);
-    setOfflineQueue(readJson<OfflineRecord[]>(queueKey(eventId), []));
-    if (!usable) setIsOfflineMode(false);
+    let cancelled = false;
+    void Promise.all([
+      readJson<OfflineManifest | null>(manifestKey(eventId), null),
+      readJson<OfflineRecord[]>(queueKey(eventId), []),
+    ]).then(([manifest, queue]) => {
+      if (cancelled) return;
+      const usable = manifest && Date.parse(manifest.expiresAt) > Date.now() ? manifest : null;
+      setOfflineManifest(usable);
+      setOfflineQueue(queue);
+      if (!usable) setIsOfflineMode(false);
+    });
+    return () => { cancelled = true; };
   }, [selectedEvent?.id]);
 
   /** Descarrega o manifesto assinado; sem ele não há validação offline. */

@@ -38,7 +38,7 @@ import { INITIAL_NOTIFICATIONS } from './data/notificationsData';
 import { motion, AnimatePresence } from 'motion/react';
 import { resolveNotificationTarget, focusKeyForTarget, type NotificationTarget } from './utils/notificationTarget';
 import { calculateBusinessRating } from './utils/reviews';
-import { usePersistentState } from './utils/persistentState';
+import { setPersistentStateScope, usePersistentState } from './utils/persistentState';
 import { useMarketplaceData } from './hooks/useMarketplaceData';
 import { addSubscriptionPeriod, getSubscriptionAccessState, getSubscriptionAlertCode, getSubscriptionAlertMessage } from './utils/subscriptions';
 import { mergeStoredBusinessProfile } from './utils/businessProfile';
@@ -257,6 +257,11 @@ export default function App() {
   const [currentLang, setCurrentLang] = usePersistentState<Language>('guigui_current_lang', detectLanguage());
   // A área pública pode ser consultada sem autenticação; o login é pedido apenas para ações privadas.
   const [currentUser, setCurrentUser] = usePersistentState<UserProfile | null>('guigui_current_user', null);
+  // Isola a cache IndexedDB por conta: cidadão, empresa e admin nunca partilham
+  // mensagens, suporte, posts ou notificações privadas no mesmo browser.
+  React.useEffect(() => {
+    setPersistentStateScope(currentUser ? `${currentUser.role}:${currentUser.id}` : 'anon');
+  }, [currentUser?.id, currentUser?.role]);
   // A projeção local não é credencial: a barra inferior só mostra destinos privados
   // depois de `/api/auth/session` confirmar a sessão no servidor.
   type SessionGate = 'checking' | 'authenticated' | 'guest';
@@ -504,85 +509,13 @@ export default function App() {
     ? (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
     : themeMode;
 
-  // Local Event Alerts & Scheduled Reminders State
-  const [reminders, setReminders] = useState<EventReminder[]>(() => {
-    try {
-      const saved = localStorage.getItem('guigui_event_reminders');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const now = Date.now();
-          return parsed.filter((reminder): reminder is EventReminder => {
-            const eventTime = Date.parse(`${reminder.eventDate}T${reminder.eventTime || '20:00'}:00`);
-            return Number.isFinite(eventTime) && eventTime > now;
-          });
-        }
-      }
-    } catch {
-      // ignore invalid local data
-    }
-    return [];
-  });
-
-  React.useEffect(() => {
-    try {
-      localStorage.setItem('guigui_event_reminders', JSON.stringify(reminders));
-    } catch {
-      // ignore
-    }
-  }, [reminders]);
-
-  // Admin Staff Members State (persisted)
-  const [adminStaff, setAdminStaff] = useState<AdminStaffMember[]>(() => {
-    try {
-      const saved = localStorage.getItem('guigui_admin_staff');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed.map((staff) => ({
-          ...staff,
-          permissions: {
-            ...staff.permissions,
-            validateTickets: false,
-          },
-        }));
-      }
-    } catch {
-      // ignore invalid local data
-    }
-    return INITIAL_ADMIN_STAFF;
-  });
-
-  React.useEffect(() => {
-    try {
-      localStorage.setItem('guigui_admin_staff', JSON.stringify(adminStaff));
-    } catch {
-      // ignore
-    }
-  }, [adminStaff]);
-
-  // Audit Logs State (persisted). Ticket redemption logs stay in the business domain.
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() => {
-    try {
-      const saved = localStorage.getItem('guigui_audit_logs');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((log) => log?.category !== 'ticket_redemption');
-        }
-      }
-    } catch {
-      // ignore invalid local data
-    }
-    return INITIAL_AUDIT_LOGS.filter((log) => log.category !== 'ticket_redemption');
-  });
-
-  React.useEffect(() => {
-    try {
-      localStorage.setItem('guigui_audit_logs', JSON.stringify(auditLogs));
-    } catch {
-      // ignore
-    }
-  }, [auditLogs]);
+  // Colecções grandes: ficam em IndexedDB (nunca no localStorage).
+  const [reminders, setReminders] = usePersistentState<EventReminder[]>('guigui_event_reminders', []);
+  const [adminStaff, setAdminStaff] = usePersistentState<AdminStaffMember[]>('guigui_admin_staff', INITIAL_ADMIN_STAFF);
+  const [auditLogs, setAuditLogs] = usePersistentState<AuditLogEntry[]>(
+    'guigui_audit_logs',
+    INITIAL_AUDIT_LOGS.filter((log) => log.category !== 'ticket_redemption'),
+  );
 
   // Centralized System Notifications State (persisted)
   const [systemNotifications, setSystemNotifications] = usePersistentState<AppNotification[]>('guigui_system_notifications', INITIAL_NOTIFICATIONS);
