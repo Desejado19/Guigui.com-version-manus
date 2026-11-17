@@ -21,9 +21,21 @@ import { existsSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { stageEsbuildBinary } from './lib/esbuild-binary.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const projectDir = path.resolve(here, '..');
+
+// Workaround do caminho longo do Windows: o Vite (middleware mode) arranca o
+// esbuild, que falha com `spawn ... ENOENT` dentro deste directório. A cópia
+// curta é preparada antes de arrancar o servidor e apagada no fim.
+const esbuildStage = stageEsbuildBinary(projectDir, {
+  log: (message) => console.log(`[dev] ${message}`),
+  // O tsx transforma o servidor com a sua própria versão do esbuild (0.28.x),
+  // diferente da que o Vite usa; o servidor trata da dele em `entrypoint.ts`.
+  from: 'tsx',
+});
+const devEnv = esbuildStage.env;
 // `process.env.GUIGUI_DEV_REEXEC` marca que já relançámos a partir da junction,
 // evitando um ciclo infinito de re-execuções.
 const alreadyReexecd = process.env.GUIGUI_DEV_REEXEC === '1';
@@ -88,8 +100,9 @@ if (hasHash && !alreadyReexecd && cwdHasHash) {
   const child = spawnSync(process.execPath, nodeArgs, {
     cwd: junctionPath,
     stdio: 'inherit',
-    env: { ...process.env, GUIGUI_DEV_REEXEC: '1' },
+    env: { ...devEnv, GUIGUI_DEV_REEXEC: '1' },
   });
+  esbuildStage.cleanup();
   process.exit(child.status ?? 0);
 }
 
@@ -99,6 +112,7 @@ const serverEntry = path.join(projectDir, 'server', 'entrypoint.ts');
 const child = spawnSync(
   process.execPath,
   [...process.execArgv, tsxCli, serverEntry, ...process.argv.slice(2)],
-  { stdio: 'inherit', env: process.env },
+  { stdio: 'inherit', env: devEnv },
 );
+esbuildStage.cleanup();
 process.exit(child.status ?? 0);

@@ -7,7 +7,7 @@
     "qs": "6.16.0"
   },
   "scripts": {
-    "dev": "touch scripts/dev.mjs && GUIGUI_DEV_REEXEC=1 node -r tsx/esm scripts/dev.mjs",
+    "dev": "node scripts/dev.mjs",
     "dev.pinned": "cross-env NODE_ENV=development PORT=3000 node scripts/dev.mjs",
     "build": "node scripts/build.mjs",
     "verify:deploy": "node scripts/verify-production-surface.mjs",
