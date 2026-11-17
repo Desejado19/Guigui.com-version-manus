@@ -1699,6 +1699,13 @@ export default function App() {
     [businesses]
   );
 
+  // Nome da empresa por id, para a pesquisa de eventos também encontrar pelo
+  // nome do negócio que organiza o evento.
+  const businessNameById = React.useMemo(
+    () => new Map(businesses.map((business) => [business.id, business.name])),
+    [businesses]
+  );
+
   const normalizedSearch = searchQuery.trim().toLowerCase();
   const filteredSearchPromotions = promotions.filter((promotion) => {
     if (!promotion.isActive) return false;
@@ -1708,7 +1715,9 @@ export default function App() {
   const filteredSearchEvents = events.filter((event) => {
     if (event.status !== 'active') return false;
     if (!normalizedSearch) return true;
-    return [event.title, event.description, event.neighborhood, event.organizerName].some((value) => value.toLowerCase().includes(normalizedSearch));
+    const businessName = event.businessId ? businessNameById.get(event.businessId) : undefined;
+    return [event.title, event.description, event.neighborhood, event.organizerName, event.organizer, businessName]
+      .some((value) => typeof value === 'string' && value.toLowerCase().includes(normalizedSearch));
   });
 
   // State Handler Actions
@@ -2080,6 +2089,25 @@ export default function App() {
     setOnlyOpenNow(false);
     setFeedRefreshToken((previous) => previous + 1);
     setCurrentTab('feed');
+  };
+
+  const handleAdminEventDecision = async (eventId: string, decision: 'approve' | 'reject') => {
+    const event = events.find((item) => item.id === eventId);
+    if (!event) throw new Error('Evento não encontrado.');
+    const updated: EventItem = {
+      ...event,
+      status: decision === 'approve' ? 'active' : 'cancelled',
+    };
+    const response = await fetch('/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(updated),
+    });
+    if (!response.ok) {
+      throw new Error('Não foi possível guardar a decisão do evento.');
+    }
+    setEvents((previous) => previous.map((item) => item.id === eventId ? updated : item));
   };
 
   const handleAddBusinessEvent = (event: EventItem) => {
@@ -2922,6 +2950,7 @@ export default function App() {
           {currentTab === 'events' && (
             <EventsView
               events={events}
+              businesses={businesses}
               currentLang={currentLang}
               currentUser={currentUser}
               onRequireLogin={handleRequireLogin}
@@ -3177,6 +3206,7 @@ export default function App() {
                 onThemeModeChange={toggleTheme}
                 onUpdateBusinesses={setBusinesses}
                 onBusinessDecision={handleAdminBusinessDecision}
+                onEventModerationDecision={handleAdminEventDecision}
                 adminStaff={adminStaff}
                 auditLogs={auditLogs}
                 onUpdateAdminStaff={setAdminStaff}

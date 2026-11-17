@@ -20,6 +20,7 @@ import {
   PurchaseOrder,
   EventReminder,
   ReminderTimeframe,
+  Business,
 } from '../types';
 import { getTranslation } from '../utils/i18n';
 import { translatePublishedText } from '../utils/contentTranslation';
@@ -42,6 +43,8 @@ import { locationMatches } from '../../shared/bissauLocations';
 
 interface EventsViewProps {
   events: EventItem[];
+  /** Empresas do directório, usadas para pesquisar eventos pelo nome do negócio. */
+  businesses?: Business[];
   currentLang: Language;
   currentUser?: UserProfile | null;
   onRequireLogin?: (notice?: string) => void;
@@ -89,6 +92,7 @@ const normaliseEventCategory = (value?: string) => (value || '').trim().toLowerC
 
 export const EventsView: React.FC<EventsViewProps> = ({
   events,
+  businesses = [],
   currentLang,
   currentUser,
   onRequireLogin,
@@ -493,6 +497,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
   };
 
   // Filter events based on search query & category
+  const businessNameById = new Map(businesses.map((business) => [business.id, business.name]));
   const searchedEvents = events.filter((ev) => {
     // Evento cuja data ja passou sai automaticamente da agenda publica.
     if (!isEventUpcoming(ev)) return false;
@@ -503,9 +508,11 @@ export const EventsView: React.FC<EventsViewProps> = ({
       ev.location,
       ev.neighborhood,
       ev.organizerName,
+      ev.organizer,
+      ev.businessId ? businessNameById.get(ev.businessId) : undefined,
       ev.category,
       ...(ev.ticketTypes || []).map((ticket) => `${ticket.name} ${ticket.priceXOF}`),
-    ];
+    ].filter((value): value is string => typeof value === 'string' && value.length > 0);
 
     const matchesSearch = !query || searchableValues.some((value) => value.toLowerCase().includes(query));
     return matchesSearch && locationMatches(ev.neighborhood, selectedNeighborhood);
@@ -646,7 +653,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
               type="search"
               value={eventSearch}
               onChange={(event) => setEventSearch(event.target.value)}
-              placeholder="Pesquisar evento, local ou organizador"
+              placeholder="Pesquisar evento, local, organizador ou empresa"
               className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-9 text-xs font-semibold text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
             />
             {eventSearch && (

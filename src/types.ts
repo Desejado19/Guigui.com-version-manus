@@ -823,7 +823,9 @@ export interface ModerationLogItem {
   businessName?: string;
   authorName: string;
   authorPhone?: string;
-  type: 'post' | 'review' | 'promotion' | 'business_profile';
+  type: 'post' | 'review' | 'promotion' | 'business_profile' | 'event';
+  /** Presente quando o item é um evento da tabela de eventos. */
+  eventId?: string;
   contentSnippet: string;
   imageUrl?: string;
   result: ModerationResult;

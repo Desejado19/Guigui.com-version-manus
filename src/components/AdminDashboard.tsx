@@ -141,6 +141,7 @@ import {
 } from '../types';
 import { getLanguageShortLabel, getNextLanguage, getTranslation } from '../utils/i18n';
 import { DEFAULT_MODERATION_SETTINGS } from '../utils/moderation';
+import { isEventPast } from '../utils/expiry';
 import { NotificationPreferencesPanel } from './NotificationPreferencesPanel';
 import type { NotificationEventInput } from '../services/notificationService';
 import { usePersistentState } from '../utils/persistentState';
@@ -161,6 +162,7 @@ interface AdminDashboardProps {
   onThemeModeChange?: (mode: 'light' | 'dark' | 'auto') => void;
   onUpdateBusinesses?: (businesses: Business[]) => void;
   onBusinessDecision?: (businessId: string, decision: 'approve' | 'reject', reason?: string) => Promise<Business | undefined>;
+  onEventModerationDecision?: (eventId: string, decision: 'approve' | 'reject', reason?: string) => Promise<void>;
   adminStaff?: AdminStaffMember[];
   auditLogs?: AuditLogEntry[];
   onUpdateAdminStaff?: (staff: AdminStaffMember[]) => void;
@@ -205,6 +207,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onThemeModeChange,
   onUpdateBusinesses,
   onBusinessDecision,
+  onEventModerationDecision,
   adminStaff: initialAdminStaff = INITIAL_ADMIN_STAFF,
   auditLogs: initialAuditLogs = INITIAL_AUDIT_LOGS,
   onUpdateAdminStaff,
@@ -810,7 +813,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [modSearchQuery, setModSearchQuery] = useState('');
   const [modDateFrom, setModDateFrom] = useState('');
   const [modDateTo, setModDateTo] = useState('');
-  const [selectedAuditLogId, setSelectedAuditLogId] = useState<string | null>(null);
+  const [selectedModerationDetailId, setSelectedModerationDetailId] = useState<string | null>(null);
 
   const [moderationLogsList, setModerationLogsList] = useState<ModerationLogItem[]>([
     {
@@ -1536,6 +1539,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleApproveModerationLog = async (id: string) => {
+    const eventItem = eventReviewItems.find((entry) => entry.id === id);
+    if (eventItem?.eventId) {
+      if (!onEventModerationDecision) {
+        alert('A aprovação de eventos não está disponível nesta sessão.');
+        return;
+      }
+      try {
+        await onEventModerationDecision(eventItem.eventId, 'approve');
+        setSelectedModerationDetailId(null);
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Falha ao aprovar o evento.');
+      }
+      return;
+    }
     const item = moderationLogsList.find((entry) => entry.id === id);
     const business = item?.businessName ? businessesList.find((entry) => entry.name === item.businessName) : undefined;
     const previous = moderationLogsList;
@@ -1568,6 +1585,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleRejectModerationLog = async (id: string) => {
     const reason = prompt('Indique o motivo da rejeição a enviar ao autor:', 'Violação de regras de concorrência ou conteúdo inadequado');
     if (!reason) return;
+
+    const eventItem = eventReviewItems.find((entry) => entry.id === id);
+    if (eventItem?.eventId) {
+      if (!onEventModerationDecision) {
+        alert('A rejeição de eventos não está disponível nesta sessão.');
+        return;
+      }
+      try {
+        await onEventModerationDecision(eventItem.eventId, 'reject', reason);
+        setSelectedModerationDetailId(null);
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Falha ao rejeitar o evento.');
+      }
+      return;
+    }
 
     const item = moderationLogsList.find((entry) => entry.id === id);
     const business = item?.businessName ? businessesList.find((entry) => entry.name === item.businessName) : undefined;
@@ -1634,8 +1666,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  const moderationBusinessOptions: string[] = Array.from(new Set<string>(moderationLogsList.map((item) => item.businessName))).sort((a, b) => a.localeCompare(b));
-  const filteredModerationItems = filterModerationLogs(moderationLogsList, {
+  // Eventos submetidos por empresas ficam em rascunho até decisão da administração.
+  // Entram na mesma fila de revisão dos restantes conteúdos.
+  const eventReviewItems = useMemo<ModerationLogItem[]>(() => events
+    .filter((event) => event.status === 'draft' && !isEventPast(event))
+    .map((event) => {
+      const business = businessesList.find((entry) => entry.id === event.businessId);
+      const createdAt = `${event.date || ''} ${event.time || ''}`.trim();
+      return {
+        id: `event:${event.id}`,
+        eventId: event.id,
+        businessName: business?.name || event.organizerName || 'Empresa',
+        authorName: event.organizerName || business?.name || 'Empresa',
+        type: 'event',
+        contentSnippet: [event.title, event.description].filter(Boolean).join(' — '),
+        imageUrl: event.coverImage,
+        result: {
+          status: 'amarelo',
+          reason: 'Evento submetido pela empresa e a aguardar aprovação da administração.',
+          confidence: 0,
+          detectedCategories: ['Submissão de evento'],
+          suggestedAction: 'flag_for_human_review',
+          isCriouloLanguage: false,
+        },
+        status: 'pending_human',
+        createdAt: createdAt || '—',
+        auditTrail: [{
+          timestamp: createdAt || '—',
+          action: 'auto_classified',
+          actor: event.organizerName || 'Empresa',
+          notes: 'Evento submetido para revisão da administração.',
+        }],
+      };
+    }), [events, businessesList]);
+
+  const reviewItems = [...eventReviewItems, ...moderationLogsList];
+  const moderationBusinessOptions: string[] = Array.from(new Set<string>(reviewItems.map((item) => item.businessName || '').filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  const filteredModerationItems = filterModerationLogs(reviewItems, {
     workflow: modFilter === 'pending' || modFilter === 'approved' || modFilter === 'rejected' || modFilter === 'amarelo' || modFilter === 'vermelho' ? modFilter : 'all',
     type: modTypeFilter,
     businessName: modBusinessFilter,
@@ -1643,11 +1710,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     dateFrom: modDateFrom,
     dateTo: modDateTo,
   });
-  const moderationColumns: Array<{ id: 'pending' | 'approved' | 'rejected'; label: string; description: string; className: string }> = [
-    { id: 'pending', label: t('moderationPending'), description: t('moderationPendingHelp'), className: 'border-amber-200 bg-amber-50/40' },
-    { id: 'approved', label: t('moderationApproved'), description: t('moderationApproved'), className: 'border-emerald-200 bg-emerald-50/40' },
-    { id: 'rejected', label: t('moderationRejected'), description: t('moderationRejected'), className: 'border-red-200 bg-red-50/40' },
-  ];
+  const moderationTypeLabel = (type: ModerationLogItem['type']) => ({
+    post: 'Publicação',
+    review: 'Avaliação',
+    promotion: 'Promoção',
+    business_profile: 'Perfil empresarial',
+    event: 'Evento',
+  }[type] || type);
+
 
   const flattenedNavigation = useMemo(
     () => adminNavigationGroups.flatMap((group) => group.items),
@@ -2175,7 +2245,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
                 <span className="text-[11px] font-bold text-slate-200">
-                  {moderationLogsList.filter((m) => m.status === 'pending_human').length} Itens em Fila de Revisão
+                  {reviewItems.filter((m) => m.status === 'pending_human').length} Itens em Fila de Revisão
                 </span>
               </div>
             </div>
@@ -2306,15 +2376,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <Filter className="w-4 h-4 text-blue-600" />
                 <h4 className="text-xs font-black uppercase tracking-wide text-slate-900">Filtros do pipeline</h4>
               </div>
-              <span className="text-[10px] font-bold text-slate-500">{filteredModerationItems.length} de {moderationLogsList.length} itens visíveis</span>
+              <span className="text-[10px] font-bold text-slate-500">{filteredModerationItems.length} de {reviewItems.length} itens visíveis</span>
             </div>
             <div className="flex flex-wrap items-center gap-1.5 font-bold">
               {[
-                { id: 'pending' as const, label: 'Em revisão', count: moderationLogsList.filter((m) => getModerationWorkflowColumn(m.status) === 'pending').length },
-                { id: 'approved' as const, label: 'Aprovados', count: moderationLogsList.filter((m) => getModerationWorkflowColumn(m.status) === 'approved').length },
-                { id: 'rejected' as const, label: 'Rejeitados / Recursos', count: moderationLogsList.filter((m) => getModerationWorkflowColumn(m.status) === 'rejected').length },
-                { id: 'amarelo' as const, label: 'Classificação Amarela', count: moderationLogsList.filter((m) => m.result.status === 'amarelo').length },
-                { id: 'vermelho' as const, label: 'Classificação Vermelha', count: moderationLogsList.filter((m) => m.result.status === 'vermelho').length },
+                { id: 'pending' as const, label: 'Em revisão', count: reviewItems.filter((m) => getModerationWorkflowColumn(m.status) === 'pending').length },
+                { id: 'approved' as const, label: 'Aprovados', count: reviewItems.filter((m) => getModerationWorkflowColumn(m.status) === 'approved').length },
+                { id: 'rejected' as const, label: 'Rejeitados / Recursos', count: reviewItems.filter((m) => getModerationWorkflowColumn(m.status) === 'rejected').length },
+                { id: 'amarelo' as const, label: 'Classificação Amarela', count: reviewItems.filter((m) => m.result.status === 'amarelo').length },
+                { id: 'vermelho' as const, label: 'Classificação Vermelha', count: reviewItems.filter((m) => m.result.status === 'vermelho').length },
               ].map((filter) => (
                 <Button type="button" key={filter.id} size="sm" variant={modFilter === filter.id ? 'primary' : 'secondary'} onClick={() => setModFilter(filter.id)} className="px-3 py-1.5 rounded-xl text-xs">
                   {filter.label} ({filter.count})
@@ -2332,7 +2402,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <label className="text-[10px] font-black uppercase tracking-wide text-slate-500">
                 Tipo
                 <select value={modTypeFilter} onChange={(event) => setModTypeFilter(event.target.value as typeof modTypeFilter)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-bold text-slate-900">
-                  <option value="pending">Em revisão</option>
+                  <option value="all">Todos os tipos</option>
                   <option value="promotion">Promoções</option>
                   <option value="event">Eventos</option>
                   <option value="business_profile">Perfis empresariais</option>
@@ -2355,7 +2425,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </Card>
 
-          {/* Moderation Workflow Board */}
           {filteredModerationItems.length === 0 ? (
             <EmptyState
               title="Nenhum item corresponde aos filtros seleccionados."
@@ -2363,193 +2432,209 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               icon={<CheckCircle2 className="w-8 h-8 text-emerald-500" />}
             />
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-              {moderationColumns.map((column) => {
-                const columnItems = filteredModerationItems.filter((item) => getModerationWorkflowColumn(item.status) === column.id);
+            <div className="space-y-2">
+              {filteredModerationItems.map((item) => {
+                const statusLabel = item.status === 'approved'
+                  ? 'Aprovado'
+                  : item.status === 'rejected'
+                    ? 'Rejeitado'
+                    : item.status === 'appealed'
+                      ? 'Em recurso'
+                      : 'Em revisão';
+                const statusClass = item.status === 'approved'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                  : item.status === 'rejected' || item.status === 'appealed'
+                    ? 'border-red-200 bg-red-50 text-red-800'
+                    : 'border-amber-300 bg-amber-50 text-amber-900';
                 return (
-                  <section key={column.id} className={`rounded-2xl border p-3 ${column.className}`}>
-                    <div className="flex items-start justify-between gap-2 border-b border-slate-200/80 pb-3 mb-3">
-                      <div>
-                        <h4 className="text-xs font-black text-slate-900">{column.label}</h4>
-                        <p className="mt-0.5 text-[10px] font-medium text-slate-600">{column.description}</p>
-                      </div>
-                      <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-slate-800 shadow-sm">{columnItems.length}</span>
-                    </div>
-                    <div className="space-y-4">
-                      {columnItems.length === 0 ? (
-                        <EmptyState title="Nenhum conteúdo nesta coluna." />
-                      ) : columnItems.map((item) => {
-                const isAuditOpen = selectedAuditLogId === item.id;
-
-                return (
-                  <Card
-                    key={item.id}
-                    className={`bg-white rounded-2xl p-5 border text-xs space-y-4 shadow-sm transition ${
-                      item.status === 'pending_human'
-                        ? 'border-amber-300 ring-1 ring-amber-200'
-                        : item.status === 'rejected' || item.status === 'appealed'
-                        ? 'border-red-300'
-                        : 'border-emerald-200'
-                    }`}
-                  >
-                    {/* Header */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3 border-slate-100">
-                      <div className="flex items-center gap-2">
-                        <span className="font-black text-slate-900 text-sm">{item.businessName}</span>
-                        <span className="bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-lg border text-[10px] font-bold uppercase">
-                          {item.type}
-                        </span>
-                        <span className="text-slate-400 font-mono text-[11px]">por {item.authorName} ({item.authorPhone})</span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant="neutral"
-                          className={`px-3 py-1 text-[10px] uppercase tracking-wider ${
-                            item.status === 'approved'
-                              ? 'bg-emerald-600 text-white'
-                              : item.status === 'rejected' || item.status === 'appealed'
-                              ? 'bg-red-600 text-white'
-                              : 'bg-amber-400 text-slate-950'
-                          }`}
-                        >
-                          Decisão {item.status === 'approved' ? 'APROVADA' : item.status === 'rejected' ? 'REJEITADA' : item.status === 'appealed' ? 'EM RECURSO' : 'PENDENTE'} · IA {item.result?.status?.toUpperCase() ?? 'SEM ANÁLISE'} ({item.result?.confidence ?? 0}%)
-                        </Badge>
-
-                        {item.status === 'appealed' && (
-                          <Badge variant="info" className="bg-purple-600 text-white px-2.5 py-1 text-[10px] uppercase tracking-wider animate-pulse">
-                            Recurso Submetido pelo Autor
-                          </Badge>
-                        )}
-
-                        <span className="text-[10px] text-slate-400 font-mono">{item.createdAt}</span>
-                      </div>
-                    </div>
-
-                    {/* Detected Categories Tags */}
-                    {item.result.detectedCategories && item.result.detectedCategories.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-[10px] font-extrabold text-slate-400 uppercase">Categorias IA:</span>
-                        {item.result.detectedCategories.map((cat, idx) => (
-                          <Badge
-                            variant={cat.includes('idioma não configurado') ? 'info' : 'neutral'}
-                            key={idx}
-                            className={`px-2 py-0.5 text-[10px] font-bold ${
-                              cat.includes('idioma não configurado')
-                                ? 'bg-blue-100 text-blue-900 border border-blue-200'
-                                : 'bg-slate-100 text-slate-800'
-                            }`}
-                          >
-                            {cat}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Content Snippet and Image */}
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      {item.imageUrl && (
-                        <img
-                          src={item.imageUrl}
-                          alt=""
-                          className="w-24 h-24 rounded-2xl object-cover border border-slate-200 flex-shrink-0"
-                        />
-                      )}
-                      <div className="flex-1 space-y-2">
-                        <p className="text-slate-900 font-medium leading-relaxed bg-slate-50 p-3 rounded-2xl border border-slate-200">
-                          "{item.contentSnippet}"
-                        </p>
-
-                        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 p-2.5 rounded-xl text-amber-900 text-[11px]">
-                          <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <strong className="font-extrabold">Motivo da Análise de IA:</strong> {item.result.reason}
+                  <Card key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4 text-xs shadow-sm">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt="" className="h-12 w-12 shrink-0 rounded-xl border border-slate-200 object-cover" />
+                        ) : (
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
+                            <Calendar className="h-5 w-5 text-slate-400" />
                           </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-black text-slate-900">{item.businessName || 'Sem empresa'}</span>
+                            <span className="rounded-lg border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-700">
+                              {moderationTypeLabel(item.type)}
+                            </span>
+                            <span className={"rounded-full border px-2 py-0.5 text-[10px] font-black " + statusClass}>
+                              {statusLabel}
+                            </span>
+                          </div>
+                          <p className="mt-1 line-clamp-1 text-[11px] font-medium text-slate-700">{item.contentSnippet || 'Sem conteúdo.'}</p>
+                          <p className="mt-0.5 text-[10px] text-slate-500">
+                            {item.authorName}{item.authorPhone ? ` (${item.authorPhone})` : ''} · {item.createdAt}
+                          </p>
                         </div>
-
-                        {item.appealReason && (
-                          <div className="flex items-start gap-2 bg-purple-50 border border-purple-200 p-2.5 rounded-xl text-purple-900 text-[11px]">
-                            <MessageSquare className="w-4 h-4 text-purple-600 flex-shrink-0 mt-0.5" />
-                            <div>
-                              <strong className="font-extrabold">Contestação do Autor:</strong> "{item.appealReason}"
-                            </div>
-                          </div>
-                        )}
                       </div>
-                    </div>
-
-                    {/* Actions and Audit Trail Collapsible */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
-                      <Button type="button" variant="ghost" size="sm"
-                        onClick={() => setSelectedAuditLogId(isAuditOpen ? null : item.id)}
-                        className="text-[11px] font-extrabold text-blue-700 hover:text-blue-900 flex items-center gap-1"
-                      >
-                        <History className="w-3.5 h-3.5" />
-                        <span>{isAuditOpen ? 'Ocultar Auditoria' : `Ver Trilho de Auditoria (${item.auditTrail.length})`}</span>
-                      </Button>
-
-                      <div className="flex items-center gap-2">
+                      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                        <Button type="button" variant="secondary" size="sm"
+                          onClick={() => setSelectedModerationDetailId(item.id)}
+                          className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
+                        >
+                          <Eye className="h-4 w-4" />
+                          <span>Detalhe</span>
+                        </Button>
                         {item.status !== 'approved' && (
                           <Button type="button" variant="primary" size="sm"
-                            onClick={() => handleApproveModerationLog(item.id)}
-                            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs transition flex items-center gap-1.5 shadow-sm"
+                            onClick={() => void handleApproveModerationLog(item.id)}
+                            className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white hover:bg-emerald-700"
                           >
-                            <Check className="w-4 h-4" />
-                            <span>Aprovar para Exibição Pública</span>
+                            <Check className="h-4 w-4" />
+                            <span>Aprovar</span>
                           </Button>
                         )}
-
-                        {item.status !== 'rejected' && (
+                        {item.status !== 'rejected' && item.status !== 'appealed' && (
                           <Button type="button" variant="danger" size="sm"
-                            onClick={() => handleRejectModerationLog(item.id)}
-                            className="px-3.5 py-2 rounded-xl bg-red-100 hover:bg-red-200 text-red-900 font-extrabold text-xs transition flex items-center gap-1.5"
+                            onClick={() => void handleRejectModerationLog(item.id)}
+                            className="flex items-center gap-1.5 rounded-xl bg-red-100 px-3 py-2 text-xs font-extrabold text-red-900 hover:bg-red-200"
                           >
-                            <X className="w-4 h-4" />
-                            <span>Rejeitar Conteúdo</span>
-                          </Button>
-                        )}
-
-                        {item.status === 'rejected' && (
-                          <Button type="button" variant="secondary" size="sm"
-                            onClick={() => handleSimulateAppeal(item.id)}
-                            className="px-3 py-2 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-900 font-bold text-[11px] transition flex items-center gap-1"
-                            title="Simular submissão de recurso pelo autor"
-                          >
-                            <span>Simular Recurso do Autor</span>
+                            <X className="h-4 w-4" />
+                            <span>Rejeitar</span>
                           </Button>
                         )}
                       </div>
                     </div>
-
-                    {/* Audit Trail Drawer */}
-                    {isAuditOpen && (
-                      <div className="bg-slate-900 text-slate-200 p-4 rounded-2xl space-y-2 mt-2 border border-slate-800 animate-in fade-in">
-                        <div className="font-extrabold text-white text-xs flex items-center gap-1.5 border-b border-slate-800 pb-2">
-                          <History className="w-4 h-4 text-blue-400" />
-                          <span>Histórico de Decisões & Auditoria de Conformidade</span>
-                        </div>
-                        <div className="space-y-2 pt-1 font-mono text-[11px]">
-                          {item.auditTrail.map((log, lIdx) => (
-                            <div key={lIdx} className="flex items-start gap-2 border-b border-slate-800/60 pb-1.5 last:border-0">
-                              <span className="text-slate-400 text-[10px] min-w-[110px]">{log.timestamp}</span>
-                              <span className="bg-slate-800 text-blue-300 px-2 py-0.5 rounded text-[10px] font-bold">
-                                {log.actor}
-                              </span>
-                              <span className="text-slate-300 flex-1">{log.notes}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </Card>
-                );
-                      })}
-                    </div>
-                  </section>
                 );
               })}
             </div>
           )}
+
+          {selectedModerationDetailId && (() => {
+            const item = reviewItems.find((entry) => entry.id === selectedModerationDetailId);
+            if (!item) return null;
+            const event = item.eventId ? events.find((entry) => entry.id === item.eventId) : undefined;
+            return (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+                <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 text-xs shadow-2xl">
+                  <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+                    <div>
+                      <h3 className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
+                        <Eye className="h-4 w-4 text-blue-600" />
+                        <span>Detalhe do conteúdo</span>
+                      </h3>
+                      <p className="mt-0.5 text-[10px] text-slate-500">{item.id}</p>
+                    </div>
+                    <button type="button"
+                      onClick={() => setSelectedModerationDetailId(null)}
+                      className="guigui-close-button"
+                      aria-label="Fechar detalhe"
+                      title="Fechar"
+                    >
+                      <X className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {[
+                      ['Empresa', item.businessName || '—'],
+                      ['Autor', item.authorName],
+                      ['Tipo', moderationTypeLabel(item.type)],
+                      ['Data', item.createdAt],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+                        <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">{label}</div>
+                        <div className="mt-0.5 font-bold text-slate-800">{value}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {event ? (
+                    <div className="mt-3 space-y-3">
+                      {event.coverImage && <img src={event.coverImage} alt="" className="h-40 w-full rounded-xl border border-slate-200 object-cover" />}
+                      <div>
+                        <h4 className="text-base font-black text-slate-900">{event.title}</h4>
+                        <p className="mt-1 whitespace-pre-line leading-relaxed text-slate-700">{event.description || 'Sem descrição registada.'}</p>
+                      </div>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {[
+                          ['Data e hora', `${event.date || '—'} ${event.time || ''}`],
+                          ['Local', `${event.location || '—'}${event.neighborhood ? ` · ${event.neighborhood}` : ''}`],
+                          ['Categoria', event.category || '—'],
+                          ['Organizador', event.organizerName || item.businessName || '—'],
+                        ].map(([label, value]) => (
+                          <div key={label}>
+                            <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">{label}</div>
+                            <div className="mt-0.5 font-medium text-slate-700">{value}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div>
+                        <h4 className="mb-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Tipos de bilhete</h4>
+                        <table className="w-full border-collapse text-left text-[10.5px]">
+                          <thead><tr className="bg-slate-50 text-[9px] uppercase text-slate-500"><th className="p-2">Tipo</th><th className="p-2">Preço</th><th className="p-2">Vendidos</th><th className="p-2">Disponíveis</th></tr></thead>
+                          <tbody>
+                            {(event.ticketTypes || []).map((type) => (
+                              <tr key={type.id} className="border-b border-slate-100">
+                                <td className="p-2 font-bold">{type.name}</td>
+                                <td className="p-2">{type.priceXOF.toLocaleString('pt-PT')} XOF</td>
+                                <td className="p-2">{type.soldQuantity}</td>
+                                <td className="p-2">{type.availableQuantity}</td>
+                              </tr>
+                            ))}
+                            {(event.ticketTypes || []).length === 0 && <tr><td colSpan={4} className="p-3 text-center text-slate-500">Sem tipos de bilhete registados.</td></tr>}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-3 space-y-2">
+                      <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 font-medium leading-relaxed text-slate-900">
+                        "{item.contentSnippet}"
+                      </p>
+                      <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-900">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                        <div>
+                          <strong className="font-extrabold">Motivo da análise:</strong> {item.result.reason}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-3 border-t border-slate-100 pt-3">
+                    <h4 className="mb-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Trilho de auditoria</h4>
+                    <div className="space-y-1.5">
+                      {item.auditTrail.map((log, index) => (
+                        <div key={index} className="flex items-start gap-2 rounded-lg bg-slate-50 p-2 text-[10.5px]">
+                          <span className="min-w-[100px] text-slate-400">{log.timestamp}</span>
+                          <span className="rounded bg-slate-200 px-1.5 py-0.5 font-bold text-slate-700">{log.actor}</span>
+                          <span className="flex-1 text-slate-600">{log.notes}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                    {item.status !== 'approved' && (
+                      <Button type="button" variant="primary" size="sm"
+                        onClick={() => { void handleApproveModerationLog(item.id).finally(() => setSelectedModerationDetailId(null)); }}
+                        className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white hover:bg-emerald-700"
+                      >
+                        <Check className="h-4 w-4" />
+                        <span>Aprovar</span>
+                      </Button>
+                    )}
+                    {item.status !== 'rejected' && item.status !== 'appealed' && (
+                      <Button type="button" variant="danger" size="sm"
+                        onClick={() => { void handleRejectModerationLog(item.id).finally(() => setSelectedModerationDetailId(null)); }}
+                        className="flex items-center gap-1.5 rounded-xl bg-red-100 px-4 py-2 text-xs font-extrabold text-red-900 hover:bg-red-200"
+                      >
+                        <X className="h-4 w-4" />
+                        <span>Rejeitar</span>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
           </>)}
         </div>
       )}
