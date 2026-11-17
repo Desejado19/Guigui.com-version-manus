@@ -590,7 +590,10 @@ describe('registo público de contas e empresas', () => {
     expect(health.status).toBe(200);
   });
 
-  it('publica apenas saúde mínima sem detalhes internos', async () => {
+  it('publica saúde sem credenciais nem detalhes internos', async () => {
+    // O contrato público expõe os booleanos de estado (o marketplace escolhe
+    // PostgreSQL vs modo local por `database.configured`), mas nunca a
+    // configuração do pool, credenciais ou diagnósticos.
     const response = await getJson('/api/health', undefined);
     expect(response.status).toBe(200);
     const body = await response.json() as Record<string, unknown>;
@@ -598,9 +601,11 @@ describe('registo público de contas e empresas', () => {
       status: 'ok',
       app: 'Guigui.com Bissau',
     });
-    expect(body).not.toHaveProperty('database');
-    expect(body).not.toHaveProperty('observability');
-    expect(body).not.toHaveProperty('geminiActive');
+    expect(body.database).toEqual({ configured: false, connected: false });
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain('postgres://');
+    expect(serialized).not.toContain('password');
+    expect(serialized).not.toContain('diagnostics');
   });
 });
 
