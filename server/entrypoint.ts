@@ -1,12 +1,13 @@
 import 'dotenv/config?override=true';
 import path from 'path';
-import { ensureShortEsbuildBinaryPath } from './modules/platform-foundation/hosting/esbuildBinaryPath';
+import { ensureShortEsbuildBinaryPath, warmTsxEsbuild } from './modules/platform-foundation/hosting/esbuildBinaryPath';
 import { runPlatformEntrypoint } from './modules/platform-foundation/hosting/runPlatformEntrypoint';
 
 // Em desenvolvimento o Vite (middleware mode) arranca o esbuild dentro deste
 // processo. Com o projecto num caminho longo do Windows, o spawn falha com
 // ENOENT; esta chamada aponta o binário para uma cópia curta antes do Vite
 // carregar. Em produção não faz nada (não é win32 / não há esbuild).
+await warmTsxEsbuild(process.cwd());
 ensureShortEsbuildBinaryPath(process.cwd());
 
 // Sem estes handlers, uma promise rejeitada numa rota async (por exemplo um

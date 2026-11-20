@@ -33,6 +33,41 @@ const WINDOWS_MAX_PATH = 260;
  * chamada depois de o tsx já ter o serviço dele a correr — aqui só se troca o
  * caminho para a versão do Vite.
  */
+/**
+ * Força o serviço nativo do esbuild do `tsx` a arrancar antes de
+ * `ensureShortEsbuildBinaryPath` trocar `ESBUILD_BINARY_PATH`.
+ *
+ * O `tsx` transforma os ficheiros de forma preguiçosa (e o Node 24 consegue
+ * despachar TypeScript simples sem esbuild), pelo que o primeiro trabalho que
+ * realmente precisa do serviço pode chegar depois da troca da variável — e
+ * então o host 0.28.2 arranca com o binário 0.25.12 do Vite e falha com
+ * "Host version ... does not match binary version ...".
+ *
+ * Aqui carrega-se a MESMA instância do esbuild que o `tsx` usa e faz-se uma
+ * transformação trivial enquanto `ESBUILD_BINARY_PATH` ainda aponta para o
+ * binário do `tsx`. O serviço fica vivo até ao fim do processo; a troca
+ * seguinte só afecta o serviço (distinto) do Vite.
+ */
+export async function warmTsxEsbuild(projectDirectory = process.cwd()): Promise<boolean> {
+  if (process.platform !== 'win32' || !process.env.ESBUILD_BINARY_PATH) return false;
+  try {
+    const projectRequire = createRequire(path.join(projectDirectory, 'package.json'));
+    const tsxEsbuildEntry = createRequire(projectRequire.resolve('tsx/package.json')).resolve(
+      'esbuild',
+    );
+    const tsxEsbuild = projectRequire(tsxEsbuildEntry) as {
+      transform(
+        source: string,
+        options: { loader: 'ts' },
+      ): Promise<unknown>;
+    };
+    await tsxEsbuild.transform('export const esbuildWarm: number = 1;', { loader: 'ts' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function ensureShortEsbuildBinaryPath(projectDirectory = process.cwd()): string | null {
   if (process.platform !== 'win32') return null;
 
