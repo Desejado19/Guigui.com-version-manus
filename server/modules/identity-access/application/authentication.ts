@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { normalizeUserText } from '../../../../shared/textNormalization';
 import type {
   CreateIdentityAccount,
   IdentityAccount,
@@ -212,7 +213,8 @@ export async function registerIdentityAccount(
     }
 
     const accountInput: CreateIdentityAccount = {
-      name: input.name,
+      // Forma NFC: "João" grafado de forma composta ou decomposta fica idêntico.
+      name: normalizeUserText(input.name),
       email,
       password: input.password,
       role: input.role,
@@ -220,7 +222,7 @@ export async function registerIdentityAccount(
       neighborhood: input.neighborhood,
       ...(input.role === 'business' && profile ? {
         businessId,
-        businessName: profile.name,
+        businessName: normalizeUserText(profile.name),
       } : {}),
     };
     const account = await dependencies.accounts.create(accountInput);

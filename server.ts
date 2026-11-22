@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes, randomInt, randomUUID, timingSafeEqual } from 'crypto';
 import { BODY_PARSED, latin1JsonBody } from './server/latin1Json';
+import { normalizeDeep } from './shared/textNormalization';
 import { GoogleGenAI } from '@google/genai';
 import {
   AuditEntry,
@@ -1216,7 +1217,9 @@ app.post('/api/app-state/:key', requireSession, async (req, res) => {
   }
 
   try {
-    const { value: incoming } = req.body || {};
+    // Texto guardado em app_state (publicações, eventos, comentários, mensagens)
+    // fica em NFC e sem caracteres de controlo antes de ser persistido.
+    const { value: incoming } = normalizeDeep(req.body || {});
 
     // Uma empresa envia a colecção inteira: o servidor repõe os registos que
     // não lhe pertencem, para que não possa apagar concorrentes nem reescrever

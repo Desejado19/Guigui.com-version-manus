@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual, randomUUID } from 'crypto';
 import type { TicketFeeSnapshot } from '../src/types';
+import { normalizeUserText } from '../shared/textNormalization';
 import type { PaymentProvider } from './integrations/ports';
 
 export type GuiguiRole = 'citizen' | 'business' | 'scanner' | 'admin';
@@ -135,7 +136,9 @@ function text(value: unknown, field: string, maxLength: number, required = false
   if (typeof value !== 'string') {
     return { ok: false, issues: [issue('invalid_type', `${field} deve ser texto.`, field)] };
   }
-  const normalized = value.trim();
+  // NFC: nomes e títulos ficam numa única forma Unicode, aceitando acentos,
+  // cedilha e restantes caracteres portugueses sem os alterar.
+  const normalized = normalizeUserText(value);
   if (required && !normalized) {
     return { ok: false, issues: [issue('required', `${field} é obrigatório.`, field)] };
   }
