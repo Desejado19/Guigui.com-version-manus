@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { foldForSearch, matchesSearch } from '../../../../shared/textNormalization';
 import { Edit2, Plus, SlidersHorizontal } from 'lucide-react';
 import {
   ManagementActionButton,
@@ -63,7 +64,7 @@ export const CommercialFeaturesPage: React.FC<{ onBack: () => void }> = ({ onBac
 
   const features = overview?.features || [];
   const plans = overview?.plans_with_config || [];
-  const filtered = useMemo(() => features.filter((feature) => !query || `${feature.name} ${feature.code} ${feature.description} ${feature.category}`.toLowerCase().includes(query.toLowerCase())), [features, query]);
+  const filtered = useMemo(() => features.filter((feature) => !query || matchesSearch(`${feature.name} ${feature.code} ${feature.description} ${feature.category}`, foldForSearch(query))), [features, query]);
   const featureConfig = (featureId: string) => configs[featureId] || { featureId, enabled: false, limitKind: 'flag', numericValue: null, textValue: null };
   const postsFeature = features.find((feature) => feature.code === 'posts');
   const postsInconsistent = plans.some((item) => {

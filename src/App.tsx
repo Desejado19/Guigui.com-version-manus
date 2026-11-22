@@ -35,6 +35,7 @@ import { INITIAL_STORIES } from './data/initialData';
 import { INITIAL_ADMIN_STAFF } from './data/adminStaffData';
 import { INITIAL_AUDIT_LOGS } from './data/auditLogsData';
 import { INITIAL_NOTIFICATIONS } from './data/notificationsData';
+import { foldForSearch, matchesSearch } from '../shared/textNormalization';
 import { motion, AnimatePresence } from 'motion/react';
 import { resolveNotificationTarget, focusKeyForTarget, type NotificationTarget } from './utils/notificationTarget';
 import { calculateBusinessRating } from './utils/reviews';
@@ -1531,11 +1532,11 @@ export default function App() {
     .filter((p) => p.status === 'approved')
     .filter((p) => {
       if (searchQuery) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchTitle = (p.title || '').toLowerCase().includes(q);
-        const matchContent = (p.content || '').toLowerCase().includes(q);
-        const matchAuthor = (p.businessName || '').toLowerCase().includes(q);
-        const matchNeigh = (p.neighborhood || '').toLowerCase().includes(q);
+        const q = foldForSearch(searchQuery);
+        const matchTitle = matchesSearch(p.title, q);
+        const matchContent = matchesSearch(p.content, q);
+        const matchAuthor = matchesSearch(p.businessName, q);
+        const matchNeigh = matchesSearch(p.neighborhood, q);
         if (!matchTitle && !matchContent && !matchAuthor && !matchNeigh) return false;
       }
       return true;
@@ -1671,11 +1672,11 @@ export default function App() {
     if (b.status !== 'active') return false;
 
     if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      const matchName = b.name.toLowerCase().includes(q);
-      const matchDesc = b.description.toLowerCase().includes(q);
-      const matchNeigh = b.neighborhood.toLowerCase().includes(q);
-      const matchCat = b.subcategoryId.toLowerCase().includes(q);
+      const q = foldForSearch(searchQuery);
+      const matchName = matchesSearch(b.name, q);
+      const matchDesc = matchesSearch(b.description, q);
+      const matchNeigh = matchesSearch(b.neighborhood, q);
+      const matchCat = matchesSearch(b.subcategoryId, q);
       if (!matchName && !matchDesc && !matchNeigh && !matchCat) return false;
     }
 
@@ -1706,18 +1707,18 @@ export default function App() {
     [businesses]
   );
 
-  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const normalizedSearch = foldForSearch(searchQuery);
   const filteredSearchPromotions = promotions.filter((promotion) => {
     if (!promotion.isActive) return false;
     if (!normalizedSearch) return true;
-    return [promotion.title, promotion.description, promotion.businessName, promotion.discountBadge, promotion.neighborhood].some((value) => value.toLowerCase().includes(normalizedSearch));
+    return [promotion.title, promotion.description, promotion.businessName, promotion.discountBadge, promotion.neighborhood].some((value) => matchesSearch(value, normalizedSearch));
   });
   const filteredSearchEvents = events.filter((event) => {
     if (event.status !== 'active') return false;
     if (!normalizedSearch) return true;
     const businessName = event.businessId ? businessNameById.get(event.businessId) : undefined;
     return [event.title, event.description, event.neighborhood, event.organizerName, event.organizer, businessName]
-      .some((value) => typeof value === 'string' && value.toLowerCase().includes(normalizedSearch));
+      .some((value) => matchesSearch(value, normalizedSearch));
   });
 
   // State Handler Actions
@@ -2032,14 +2033,14 @@ export default function App() {
     setSearchQuery(trimmed);
 
     if (trimmed) {
-      const normalized = trimmed.toLowerCase();
+      const normalized = foldForSearch(trimmed);
       const candidates = businesses
         .filter((business) => business.status === 'active')
         .map((business) => {
-          const name = business.name.toLowerCase();
-          const description = (business.description || '').toLowerCase();
-          const neighborhood = (business.neighborhood || '').toLowerCase();
-          const category = (business.subcategoryId || '').toLowerCase();
+          const name = foldForSearch(business.name);
+          const description = foldForSearch(business.description || '');
+          const neighborhood = foldForSearch(business.neighborhood || '');
+          const category = foldForSearch(business.subcategoryId || '');
 
           let score = 0;
           if (name === normalized) score += 100;
@@ -2059,11 +2060,11 @@ export default function App() {
         setSelectedBusiness(null);
         const matchingEvent = events.find((event) =>
           [event.title, event.description, event.location, event.neighborhood, event.organizerName]
-            .some((value) => value.toLowerCase().includes(normalized))
+            .some((value) => matchesSearch(value, normalized))
         );
         const matchingPromotion = promotions.some((promotion) =>
           [promotion.title, promotion.description, promotion.businessName, promotion.neighborhood]
-            .some((value) => value.toLowerCase().includes(normalized))
+            .some((value) => matchesSearch(value, normalized))
         );
         if (matchingEvent) {
           setCurrentTab('events');

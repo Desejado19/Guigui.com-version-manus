@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { databasePool } from './db';
+import { foldedLikePattern, foldedSql } from './sqlSearch';
 
 export const SUBMISSION_TYPES = [
   'event',
@@ -252,9 +253,9 @@ function buildWhere(filters: SubmissionFilters, includeStatus: boolean) {
     conditions.push(`submitted_at <= ${add(`${filters.dateTo}T23:59:59.999Z`)}::timestamptz`);
   }
   if (filters.search && filters.search.trim()) {
-    const term = `%${filters.search.trim()}%`;
+    const term = foldedLikePattern(filters.search.trim());
     const param = add(term);
-    conditions.push(`(title ILIKE ${param} OR summary ILIKE ${param} OR coalesce(company_id, '') ILIKE ${param})`);
+    conditions.push(`(${foldedSql('title')} LIKE ${param} OR ${foldedSql('summary')} LIKE ${param} OR ${foldedSql("coalesce(company_id, '')")} LIKE ${param})`);
   }
 
   return { clause: conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '', params };

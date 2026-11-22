@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { foldForSearch, matchesSearch } from '../../../shared/textNormalization';
 import {
   Users,
   UserPlus,
@@ -277,8 +278,8 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
   // Filtered staff list
   const filteredStaff = staffList.filter((s) => {
     const matchSearch =
-      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      matchesSearch(s.name, foldForSearch(searchQuery)) ||
+      matchesSearch(s.email, foldForSearch(searchQuery)) ||
       s.phone.includes(searchQuery);
     const matchDept = selectedDept === 'all' || s.department === selectedDept;
     const matchStatus = selectedStatus === 'all' || s.status === selectedStatus;

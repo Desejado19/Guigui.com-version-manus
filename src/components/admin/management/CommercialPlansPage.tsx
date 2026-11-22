@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { foldForSearch, matchesSearch } from '../../../../shared/textNormalization';
 import { Copy, Edit2, History, Layers3, Plus, Power, Users } from 'lucide-react';
 import {
   ManagementActionButton,
@@ -109,7 +110,7 @@ export const CommercialPlansPage: React.FC<{ onBack: () => void }> = ({ onBack }
     if (statusFilter === 'active' && !plan.isActive) return false;
     if (statusFilter === 'inactive' && plan.isActive) return false;
     if (!query) return true;
-    return `${plan.name} ${plan.code} ${plan.description}`.toLowerCase().includes(query.toLowerCase());
+    return matchesSearch(`${plan.name} ${plan.code} ${plan.description}`, foldForSearch(query));
   }), [plans, query, statusFilter]);
 
   const totalSubscribers = plans.reduce((sum, plan) => sum + plan.subscribers, 0);

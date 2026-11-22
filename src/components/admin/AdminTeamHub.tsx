@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { foldForSearch, matchesSearch } from '../../../shared/textNormalization';
 import {
   Check,
   KeyRound,
@@ -253,7 +254,7 @@ export const AdminTeamHub: React.FC<AdminTeamHubProps> = () => {
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return members;
-    return members.filter((member) => [member.name, member.email].some((value) => value.toLowerCase().includes(needle)));
+    return members.filter((member) => [member.name, member.email].some((value) => matchesSearch(value, foldForSearch(needle))));
   }, [members, query]);
 
   const paginated = usePaginatedList(filtered, {

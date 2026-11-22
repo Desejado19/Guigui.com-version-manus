@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { databasePool } from './db';
+import { foldedLikePattern, foldedSql } from './sqlSearch';
 
 export type CommercialActor = { id: string; name: string };
 export type SubscriptionStatusValue = 'active' | 'pending' | 'expired' | 'suspended' | 'cancelled';
@@ -1012,8 +1013,8 @@ export async function listCommercialSubscriptions(filters: any = {}) {
     conditions.push(`s.status = $${params.length}`);
   }
   if (search) {
-    params.push(`%${search}%`);
-    conditions.push(`(c.name ILIKE $${params.length} OR s.id ILIKE $${params.length} OR c.id ILIKE $${params.length})`);
+    params.push(foldedLikePattern(search));
+    conditions.push(`(${foldedSql('c.name')} LIKE $${params.length} OR lower(s.id) LIKE $${params.length} OR lower(c.id) LIKE $${params.length})`);
   }
   if (planId) { params.push(planId); conditions.push(`s.plan_id = $${params.length}`); }
   if (groupId) { params.push(groupId); conditions.push(`s.category_group_id = $${params.length}`); }
@@ -1194,7 +1195,10 @@ export async function listCommercialAudit(filters: any = {}) {
   const from = parseDate(filters.from);
   const to = parseDate(filters.to);
   if (entityType) { params.push(entityType); conditions.push(`entity_type=$${params.length}`); }
-  if (search) { params.push(`%${search}%`); conditions.push(`(entity_id ILIKE $${params.length} OR action ILIKE $${params.length} OR actor_name ILIKE $${params.length} OR reason ILIKE $${params.length})`); }
+  if (search) {
+    params.push(foldedLikePattern(search));
+    conditions.push(`(${foldedSql('entity_id')} LIKE $${params.length} OR ${foldedSql('action')} LIKE $${params.length} OR ${foldedSql('actor_name')} LIKE $${params.length} OR ${foldedSql('reason')} LIKE $${params.length})`);
+  }
   if (from) { params.push(from); conditions.push(`created_at >= $${params.length}`); }
   if (to) { params.push(to); conditions.push(`created_at <= $${params.length}`); }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';

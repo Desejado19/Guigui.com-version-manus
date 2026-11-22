@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { databasePool, acquireClient, releaseClient } from './db';
+import { foldedLikePattern, foldedSql } from './sqlSearch';
 import { createPostgresConversation, persistPostgresNotification } from './postgresCommunicationService';
 
 export type StoryRole = 'user' | 'business' | 'admin';
@@ -1020,8 +1021,8 @@ export async function listModerationStories(userId: string, filters: { status?: 
     where.push(`s.status=$${params.length}`);
   }
   if (filters.query?.trim()) {
-    params.push(`%${filters.query.trim()}%`);
-    where.push(`(s.business_name ILIKE $${params.length} OR s.caption ILIKE $${params.length})`);
+    params.push(foldedLikePattern(filters.query.trim()));
+    where.push(`(${foldedSql('s.business_name')} LIKE $${params.length} OR ${foldedSql('s.caption')} LIKE $${params.length})`);
   }
   const result = await db.query(`${STORY_SELECT} WHERE ${where.join(' AND ')} ORDER BY s.created_at DESC LIMIT 300`, params);
   return hydrateStories(result.rows as Row[], userId);

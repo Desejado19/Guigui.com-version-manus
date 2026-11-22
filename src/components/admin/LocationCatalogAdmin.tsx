@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { foldForSearch, matchesSearch } from '../../../shared/textNormalization';
 import { Archive, MapPin, Plus, RefreshCw, Search } from 'lucide-react';
 import type { BissauLocationCatalogResponse, BissauLocationDto } from '../../../shared/bissauLocations';
 
@@ -47,7 +48,7 @@ export const LocationCatalogAdmin: React.FC = () => {
   const filtered = (catalog?.locations || []).filter((entry) => {
     const search = query.trim().toLowerCase();
     if (!search) return true;
-    return [entry.name, entry.sector, ...entry.aliases].some((value) => value.toLowerCase().includes(search));
+    return [entry.name, entry.sector, ...entry.aliases].some((value) => matchesSearch(value, foldForSearch(search)));
   });
 
   const create = async (event: React.FormEvent) => {
