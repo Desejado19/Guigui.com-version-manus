@@ -162,16 +162,16 @@ import { BUSINESS_NAVIGATION } from '../config/navigation';
 
 const readLocalMediaFile = (file: File): Promise<string> => new Promise((resolve, reject) => {
   if (!/^image\/(jpeg|png|webp|gif)|^video\/(mp4|webm|quicktime)$/.test(file.type)) {
-    reject(new Error('Formato n�o suportado. Use imagem JPG/PNG/WebP/GIF ou v�deo MP4/WebM.'));
+    reject(new Error('Formato não suportado. Use imagem JPG/PNG/WebP/GIF ou vídeo MP4/WebM.'));
     return;
   }
   if (file.size > 25 * 1024 * 1024) {
-    reject(new Error('O ficheiro excede o limite de 25 MB da vers�o de demonstra��o.'));
+    reject(new Error('O ficheiro excede o limite de 25 MB da versão de demonstração.'));
     return;
   }
   const reader = new FileReader();
   reader.onload = () => resolve(String(reader.result || ''));
-  reader.onerror = () => reject(new Error('N�o foi poss�vel ler o ficheiro local.'));
+  reader.onerror = () => reject(new Error('Não foi possível ler o ficheiro local.'));
   reader.readAsDataURL(file);
 });
 
@@ -439,7 +439,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
   };
   const denyPermission = (permission: keyof BusinessTeamMember['permissions']) => {
     if (can(permission)) return true;
-    setTeamNotice('N�o tem permiss�o para executar esta opera��o.');
+    setTeamNotice('Não tem permissão para executar esta operação.');
     return false;
   };
   // Item destacado na barra inferior móvel (o marketing agrega os separadores
@@ -753,7 +753,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
 
   const handleExportOrdersCsv = () => {
     if (filteredOrderHistory.length === 0) {
-      alert('N�o h� pedidos correspondentes aos filtros selecionados para exportar.');
+      alert('Não há pedidos correspondentes aos filtros selecionados para exportar.');
       return;
     }
 
@@ -821,7 +821,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
 
     if (found.itemType !== 'ticket' || !found.eventId) {
       setRedemptionMessage({
-        text: 'Este c�digo pertence a uma compra de produto, promo��o ou servi�o e n�o pode ser validado como bilhete.',
+        text: 'Este código pertence a uma compra de produto, promoção ou serviço e não pode ser validado como bilhete.',
         type: 'error',
       });
       return;
@@ -847,7 +847,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result.valid) {
         setRedemptionMessage({
-          text: result.message || 'O bilhete n�o foi validado pelo servidor.',
+          text: result.message || 'O bilhete não foi validado pelo servidor.',
           type: result.status === 'already_used' ? 'info' : 'error',
         });
         return;
@@ -860,7 +860,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
       });
       setRedemptionCodeInput('');
     } catch {
-      setRedemptionMessage({ text: 'N�o foi poss�vel contactar o servidor de valida��o.', type: 'error' });
+      setRedemptionMessage({ text: 'Não foi possível contactar o servidor de validação.', type: 'error' });
     }
   };
 
@@ -868,7 +868,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
     e.preventDefault();
     if (!denyPermission('billing')) return;
     if (!upgradePaymentPhone.trim()) {
-      alert('Introduza o n�mero de telem�vel usado no pagamento.');
+      alert('Introduza o número de telemóvel usado no pagamento.');
       return;
     }
 
@@ -888,7 +888,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           useCase: business.subscriptionStartedAt ? 'subscription_renewal' : 'subscription_initial',
-          useCaseLabel: `${business.subscriptionStartedAt ? 'Renova��o' : 'Activa��o'} Plano ${targetUpgradeTier.toUpperCase()} (${isAnnualBilling ? '1 ano' : '1 m�s'})`,
+          useCaseLabel: `${business.subscriptionStartedAt ? 'Renovação' : 'Activação'} Plano ${targetUpgradeTier.toUpperCase()} (${isAnnualBilling ? '1 ano' : '1 mjs'})`,
           businessId: business.id,
           businessName: business.name,
           payerName: business.ownerName || business.name,
@@ -900,7 +900,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success || !data.transaction) {
-        throw new Error(data.error || 'O pagamento do upgrade n�o foi aceite.');
+        throw new Error(data.error || 'O pagamento do upgrade não foi aceite.');
       }
 
       if (data.transaction.status !== 'confirmed_api') {
@@ -935,7 +935,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
       onUpdateBusiness?.(updatedBiz);
       setPostsQuota(selectedPlan.postsPerMonth === 'unlimited' || selectedPlan.postsPerMonth === 'negotiated' ? Number.MAX_SAFE_INTEGER : Number(selectedPlan.postsPerMonth || 0));
       setShowUpgradeModal(false);
-      alert(`${paymentStatusMessage(data.transaction)}\n\nPLANO ${selectedPlan.name.toUpperCase()} ACTIVADO COM SUCESSO!\n\nPer�odo: ${isAnnualBilling ? 'anual' : 'mensal'}. Pr�xima renova��o: ${new Date(renewDate).toLocaleDateString('pt-PT')}. Limites configurados: ${limitLabel(selectedPlan.postsPerMonth)} posts e ${limitLabel(selectedPlan.promotionsPerMonth)} promo��es por m�s.`);
+      alert(`${paymentStatusMessage(data.transaction)}\n\nPLANO ${selectedPlan.name.toUpperCase()} ACTIVADO COM SUCESSO!\n\nPeríodo: ${isAnnualBilling ? 'anual' : 'mensal'}. Próxima renovação: ${new Date(renewDate).toLocaleDateString('pt-PT')}. Limites configurados: ${limitLabel(selectedPlan.postsPerMonth)} posts e ${limitLabel(selectedPlan.promotionsPerMonth)} promoções por mês.`);
     } catch (err) {
       alert(err instanceof Error ? err.message : t('business.upgradeFailed'));
     } finally {
@@ -994,32 +994,32 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
   const [categoryGroupsList, setCategoryGroupsList] = usePersistentState<CategoryGroup[]>('guigui_admin_category_groups', [
     {
       id: 'restauracao',
-      name: 'Restaura��o, Caf�s e Pequeno Com�rcio',
+      name: 'Restauração, Cafés e Pequeno Comércio',
       description: 'Restaurantes, bares, lanchonetes, padarias, pequenas lojas de bairro',
       prices: { basic: 10000, professional: 25000, premium: 45000, enterprise: 85000 },
     },
     {
       id: 'hotelaria_saude_educacao',
-      name: 'Hotelaria, Cl�nicas, Escolas e Com�rcio M�dio',
-      description: 'Hot�is, pousadas, cl�nicas m�dicas, escolas privadas, supermercados',
+      name: 'Hotelaria, Clínicas, Escolas e Comércio Médio',
+      description: 'Hotéis, pousadas, clínicas médicas, escolas privadas, supermercados',
       prices: { basic: 15000, professional: 35000, premium: 65000, enterprise: 120000 },
     },
     {
       id: 'corporativo_financeiro',
-      name: 'Bancos, Seguradoras, Telecoms e Constru��o',
-      description: 'Institui��es financeiras, operadoras telem�vel, concession�rias, construtoras',
+      name: 'Bancos, Seguradoras, Telecoms e Construção',
+      description: 'Instituições financeiras, operadoras telemóvel, concessionárias, construtoras',
       prices: { basic: 35000, professional: 75000, premium: 150000, enterprise: 300000 },
     },
     {
       id: 'ongs_artesãos',
-      name: 'ONGs, Associa��es e Artes�os Local',
-      description: 'Organiza��es comunit�rias, artes�os de Bissau, cooperativas culturais',
+      name: 'ONGs, Associações e Artesãos Local',
+      description: 'Organizações comunitárias, artesãos de Bissau, cooperativas culturais',
       prices: { basic: 5000, professional: 12000, premium: 25000, enterprise: 50000 },
     },
     {
       id: 'servicos_profissionais',
-      name: 'Servi�os Profissionais e Consultoria',
-      description: 'Escrit�rios de advocacia, contabilidade, oficinas, consultores independentes',
+      name: 'Serviços Profissionais e Consultoria',
+      description: 'Escritórios de advocacia, contabilidade, oficinas, consultores independentes',
       prices: { basic: 12000, professional: 28000, premium: 50000, enterprise: 95000 },
     },
   ]);
@@ -1034,7 +1034,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
     {
       id: 'audit-2026-101',
       date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      categoryGroup: 'Restaura��o, Caf�s e Pequeno Com�rcio',
+      categoryGroup: 'Restauração, Cafés e Pequeno Comércio',
       tier: 'professional',
       oldPrice: 20000,
       newPrice: 25000,
@@ -1043,11 +1043,11 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
     {
       id: 'audit-2026-102',
       date: '2026-08-01 11:20',
-      categoryGroup: 'Bancos, Seguradoras, Telecoms e Constru��o',
+      categoryGroup: 'Bancos, Seguradoras, Telecoms e Construção',
       tier: 'enterprise',
       oldPrice: 280000,
       newPrice: 300000,
-      updatedBy: 'Administra��o Guigui',
+      updatedBy: 'Administração Guigui',
     },
   ]);
 
@@ -1086,18 +1086,18 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
 
     setPriceAuditLogs((prev) => [newLog, ...prev]);
     setEditingCell(null);
-    setSaveToast(`Pre�o do escal�o ${tier.toUpperCase()} atualizado para ${newPrice.toLocaleString('pt-PT')} XOF!`);
+    setSaveToast(`Preço do escalão ${tier.toUpperCase()} atualizado para ${newPrice.toLocaleString('pt-PT')} XOF!`);
     setTimeout(() => setSaveToast(null), 4000);
   };
 
   const handleUpdateConfigParam = (key: keyof BusinessModelConfig, value: number) => {
     setPricingConfig((prev) => ({ ...prev, [key]: value }));
-    setSaveToast(`Valor de tarif�rio (${key}) atualizado com sucesso!`);
+    setSaveToast(`Valor de tarifário (${key}) atualizado com sucesso!`);
     setTimeout(() => setSaveToast(null), 3500);
   };
 
   const handleResetPricingDefaults = () => {
-    if (confirm('Tem a certeza de que deseja restaurar a matriz de pre�os e taxas de bilh�tica para os valores padr�o?')) {
+    if (confirm('Tem a certeza de que deseja restaurar a matriz de preços e taxas de bilhética para os valores padrão?')) {
       setPricingConfig({
         ticketCommissionPercent: 10,
         ticketFixedFeeXOF: 200,
@@ -1111,36 +1111,36 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
       setCategoryGroupsList([
         {
           id: 'restauracao',
-          name: 'Restaura��o, Caf�s e Pequeno Com�rcio',
+          name: 'Restauração, Cafés e Pequeno Comércio',
           description: 'Restaurantes, bares, lanchonetes, padarias, pequenas lojas de bairro',
           prices: { basic: 10000, professional: 25000, premium: 45000, enterprise: 85000 },
         },
         {
           id: 'hotelaria_saude_educacao',
-          name: 'Hotelaria, Cl�nicas, Escolas e Com�rcio M�dio',
-          description: 'Hot�is, pousadas, cl�nicas m�dicas, escolas privadas, supermercados',
+          name: 'Hotelaria, Clínicas, Escolas e Comércio Médio',
+          description: 'Hotéis, pousadas, clínicas médicas, escolas privadas, supermercados',
           prices: { basic: 15000, professional: 35000, premium: 65000, enterprise: 120000 },
         },
         {
           id: 'corporativo_financeiro',
-          name: 'Bancos, Seguradoras, Telecoms e Constru��o',
-          description: 'Institui��es financeiras, operadoras telem�vel, concession�rias, construtoras',
+          name: 'Bancos, Seguradoras, Telecoms e Construção',
+          description: 'Instituições financeiras, operadoras telemóvel, concessionárias, construtoras',
           prices: { basic: 35000, professional: 75000, premium: 150000, enterprise: 300000 },
         },
         {
           id: 'ongs_artesãos',
-          name: 'ONGs, Associa��es e Artes�os Local',
-          description: 'Organiza��es comunit�rias, artes�os de Bissau, cooperativas culturais',
+          name: 'ONGs, Associações e Artesãos Local',
+          description: 'Organizações comunitárias, artesãos de Bissau, cooperativas culturais',
           prices: { basic: 5000, professional: 12000, premium: 25000, enterprise: 50000 },
         },
         {
           id: 'servicos_profissionais',
-          name: 'Servi�os Profissionais e Consultoria',
-          description: 'Escrit�rios de advocacia, contabilidade, oficinas, consultores independentes',
+          name: 'Serviços Profissionais e Consultoria',
+          description: 'Escritórios de advocacia, contabilidade, oficinas, consultores independentes',
           prices: { basic: 12000, professional: 28000, premium: 50000, enterprise: 95000 },
         },
       ]);
-      setSaveToast('Valores padr�o da matriz de pre�os restaurados com sucesso.');
+      setSaveToast('Valores padrão da matriz de preços restaurados com sucesso.');
       setTimeout(() => setSaveToast(null), 3500);
     }
   };
@@ -1245,7 +1245,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
 
   const guardSubscriptionAction = () => {
     if (!subscriptionReadOnly) return true;
-    alert('O plano terminou ou a empresa est� suspensa. Pode consultar os dados, mas deve renovar o plano antes de criar, editar, publicar, promover ou gerir opera��es comerciais.');
+    alert('O plano terminou ou a empresa está suspensa. Pode consultar os dados, mas deve renovar o plano antes de criar, editar, publicar, promover ou gerir operações comerciais.');
     return false;
   };
 
@@ -1311,10 +1311,10 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
       const value = window.prompt('Nova data e hora (formato ISO, por exemplo 2026-09-20T18:00:00):', item.scheduledAt.slice(0, 16));
       if (!value) return;
       const response = await fetch(`/api/marketing/scheduled-items/${item.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ scheduledAt: value }) });
-      if (!response.ok) alert('N�o foi poss�vel reagendar este conte�do.');
+      if (!response.ok) alert('Não foi possível reagendar este conteúdo.');
     } else {
       const response = await fetch(`/api/marketing/scheduled-items/${item.id}${action === 'publish' ? '/publish-now' : ''}`, { method: action === 'publish' ? 'POST' : 'PATCH', headers: action === 'cancel' ? { 'Content-Type': 'application/json' } : undefined, credentials: 'include', body: action === 'cancel' ? JSON.stringify({ status: 'cancelled' }) : undefined });
-      if (!response.ok) alert('N�o foi poss�vel atualizar este agendamento.');
+      if (!response.ok) alert('Não foi possível atualizar este agendamento.');
     }
     await loadScheduledItems();
   };
@@ -1332,7 +1332,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
 
   const handleLocalPostVideo = async (file?: File) => {
     if (!file) return;
-    try { setPostVideoUrl(await readLocalMediaFile(file)); } catch (error) { alert(error instanceof Error ? error.message : 'Falha ao carregar o v�deo.'); }
+    try { setPostVideoUrl(await readLocalMediaFile(file)); } catch (error) { alert(error instanceof Error ? error.message : 'Falha ao carregar o vídeo.'); }
   };
 
   const handleLocalGalleryImages = async (files: FileList | null) => {
@@ -1349,7 +1349,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
       const dataUrl = await readLocalMediaFile(file);
       if (promoMediaType === 'video') setPromoVideoUrl(dataUrl);
       else setPromoImageUrl(dataUrl);
-    } catch (error) { alert(error instanceof Error ? error.message : 'Falha ao carregar o media da promo��o.'); }
+    } catch (error) { alert(error instanceof Error ? error.message : 'Falha ao carregar o media da promoção.'); }
   };
 
   const handleRequestContentService = async (service: ContentService) => {
@@ -1358,12 +1358,12 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
     try {
       const response = await fetch('/api/monetization/requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'content_service', businessId: business.id, businessName: business.name, serviceId: service.id, serviceName: service.name, notes: contentServiceRequestNote.trim() }) });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || 'N�o foi poss�vel enviar o pedido de or�amento.');
-      setMonetizationNotice(`Pedido de or�amento enviado para ${service.name}. A Administra��o entrar� em contacto.`);
+      if (!response.ok) throw new Error(result.error || 'Não foi possível enviar o pedido de orçamento.');
+      setMonetizationNotice(`Pedido de orçamento enviado para ${service.name}. A Administração entrará em contacto.`);
       setContentServiceRequestNote('');
       setSelectedContentServiceId('');
     } catch (error) {
-      setMonetizationNotice(error instanceof Error ? error.message : 'N�o foi poss�vel enviar o pedido.');
+      setMonetizationNotice(error instanceof Error ? error.message : 'Não foi possível enviar o pedido.');
     }
   };
 
@@ -1376,20 +1376,20 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
       try {
         const response = await fetch('/api/monetization/requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'advertising', businessId: business.id, businessName: business.name, productId: advertisingProduct.id, productCode: advertisingProduct.code, productName: advertisingProduct.name }) });
         const result = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(result.error || 'N�o foi poss�vel solicitar a campanha.');
-        setMonetizationNotice(`Pedido de or�amento enviado para ${advertisingProduct.name}.`);
-      } catch (error) { setMonetizationNotice(error instanceof Error ? error.message : 'N�o foi poss�vel solicitar a campanha.'); }
+        if (!response.ok) throw new Error(result.error || 'Não foi possível solicitar a campanha.');
+        setMonetizationNotice(`Pedido de orçamento enviado para ${advertisingProduct.name}.`);
+      } catch (error) { setMonetizationNotice(error instanceof Error ? error.message : 'Não foi possível solicitar a campanha.'); }
       return;
     }
     const amount = resolveProductPrice(resolvedMonetizationCatalog, advertisingProduct.code, 1, advertisingProduct.periodDays);
     try {
       const response = await fetch('/api/payments/create', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': `ad-${business.id}-${advertisingProduct.code}-${Date.now()}` }, body: JSON.stringify({ useCase: 'advertising_purchase', useCaseLabel: advertisingProduct.name, productId: advertisingProduct.id, productCode: advertisingProduct.code, quantity: 1, businessId: business.id, businessName: business.name, payerName: business.ownerName || business.name, payerPhone: mobileMoneyPhone.startsWith('+245') ? mobileMoneyPhone : `+245 ${mobileMoneyPhone}`, amountXOF: amount, provider: selectedPaymentProvider === 'orange' ? 'orange_money' : 'telecel' }) });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || 'N�o foi poss�vel iniciar o pagamento da publicidade.');
+      if (!response.ok) throw new Error(result.error || 'Não foi possível iniciar o pagamento da publicidade.');
       setMonetizationNotice(result.transaction
         ? `${paymentStatusMessage(result.transaction)} ${advertisingProduct.name}.`
         : `Pagamento registado para ${advertisingProduct.name}.`);
-    } catch (error) { setMonetizationNotice(error instanceof Error ? error.message : 'N�o foi poss�vel iniciar o pagamento.'); }
+    } catch (error) { setMonetizationNotice(error instanceof Error ? error.message : 'Não foi possível iniciar o pagamento.'); }
   };
 
   const handleBuyExtraPost = async (e: React.FormEvent) => {
@@ -1418,7 +1418,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.transaction) {
-        throw new Error(data.error || 'O pagamento n�o foi aceite pelo servidor.');
+        throw new Error(data.error || 'O pagamento não foi aceite pelo servidor.');
       }
       setIsProcessingPayment(false);
       setShowBuyPostModal(false);
@@ -1430,7 +1430,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
       const previousWallet: MonetizationWallet = business.monetizationWallet || { postsExtraPurchased: 0, promotionsExtraPurchased: 0, postsExtraUsed: 0, promotionsExtraUsed: 0, updatedAt: new Date().toISOString() };
       onUpdateBusiness?.({ ...business, monetizationWallet: { ...previousWallet, postsExtraPurchased: previousWallet.postsExtraPurchased + extraPostQuantity, updatedAt: new Date().toISOString() } });
       setPostsQuota((prev) => prev + extraPostQuantity);
-      alert(`${paymentStatusMessage(data.transaction)} +${extraPostQuantity} post(s) extra(s) adicionado(s) � carteira.`);
+      alert(`${paymentStatusMessage(data.transaction)} +${extraPostQuantity} post(s) extra(s) adicionado(s) é carteira.`);
     } catch (err) {
       console.error(err);
       setIsProcessingPayment(false);
@@ -1464,7 +1464,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.transaction) {
-        throw new Error(data.error || 'O pagamento n�o foi aceite pelo servidor.');
+        throw new Error(data.error || 'O pagamento não foi aceite pelo servidor.');
       }
       setIsProcessingPayment(false);
       setShowBuyPromoModal(false);
@@ -1475,7 +1475,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
       }
       const previousWallet: MonetizationWallet = business.monetizationWallet || { postsExtraPurchased: 0, promotionsExtraPurchased: 0, postsExtraUsed: 0, promotionsExtraUsed: 0, updatedAt: new Date().toISOString() };
       onUpdateBusiness?.({ ...business, monetizationWallet: { ...previousWallet, promotionsExtraPurchased: previousWallet.promotionsExtraPurchased + extraPromotionQuantity, updatedAt: new Date().toISOString() } });
-      alert(`${paymentStatusMessage(data.transaction)} +${extraPromotionQuantity} promo��o(�es) extra(s) adicionada(s) � carteira.`);
+      alert(`${paymentStatusMessage(data.transaction)} +${extraPromotionQuantity} promoção(res) extra(s) adicionada(s) é carteira.`);
     } catch (err) {
       console.error(err);
       setIsProcessingPayment(false);
@@ -1511,13 +1511,13 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.result) {
-        throw new Error(data.error || 'O servi�o de modera��o n�o devolveu uma decis�o v�lida.');
+        throw new Error(data.error || 'O serviço de moderação não devolveu uma decisão válida.');
       }
       setAiResult(data.result);
 
       if (data.result.status === 'verde' || data.result.status === 'amarelo') {
         if (postPublishMode === 'scheduled' && data.result.status !== 'verde') {
-          alert('Este conte�do precisa de aprova��o antes de ser agendado para publica��o autom�tica.');
+          alert('Este conteúdo precisa de aprovação antes de ser agendado para publicação automática.');
           return;
         }
         if (postPublishMode === 'scheduled' && (!postScheduledAt || Date.parse(postScheduledAt) <= Date.now())) {
@@ -1565,7 +1565,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
             }),
           });
           const result = await response.json().catch(() => ({}));
-          if (!response.ok) throw new Error(result.error || 'N�o foi poss�vel criar o agendamento.');
+          if (!response.ok) throw new Error(result.error || 'Não foi possível criar o agendamento.');
         }
         onAddPost(business.id, newPost);
         setPostsQuota((prev) => Math.max(0, prev - 1));
@@ -1579,7 +1579,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
       }
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : 'Erro ao comunicar com o servi�o de modera��o.');
+      alert(err instanceof Error ? err.message : 'Erro ao comunicar com o serviço de moderação.');
     } finally {
       setIsModerating(false);
     }
@@ -1591,7 +1591,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
     if (!guardSubscriptionAction()) return;
     if (!promoTitle || !promoDesc) return;
     if (currentPlan.promotionsPerMonth !== 'unlimited' && currentPlan.promotionsPerMonth !== 'negotiated' && currentUsage.promotionsUsed >= Number(currentPlan.promotionsPerMonth)) {
-      alert(`A cota mensal de promo��es (${limitLabel(currentPlan.promotionsPerMonth)}) foi atingida. Pode comprar uma promo��o extra por ${pricingConfig.extraPromotionPriceXOF.toLocaleString('pt-PT')} XOF.`);
+      alert(`A cota mensal de promoções (${limitLabel(currentPlan.promotionsPerMonth)}) foi atingida. Pode comprar uma promoção extra por ${pricingConfig.extraPromotionPriceXOF.toLocaleString('pt-PT')} XOF.`);
       setShowBuyPromoModal(true);
       return;
     }
@@ -1633,10 +1633,10 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(result.error || 'N�o foi poss�vel guardar a promo��o.');
+        throw new Error(result.error || 'Não foi possível guardar a promoção.');
       }
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'N�o foi poss�vel guardar a promo��o.');
+      alert(error instanceof Error ? error.message : 'Não foi possível guardar a promoção.');
       return;
     }
     onAddPromotion(business.id, newPromo);
@@ -1646,7 +1646,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
     setPromoDesc('');
     setPromoImageUrl('');
     setPromoVideoUrl('');
-    alert('Promo��o criada com sucesso!');
+    alert('Promoção criada com sucesso!');
   };
 
   const teamRoleLabels: Record<BusinessTeamRole, string> = {
@@ -1665,7 +1665,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
     const email = teamEmail.trim().toLowerCase();
     if (!name || !email) return;
     if (teamMembers.some((member) => member.email === email)) {
-      setTeamNotice('J� existe um colaborador com este e-mail.');
+      setTeamNotice('Jd existe um colaborador com este e-mail.');
       return;
     }
     const invitationToken = `${crypto.randomUUID()}-${crypto.randomUUID()}`;
@@ -1691,7 +1691,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
       }
       const payload = await response.json().catch(() => ({}));
     } catch {
-      setTeamNotice('N�o foi poss�vel contactar o servi�o de e-mail. Tente novamente.');
+      setTeamNotice('Não foi possível contactar o serviço de e-mail. Tente novamente.');
       return;
     }
     const member: BusinessTeamMember = {
@@ -2092,11 +2092,11 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <h1 className="min-w-0 break-words text-base sm:text-lg font-black">{business.name}</h1>
                       <Badge variant="info" className="px-2 py-0.5 text-[9px] uppercase">
-                        Escal�o {business.tier}
+                        Escalão {business.tier}
                       </Badge>
                     </div>
                     <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">
-                      📍 {business.neighborhood} • Direct�rio Guigui.com
+                      📍 {business.neighborhood} • Directório Guigui.com
                     </p>
                   </div>
                 </div>
@@ -2136,13 +2136,13 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                       </p>
                       <p className="mt-1 text-xs leading-relaxed">
                         {subscriptionAccessState === 'active'
-                          ? `Pr�ximo pagamento: ${new Date(business.subscriptionRenewDate).toLocaleDateString('pt-PT')} (${subscriptionInterval === 'annual' ? 'renova��o anual' : 'renova��o mensal'}${subscriptionRemainingDays !== null ? `, faltam ${subscriptionRemainingDays} dias` : ''}).`
-                          : 'Pode consultar dados, hist�rico, m�tricas e factura��o, mas n�o pode criar, editar, publicar, promover, gerir eventos ou validar opera��es at� renovar ou ser reactivada.'}
+                          ? `Próximo pagamento: ${new Date(business.subscriptionRenewDate).toLocaleDateString('pt-PT')} (${subscriptionInterval === 'annual' ? 'renovação anual' : 'renovação mensal'}${subscriptionRemainingDays !== null ? `, faltam ${subscriptionRemainingDays} dias` : ''}).`
+                          : 'Pode consultar dados, histórico, métricas e facturação, mas não pode criar, editar, publicar, promover, gerir eventos ou validar operações até renovar ou ser reactivada.'}
                       </p>
                     </div>
                   </div>
                   <Button type="button" variant="primary" size="sm" onClick={() => { if (canTab('billing')) setActiveTab('billing'); else denyPermission('billing'); }} className="bg-[var(--color-bg-surface-dark)] hover:bg-[var(--color-bg-surface-dark)]/80">
-                    {subscriptionAccessState === 'active' ? 'Ver renova��o' : 'Renovar plano'}
+                    {subscriptionAccessState === 'active' ? 'Ver renovação' : 'Renovar plano'}
                   </Button>
                 </div>
               </Card>
@@ -2220,8 +2220,8 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
 
             <ChartFrame
               title="Atividade comercial"
-              description="Volume atual dos m�dulos da empresa."
-              eyebrow="Vis�o geral"
+              description="Volume atual dos módulos da empresa."
+              eyebrow="Visão geral"
               height="md"
               action={<PieChartIcon className="h-5 w-5 text-[var(--color-green-600)]" />}
             >
@@ -2511,7 +2511,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
               >
                 <div className="font-bold flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4" />
-                  <span>Modera��o IA: {aiResult.status.toUpperCase()}</span>
+                  <span>Moderação IA: {aiResult.status.toUpperCase()}</span>
                 </div>
                 <p className="mt-1">{aiResult.reason}</p>
               </div>
@@ -2522,7 +2522,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
             <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5 dark:bg-[var(--color-bg-surface-dark)]">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--color-text-muted)]">Biblioteca</p>
               <h3 className="mt-1 text-lg font-black text-[var(--color-text-strong)]">{t('business.PublicacoesActivas')}</h3>
-              <p className="mt-1 text-xs text-[var(--color-text-muted)]">{business.posts.length} publica��o(�es) vis�vel(eis) no perfil.</p>
+              <p className="mt-1 text-xs text-[var(--color-text-muted)]">{business.posts.length} publicação(res) visível(eis) no perfil.</p>
             </Card>
 
             {business.posts.map((p) => (
@@ -2540,7 +2540,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                 }}
               >
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-[var(--color-text-strong)]">{p.title || 'Publica��o sem t�tulo'}</span>
+                  <span className="font-bold text-[var(--color-text-strong)]">{p.title || 'Publicação sem título'}</span>
                   <Badge variant="success" className="px-2 py-0.5 text-[10px]">
                     Aprovado
                   </Badge>
@@ -2641,7 +2641,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                   type="url"
                   value={(promoMediaType === 'image' ? promoImageUrl : promoVideoUrl).startsWith('data:') ? '' : (promoMediaType === 'image' ? promoImageUrl : promoVideoUrl)}
                   onChange={(e) => promoMediaType === 'image' ? setPromoImageUrl(e.target.value) : setPromoVideoUrl(e.target.value)}
-                  placeholder={promoMediaType === 'image' ? 'Ou inserir URL de imagem...' : 'Ou inserir URL de v�deo...'}
+                  placeholder={promoMediaType === 'image' ? 'Ou inserir URL de imagem...' : 'Ou inserir URL de vídeo...'}
                   className="w-full bg-[var(--color-bg-surface)] border-[var(--color-gold-200)] rounded-xl p-3 text-[var(--color-text-strong)]"
                 />
               </div>
@@ -2735,13 +2735,13 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
           {/* Customer Reviews List & Response Controls */}
           <div className="space-y-4 pt-2">
             <h4 className="text-xs font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider">
-              Todas as Avalia��es ({business.reviews.length})
+              Todas as Avaliações ({business.reviews.length})
             </h4>
 
             {business.reviews.length === 0 ? (
               <EmptyState
                 title={t('business.AindaNaoRecebeu')}
-                description="As avalia��es confirmadas por SMS aparecer�o aqui."
+                description="As avaliações confirmadas por SMS aparecerão aqui."
               />
             ) : (
               business.reviews.map((rev) => {
@@ -2770,10 +2770,10 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                           <button type="button"
                             onClick={() => {
                               if (!denyPermission('content')) return;
-                              const reason = prompt('Motivo da den�ncia desta avalia��o (ex: difama��o, n�o-cliente):', 'Aprecia��o inadequada');
+                              const reason = prompt('Motivo da denúncia desta avaliação (ex: difamação, não-cliente):', 'Apreciação inadequada');
                               if (reason) {
                                 onFlagReview(business.id, rev.id, reason);
-                                alert('Den�ncia enviada � administra��o do Guigui.com.');
+                                alert('Denúncia enviada é administração do Guigui.com.');
                               }
                             }}
                             className="text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-red-600)] font-bold flex items-center gap-1 hover:bg-[var(--color-red-50)] px-2 py-1 rounded transition"
@@ -2841,7 +2841,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                     {isReplying && (
                       <div className="bg-[var(--color-bg-surface)] p-4 rounded-xl border-[var(--color-violet-300)] space-y-3 shadow-sm text-xs">
                         <div className="font-extrabold text-[var(--color-text-strong)]">
-                          {rev.ownerReply ? 'Editar Resposta' : 'Nova Resposta P�blica do Estabelecimento'}
+                          {rev.ownerReply ? 'Editar Resposta' : 'Nova Resposta Publica do Estabelecimento'}
                         </div>
                         <textarea
                           rows={2}
@@ -3419,7 +3419,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
             </div>
           </div>
 
-          {/* Audit Log / Hist�rico de Altera��es de Pre�o (4.2.c) */}
+          {/* Audit Log / Histórico de Alterações de Preço (4.2.c) */}
           <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
             <div className="flex items-center justify-between border-b pb-3 border-[var(--color-border-subtle)]">
               <h3 className="text-sm font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider flex items-center gap-2">
@@ -4304,7 +4304,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider flex items-center gap-2">
                 <Package className="w-4.5 h-4.5 text-[var(--color-green-600)]" />
-                <span>Hist�rico de Compras & Reservas Registadas ({myBusinessOrders.length})</span>
+                <span>Histórico de Compras & Reservas Registadas ({myBusinessOrders.length})</span>
               </h3>
 
               <input
@@ -4319,7 +4319,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
             {myBusinessOrders.length === 0 ? (
               <EmptyState
                 title={t('business.AindaNaoCompras')}
-                description="As compras e reservas confirmadas aparecer�o neste hist�rico."
+                description="As compras e reservas confirmadas aparecerão neste histórico."
               />
             ) : (
               <div className="overflow-x-auto border border-[var(--color-border-subtle)] rounded-2xl">
@@ -4410,16 +4410,16 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
         </div>
       )}
 
-      {/* TAB: Relat�rios e Estat�sticas (Recharts) */}
+      {/* TAB: Relatórios e Estatísticas (Recharts) */}
       {activeTab === 'analytics' && (() => {
         // Daily Data for Ticket & Product Sales
         const dailySalesData = [
           { period: 'Segunda', bilhetesQtd: 12, produtosQtd: 8, bilhetesXOF: 120000, produtosXOF: 40000, totalXOF: 160000 },
-          { period: 'Ter�a', bilhetesQtd: 18, produtosQtd: 14, bilhetesXOF: 180000, produtosXOF: 70000, totalXOF: 250000 },
+          { period: 'Terça', bilhetesQtd: 18, produtosQtd: 14, bilhetesXOF: 180000, produtosXOF: 70000, totalXOF: 250000 },
           { period: 'Quarta', bilhetesQtd: 25, produtosQtd: 19, bilhetesXOF: 250000, produtosXOF: 95000, totalXOF: 345000 },
           { period: 'Quinta', bilhetesQtd: 32, produtosQtd: 22, bilhetesXOF: 320000, produtosXOF: 110000, totalXOF: 430000 },
           { period: 'Sexta', bilhetesQtd: 55, produtosQtd: 38, bilhetesXOF: 550000, produtosXOF: 190000, totalXOF: 740000 },
-          { period: 'S�bado', bilhetesQtd: 80, produtosQtd: 52, bilhetesXOF: 800000, produtosXOF: 260000, totalXOF: 1060000 },
+          { period: 'Sábado', bilhetesQtd: 80, produtosQtd: 52, bilhetesXOF: 800000, produtosXOF: 260000, totalXOF: 1060000 },
           { period: 'Domingo', bilhetesQtd: 64, produtosQtd: 41, bilhetesXOF: 640000, produtosXOF: 205000, totalXOF: 845000 },
         ];
 
@@ -4434,11 +4434,11 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
         // Views & Direct Engagement Clicks (Daily)
         const dailyEngagementData = [
           { period: 'Segunda', visualizacoes: 420, cliquesWhatsapp: 38, chamadasVoz: 19, direcoesMapa: 24 },
-          { period: 'Ter�a', visualizacoes: 510, cliquesWhatsapp: 45, chamadasVoz: 22, direcoesMapa: 31 },
+          { period: 'Terça', visualizacoes: 510, cliquesWhatsapp: 45, chamadasVoz: 22, direcoesMapa: 31 },
           { period: 'Quarta', visualizacoes: 580, cliquesWhatsapp: 52, chamadasVoz: 28, direcoesMapa: 39 },
           { period: 'Quinta', visualizacoes: 690, cliquesWhatsapp: 64, chamadasVoz: 34, direcoesMapa: 45 },
           { period: 'Sexta', visualizacoes: 980, cliquesWhatsapp: 95, chamadasVoz: 51, direcoesMapa: 78 },
-          { period: 'S�bado', visualizacoes: 1340, cliquesWhatsapp: 142, chamadasVoz: 76, direcoesMapa: 110 },
+          { period: 'Sábado', visualizacoes: 1340, cliquesWhatsapp: 142, chamadasVoz: 76, direcoesMapa: 110 },
           { period: 'Domingo', visualizacoes: 1120, cliquesWhatsapp: 118, chamadasVoz: 62, direcoesMapa: 89 },
         ];
 
@@ -4461,12 +4461,12 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
             desconto: '20% OFF',
           },
           {
-            titulo: 'Menu Almo�o Crioulo Especial',
+            titulo: 'Menu Almoço Crioulo Especial',
             visualizacoes: 2450,
             resgates: 215,
             cliquesWhatsapp: 130,
             conversao: 8.8,
-            desconto: 'Pre�o Fixo 3.500 XOF',
+            desconto: 'Preço Fixo 3.500 XOF',
           },
           {
             titulo: 'Happy Hour Chopp & Petisco 2x1',
@@ -4477,7 +4477,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
             desconto: 'Leve 2 Pague 1',
           },
           {
-            titulo: 'Jantar Rom�ntico com M�sica ao Vivo',
+            titulo: 'Jantar Romântico com Música ao Vivo',
             visualizacoes: 1290,
             resgates: 94,
             cliquesWhatsapp: 62,
@@ -4485,12 +4485,12 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
             desconto: '15% OFF Casal',
           },
           {
-            titulo: 'Feijoada Completa de S�bado',
+            titulo: 'Feijoada Completa de Sábado',
             visualizacoes: 1680,
             resgates: 128,
             cliquesWhatsapp: 75,
             conversao: 7.6,
-            desconto: 'Sobremesa Gr�tis',
+            desconto: 'Sobremesa Grátis',
           },
         ];
 
@@ -4523,7 +4523,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
         const pieDistributionData = [
           { name: 'Bilhetes VIP & Mesas', value: 42, color: '#10B981' },
           { name: 'Bilhetes Entrada Geral', value: 33, color: '#3B82F6' },
-          { name: 'Menus & Refei��es', value: 15, color: '#F59E0B' },
+          { name: 'Menus & Refeições', value: 15, color: '#F59E0B' },
           { name: 'Vouchers & Bebidas', value: 10, color: '#8B5CF6' },
         ];
 
@@ -4654,7 +4654,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
               />
             </div>
 
-            {/* SECTION 1: GR�FICO DE VISUALIZA�ÕES E CLIQUES (Recharts Area & Line Chart) */}
+            {/* SECTION 1: GRÁFICO DE VISUALIZAÇÕES E CLIQUES (Recharts Area & Line Chart) */}
             {(analyticsSubSection === 'all' || analyticsSubSection === 'views_clicks') && (
               <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
                 <div className="flex flex-wrap items-center justify-between border-b border-[var(--color-border-subtle)] pb-3 gap-3">
@@ -4793,7 +4793,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
               </div>
             )}
 
-            {/* SECTION 2: GR�FICO DE DESEMPENHO DAS PROMO�ÕES (Recharts BarChart) */}
+            {/* SECTION 2: GRÁFICO DE DESEMPENHO DAS PROMOÇÕES (Recharts BarChart) */}
             {(analyticsSubSection === 'all' || analyticsSubSection === 'promotions') && (
               <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
                 <div className="flex flex-wrap items-center justify-between border-b border-[var(--color-border-subtle)] pb-3 gap-3">
@@ -4898,7 +4898,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                           <span>Volume de Vendas: Bilhetes vs. Produtos</span>
                         </h4>
                         <p className="text-[11px] text-[var(--color-text-muted)]">
-                          Compara��o da performance por {analyticsTimeframe === 'daily' ? 'dia da semana' : 'semana do m�s'}.
+                          Comparação da performance por {analyticsTimeframe === 'daily' ? 'dia da semana' : 'semana do mjs'}.
                         </p>
                       </div>
                       <div className="bg-[var(--color-bg-subtle)] p-1 rounded-xl flex items-center gap-1 border-[var(--color-border-subtle)] text-xs">
@@ -5130,7 +5130,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
         <EmptyState
           icon={<Users className="h-6 w-6" />}
           title="Clientes"
-          description="Este m�dulo est� preparado para centralizar clientes, hist�rico de relacionamento e segmenta��o."
+          description="Este módulo está preparado para centralizar clientes, histórico de relacionamento e segmentação."
         />
       )}
 
@@ -5790,13 +5790,13 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
               <div className="min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--color-green-600)]">{t('business.PublicacaoCriadaPela')}</p>
                 <h2 id="business-post-detail-title" className="mt-1 text-xl font-black text-[var(--color-text-strong)]">
-                  {selectedBusinessPost.title || 'Publica��o sem t�tulo'}
+                  {selectedBusinessPost.title || 'Publicação sem título'}
                 </h2>
                 <p className="mt-1 text-[11px] font-semibold text-[var(--color-text-muted)]">
                   {new Date(selectedBusinessPost.createdAt).toLocaleString('pt-PT')}
                 </p>
               </div>
-              <IconButton label="Fechar publica��o" variant="secondary" size="sm" onClick={() => setSelectedBusinessPost(null)}>
+              <IconButton label="Fechar publicação" variant="secondary" size="sm" onClick={() => setSelectedBusinessPost(null)}>
                 <X className="h-4 w-4" />
               </IconButton>
             </div>
@@ -5910,7 +5910,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
           <div className="bg-[var(--color-neutral-0)] rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 overscroll-contain">
             <div className="flex items-center justify-between border-b pb-3"><h3 className="font-extrabold text-[var(--color-text-strong)] text-base flex items-center gap-2"><Tag className="w-5 h-5 text-[var(--color-gold-600)]" /><span>{t('business.ComprarPromocaoExtra')}</span></h3><button type="button" onClick={() => setShowBuyPromoModal(false)} className="guigui-close-button" aria-label={t('business.FecharCompraPromocao')} title="Fechar"><X className="w-4 h-4" /></button></div>
             <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">{t('business.EscolhaPacotePromocoes')}</p>
-            <div className="bg-[var(--color-gold-50)] p-4 rounded-2xl border-[var(--color-gold-200)] space-y-3 font-mono"><div className="flex items-center justify-between gap-3"><div><div className="text-[10px] text-[var(--color-gold-800)] uppercase font-bold">Destaques promocionais</div><div className="text-xs text-[var(--color-gold-700)]">{t('business.PrecoQuantidadeDefinidos')}</div></div><select value={extraPromotionQuantity} onChange={(e) => setExtraPromotionQuantity(Number(e.target.value) || 1)} className="rounded-xl border-[var(--color-gold-200)] bg-[var(--color-bg-surface)] px-2 py-2 text-xs font-black text-[var(--color-gold-900)]" aria-label={t('business.PacotePromocoesExtra')}>{(promotionExtraProduct?.priceRules || [{ id: 'promotion-extra-default', quantity: 1, label: '+1 promo��o', price: pricingConfig.extraPromotionPriceXOF }]).map((rule) => <option key={rule.id} value={rule.quantity}>{rule.label}</option>)}</select></div><div className="text-right text-base font-black text-[var(--color-gold-700)]">{promotionExtraPrice.toLocaleString('pt-PT')} XOF</div></div>
+            <div className="bg-[var(--color-gold-50)] p-4 rounded-2xl border-[var(--color-gold-200)] space-y-3 font-mono"><div className="flex items-center justify-between gap-3"><div><div className="text-[10px] text-[var(--color-gold-800)] uppercase font-bold">Destaques promocionais</div><div className="text-xs text-[var(--color-gold-700)]">{t('business.PrecoQuantidadeDefinidos')}</div></div><select value={extraPromotionQuantity} onChange={(e) => setExtraPromotionQuantity(Number(e.target.value) || 1)} className="rounded-xl border-[var(--color-gold-200)] bg-[var(--color-bg-surface)] px-2 py-2 text-xs font-black text-[var(--color-gold-900)]" aria-label={t('business.PacotePromocoesExtra')}>{(promotionExtraProduct?.priceRules || [{ id: 'promotion-extra-default', quantity: 1, label: '+1 promoção', price: pricingConfig.extraPromotionPriceXOF }]).map((rule) => <option key={rule.id} value={rule.quantity}>{rule.label}</option>)}</select></div><div className="text-right text-base font-black text-[var(--color-gold-700)]">{promotionExtraPrice.toLocaleString('pt-PT')} XOF</div></div>
             <form onSubmit={handleBuyExtraPromo} className="space-y-4 text-xs"><div><label className="block text-[var(--color-text-strong)] font-semibold mb-1">{t('business.SeleccioneCarteiraTelemovel')}</label><div className="grid grid-cols-2 gap-3"><button type="button" onClick={() => setSelectedPaymentProvider('orange')} className={`p-3 rounded-xl border text-center font-bold transition ${selectedPaymentProvider === 'orange' ? 'border-[var(--color-gold-500)] bg-[var(--color-gold-50)] text-[var(--color-gold-900)] ring-2 ring-[var(--color-gold-500)]' : 'border-[var(--color-border-subtle)] text-[var(--color-text-muted)]'}`}>Orange Money</button><button type="button" onClick={() => setSelectedPaymentProvider('telecel')} className={`p-3 rounded-xl border text-center font-bold transition ${selectedPaymentProvider === 'telecel' ? 'border-[var(--color-green-600)] bg-[var(--color-green-50)] text-[var(--color-green-900)] ring-2 ring-[var(--color-green-600)]' : 'border-[var(--color-border-subtle)] text-[var(--color-text-muted)]'}`}>Telecel Cash</button></div></div><div><label className="block text-[var(--color-text-strong)] font-semibold mb-1">{t('business.NumeroTelemovel2452')}</label><input type="text" required value={mobileMoneyPhone} onChange={(e) => setMobileMoneyPhone(e.target.value)} className="w-full bg-[var(--color-bg-subtle)] border-[var(--color-border-subtle)] rounded-xl p-3 font-mono text-[var(--color-text-strong)]" /></div><button type="submit" disabled={isProcessingPayment} className="w-full py-3.5 bg-[var(--color-gold-600)] hover:bg-[var(--color-gold-700)] text-white font-extrabold rounded-xl transition shadow-sm min-h-[44px]">{isProcessingPayment ? 'A processar simulação...' : `Simular pagamento de ${promotionExtraPrice.toLocaleString('pt-PT')} XOF`}</button></form>
           </div>
         </div>
@@ -5951,7 +5951,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                   }`}
                 >
                   <div className="font-black text-[var(--color-text-strong)] text-xs">{plan.name}</div>
-                  <div className="text-[10px] text-[var(--color-green-700)] font-bold mt-1">{limitLabel(plan.postsPerMonth)} posts · {limitLabel(plan.promotionsPerMonth)} promo��es</div>
+                  <div className="text-[10px] text-[var(--color-green-700)] font-bold mt-1">{limitLabel(plan.postsPerMonth)} posts · {limitLabel(plan.promotionsPerMonth)} promoções</div>
                   <div className="text-[10px] text-[var(--color-text-muted)] mt-0.5">{plan.price > 0 ? `${plan.price.toLocaleString('pt-PT')} ${plan.currency}${t('business.Mes')}` : t('business.PrecoNegociado')}</div>
                   {targetUpgradePlanId === plan.id && (
                     <CheckCircle className="w-4 h-4 text-[var(--color-green-600)] absolute top-3 right-3" />

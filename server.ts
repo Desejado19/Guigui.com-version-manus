@@ -5363,7 +5363,7 @@ app.post('/api/tickets/resend-sms', async (req, res) => {
 // ============================================================================
 app.get('/api/tickets/sold', requireRole('business', 'admin'), async (req, res) => {
   const context = await sessionContext(req);
-  if (!context) return res.status(401).json({ error: 'Sess�o autenticada necess�ria.', code: 'AUTHENTICATION_REQUIRED' });
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
   const stored = context.role === 'business'
     ? (await identityAccess.findById(context.userId) || undefined)
     : null;
@@ -5371,7 +5371,7 @@ app.get('/api/tickets/sold', requireRole('business', 'admin'), async (req, res) 
     ? (typeof req.query.companyId === 'string' ? req.query.companyId : undefined)
     : stored?.businessId;
   if (context.role === 'business' && !companyId) {
-    return res.status(403).json({ error: 'A sua conta n�o est� associada a uma empresa.', code: 'BUSINESS_ACCOUNT_REQUIRED' });
+    return res.status(403).json({ error: 'A sua conta não está associada a uma empresa.', code: 'BUSINESS_ACCOUNT_REQUIRED' });
   }
   const eventId = typeof req.query.eventId === 'string' && req.query.eventId.trim() ? req.query.eventId.trim() : undefined;
   const tickets = companyId && databaseConfigured ? await listPostgresTicketsForCompany(companyId, eventId) : [];
@@ -5473,7 +5473,7 @@ app.post('/api/tickets/scanner-auth', requireRole('business'), async (req, res) 
 });
 /**
  * Manifesto offline do scanner (GUI-3.5.09). Descarregado antes de a equipa
- * ficar sem rede, cont�m apenas os bilhetes v�lidos do evento.
+ * ficar sem rede, contém apenas os bilhetes válidos do evento.
  */
 app.post('/api/tickets/offline-manifest', requireRole('business'), async (req, res) => {
   const requestId = requestIdFrom(req);
@@ -5481,12 +5481,12 @@ app.post('/api/tickets/offline-manifest', requireRole('business'), async (req, r
   const doorCode = typeof req.body?.doorCode === 'string' ? req.body.doorCode : '';
   if (!matchesScannerDoorCode(doorCode)) {
     recordAudit({ action: 'scanner_manifest_denied', resource: 'scanner', actorRole: 'scanner', requestId, success: false });
-    return res.status(403).json({ error: 'Scanner n�o autorizado.', code: 'SCANNER_UNAUTHORIZED' });
+    return res.status(403).json({ error: 'Scanner não autorizado.', code: 'SCANNER_UNAUTHORIZED' });
   }
   if (!eventId) return res.status(400).json({ error: 'Indique o evento.', code: 'SCANNER_SCOPE_REQUIRED' });
-  if (!ticketSigningSecret) return res.status(503).json({ error: 'Assinatura de bilhetes n�o configurada.', code: 'TICKET_SIGNING_UNAVAILABLE' });
+  if (!ticketSigningSecret) return res.status(503).json({ error: 'Assinatura de bilhetes não configurada.', code: 'TICKET_SIGNING_UNAVAILABLE' });
 
-  // A empresa organizadora vem da sess�o, nunca do corpo do pedido.
+  // A empresa organizadora vem da sessão, nunca do corpo do pedido.
   const context = await sessionContext(req);
   const stored = context ? await identityAccess.findById(context.userId) || undefined : undefined;
   const sessionBusinessId = stored?.businessId || '';
@@ -5505,8 +5505,8 @@ app.post('/api/tickets/offline-manifest', requireRole('business'), async (req, r
 });
 
 /**
- * Sincroniza as entradas validadas offline (GUI-3.5.10). O servidor � a
- * autoridade e devolve os casos de duplica��o para o scanner corrigir.
+ * Sincroniza as entradas validadas offline (GUI-3.5.10). O servidor é a
+ * autoridade e devolve os casos de duplicação para o scanner corrigir.
  */
 app.post('/api/tickets/validate-batch', requireRole('business'), async (req, res) => {
   const requestId = requestIdFrom(req);
@@ -5514,7 +5514,7 @@ app.post('/api/tickets/validate-batch', requireRole('business'), async (req, res
   const records = Array.isArray(req.body?.records) ? req.body.records : [];
   if (!matchesScannerDoorCode(doorCode)) {
     recordAudit({ action: 'scanner_batch_denied', resource: 'scanner', actorRole: 'scanner', requestId, success: false });
-    return res.status(403).json({ error: 'Scanner n�o autorizado.', code: 'SCANNER_UNAUTHORIZED' });
+    return res.status(403).json({ error: 'Scanner não autorizado.', code: 'SCANNER_UNAUTHORIZED' });
   }
   if (records.length === 0) return res.json({ outcomes: [], duplicates: 0, requestId });
   if (records.length > 2000) return res.status(413).json({ error: 'Lote demasiado grande.', code: 'BATCH_TOO_LARGE' });

@@ -4,7 +4,7 @@
 // Cobre `companies` (coluna name + jsonb data) e `app_state` (jsonb value).
 // Uso: npx tsx scripts/fix-mojibake-text.ts [--apply]
 // Sem --apply apenas mostra o que mudaria.
-import 'dotenv/config?override=true';
+import 'dotenv/config';
 import { databasePool } from '../server/db';
 
 const APPLY = process.argv.includes('--apply');
@@ -41,14 +41,13 @@ function fixDeep(value: unknown): { value: unknown; changed: boolean } {
   }
   if (value && typeof value === 'object') {
     let changed = false;
-    const next: Record<string, unknown> = {};
-    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    const entries = Object.entries(value as Record<string, unknown>).map(([key, item]) => {
       const fixedKey = decodeOnce(key) ?? key;
       const result = fixDeep(item);
       if (result.changed || fixedKey !== key) changed = true;
-      next[fixedKey] = result.value;
-    }
-    return { value: changed ? next : value, changed };
+      return [fixedKey, result.value] as const;
+    });
+    return { value: changed ? Object.fromEntries(entries) : value, changed };
   }
   return { value, changed: false };
 }
@@ -79,7 +78,9 @@ async function main() {
     }
   }
 
-  const states = await pool.query("SELECT key, value FROM app_state WHERE value::text LIKE '%Ã%'");
+  // Sem filtro por `Ã`: o duplo encoding de caracteres de 3/4 bytes começa por
+  // `â`/`ð`, pelo que um LIKE estreito deixaria valores por reparar.
+  const states = await pool.query('SELECT key, value FROM app_state ORDER BY key');
   for (const row of states.rows as any[]) {
     const fixed = fixDeep(row.value);
     if (!fixed.changed) continue;
