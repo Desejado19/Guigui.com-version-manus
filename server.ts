@@ -3,6 +3,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes, randomInt, randomUUID, timingSafeEqual } from 'crypto';
+import { BODY_PARSED, latin1JsonBody } from './server/latin1Json';
 import { GoogleGenAI } from '@google/genai';
 import {
   AuditEntry,
@@ -401,7 +402,23 @@ async function consumeAiQuota(userId: string): Promise<boolean> {
   return current.count <= AI_RATE_LIMIT_MAX_REQUESTS;
 }
 
-app.use(express.json({ limit: '10mb' }));
+// Clientes/importações em Latin-1: o corpo é convertido para UTF-8 antes do
+// parser padrão, para que acentos e cedilha não sejam rejeitados com 415.
+app.use(latin1JsonBody);
+const jsonBodyParser = express.json({ limit: '10mb' });
+app.use((req, res, next) => {
+  // Pedidos já convertidos de Latin-1 não passam outra vez pelo parser.
+  if ((req as unknown as Record<symbol, boolean>)[BODY_PARSED]) return next();
+  jsonBodyParser(req, res, (error?: { type?: string; status?: number }) => {
+    if (error?.type === 'charset.unsupported') {
+      return res.status(415).json({
+        error: 'Codificação de caracteres não suportada. Envie o corpo do pedido em UTF-8.',
+        code: 'UNSUPPORTED_CHARSET',
+      });
+    }
+    next(error);
+  });
+});
 app.use('/api', (req, res, next) => {
   const cookieLanguage = req.headers.cookie?.match(/(?:^|;\s*)guigui_lang=([^;]+)/)?.[1];
   const language = resolveRequestLanguage(cookieLanguage || req.headers['accept-language']);
