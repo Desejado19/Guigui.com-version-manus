@@ -46,7 +46,7 @@ export const FacebookRightSidebar: React.FC<FacebookRightSidebarProps> = ({
               onClick={() => onSelectBusiness(b)}
               className="flex items-center gap-3 p-2 rounded-xl hover:bg-[var(--color-neutral-200)]/60 transition cursor-pointer group"
             >
-              <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 flex-shrink-0 bg-slate-100 dark:bg-slate-800">
+              <div className="w-16 h-16 rounded-xl overflow-hidden border border-[var(--color-border-subtle)] dark:border-slate-700 flex-shrink-0 bg-slate-100 dark:bg-slate-800">
                 <BusinessLogo name={b.name} src={b.logo} className="w-full h-full group-hover:scale-105 transition" />
               </div>
 
@@ -65,7 +65,7 @@ export const FacebookRightSidebar: React.FC<FacebookRightSidebarProps> = ({
         </div>
       </div>
 
-      <hr className="border-slate-200 dark:border-slate-700" />
+      <hr className="border-[var(--color-border-subtle)] dark:border-slate-700" />
 
       {/* Events Widget */}
       <div className="space-y-3">
@@ -84,10 +84,10 @@ export const FacebookRightSidebar: React.FC<FacebookRightSidebarProps> = ({
             <div
               key={ev.id}
               onClick={() => onTabChange('events')}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-2xl space-y-2 shadow-sm hover:shadow-md transition cursor-pointer"
+              className="bg-white dark:bg-slate-900 border border-[var(--color-border-subtle)] dark:border-slate-700 p-3 rounded-2xl space-y-2 shadow-sm hover:shadow-md transition cursor-pointer"
             >
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 flex-shrink-0 bg-slate-100 dark:bg-slate-800">
+                <div className="w-12 h-12 rounded-xl overflow-hidden border border-[var(--color-border-subtle)] dark:border-slate-700 flex-shrink-0 bg-slate-100 dark:bg-slate-800">
                   {ev.coverImage ? (
                     <img src={ev.coverImage} alt="" className="w-full h-full object-cover" />
                   ) : (
@@ -112,7 +112,7 @@ export const FacebookRightSidebar: React.FC<FacebookRightSidebarProps> = ({
         </div>
       </div>
 
-      <hr className="border-slate-200 dark:border-slate-700" />
+      <hr className="border-[var(--color-border-subtle)] dark:border-slate-700" />
 
       {/* Online Business WhatsApp Contacts (Facebook Contacts List) */}
       <div className="space-y-3">
@@ -131,7 +131,7 @@ export const FacebookRightSidebar: React.FC<FacebookRightSidebarProps> = ({
               className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-[var(--color-neutral-200)]/60 transition cursor-pointer text-xs group"
             >
               <div className="relative flex-shrink-0">
-                <BusinessLogo name={b.name} src={b.logo} className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700" />
+                <BusinessLogo name={b.name} src={b.logo} className="w-8 h-8 rounded-full border border-[var(--color-border-subtle)] dark:border-slate-700" />
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />
               </div>
 

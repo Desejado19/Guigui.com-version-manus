@@ -64,7 +64,7 @@ export const FeaturedHomepageBanner: React.FC<FeaturedHomepageBannerProps> = ({
   return (
     <section className="guigui-sponsored-banner" aria-label="Destaques da página inicial" aria-live="polite">
       {activeSlide.type === 'business' ? (
-        <div className="group grid grid-cols-1 items-stretch sm:grid-cols-[1.35fr_1fr]">
+        <div className="grid grid-cols-1 items-stretch sm:grid-cols-[1.35fr_1fr]">
           <div className="guigui-sponsored-copy">
             <span className="guigui-sponsored-label">Empresa em destaque</span>
             <h2>{activeSlide.business.name}</h2>
@@ -79,17 +79,19 @@ export const FeaturedHomepageBanner: React.FC<FeaturedHomepageBannerProps> = ({
             </button>
           </div>
           {activeSlide.business.coverImage && (
-            <img src={activeSlide.business.coverImage} alt="" className="guigui-sponsored-image" />
+            <div className="guigui-sponsored-media">
+              <img src={activeSlide.business.coverImage} alt="" className="guigui-sponsored-image" />
+            </div>
           )}
         </div>
       ) : (
-        <a
-          href={activeSlide.campaign.linkUrl || '#'}
-          target={activeSlide.campaign.linkUrl && !activeSlide.campaign.linkUrl.startsWith('#') ? '_blank' : undefined}
-          rel="noreferrer"
-          onClick={(event) => onCampaignClick(activeSlide.campaign.id, event)}
-          className="group grid grid-cols-1 items-stretch sm:grid-cols-[1.35fr_1fr]"
-        >
+                  <a
+            href={activeSlide.campaign.linkUrl || '#'}
+            target={activeSlide.campaign.linkUrl && !activeSlide.campaign.linkUrl.startsWith('#') ? '_blank' : undefined}
+            rel="noreferrer"
+            onClick={(event) => onCampaignClick(activeSlide.campaign.id, event)}
+            className="grid grid-cols-1 items-stretch sm:grid-cols-[1.35fr_1fr]"
+          >
           <div className="guigui-sponsored-copy">
             <span className="guigui-sponsored-label">
               Publicidade — {activeSlide.campaign.audience === 'all' ? 'Comunidade Guigui' : activeSlide.campaign.audience || 'Comunidade Guigui'}
@@ -98,28 +100,22 @@ export const FeaturedHomepageBanner: React.FC<FeaturedHomepageBannerProps> = ({
             {activeSlide.campaign.description && <p>{activeSlide.campaign.description}</p>}
             <span className="guigui-sponsored-link">Saber mais →</span>
           </div>
-          {activeSlide.campaign.imageUrl && <img src={activeSlide.campaign.imageUrl} alt="" className="guigui-sponsored-image" />}
+          {activeSlide.campaign.imageUrl && (
+            <div className="guigui-sponsored-media">
+              <img src={activeSlide.campaign.imageUrl} alt="" className="guigui-sponsored-image" />
+            </div>
+          )}
         </a>
       )}
 
       {slides.length > 1 && (
-        <div className="flex items-center justify-end gap-2 px-3 pb-3">
-          <button
-            type="button"
-            aria-label="Destaque anterior"
-            onClick={() => goToSlide(-1)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 dark:bg-slate-900/95 text-slate-800 dark:text-slate-100 shadow-sm hover:bg-white"
-          >
-            <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+        <div className="guigui-sponsored-pager">
+          <button type="button" aria-label="Destaque anterior" onClick={() => goToSlide(-1)} className="guigui-sponsored-nav">
+            <ArrowLeft aria-hidden="true" strokeWidth={1.1} className="h-3.5 w-3.5" />
           </button>
-          <span className="min-w-12 text-center text-xs font-bold text-slate-700 dark:text-slate-200">{activeSlideIndex + 1} / {slides.length}</span>
-          <button
-            type="button"
-            aria-label="Próximo destaque"
-            onClick={() => goToSlide(1)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 dark:bg-slate-900/95 text-slate-800 dark:text-slate-100 shadow-sm hover:bg-white"
-          >
-            <ArrowRight aria-hidden="true" className="h-4 w-4" />
+          <span className="guigui-sponsored-counter">{activeSlideIndex + 1} / {slides.length}</span>
+          <button type="button" aria-label="Próximo destaque" onClick={() => goToSlide(1)} className="guigui-sponsored-nav">
+            <ArrowRight aria-hidden="true" strokeWidth={1.1} className="h-3.5 w-3.5" />
           </button>
         </div>
       )}

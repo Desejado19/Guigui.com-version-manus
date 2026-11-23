@@ -6,7 +6,6 @@
  * aqui para manter compatibilidade com os imports antigos.
  */
 
-export { tokens, type Tokens, type ColorTokenFamily, type ColorTokenLevel } from './tokens';
 export {
   Button,
   Spinner,

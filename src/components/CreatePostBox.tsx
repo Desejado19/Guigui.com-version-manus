@@ -168,17 +168,17 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
   return (
     <>
       {/* Modern Create Post Trigger Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 shadow-sm space-y-3">
+      <div className="bg-white dark:bg-slate-900 border border-[var(--color-border-subtle)] dark:border-slate-700 rounded-3xl p-4 shadow-sm space-y-3">
         <div className="flex items-center gap-3">
           <BusinessLogo
             name={currentUser?.name || business.name}
             src={currentUser?.avatarUrl || business.logo}
-            className="w-10 h-10 rounded-2xl border border-slate-200 dark:border-slate-700 shrink-0"
+            className="w-10 h-10 rounded-2xl border border-[var(--color-border-subtle)] dark:border-slate-700 shrink-0"
           />
 
           <button type="button"
             onClick={handleOpenClick}
-            className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/80 rounded-2xl px-4 py-3 text-left text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium transition cursor-pointer border border-slate-200/60"
+            className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/80 rounded-2xl px-4 py-3 text-left text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium transition cursor-pointer border border-[var(--color-border-subtle)]/60"
           >
             {currentUser ? `${t('publishAs')} ${currentUser.name}...` : t('publishLoginPrompt')}
           </button>
@@ -204,7 +204,7 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
               setMediaTab('video');
               handleOpenClick();
             }}
-            className="flex-1 py-2 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition flex items-center justify-center gap-1.5 text-purple-700"
+            className="flex-1 py-2 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition flex items-center justify-center gap-1.5 text-purple-700 dark:text-blue-300"
           >
             <Video className="w-4 h-4 text-purple-600" />
             <span className="flex items-center gap-1">
@@ -218,7 +218,7 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
               setMediaTab('gallery');
               handleOpenClick();
             }}
-            className="flex-1 py-2 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition flex items-center justify-center gap-1.5 text-blue-700"
+            className="flex-1 py-2 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition flex items-center justify-center gap-1.5 text-blue-700 dark:text-blue-300"
           >
             <Tag className="w-4 h-4 text-blue-600" />
             <span className="hidden sm:inline">Galeria</span>
@@ -226,7 +226,7 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
 
           <button type="button"
             onClick={handleOpenClick}
-            className="flex-1 py-2 rounded-2xl hover:bg-[var(--color-neutral-100)] transition flex items-center justify-center gap-1.5 text-[var(--color-blue-600)]"
+            className="flex-1 py-2 rounded-2xl hover:bg-[var(--color-neutral-100)] transition flex items-center justify-center gap-1.5 text-[var(--color-blue-600)] dark:text-[#8AB4FF]"
           >
             <Sparkles className="w-4 h-4 text-[var(--color-blue-600)]" />
             <span className="hidden md:inline">IA</span>
@@ -236,10 +236,10 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
 
       {/* Post Modal Dialog with Media Selector */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700 my-auto animate-in zoom-in-95">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl border border-[var(--color-border-subtle)] dark:border-slate-700 my-auto animate-in zoom-in-95">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-[var(--color-border-subtle)] dark:border-slate-700 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
                   Criar Publicação Comercial
@@ -262,7 +262,7 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
             {/* Business Author Metadata */}
             <div className="p-6 space-y-4 text-xs">
               <div className="flex items-center gap-3">
-                <BusinessLogo name={business.name} src={business.logo} className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-700" />
+                <BusinessLogo name={business.name} src={business.logo} className="w-10 h-10 rounded-full border border-[var(--color-border-subtle)] dark:border-slate-700" />
                 <div>
                   <div className="font-bold text-slate-900 dark:text-white text-sm">{business.name}</div>
                   <span className="text-[10px] bg-blue-50 text-[var(--color-blue-600)] px-2 py-0.5 rounded-full font-bold">
@@ -310,7 +310,7 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
                     value={postTitle}
                     onChange={(e) => setPostTitle(e.target.value)}
                     placeholder="Ex: Novo Lote de Produtos & Oferta Especial..."
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[var(--color-blue-600)]"
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-subtle)] dark:border-slate-700 rounded-xl p-3 text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[var(--color-blue-600)]"
                   />
                 </div>
 
@@ -322,7 +322,7 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
                     value={postContent}
                     onChange={(e) => setPostContent(e.target.value)}
                     placeholder="Escreva a novidade para os clientes e moradores de Bissau..."
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-slate-900 dark:text-white focus:outline-none focus:border-[var(--color-blue-600)]"
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-subtle)] dark:border-slate-700 rounded-xl p-3 text-slate-900 dark:text-white focus:outline-none focus:border-[var(--color-blue-600)]"
                   />
                 </div>
 
@@ -340,11 +340,11 @@ export const CreatePostBox: React.FC<CreatePostBoxProps> = ({
                         value={postImageUrl.startsWith('data:') ? '' : postImageUrl}
                         onChange={(e) => setPostImageUrl(e.target.value)}
                         placeholder="Ou inserir URL da imagem..."
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white focus:outline-none focus:border-[var(--color-blue-600)]"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-subtle)] dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white focus:outline-none focus:border-[var(--color-blue-600)]"
                       />
                     </div>
                     {postImageUrl && (
-                      <div className="mt-2 h-32 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800">
+                      <div className="mt-2 h-32 rounded-xl overflow-hidden border border-[var(--color-border-subtle)] dark:border-slate-700 bg-slate-100 dark:bg-slate-800">
                         <img src={postImageUrl} alt={t('business.PreVisualizacao')} className="w-full h-full object-cover" />
                       </div>
                     )}

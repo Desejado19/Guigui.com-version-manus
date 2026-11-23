@@ -1,3 +1,4 @@
+import { toPublicIdentity } from '../domain/identityTypes';
 import type {
   BusinessTeamPermissions,
   BusinessTeamRole,
@@ -46,12 +47,6 @@ function samePermissions(left: BusinessTeamPermissions, right: BusinessTeamPermi
     && left.events === right.events
     && left.tickets === right.tickets
     && left.billing === right.billing;
-}
-
-function toPublicIdentity(account: Awaited<ReturnType<IdentityAccountRepository['create']>>): PublicIdentity | null {
-  if (!account) return null;
-  const { passwordHash: _passwordHash, createdAt: _createdAt, ...user } = account;
-  return user;
 }
 
 async function compensateAccount(

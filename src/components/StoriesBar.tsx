@@ -88,7 +88,7 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({
   const highlightPlaying = activeHighlight?.stories?.length ? activeHighlight : null;
 
   return (
-    <section className="w-full rounded-2xl border border-slate-200 bg-white px-2 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900" aria-label="Stories">
+    <section className="w-full rounded-2xl border border-[var(--color-border-subtle)] bg-white px-2 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900" aria-label="Stories">
       <div className="mb-2 flex items-center justify-between px-1">
         <div>
           <h2 className="text-xs font-black uppercase tracking-[0.14em] text-slate-700 dark:text-slate-200">Stories</h2>
@@ -101,7 +101,7 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({
             </button>
           )}
           {canCreateStory && (
-            <button type="button" onClick={() => onManageStories ? onManageStories() : setManagerOpen(true)} className="flex items-center gap-1 rounded-full border border-slate-200 px-2.5 py-1.5 text-[10px] font-black text-slate-600 dark:border-slate-700 dark:text-slate-300" aria-label="Gerir stories">
+            <button type="button" onClick={() => onManageStories ? onManageStories() : setManagerOpen(true)} className="flex items-center gap-1 rounded-full border border-[var(--color-border-subtle)] px-2.5 py-1.5 text-[10px] font-black text-slate-600 dark:border-slate-700 dark:text-slate-300" aria-label="Gerir stories">
               <Settings2 className="h-3.5 w-3.5" /> Gerir
             </button>
           )}

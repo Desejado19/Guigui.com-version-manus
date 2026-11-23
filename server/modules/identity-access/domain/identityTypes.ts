@@ -38,11 +38,24 @@ export interface PublicIdentity {
 export interface IdentityAccount extends PublicIdentity {
   passwordHash: string;
   createdAt: string;
+  /** Claim `sub` do Google; nunca é exposta na identidade pública. */
+  googleSubject?: string;
+}
+
+/**
+ * Projecção pública de uma conta: remove credenciais e metadados internos.
+ * Usada por todos os endpoints que devolvem o utilizador (login, sessão,
+ * convite de equipa) para que o cliente receba sempre a mesma forma.
+ */
+export function toPublicIdentity(account: IdentityAccount): PublicIdentity {
+  const { passwordHash: _passwordHash, createdAt: _createdAt, googleSubject: _googleSubject, ...identity } = account;
+  return identity;
 }
 
 export type CreateIdentityAccount = Omit<PublicIdentity, 'id' | 'avatarUrl'> & {
   avatarUrl?: string;
   password: string;
+  googleSubject?: string;
 };
 
 export interface TeamInvitation {

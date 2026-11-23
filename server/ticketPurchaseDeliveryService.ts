@@ -13,7 +13,7 @@ type TicketSmsGroup = {
 
 export type TicketPurchaseDeliveryResult = {
   email: {
-    state: 'simulated' | 'failed' | 'unavailable';
+    state: 'simulated' | 'accepted' | 'rejected' | 'failed' | 'unavailable';
     reference?: string;
   };
   notification: { state: 'created' | 'failed' | 'unavailable' };

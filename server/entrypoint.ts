@@ -2,6 +2,7 @@ import 'dotenv/config?override=true';
 import path from 'path';
 import { ensureShortEsbuildBinaryPath, warmTsxEsbuild } from './modules/platform-foundation/hosting/esbuildBinaryPath';
 import { runPlatformEntrypoint } from './modules/platform-foundation/hosting/runPlatformEntrypoint';
+import { SchemaOutOfDateError } from './schemaVersion';
 
 // Em desenvolvimento o Vite (middleware mode) arranca o esbuild dentro deste
 // processo. Com o projecto num caminho longo do Windows, o spawn falha com
@@ -24,8 +25,16 @@ process.on('uncaughtException', (error) => {
   process.exit(1);
 });
 
-await runPlatformEntrypoint(
-  process.env,
-  path.resolve(process.cwd(), 'data'),
-  () => import('../server.js'),
-);
+try {
+  await runPlatformEntrypoint(
+    process.env,
+    path.resolve(process.cwd(), 'data'),
+    () => import('../server.js'),
+  );
+} catch (error) {
+  if (error instanceof SchemaOutOfDateError) {
+    console.error(`[Guigui.com] ${error.message}`);
+    process.exit(1);
+  }
+  throw error;
+}

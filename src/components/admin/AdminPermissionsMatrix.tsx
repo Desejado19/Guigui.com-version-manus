@@ -102,23 +102,23 @@ export const AdminPermissionsMatrix: React.FC<AdminPermissionsMatrixProps> = ({
     });
   };  return (
     <div className="space-y-5">
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700 md:min-w-[1050px] w-full border-collapse text-left text-[11px]">
+      <div className="overflow-x-auto rounded-2xl border border-[var(--color-border-default)] dark:border-slate-700 md:min-w-[1050px] w-full border-collapse text-left text-[11px]">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-              <th className="sticky left-0 z-10 min-w-[235px] border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 font-black text-slate-700">{t('admin.permissionColumn')}</th>
+            <tr className="border-b border-[var(--color-border-default)] dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+              <th className="sticky left-0 z-10 min-w-[235px] border-r border-[var(--color-border-default)] dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 font-black text-slate-700">{t('admin.permissionColumn')}</th>
               {roles.map(({ accessLevel, members }) => (
                 <th key={accessLevel} className="min-w-[145px] p-3 text-center font-black text-slate-700">
                   <div>{accessLevelLabels[accessLevel]}</div>
-                  <div className="mt-1 text-[9px] font-semibold text-slate-400">{members.length} conta(s)</div>
+                  <div className="mt-1 text-[9px] font-semibold text-slate-500">{members.length} conta(s)</div>
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-[var(--color-border-subtle)]">
             {permissionDefinitions.map((definition) => (
-              <tr key={definition.key} className={definition.companyOnly ? 'bg-amber-50/60' : 'bg-white dark:bg-slate-900'}>
-                <td className="sticky left-0 z-10 border-r border-slate-100 bg-inherit p-3">
+              <tr key={definition.key} className={definition.companyOnly ? 'bg-[var(--tone-warning-bg)]/60' : 'bg-white dark:bg-slate-900'}>
+                <td className="sticky left-0 z-10 border-r border-[var(--color-border-subtle)] bg-inherit p-3">
                   <div className="flex items-start gap-2">
                     {definition.companyOnly ? <Ticket className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" /> : <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />}
                     <div>
@@ -138,10 +138,10 @@ export const AdminPermissionsMatrix: React.FC<AdminPermissionsMatrixProps> = ({
                         onClick={() => handleToggle(accessLevel, definition.key)}
                         className={`mx-auto flex min-h-[38px] min-w-[116px] items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-[10px] font-black transition ${
                           disabled
-                            ? 'cursor-not-allowed border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-400'
+                            ? 'cursor-not-allowed border-[var(--color-border-default)] dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-400'
                             : checked
-                            ? 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 hover:border-amber-300 hover:bg-amber-50'
+                            ? 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)] hover:bg-[var(--tone-success-bg)]'
+                            : 'border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 hover:border-[var(--tone-warning-border)] hover:bg-[var(--tone-warning-bg)]'
                         }`}
                         title={definition.companyOnly ? 'Operação reservada ao painel da empresa organizadora' : `Alterar ${definition.label} para ${accessLevelLabels[accessLevel]}`}
                       >

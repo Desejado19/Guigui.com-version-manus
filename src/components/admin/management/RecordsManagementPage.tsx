@@ -198,8 +198,8 @@ export function RecordsManagementPage<Row>({
 
       {detailRow && detail && (
         <div className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-slate-900/55 p-4" role="dialog" aria-modal="true" aria-label={detailLabel?.(detailRow) || 'Detalhe do registo'}>
-          <div className="my-6 w-full max-w-3xl rounded-2xl border border-[#e6dac8] bg-white shadow-2xl">
-            <div className="flex items-center justify-between gap-3 border-b border-slate-100 p-4">
+          <div className="my-6 w-full max-w-3xl rounded-2xl border border-[var(--color-border-default)] bg-white shadow-2xl">
+            <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border-subtle)] p-4">
               <h3 className="text-sm font-black text-slate-900">{detailLabel?.(detailRow) || 'Detalhe do registo'}</h3>
               <button type="button" onClick={() => setDetailRow(null)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" aria-label="Fechar detalhe">
                 <X className="h-4 w-4" />

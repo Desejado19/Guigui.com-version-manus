@@ -38,9 +38,15 @@ export interface PaymentProviderAdapter {
   parseWebhook(payload: unknown): PaymentWebhookEvent | null;
 }
 
+/**
+ * Resultado de uma entrega externa.
+ *
+ * `accepted` significa que o fornecedor aceitou a mensagem; não é `delivered`.
+ * `simulated` continua a existir para os fluxos sem fornecedor configurado.
+ */
 export interface IntegrationDeliveryResult {
-  mode: 'simulated';
-  state: 'simulated';
+  mode: 'simulated' | 'development' | 'live';
+  state: 'simulated' | 'accepted' | 'rejected' | 'failed';
   reference: string;
 }
 
@@ -60,6 +66,10 @@ export interface TeamInvitationEmailInput {
   businessName: string;
   roleLabel: string;
   invitationUrl: string;
+  /** Nome apresentado ao convidado; por omissão usa `businessName`. */
+  organizationName?: string;
+  modules?: string[];
+  isAdminScope?: boolean;
 }
 
 export interface SmsDeliveryInput {

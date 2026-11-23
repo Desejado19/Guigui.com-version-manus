@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Bell, BellRing, Calendar, ChevronDown, MapPin, Minus, MessageCircle, Plus, ShieldCheck, X } from 'lucide-react';
+import { Bell, BellRing, Calendar, ChevronDown, Download, MapPin, Minus, MessageCircle, Plus, ShieldCheck, X } from 'lucide-react';
 import type { EventItem, Language, UserProfile } from '../../types';
 import { translatePublishedText } from '../../utils/contentTranslation';
 import {
@@ -8,6 +8,7 @@ import {
   normaliseMonetizationCatalog,
 } from '../../data/monetizationCatalog';
 import { formatEventDateLong, lowestTicketPrice } from './EventCard';
+import { downloadBuyerListCsv } from '../../utils/buyerListExport';
 
 const POLICY_VERSION = '1.0';
 const PHONE_PATTERN = /^\+?[0-9][0-9\s().-]{6,23}$/;
@@ -83,6 +84,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
 }) => {
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [isExportingBuyers, setIsExportingBuyers] = useState(false);
+  const [buyerExportNotice, setBuyerExportNotice] = useState<string | null>(null);
   const [buyerName, setBuyerName] = useState(currentUser?.name || '');
   const [buyerPhone, setBuyerPhone] = useState(currentUser?.phone || '');
   const [holderIsOther, setHolderIsOther] = useState(false);
@@ -132,6 +135,28 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const fromPrice = lowestTicketPrice(event);
   const mapsQuery = encodeURIComponent(`${event.location}, ${event.neighborhood}, Bissau`);
 
+  // Só a organização do evento (ou a administração) pode descarregar a lista de
+  // compradores; a API valida o mesmo âmbito pela empresa da sessão.
+  const canExportBuyers = Boolean(
+    currentUser
+    && (currentUser.role === 'admin'
+      || (currentUser.role === 'business'
+        && currentUser.businessId
+        && event.businessId
+        && currentUser.businessId === event.businessId)),
+  );
+
+  const handleDownloadBuyers = async () => {
+    setIsExportingBuyers(true);
+    setBuyerExportNotice(null);
+    try {
+      const result = await downloadBuyerListCsv(event.id);
+      setBuyerExportNotice(result.message);
+    } finally {
+      setIsExportingBuyers(false);
+    }
+  };
+
   const handleSubmit = () => {
     if (!currentUser) {
       onRequireLogin?.('Inicie sessão ou crie uma conta para comprar bilhetes.');
@@ -167,7 +192,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[300] overflow-y-auto bg-[rgba(8,26,22,0.72)] px-3 py-4 backdrop-blur-xs sm:px-6 sm:py-8"
+      className="fixed inset-0 z-[300] overflow-y-auto bg-[rgba(8,26,22,0.72)] px-3 py-4 sm:px-6 sm:py-8"
       role="dialog"
       aria-modal="true"
       aria-label={event.title}
@@ -211,7 +236,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 onClick={() => onToggleReminder(event)}
                 aria-label={hasReminder ? 'Lembrete ativo' : 'Ativar lembrete'}
                 title={hasReminder ? 'Lembrete ativo' : 'Ativar lembrete'}
-                className={`flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-sm transition ${ hasReminder ? 'bg-[var(--color-gold-400)] text-[var(--color-green-950)]' : 'bg-white/20 text-white hover:bg-white/30' }`}
+                className={`flex h-10 w-10 items-center justify-center rounded-full transition ${ hasReminder ? 'bg-[var(--color-gold-400)] text-[var(--color-green-950)]' : 'bg-white/20 text-white hover:bg-white/30' }`}
               >
                 {hasReminder ? <BellRing className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
               </button>
@@ -220,7 +245,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               type="button"
               onClick={onClose}
               aria-label="Fechar detalhe do evento"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm transition hover:bg-white/30"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white transition hover:bg-white/30"
             >
               <X className="h-5 w-5" />
             </button>
@@ -236,6 +261,29 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 {translatePublishedText(event.description, currentLang, 'description')}
               </p>
             </section>
+
+            {canExportBuyers && (
+              <section className="space-y-3 rounded-2xl border border-[var(--color-neutral-200)] bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+                <div>
+                  <h3 className="text-base font-black text-[var(--color-neutral-900)] dark:text-white">Compradores deste evento</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-[var(--color-neutral-600)] dark:text-slate-300">
+                    Descarregue a lista completa em CSV, com nome, telefone, quantidade de bilhetes e os tipos comprados por cada pessoa.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleDownloadBuyers()}
+                  disabled={isExportingBuyers}
+                  className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[var(--color-green-700)] px-4 py-2 text-xs font-black text-white transition hover:bg-[var(--color-green-800)] disabled:opacity-60"
+                >
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                  {isExportingBuyers ? 'A preparar lista...' : 'Baixar lista de compradores (CSV)'}
+                </button>
+                {buyerExportNotice && (
+                  <p role="status" className="text-[11px] font-semibold text-[var(--color-neutral-600)] dark:text-slate-300">{buyerExportNotice}</p>
+                )}
+              </section>
+            )}
 
             <section className="flex items-center gap-3 rounded-2xl border border-[var(--color-neutral-200)] dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[var(--color-green-800)] text-sm font-black text-white">

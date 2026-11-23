@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   Bell,
   CalendarDays,
@@ -26,6 +26,7 @@ import { QRCodeDisplay } from './QRCodeDisplay';
 import { MyTicketsPanel } from './MyTicketsPanel';
 import { formatCurrencyXOF, getLanguageShortLabel, getNextLanguage, getTranslation } from '../utils/i18n';
 import { Badge, Button, Card, EmptyState, IconButton, Panel, PanelHeader, StatCard } from './ui';
+import { ChangePasswordCard } from './security/ChangePasswordCard';
 
 interface CitizenDashboardProps {
   currentUser: UserProfile;
@@ -56,7 +57,6 @@ interface CitizenDashboardProps {
   notificationPreferences?: NotificationPreferences;
   onNotificationPreferencesChange?: (next: NotificationPreferences) => void;
   onProfileChange?: (profile: Partial<UserProfile>) => void;
-  onPasswordChange?: (currentPassword: string, newPassword: string) => Promise<void>;
   onDeactivateAccount?: () => Promise<void>;
   onDeleteAccount?: () => Promise<void>;
   sidebarCollapsed?: boolean;
@@ -64,7 +64,21 @@ interface CitizenDashboardProps {
   onExplore: () => void;
 }
 
-type CitizenSection = 'overview' | 'system-settings' | 'personal-settings' | 'privacy-settings' | 'account-data' | 'tickets' | 'purchases' | 'notifications' | 'messages' | 'support';
+type CitizenSection =
+  | 'overview'
+  | 'tickets'
+  | 'purchases'
+  | 'notifications'
+  | 'messages'
+  | 'support'
+  // Módulos agregados: os dois antigos módulos de conta e os dois de definições.
+  | 'account-profile'
+  | 'security-settings'
+  // Identificadores antigos, mantidos apenas para encaminhar links existentes.
+  | 'account-data'
+  | 'personal-settings'
+  | 'privacy-settings'
+  | 'system-settings';
 
 export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
   currentUser,
@@ -95,7 +109,6 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
   notificationPreferences,
   onNotificationPreferencesChange,
   onProfileChange,
-  onPasswordChange,
   onDeactivateAccount,
   onDeleteAccount,
   sidebarCollapsed: controlledSidebarCollapsed,
@@ -105,10 +118,30 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
   const t = (key: string, variables?: Record<string, string | number>) => getTranslation(currentLang, key, variables);
   const formatXOF = (value: number) => formatCurrencyXOF(value, currentLang);
   const [section, setSection] = useState<CitizenSection>(initialSection);
+  const [accountProfileTab, setAccountProfileTab] = useState<'data' | 'profile'>('data');
+  const [securitySettingsTab, setSecuritySettingsTab] = useState<'privacy' | 'system'>('privacy');
 
   React.useEffect(() => {
     if (!focusConversationId && !focusSupportId) setSection(initialSection);
   }, [focusConversationId, focusSupportId, initialSection, initialMessageBusinessId]);
+
+  // Os quatro módulos antigos passaram a duas páginas agregadas. Qualquer
+  // referência antiga (atalho, estado restaurado) abre a secção correspondente.
+  React.useEffect(() => {
+    if (section === 'account-data') {
+      setAccountProfileTab('data');
+      setSection('account-profile');
+    } else if (section === 'personal-settings') {
+      setAccountProfileTab('profile');
+      setSection('account-profile');
+    } else if (section === 'privacy-settings') {
+      setSecuritySettingsTab('privacy');
+      setSection('security-settings');
+    } else if (section === 'system-settings') {
+      setSecuritySettingsTab('system');
+      setSection('security-settings');
+    }
+  }, [section]);
     const [selectedTicket, setSelectedTicket] = useState<PurchaseOrder | null>(null);
 
   // Allow closing the ticket modal via the Escape key for better accessibility
@@ -136,10 +169,7 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
     secureMessages: true,
     dataPersonalization: true,
   });
-  const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirmation: '' });
-  const [passwordMessage, setPasswordMessage] = useState('');
   const [passwordChanged, setPasswordChanged] = useState(Boolean(currentUser.passwordChangedAt));
-  const [passwordSubmitting, setPasswordSubmitting] = useState(false);
 
   // CSRF token from double-submit cookie pattern
   const [csrfToken, setCsrfToken] = useState<string>('');
@@ -264,15 +294,15 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
         <div className="min-w-0 flex-1">
           <p className="line-clamp-2 text-sm font-black text-[var(--color-text-strong)]">{order.itemTitle}</p>
           <p className="mt-1 text-[11px] font-semibold text-[var(--color-text-muted)]">{order.businessName} Â· {new Date(order.purchasedAt).toLocaleDateString('pt-PT')}</p>
-          <p className="mt-1 font-mono text-[11px] font-black tracking-wide text-[var(--color-blue-600)]">{order.orderCode}</p>
+          <p className="mt-1 font-mono text-[11px] font-black tracking-wide text-[var(--color-blue-600)] dark:text-blue-300">{order.orderCode}</p>
         </div>
         <Badge variant="neutral" className={`shrink-0 border-0 px-2 py-1 text-[9px] uppercase ${statusClass(order.status)}`}>{statusLabel(order.status)}</Badge>
       </div>
-      {isTicket && order.ticketCredentials && order.ticketCredentials.length > 1 && <div className="mt-3 rounded-xl bg-[var(--color-blue-50)] p-3"><p className="mb-2 text-[10px] font-black uppercase tracking-wide text-[var(--color-blue-600)]">Credenciais individuais ({order.ticketCredentials.length})</p><div className="grid gap-2 sm:grid-cols-2">{order.ticketCredentials.map((credential, index) => <button key={credential.id} type="button" onClick={() => setSelectedTicket({ ...order, orderCode: credential.ticketCode, qrToken: credential.qrToken, ticketPin: credential.pinCode, customerName: credential.holderName || order.customerName, customerPhone: credential.holderPhone || order.customerPhone })} className="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-2.5 py-2 text-left text-[10px] font-black text-[var(--color-text-strong)] hover:border-[var(--color-green-600)]">{index + 1}. {credential.holderName || order.holderName || order.customerName}<span className="mt-0.5 block font-mono text-[9px]">{credential.ticketCode}</span></button>)}</div></div>}
+      {isTicket && order.ticketCredentials && order.ticketCredentials.length > 1 && <div className="mt-3 rounded-xl bg-[var(--color-blue-50)] p-3"><p className="mb-2 text-[10px] font-black uppercase tracking-wide text-[var(--color-blue-600)] dark:text-blue-300">Credenciais individuais ({order.ticketCredentials.length})</p><div className="grid gap-2 sm:grid-cols-2">{order.ticketCredentials.map((credential, index) => <button key={credential.id} type="button" onClick={() => setSelectedTicket({ ...order, orderCode: credential.ticketCode, qrToken: credential.qrToken, ticketPin: credential.pinCode, customerName: credential.holderName || order.customerName, customerPhone: credential.holderPhone || order.customerPhone })} className="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-2.5 py-2 text-left text-[10px] font-black text-[var(--color-text-strong)] hover:border-[var(--color-green-600)]">{index + 1}. {credential.holderName || order.holderName || order.customerName}<span className="mt-0.5 block font-mono text-[9px]">{credential.ticketCode}</span></button>)}</div></div>}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-border-subtle)] pt-3">
         <span className="text-xs font-black text-[var(--color-text-strong)]">{formatXOF(order.totalPriceXOF)}</span>
         {isTicket && (
-          <Button type="button" variant="primary" size="sm" onClick={() => setSelectedTicket(order)} className="min-h-10 bg-[var(--color-green-600)] text-[11px] hover:bg-[var(--color-green-700)]">
+          <Button type="button" variant="primary" size="sm" onClick={() => setSelectedTicket(order)} className="min-h-10 bg-[var(--color-green-700)] text-[11px] hover:bg-[var(--color-green-800)]">
             Abrir bilhete <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
           </Button>
         )}
@@ -315,10 +345,8 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
       { id: 'support', label: 'Suporte', icon: LifeBuoy },
     ] },
     { heading: 'Conta', items: [
-      { id: 'account-data', label: 'Dados e conta', icon: UserX },
-      { id: 'system-settings', label: 'Definições do sistema', icon: Palette },
-      { id: 'personal-settings', label: 'Perfil e preferências', icon: UserRound },
-      { id: 'privacy-settings', label: 'Segurança e privacidade', icon: ShieldCheck },
+      { id: 'account-profile', label: 'Conta e perfil', icon: UserRound },
+      { id: 'security-settings', label: 'Segurança e definições', icon: ShieldCheck },
     ] },
   ];
 
@@ -334,7 +362,7 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
   return (
     <div className="guigui-profile-dashboard w-full min-h-[calc(100vh-72px)] bg-[var(--color-bg-surface)]">
       <div className="flex min-h-[calc(100vh-72px)] w-full bg-[var(--color-bg-surface)]">
-        <div className={`${mobileSidebarOpen ? 'block' : 'hidden'} fixed inset-0 z-40 bg-[var(--color-bg-surface)]/60 backdrop-blur-[1px] md:hidden`} onClick={() => setMobileSidebarOpen(false)} />
+        <div className={`${mobileSidebarOpen ? 'block' : 'hidden'} fixed inset-0 z-40 bg-[var(--color-bg-surface)]/60 md:hidden`} onClick={() => setMobileSidebarOpen(false)} />
 
         <aside
           style={{ width: sidebarCollapsed ? 72 : 248 }}
@@ -349,7 +377,7 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
                 {!sidebarCollapsed && (
                   <div className="min-w-0">
                     <div className="text-lg font-black leading-none text-white">Guigui<span className="text-[#e8a23a]">.com</span></div>
-                    <div className="mt-1.5 text-[8.5px] font-black uppercase tracking-[0.2em] text-[#8fb3ac]">{t('personalArea')}</div>
+                    <div className="mt-1.5 text-[8.5px] font-black uppercase tracking-[0.2em] text-[var(--color-text-muted-dark)]">{t('personalArea')}</div>
                   </div>
                 )}
               </div>
@@ -360,7 +388,7 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
                     label={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}
                     variant="secondary"
                     size="sm"
-                    className="h-8 w-8 rounded-full border-0 bg-transparent text-[#8fb3ac] shadow-none hover:bg-white/10 hover:text-white"
+                    className="h-8 w-8 rounded-full border-0 bg-transparent text-[var(--color-text-muted-dark)] shadow-none hover:bg-[var(--color-green-800)] hover:text-white"
                     onClick={() => setSidebarCollapsed((value) => !value)}
                     title={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}
                   >
@@ -370,7 +398,7 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
                     label={`${t('close')} menu lateral`}
                     variant="secondary"
                     size="sm"
-                    className="h-8 w-8 rounded-full border-0 bg-transparent text-[#8fb3ac] shadow-none hover:bg-white/10 hover:text-white md:hidden"
+                    className="h-8 w-8 rounded-full border-0 bg-transparent text-[var(--color-text-muted-dark)] shadow-none hover:bg-[var(--color-green-800)] hover:text-white md:hidden"
                     onClick={() => setMobileSidebarOpen(false)}
                   >
                     <X className="h-4 w-4" />
@@ -382,7 +410,7 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
                   label="Expandir menu"
                   variant="secondary"
                   size="sm"
-                  className="absolute right-1 top-3 h-6 w-6 rounded-full border-0 bg-transparent text-[#8fb3ac] shadow-none hover:bg-white/10 hover:text-white"
+                  className="absolute right-1 top-3 h-6 w-6 rounded-full border-0 bg-transparent text-[var(--color-text-muted-dark)] shadow-none hover:bg-[var(--color-green-800)] hover:text-white"
                   onClick={() => setSidebarCollapsed(false)}
                   title="Expandir menu"
                 >
@@ -396,30 +424,31 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    setSection('personal-settings');
+                    setSection('account-profile');
+                    setAccountProfileTab('profile');
                     setMobileSidebarOpen(false);
                   }}
-                  className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.045] p-2.5 text-left transition hover:bg-white/[0.08]"
+                  className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-[#1b4a43] bg-[#0d3a34] p-2.5 text-left transition hover:bg-[var(--color-green-800)]"
                 >
                   {currentUser.avatarUrl ? (
-                    <img src={currentUser.avatarUrl} alt={currentUser.name} className="h-10 w-10 shrink-0 rounded-full border border-white/10 object-cover" />
+                    <img src={currentUser.avatarUrl} alt={currentUser.name} className="h-10 w-10 shrink-0 rounded-full border border-[var(--color-green-800)] object-cover" />
                   ) : (
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#155048] text-xs font-black text-[#d8e6e2]">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-green-800)] text-xs font-black text-[var(--color-green-100)]">
                       {currentUser.name.slice(0, 2).toUpperCase()}
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[12px] font-black text-white">{currentUser.name}</div>
-                    <div className="mt-0.5 truncate text-[10px] font-semibold text-[#8fb3ac]">{currentUser.email}</div>
+                    <div className="mt-0.5 truncate text-[10px] font-semibold text-[var(--color-text-muted-dark)]">{currentUser.email}</div>
                   </div>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-[#6f8f89]" />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[var(--color-text-muted-dark)]" />
                 </button>
               )}
 
               {citizenNavigationGroups.map((group) => (
                 <div key={group.heading} className={sidebarCollapsed ? 'mb-2 space-y-1.5' : 'mb-3 space-y-1'}>
                   {!sidebarCollapsed && (
-                    <div className="px-3 pb-1 pt-1.5 text-[8px] font-black uppercase tracking-[0.22em] text-[#6f8f89]">{group.heading}</div>
+                    <div className="px-3 pb-1 pt-1.5 text-[8px] font-black uppercase tracking-[0.22em] text-[var(--color-text-muted-dark)]">{group.heading}</div>
                   )}
 
                   <div className={sidebarCollapsed ? 'space-y-1.5' : 'space-y-1'}>
@@ -438,15 +467,15 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
                           aria-label={item.label}
                           aria-current={isActive ? 'page' : undefined}
                           title={item.label}
-                          className={`group relative flex w-full items-center rounded-full text-left transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[#3fae80]/50 ${
+                          className={`group relative flex w-full items-center rounded-full text-left transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[var(--color-green-700)]/50 ${
                             sidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2'
                           } ${
                             isActive
-                              ? 'bg-[#3fae80] text-white shadow-[0_16px_28px_-16px_rgba(63,174,128,0.9)]'
-                              : 'text-[#d8e6e2] hover:bg-white/[0.05]'
+                              ? 'bg-[var(--color-green-700)] text-white shadow-[0_16px_28px_-16px_rgba(23,97,88,0.9)]'
+                              : 'text-[var(--color-green-100)] hover:bg-[var(--color-green-800)]'
                           }`}
                         >
-                          <div className={`flex shrink-0 items-center justify-center rounded-full ${sidebarCollapsed ? 'h-8 w-8' : 'h-9 w-9'} ${isActive ? 'bg-black/10 text-white' : 'bg-white/[0.06] text-[#a9c4be] group-hover:bg-white/[0.1] group-hover:text-white'}`}>
+                          <div className={`flex shrink-0 items-center justify-center rounded-full ${sidebarCollapsed ? 'h-8 w-8' : 'h-9 w-9'} ${isActive ? 'bg-black/10 text-white' : 'bg-[#124039] text-[#a9c4be] group-hover:bg-[var(--color-green-800)] group-hover:text-white'}`}>
                             <Icon className="h-4 w-4" />
                           </div>
 
@@ -467,14 +496,14 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
               ))}
             </div>
 
-            <div className="mt-auto border-t border-white/10 px-2 py-2.5">
-              <div className={`flex items-center rounded-2xl border border-white/10 bg-white/[0.04] p-2 ${sidebarCollapsed ? 'justify-center' : 'gap-2.5'}`}>
+            <div className="mt-auto border-t border-[var(--color-green-800)] px-2 py-2.5">
+              <div className={`flex items-center rounded-2xl border border-[var(--color-green-800)] bg-[#0e3a34] p-2 ${sidebarCollapsed ? 'justify-center' : 'gap-2.5'}`}>
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#3fae80]/15 text-[#7fd8b4]">
                   <CheckCircle2 className="h-4 w-4" />
                 </div>
                 {!sidebarCollapsed && (
                   <div className="min-w-0">
-                    <div className="text-[9px] font-black uppercase tracking-[0.18em] text-[#8fb3ac]">{t('activeAccountLabel')}</div>
+                    <div className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--color-text-muted-dark)]">{t('activeAccountLabel')}</div>
                     <div className="truncate text-[11.5px] font-black text-white">{currentUser.name}</div>
                   </div>
                 )}
@@ -512,7 +541,7 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
               <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
                   <div className="relative shrink-0">
-                    <img src={currentUser.avatarUrl} alt={`Fotografia de ${currentUser.name}`} className="h-12 w-12 rounded-xl border-2 border-white/20 object-cover shadow-lg sm:h-16 sm:w-16" />
+                    <img src={currentUser.avatarUrl} alt={`Fotografia de ${currentUser.name}`} className="h-12 w-12 rounded-xl border-2 border-[#2a655a] object-cover shadow-lg sm:h-16 sm:w-16" />
                     <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[var(--color-bg-surface-dark)] bg-[var(--color-green-500)] text-white" title={t('activeAccountLabel')}><CheckCircle2 className="h-3 w-3" aria-hidden="true" /></span>
                   </div>
                   <div className="min-w-0">
@@ -554,7 +583,7 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
 
           <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
             <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4">
-              <div className="mb-5 flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-blue-700)]">Actividade recente</p><h2 className="mt-1 text-base font-black text-[var(--color-text-strong)]">Os meus bilhetes</h2></div><Ticket className="h-5 w-5 text-[var(--color-green-600)]" aria-hidden="true" /></div>
+              <div className="mb-5 flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-blue-700)] dark:text-blue-300">Actividade recente</p><h2 className="mt-1 text-base font-black text-[var(--color-text-strong)]">Os meus bilhetes</h2></div><Ticket className="h-5 w-5 text-[var(--color-green-600)]" aria-hidden="true" /></div>
               <div className="grid gap-3 sm:grid-cols-2">{ticketOrders.slice(0, 4).map((order) => renderOrderCard(order, true))}</div>
               {ticketOrders.length === 0 && <EmptyState title={t('noTicketsExplore')} description="Os seus bilhetes aparecerão aqui depois de uma compra." icon={<Ticket className="h-6 w-6" aria-hidden="true" />} />}
             </div>
@@ -581,75 +610,81 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
         />
       )}
 
-      {section === 'system-settings' && <div className="space-y-5">
+      {section === 'account-profile' && (
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-emerald-100)] text-[var(--color-emerald-700)] dark:bg-[var(--color-emerald-950)]/40 dark:text-[var(--color-emerald-300)]"><UserRound className="h-5 w-5" /></div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-emerald-600)]">Conta</p>
+              <h2 className="mt-1 text-base font-black text-[var(--color-text-strong)] sm:text-lg">Conta e perfil</h2>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">Dados da conta e preferências pessoais, reunidos num único módulo.</p>
+            </div>
+          </div>
+          <div role="tablist" aria-label="Secções de Conta e perfil" className="mt-3 flex flex-wrap gap-2">
+            {([
+              { id: 'data' as const, label: 'Dados e conta', icon: UserX },
+              { id: 'profile' as const, label: 'Perfil e preferências', icon: UserRound },
+            ]).map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={accountProfileTab === id}
+                data-testid={`account-profile-tab-${id}`}
+                onClick={() => setAccountProfileTab(id)}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-black transition ${accountProfileTab === id ? 'bg-[var(--color-green-600)] text-white' : 'border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] hover:border-[var(--color-border-strong)]'}`}
+              >
+                <Icon className="h-3.5 w-3.5" /> {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {section === 'security-settings' && (
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-violet-100)] text-[var(--color-violet-700)] dark:bg-[var(--color-violet-950)]/40 dark:text-[var(--color-violet-300)]"><ShieldCheck className="h-5 w-5" /></div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-violet-600)]">Definições</p>
+              <h2 className="mt-1 text-base font-black text-[var(--color-text-strong)] sm:text-lg">Segurança e definições</h2>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">Privacidade, segurança da conta e definições do sistema, reunidas num único módulo.</p>
+            </div>
+          </div>
+          <div role="tablist" aria-label="Secções de Segurança e definições" className="mt-3 flex flex-wrap gap-2">
+            {([
+              { id: 'privacy' as const, label: 'Segurança e privacidade', icon: ShieldCheck },
+              { id: 'system' as const, label: 'Definições do sistema', icon: Palette },
+            ]).map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={securitySettingsTab === id}
+                data-testid={`security-settings-tab-${id}`}
+                onClick={() => setSecuritySettingsTab(id)}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-black transition ${securitySettingsTab === id ? 'bg-[var(--color-green-600)] text-white' : 'border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] hover:border-[var(--color-border-strong)]'}`}
+              >
+                <Icon className="h-3.5 w-3.5" /> {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {section === 'security-settings' && securitySettingsTab === 'system' && <div className="space-y-5">
         <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4"><div className="flex items-start gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-violet-100)] text-[var(--color-violet-700)] dark:bg-[var(--color-violet-950)]/40 dark:text-[var(--color-violet-300)]"><ShieldCheck className="h-5 w-5" /></div><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-violet-600)]">Funcionamento da plataforma</p><h2 className="mt-1 text-base sm:text-lg font-black text-[var(--color-text-strong)]">{t('citizen.systemSettings')}</h2><p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">{t('citizen.securityChangesSaved')}</p></div></div></Card>
-        <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4"><div className="mb-4 flex items-center gap-2"><LockKeyhole className="h-5 w-5 text-[var(--color-emerald-600)]" /><h2 className="text-base font-black text-[var(--color-text-strong)]">{t('account.security')}</h2></div><div className="grid gap-4 sm:grid-cols-3"><input type="password" placeholder="Palavra-passe atual" value={passwordForm.current} onChange={(event) => setPasswordForm((current) => ({ ...current, current: event.target.value }))} className={fieldClass} /><input type="password" placeholder="Nova palavra-passe" value={passwordForm.next} onChange={(event) => setPasswordForm((current) => ({ ...current, next: event.target.value }))} className={fieldClass} /><input type="password" placeholder="Confirmar nova palavra-passe" value={passwordForm.confirmation} onChange={(event) => setPasswordForm((current) => ({ ...current, confirmation: event.target.value }))} className={fieldClass} /></div><Button type="button" variant="primary" size="sm" loading={passwordSubmitting} onClick={async () => { if (!passwordForm.current) { setPasswordMessage('Informe a palavra-passe atual.'); return; } // Password policy validation
-  const newPassword = passwordForm.next;
-  const confirmation = passwordForm.confirmation;
-
-  // Check minimum length (8 characters)
-  if (newPassword.length < 8) {
-    setPasswordMessage('A nova palavra-passe deve ter pelo menos 8 caracteres.');
-    return;
-  }
-
-  // Check password complexity: must contain at least 3 of 4: lowercase, uppercase, number, symbol
-  const hasLowercase = /[a-z]/.test(newPassword);
-  const hasUppercase = /[A-Z]/.test(newPassword);
-  const hasNumber = /[0-9]/.test(newPassword);
-  const hasSymbol = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
-  const complexPassword: number = (hasLowercase ? 1 : 0) + (hasUppercase ? 1 : 0) + (hasNumber ? 1 : 0) + (hasSymbol ? 1 : 0);
-
-  if (complexPassword < 3) {
-    setPasswordMessage('A palavra-passe deve conter pelo menos 3 dos seguintes: minúsculas, maiúsculas, números, caracteres especiais.');
-    return;
-  }
-
-  // Check confirmation matches
-  if (newPassword !== confirmation) {
-    setPasswordMessage('A confirmação da nova palavra-passe não coincide.');
-    return;
-  }
-  if (!passwordForm.current) {
-    setPasswordMessage('Informe a palavra-passe atual.');
-    return;
-  } if (!onPasswordChange) { setPasswordMessage('A alteração de palavra-passe não está disponível.'); return; }
-  setPasswordSubmitting(true); setPasswordMessage('');
-  try {
-    const response = await fetch('/api/auth/change-password', {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'X-CSRF-Token': csrfToken,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ currentPassword: passwordForm.current, newPassword: passwordForm.next }),
-    });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      setPasswordMessage(errorData.detail || `Erro ${response.status}: Não foi possível atualizar a palavra-passe.`);
-      setPasswordSubmitting(false);
-      return;
-    }
-    setPasswordChanged(true);
-    setPasswordForm({ current: '', next: '', confirmation: '' });
-    setPasswordMessage('Palavra-passe atualizada com sucesso.');
-    setPasswordSubmitting(false);
-    await onPasswordChange(passwordForm.current, passwordForm.next);
-  } catch (error) {
-    setPasswordMessage(error instanceof Error ? error.message : 'Não foi possível atualizar a palavra-passe.');
-    setPasswordSubmitting(false);
-  }}} className="mt-4 bg-[var(--color-green-600)] hover:bg-[var(--color-green-700)]">{passwordSubmitting ? 'A atualizar...' : 'Atualizar palavra-passe'}</Button>{passwordMessage && <p className={`mt-2 text-xs font-bold ${passwordMessage.includes('sucesso') ? 'text-[var(--color-emerald-600)]' : 'text-[var(--color-rose-600)]'}`}>{passwordMessage}</p>}{passwordChanged && !passwordMessage.includes('sucesso') && <p className="mt-2 text-xs font-bold text-[var(--color-emerald-600)]">{t('citizen.passwordUpdated')}</p>}</Card>
+        <ChangePasswordCard accountEmail={currentUser?.email} accountName={currentUser?.name} />
         <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4"><div className="mb-4 flex items-center gap-2"><MessageCircle className="h-5 w-5 text-[var(--color-green-600)]" /><h2 className="text-base font-black text-[var(--color-text-strong)]">{t('citizen.communicationPreferences')}</h2></div><div className="flex flex-wrap gap-2">{(['email', 'sms', 'both'] as const).map((option) =>         <button key={option} type="button" onClick={() => { setCommunicationPreference(option); updateProfile({ communicationPreference: option }); }} className={`rounded-xl px-3 py-2 text-xs font-black ${communicationPreference === option ? 'bg-[var(--color-green-600)] text-white' : 'bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] dark:bg-[var(--color-bg-surface-dark)] dark:text-[var(--color-text-muted-dark)]'}`}>{option === 'both' ? 'E-mail e telefone' : option === 'email' ? 'E-mail' : 'Telefone'}</button>)}</div></div>
       </div>}
 
-      {section === 'privacy-settings' && <div className="space-y-5">
+      {section === 'security-settings' && securitySettingsTab === 'privacy' && <div className="space-y-5">
         <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4"><div className="flex items-start gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-emerald-100)] text-[var(--color-emerald-700)] dark:bg-[var(--color-emerald-950)]/40 dark:text-[var(--color-emerald-300)]"><ShieldCheck className="h-5 w-5" /></div><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-emerald-600)]">{t('citizen.accountModule')}</p><h2 className="mt-1 text-base sm:text-lg font-black text-[var(--color-text-strong)]">Privacidade</h2><p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">{t('citizen.accountModuleHint')}</p></div></div></div>
         <div className="grid gap-3 lg:grid-cols-2">{settingToggle('privateProfile', 'Perfil privado', 'O seu perfil e dados pessoais ficam visíveis apenas na sua área autenticada.')}{settingToggle('sessionAlerts', 'Alertas de segurança', 'Receba avisos quando uma nova sessão ou dispositivo aceder à sua conta.')}{settingToggle('secureMessages', 'Comunicação protegida', 'Mantenha mensagens e pedidos de suporte acessíveis apenas aos participantes autorizados.')}{settingToggle('dataPersonalization', 'Personalização de dados', 'Permita que a plataforma use os seus favoritos e histórico para melhorar a experiência.')}</div>
         <div className="rounded-2xl border border-[var(--color-emerald-200)] bg-[var(--color-emerald-50)] p-4 text-xs font-semibold leading-relaxed text-[var(--color-emerald-800)] dark:border-[var(--color-emerald-900)] dark:bg-[var(--color-emerald-950)]/30 dark:text-[var(--color-emerald-200)]">{t('citizen.changesAppliedNote')}</div>
       </div>}
 
-      {section === 'account-data' && <div className="space-y-5">
+      {section === 'account-profile' && accountProfileTab === 'data' && <div className="space-y-5">
         <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4">
           <div className="flex items-start gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-rose-100)] text-[var(--color-rose-700)] dark:bg-[var(--color-rose-950)]/40 dark:text-[var(--color-rose-300)]"><UserX className="h-5 w-5" /></div>
@@ -675,7 +710,7 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
         <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-4 text-xs font-semibold leading-relaxed text-[var(--color-text-muted)] dark:border-[var(--color-border-subtle-dark)] dark:bg-[var(--color-bg-subtle-dark)] dark:text-[var(--color-text-muted-dark)]">{t('citizen.ownerActionsNote')}</div>
       </div>}
 
-      {section === 'personal-settings' && <div className="space-y-5">
+      {section === 'account-profile' && accountProfileTab === 'profile' && <div className="space-y-5">
         <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4"><div className="flex items-start gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-blue-100)] text-[var(--color-blue-700)] dark:bg-[var(--color-blue-950)]/40 dark:text-[var(--color-blue-300)]"><UserRound className="h-5 w-5" /></div><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-green-600)]">{t('citizen.citizenData')}</p><h2 className="mt-1 text-base sm:text-lg font-black text-[var(--color-text-strong)]">{t('citizen.personalSettings')}</h2><p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">{t('citizen.citizenDataHint')}</p></div></div><div className="mt-5 grid gap-4 sm:grid-cols-2"><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)]">Nome<input value={profileForm.name} onChange={(event) => setProfileForm((current) => ({ ...current, name: event.target.value }))} className={fieldClass} /></label><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)]">Fotografia de perfil<input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarUpload} className={`${fieldClass} file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--color-green-600)] file:px-3 file:py-1.5 file:text-xs file:font-black file:text-white`} /><span className="mt-1 block text-[10px] font-semibold text-[var(--color-text-muted)]">{t('citizen.photoFormats')}</span>{profileForm.avatarUrl && <img src={profileForm.avatarUrl} alt={t('citizen.photoPreview')} className="mt-2 h-16 w-16 rounded-2xl object-cover" />}</label><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)]">E-mail<input type="email" value={profileForm.email} onChange={(event) => setProfileForm((current) => ({ ...current, email: event.target.value }))} className={fieldClass} /></label><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)]">Telefone<input value={profileForm.phone} onChange={(event) => setProfileForm((current) => ({ ...current, phone: event.target.value }))} className={fieldClass} /></label><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)] sm:col-span-2">{t('citizen.neighborhood')}<input value={profileForm.neighborhood} onChange={(event) => setProfileForm((current) => ({ ...current, neighborhood: event.target.value }))} className={fieldClass} /></label></div><button type="button" onClick={() => { onProfileChange?.(profileForm); setProfileSaved(true); window.setTimeout(() => setProfileSaved(false), 2500); }} className="mt-4 rounded-xl bg-[var(--color-green-600)] px-4 py-2.5 text-xs font-black text-white hover:bg-[var(--color-green-700)]">Guardar dados pessoais</button>{profileSaved && <span className="ml-3 text-xs font-bold text-[var(--color-emerald-600)]">Dados guardados.</span>}{profileError && <p className="mt-2 text-xs font-bold text-[var(--color-rose-600)]">{profileError}</p>}</div>
         <div className="grid gap-4 lg:grid-cols-2"><div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4"><div className="mb-4 flex items-center gap-2"><Ticket className="h-5 w-5 text-[var(--color-green-600)]" /><h2 className="text-base font-black text-[var(--color-text-strong)]">{t('citizen.ticketPreferences')}</h2></div><div className="flex flex-wrap gap-2">{(['digital', 'both'] as const).map((option) =>         <button key={option} type="button" onClick={() => { setTicketPreference(option); updateProfile({ ticketPreference: option }); }} className={`rounded-xl px-3 py-2 text-xs font-black ${ticketPreference === option ? 'bg-[var(--color-green-600)] text-white' : 'bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] dark:bg-[var(--color-bg-surface-dark)] dark:text-[var(--color-text-muted-dark)]'}`}>{option === 'digital' ? 'Bilhete digital' : 'Digital e comprovativo'}</button>)}</div></div><div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4"><div className="mb-4 flex items-center gap-2"><Heart className="h-5 w-5 text-[var(--color-rose-600)]" /><h2 className="text-base font-black text-[var(--color-text-strong)]">Favoritos e mensagens</h2></div><p className="text-xs leading-relaxed text-[var(--color-text-muted)]">{favoriteBusinesses.length ? `${favoriteBusinesses.length} empresa(s) seguida(s) na sua conta.` : 'Ainda não segue nenhuma empresa.'} As mensagens comerciais e pedidos de suporte permanecem separados.</p></div></div>
       </div>}
@@ -687,7 +722,7 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
       {section === 'messages' && <CommunicationHub currentLang={currentLang} mode="user" currentUser={currentUser} businesses={businesses} conversations={conversations} messages={conversationMessages} supportRequests={supportRequests} onCreateConversation={onCreateConversation} onSendMessage={onSendMessage} onCreateSupport={onCreateSupport} onReplySupport={onReplySupport} onMarkConversationRead={onMarkConversationRead} initialChannel="messages" focusConversationId={focusConversationId} initialBusinessId={initialMessageBusinessId} channelOnly />}
       {section === 'support' && <CommunicationHub currentLang={currentLang} mode="user" currentUser={currentUser} businesses={businesses} conversations={conversations} messages={conversationMessages} supportRequests={supportRequests} onCreateConversation={onCreateConversation} onSendMessage={onSendMessage} onCreateSupport={onCreateSupport} onReplySupport={onReplySupport} onMarkConversationRead={onMarkConversationRead} initialChannel="support" focusSupportId={focusSupportId} initialBusinessId={initialMessageBusinessId} channelOnly />}
 
-            {selectedTicket && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--color-bg-surface-dark)]/70 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="ticket-dialog-title" onClick={() => setSelectedTicket(null)}><div className="max-h-[calc(100vh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-[var(--color-bg-surface)] p-3 shadow-2xl dark:bg-[var(--color-bg-surface-dark)]" onClick={(e) => e.stopPropagation()}><div className="sticky top-0 z-10 -mx-3 -mt-3 mb-2 flex items-center justify-between gap-3 rounded-t-3xl border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-3 pb-2 pt-3 dark:border-[var(--color-border-subtle-dark)] dark:bg-[var(--color-bg-surface-dark)]"><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-wider text-[var(--color-emerald-700)]">Bilhete</p><p className="truncate text-xs font-bold text-[var(--color-text-muted)]">{selectedTicket.itemTitle}</p></div><button type="button" onClick={() => setSelectedTicket(null)} className="guigui-close-button flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--color-bg-surface)] text-[var(--color-text-strong)] shadow-md transition hover:bg-[var(--color-bg-subtle)] dark:bg-[var(--color-bg-surface-dark)] dark:text-white dark:hover:bg-[var(--color-bg-surface-dark)]/80" aria-label={`${t('close')} bilhete`} title={`${t('close')} bilhete`}><X className="h-6 w-6" /></button></div><h2 id="ticket-dialog-title" className="sr-only">Comprovativo do bilhete</h2><QRCodeDisplay code={selectedTicket.orderCode} qrToken={selectedTicket.qrToken} title={selectedTicket.itemTitle} subtitle={selectedTicket.businessName} buyerName={selectedTicket.customerName} buyerPhone={selectedTicket.customerPhone} amountXOF={selectedTicket.totalPriceXOF} pinCode={selectedTicket.ticketPin} validUntil={selectedTicket.purchasedAt ? new Date(new Date(selectedTicket.purchasedAt).getTime() + 60 * 60 * 1000).toISOString() : undefined} status={selectedTicket.status === 'cancelled' ? 'cancelled' : selectedTicket.status === 'redeemed' ? 'used' : 'valid'} onCopyCode={() => copyCode(selectedTicket.orderCode)} currentLang={currentLang} />{copiedCode === selectedTicket.orderCode && <p className="pb-2 text-center text-xs font-black text-[var(--color-emerald-700)]">{t('citizen.codeCopied')}</p>}</div></div>}
+            {selectedTicket && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--color-bg-surface-dark)]/70 p-3" role="dialog" aria-modal="true" aria-labelledby="ticket-dialog-title" onClick={() => setSelectedTicket(null)}><div className="max-h-[calc(100vh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-[var(--color-bg-surface)] p-3 shadow-2xl dark:bg-[var(--color-bg-surface-dark)]" onClick={(e) => e.stopPropagation()}><div className="sticky top-0 z-10 -mx-3 -mt-3 mb-2 flex items-center justify-between gap-3 rounded-t-3xl border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-3 pb-2 pt-3 dark:border-[var(--color-border-subtle-dark)] dark:bg-[var(--color-bg-surface-dark)]"><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-wider text-[var(--color-emerald-700)]">Bilhete</p><p className="truncate text-xs font-bold text-[var(--color-text-muted)]">{selectedTicket.itemTitle}</p></div><button type="button" onClick={() => setSelectedTicket(null)} className="guigui-close-button flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--color-bg-surface)] text-[var(--color-text-strong)] shadow-md transition hover:bg-[var(--color-bg-subtle)] dark:bg-[var(--color-bg-surface-dark)] dark:text-white dark:hover:bg-[var(--color-bg-surface-dark)]/80" aria-label={`${t('close')} bilhete`} title={`${t('close')} bilhete`}><X className="h-6 w-6" /></button></div><h2 id="ticket-dialog-title" className="sr-only">Comprovativo do bilhete</h2><QRCodeDisplay code={selectedTicket.orderCode} qrToken={selectedTicket.qrToken} title={selectedTicket.itemTitle} subtitle={selectedTicket.businessName} buyerName={selectedTicket.customerName} buyerPhone={selectedTicket.customerPhone} amountXOF={selectedTicket.totalPriceXOF} pinCode={selectedTicket.ticketPin} validUntil={selectedTicket.purchasedAt ? new Date(new Date(selectedTicket.purchasedAt).getTime() + 60 * 60 * 1000).toISOString() : undefined} status={selectedTicket.status === 'cancelled' ? 'cancelled' : selectedTicket.status === 'redeemed' ? 'used' : 'valid'} onCopyCode={() => copyCode(selectedTicket.orderCode)} currentLang={currentLang} />{copiedCode === selectedTicket.orderCode && <p className="pb-2 text-center text-xs font-black text-[var(--color-emerald-700)]">{t('citizen.codeCopied')}</p>}</div></div>}
     </section>
           </main>
         </div>

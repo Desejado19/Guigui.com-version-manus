@@ -96,6 +96,7 @@ const BUSINESS_FORBIDDEN_VALUE_KEYS: ReadonlySet<string> = new Set([
   'guigui_conversations',
   'guigui_conversation_messages',
   'guigui_support_requests',
+  'guigui_about_content',
 ]);
 
 /**

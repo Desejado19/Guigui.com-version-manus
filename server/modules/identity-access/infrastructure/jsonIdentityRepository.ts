@@ -201,8 +201,23 @@ export function findUserById(id: string) {
   return store.users.find((user) => user.id === id);
 }
 
+export function findUserByGoogleSubject(googleSubject: string) {
+  return store.users.find((user) => user.googleSubject === googleSubject);
+}
+
+/** Liga a identidade Google apenas quando a conta ainda não tem outra. */
+export function linkUserGoogleSubject(userId: string, googleSubject: string): boolean {
+  const user = findUserById(userId);
+  if (!user || (user.googleSubject && user.googleSubject !== googleSubject)) return false;
+  const other = findUserByGoogleSubject(googleSubject);
+  if (other && other.id !== userId) return false;
+  user.googleSubject = googleSubject;
+  persistStore();
+  return true;
+}
+
 export function toPublicUser(user: StoredUser): PublicUser {
-  const { passwordHash: _passwordHash, createdAt: _createdAt, ...publicUser } = user;
+  const { passwordHash: _passwordHash, createdAt: _createdAt, googleSubject: _googleSubject, ...publicUser } = user;
   return publicUser;
 }
 
@@ -235,12 +250,15 @@ export function verifyDemoPassword(email: string, password: string, fallbackPass
   return overrideHash ? verifyPassword(password, overrideHash) : password === fallbackPassword;
 }
 
-export function changeDemoPassword(email: string, currentPassword: string, newPassword: string) {
+export function changeDemoPassword(email: string, currentPassword: string, newPassword: string, fallbackPassword?: string) {
   const normalizedEmail = email.trim().toLowerCase();
   const overrideHash = demoPasswordStore[normalizedEmail];
-  const currentIsValid = overrideHash
-    ? verifyPassword(currentPassword, overrideHash)
-    : currentPassword === '123456';
+  // `fallbackPassword` é a palavra-passe com que a conta demo entra hoje; sem
+  // ela, as contas de demonstração nunca conseguiam alterar a palavra-passe.
+  // Aceita-se qualquer das duas: um override antigo pode ter ficado gravado e
+  // não deve bloquear quem entra com a credencial configurada.
+  const currentIsValid = (overrideHash ? verifyPassword(currentPassword, overrideHash) : false)
+    || currentPassword === (fallbackPassword || '123456');
   if (!currentIsValid) return false;
   demoPasswordStore[normalizedEmail] = hashPassword(newPassword);
   fs.mkdirSync(dataDirectory, { recursive: true });
@@ -299,6 +317,8 @@ export function createUser(input: CreateIdentityAccount) {
     teamPermissions: input.teamPermissions,
     passwordHash: hashPassword(input.password),
     createdAt: new Date().toISOString(),
+    ...(input.adminAccess ? { adminAccess: input.adminAccess } : {}),
+    ...(input.googleSubject ? { googleSubject: input.googleSubject } : {}),
   };
   store.users.unshift(user);
   try {
@@ -314,6 +334,8 @@ export function createJsonIdentityRepository(): IdentityAccountRepository {
   return {
     findByEmail: async (email) => findUserByEmail(email) ?? null,
     findById: async (id) => findUserById(id) ?? null,
+    findByGoogleSubject: async (googleSubject) => findUserByGoogleSubject(googleSubject) ?? null,
+    linkGoogleSubject: async (userId, googleSubject) => linkUserGoogleSubject(userId, googleSubject),
     create: async (input) => createUser(input),
     changePassword: async (email, currentPassword, newPassword) => changeUserPassword(email, currentPassword, newPassword),
     deactivate: async (email) => deactivateUserAccount(email),
@@ -323,7 +345,7 @@ export function createJsonIdentityRepository(): IdentityAccountRepository {
 
 export function createJsonCredentialRepository(): IdentityCredentialRepository {
   return {
-    changeDemoPassword: async (email, currentPassword, newPassword) => changeDemoPassword(email, currentPassword, newPassword),
+    changeDemoPassword: async (email, currentPassword, newPassword, fallbackPassword) => changeDemoPassword(email, currentPassword, newPassword, fallbackPassword),
     createPasswordReset: async (email) => createPasswordReset(email),
     resetPassword: async (token, newPassword) => resetPassword(token, newPassword),
   };

@@ -27,7 +27,7 @@ const OperationalAlertsPanel: React.FC<{
 }> = ({ data, loading, error, onOpenSection }) => {
   const active = (data?.alerts || []).filter((alert) => alert.count > 0);
   return (
-    <section aria-labelledby="finance-operational-alerts" className="rounded-2xl border border-[#e6dac8] bg-white p-4 shadow-sm">
+    <section aria-labelledby="finance-operational-alerts" className="rounded-2xl border border-[var(--color-border-default)] bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex items-start gap-2.5">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#123e3b] text-white shadow-sm"><BellRing className="h-4 w-4" /></span>
@@ -39,17 +39,17 @@ const OperationalAlertsPanel: React.FC<{
           </div>
         </div>
         {data && active.length > 0 && (
-          <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[9px] font-black text-rose-800">
+          <span className="rounded-full border border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] px-2.5 py-1 text-[9px] font-black text-[var(--tone-danger-text)]">
             {data.totals.affectedItems} item(ns) · {formatXOF(data.totals.amountXOF)}
           </span>
         )}
       </div>
 
-      {error && <div role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-[10px] font-bold text-rose-900">{error}</div>}
+      {error && <div role="alert" className="mt-3 rounded-xl border border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] p-2.5 text-[10px] font-bold text-[var(--tone-danger-text)]">{error}</div>}
       {loading ? (
         <p className="mt-3 text-[10px] font-bold text-slate-500">A calcular alertas operacionais…</p>
       ) : !error && active.length === 0 ? (
-        <div className="mt-3 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-2.5 text-[10px] text-emerald-900">
+        <div className="mt-3 flex items-start gap-2 rounded-xl border border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] p-2.5 text-[10px] text-[var(--tone-success-text)]">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
           <span><strong className="font-black">Sem alertas operacionais.</strong> Não existem divergências de reconciliação nem pagamentos pendentes acima de 48 horas.</span>
         </div>
@@ -58,16 +58,16 @@ const OperationalAlertsPanel: React.FC<{
           {active.map((alert) => {
             const critical = alert.severity === 'critical';
             return (
-              <article key={alert.id} className={`rounded-xl border p-3 ${critical ? 'border-rose-200 bg-rose-50/60' : 'border-amber-200 bg-amber-50/60'}`}>
+              <article key={alert.id} className={`rounded-xl border p-3 ${critical ? 'border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)]/60' : 'border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)]/60'}`}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="flex min-w-0 items-start gap-2">
-                    <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${critical ? 'text-rose-700' : 'text-amber-700'}`} />
+                    <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${critical ? 'text-[var(--tone-danger-text)]' : 'text-[var(--tone-warning-text)]'}`} />
                     <div>
                       <h4 className="text-[11px] font-black text-slate-900">{alert.title}</h4>
                       <p className="mt-0.5 text-[9.5px] leading-relaxed text-slate-600">{alert.description}</p>
                     </div>
                   </div>
-                  <span className={`rounded-full border px-2 py-0.5 text-[8.5px] font-black ${critical ? 'border-rose-300 bg-white text-rose-800' : 'border-amber-300 bg-white text-amber-800'}`}>
+                  <span className={`rounded-full border px-2 py-0.5 text-[8.5px] font-black ${critical ? 'border-[var(--tone-danger-border)] bg-white text-[var(--tone-danger-text)]' : 'border-[var(--tone-warning-border)] bg-white text-[var(--tone-warning-text)]'}`}>
                     {alert.count} {alert.count === 1 ? 'ocorrência' : 'ocorrências'}
                   </span>
                 </div>
@@ -80,13 +80,13 @@ const OperationalAlertsPanel: React.FC<{
                     <li key={item.id} className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-white bg-white/80 px-2.5 py-1.5 text-[9.5px]">
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-black text-slate-800">
-                          {item.payerName} <span className="font-mono text-[8.5px] font-bold text-slate-400">{item.transactionId}</span>
+                          {item.payerName} <span className="font-mono text-[8.5px] font-bold text-slate-500">{item.transactionId}</span>
                         </div>
                         <div className="text-slate-500">{item.providerLabel} · {item.statusLabel} · há {formatFinanceAge(item.ageHours)}</div>
                       </div>
                       <div className="text-right">
                         <div className="whitespace-nowrap font-black tabular-nums text-slate-900">{formatXOF(item.amountXOF)}</div>
-                        {item.divergenceXOF != null && <div className="font-bold text-rose-700">Desvio: {formatXOF(item.divergenceXOF)}</div>}
+                        {item.divergenceXOF != null && <div className="font-bold text-[var(--tone-danger-text)]">Desvio: {formatXOF(item.divergenceXOF)}</div>}
                       </div>
                     </li>
                   ))}
@@ -136,12 +136,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onOpenSection }) =
 
   const platform = summary?.platform;
   const kpis = [
-    { label: 'Volume financeiro registado', value: formatXOF(platform?.volumeXOF), hint: `${platform?.transactionCount ?? 0} transações de plataforma`, tone: 'border-[#cfe2df] bg-[#f3faf8] text-[#123e3b]' },
-    { label: 'Pagamentos confirmados', value: String(platform?.confirmedCount ?? '—'), hint: `${formatXOF(platform?.confirmedXOF)} · apenas reais`, tone: 'border-emerald-200 bg-emerald-50 text-emerald-900' },
-    { label: 'Pagamentos pendentes', value: String(platform?.pendingCount ?? '—'), hint: formatXOF(platform?.pendingXOF), tone: 'border-amber-200 bg-amber-50 text-amber-900' },
-    { label: 'Total reconciliado', value: formatXOF(platform?.reconciledXOF), hint: `${platform?.reconciledCount ?? 0} pagamentos`, tone: 'border-sky-200 bg-sky-50 text-sky-900' },
-    { label: 'Reembolsos efetuados', value: formatXOF(platform?.refundsProcessedXOF), hint: `${platform?.refundsProcessedCount ?? 0} processos concluídos`, tone: 'border-violet-200 bg-violet-50 text-violet-900' },
-    { label: 'Número de transações', value: String(platform?.transactionCount ?? '—'), hint: 'Receita de bilhetes excluída', tone: 'border-slate-200 bg-white text-slate-900' },
+    { label: 'Volume financeiro registado', value: formatXOF(platform?.volumeXOF), hint: `${platform?.transactionCount ?? 0} transações de plataforma`, tone: 'border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] text-[var(--color-green-800)]' },
+    { label: 'Pagamentos confirmados', value: String(platform?.confirmedCount ?? '—'), hint: `${formatXOF(platform?.confirmedXOF)} · apenas reais`, tone: 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)]' },
+    { label: 'Pagamentos pendentes', value: String(platform?.pendingCount ?? '—'), hint: formatXOF(platform?.pendingXOF), tone: 'border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)]' },
+    { label: 'Total reconciliado', value: formatXOF(platform?.reconciledXOF), hint: `${platform?.reconciledCount ?? 0} pagamentos`, tone: 'border-[var(--tone-info-border)] bg-[var(--tone-info-bg)] text-[var(--tone-info-text)]' },
+    { label: 'Reembolsos efetuados', value: formatXOF(platform?.refundsProcessedXOF), hint: `${platform?.refundsProcessedCount ?? 0} processos concluídos`, tone: 'border-[var(--tone-info-border)] bg-[var(--tone-info-bg)] text-[var(--tone-info-text)]' },
+    { label: 'Número de transações', value: String(platform?.transactionCount ?? '—'), hint: 'Receita de bilhetes excluída', tone: 'border-[var(--color-border-default)] bg-white text-slate-900' },
   ];
 
   return (

@@ -17,9 +17,9 @@ interface AdminUser {
 }
 
 const ROLE_META: Record<UserRole, { label: string; className: string; icon: React.ReactNode }> = {
-  admin: { label: 'Admin', className: 'bg-purple-50 text-purple-700 border-purple-200', icon: <ShieldCheck className="w-3 h-3" /> },
-  business: { label: 'Empresa', className: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <Store className="w-3 h-3" /> },
-  user: { label: 'Cidadao', className: 'bg-blue-50 text-blue-700 border-blue-200', icon: <Users className="w-3 h-3" /> },
+  admin: { label: 'Admin', className: 'bg-[var(--tone-info-bg)] text-[var(--tone-info-text)] border-[var(--tone-info-border)]', icon: <ShieldCheck className="w-3 h-3" /> },
+  business: { label: 'Empresa', className: 'bg-[var(--tone-success-bg)] text-[var(--tone-success-text)] border-[var(--tone-success-border)]', icon: <Store className="w-3 h-3" /> },
+  user: { label: 'Cidadao', className: 'bg-[var(--tone-info-bg)] text-[var(--tone-info-text)] border-[var(--tone-info-border)]', icon: <Users className="w-3 h-3" /> },
 };
 
 const ROLE_FILTERS: Array<{ value: string; label: string }> = [
@@ -90,13 +90,13 @@ export const AdminUsersHub: React.FC = () => {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Pesquisar nome ou email..."
-              className="pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl w-64 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+              className="pl-9 pr-3 py-2 text-sm border border-[var(--color-border-default)] rounded-xl w-64 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
             />
           </div>
           <select
             value={role}
             onChange={(e) => setRole(e.target.value)}
-            className="py-2 px-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white"
+            className="py-2 px-3 text-sm border border-[var(--color-border-default)] rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white"
           >
             {ROLE_FILTERS.map((f) => (
               <option key={f.value} value={f.value}>{f.label}</option>
@@ -106,7 +106,7 @@ export const AdminUsersHub: React.FC = () => {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>
+        <div className="bg-[var(--tone-danger-bg)] border border-[var(--tone-danger-border)] text-[var(--tone-danger-text)] text-sm rounded-xl px-4 py-3">{error}</div>
       )}
 
       <div className="rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] overflow-hidden">
@@ -121,7 +121,7 @@ export const AdminUsersHub: React.FC = () => {
                 <th className="text-left font-bold px-4 py-3">Registado</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[var(--color-border-subtle)]">
               {loading && (
                 <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400"><Loader2 className="w-5 h-5 animate-spin inline mr-2" />A carregar utilizadores...</td></tr>
               )}

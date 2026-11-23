@@ -73,6 +73,7 @@
   --color-red-700: #B42318;
   --color-red-800: #912018;
   --color-red-900: #7A271A;
+  --color-red-950: var(--color-red-900);
 
   /* Amarelo - aviso, atenção, pendente */
   --color-yellow-50: #FFFBEB;
@@ -85,6 +86,7 @@
   --color-yellow-700: #A15C07;
   --color-yellow-800: #854D0E;
   --color-yellow-900: #713F12;
+  --color-yellow-950: var(--color-yellow-900);
 
   /* Azul - informação, dados, indicadores neutros */
   --color-blue-50: #EFF8FF;
@@ -97,6 +99,7 @@
   --color-blue-700: #175CD3;
   --color-blue-800: #1849A9;
   --color-blue-900: #194185;
+  --color-blue-950: var(--color-blue-900);
   /* Neutro quente - superfícies, texto, bordas */
   --color-neutral-0: #FFFFFF;
   --color-neutral-25: #FCFBF8;
@@ -171,8 +174,10 @@
   --color-emerald-200: var(--color-green-200);
   --color-emerald-300: var(--color-green-300);
   --color-emerald-400: var(--color-green-400);
-  --color-emerald-500: var(--color-green-500);
-  --color-emerald-600: var(--color-green-600);
+  /* 500/600 são usados sobretudo em texto pequeno e botões com texto branco.
+     Apontam para green-700 (7.27:1 sobre branco) para cumprir WCAG AA. */
+  --color-emerald-500: var(--color-green-700);
+  --color-emerald-600: var(--color-green-700);
   --color-emerald-700: var(--color-green-700);
   --color-emerald-800: var(--color-green-800);
   --color-emerald-900: var(--color-green-900);
@@ -206,8 +211,9 @@
   --color-amber-200: var(--color-gold-200);
   --color-amber-300: var(--color-gold-300);
   --color-amber-400: var(--color-gold-400);
-  --color-amber-500: var(--color-gold-500);
-  --color-amber-600: var(--color-gold-600);
+  /* Texto âmbar pequeno sobre branco: gold-700 garante 4.63:1. */
+  --color-amber-500: var(--color-gold-700);
+  --color-amber-600: var(--color-gold-700);
   --color-amber-700: var(--color-gold-700);
   --color-amber-800: var(--color-gold-800);
   --color-amber-900: var(--color-gold-900);
@@ -338,6 +344,12 @@
   --color-bg-brand-soft: var(--color-green-50);
   --color-bg-accent: var(--color-gold-500);
   --color-bg-danger: var(--color-red-700);
+  --color-accent-500: var(--color-coral-500);
+  --color-accent-600: var(--color-coral-600);
+  --color-bg-strong: var(--color-neutral-200);
+  --color-paper: var(--color-bg-canvas);
+  /* Limite de campos: 5.61:1 sobre branco (WCAG 1.4.11 exige 3:1). */
+  --color-border-input: var(--color-neutral-500);
   --color-text-strong: var(--color-neutral-900);
   --color-text-default: var(--color-neutral-700);
   --color-text-muted: var(--color-neutral-500);
@@ -352,7 +364,7 @@
   --color-border-default: var(--color-neutral-200);
   --color-border-subtle: rgba(16, 41, 35, 0.08);
   --color-border-strong: var(--color-green-900);
-  --color-focus-ring: rgba(232, 162, 58, 0.52);
+  --color-focus-ring: var(--color-green-700);
   --color-state-success: var(--color-green-600);
   --color-state-warning: var(--color-yellow-700);
   --color-state-danger: var(--color-red-700);
@@ -410,7 +422,7 @@
   --guigui-gold: var(--gold);
   --guigui-ink: var(--text);
   --guigui-muted: var(--mute);
-  --guigui-surface: rgba(255, 255, 255, 0.94);
+  --guigui-surface: #ffffff;
   --guigui-border: var(--line);
   --guigui-shadow: 0 18px 45px rgba(11, 59, 55, 0.10);
   --guigui-ease: cubic-bezier(0.23, 1, 0.32, 1);
@@ -458,6 +470,11 @@ html.dark {
   --color-border-subtle: rgba(220, 234, 230, 0.1);
   --color-text-positive: #8be2be;
   --color-text-negative: #ffa198;
+  --color-accent-500: var(--color-coral-400);
+  --color-accent-600: var(--color-coral-500);
+  --color-bg-strong: var(--color-green-800);
+  --color-border-input: var(--color-neutral-400);
+  --color-focus-ring: #8be2be;
 }
 html.dark body {
   background: linear-gradient(180deg, #071d1b 0%, #0b2122 100%);
@@ -472,8 +489,6 @@ html.dark .guigui-app-shell {
 html.dark .guigui-navbar {
   background: #0b1416;
   border-color: rgba(148, 163, 184, 0.2);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
 }
 html.dark .guigui-nav-search,
 html.dark .guigui-nav-popover,
@@ -511,8 +526,6 @@ html.dark .guigui-coral-button:hover {
 html.dark .guigui-backbar {
   background: #0d2725;
   border-color: rgba(148, 163, 184, 0.18);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
 }
 html.dark .guigui-nav-link,
 html.dark .guigui-nav-link:hover,
@@ -536,12 +549,19 @@ html.dark .text-slate-800,
 html.dark .text-slate-700 {
   color: #e8f2ee;
 }
-html.dark .text-slate-600 {
+html.dark .text-slate-600,
+html.dark .text-slate-500 {
   color: #c2d3cd;
 }
+html.dark .text-emerald-500,
+html.dark .text-emerald-600,
 html.dark .text-emerald-700,
 html.dark .text-emerald-800 {
   color: #7fe0bb;
+}
+html.dark .text-amber-500,
+html.dark .text-amber-600 {
+  color: var(--color-gold-300);
 }
 html.dark [class*="text-[var(--color-green-950)]"],
 html.dark [class*="text-[var(--color-green-900)]"],
@@ -565,10 +585,10 @@ html.dark .bg-white {
   background-color: var(--color-bg-surface);
 }
 html.dark .bg-slate-50 {
-  background-color: #0b2320;
+  background-color: var(--color-bg-surface-dark);
 }
 html.dark .bg-slate-100 {
-  background-color: #102d2b;
+  background-color: var(--color-bg-subtle);
 }
 html.dark .bg-slate-200 {
   background-color: #16332f;
@@ -579,8 +599,43 @@ html.dark .bg-emerald-50 {
 html.dark .bg-emerald-100 {
   background-color: rgba(63, 174, 128, 0.24);
 }
+
+/* ------------------------------------------------------------
+   Tons semânticos: sucesso, aviso, perigo e informação.
+   Os componentes de gestão usam estes tokens em vez de cores fixas
+   (emerald/amber/rose/sky-50…), para que cartões, chips, alertas e KPIs
+   sigam a paleta do tema ativo — claro ou escuro.
+   ------------------------------------------------------------ */
+:root {
+  --tone-success-bg: var(--color-green-50);
+  --tone-success-border: var(--color-green-200);
+  --tone-success-text: var(--color-green-800);
+  --tone-warning-bg: var(--color-gold-50);
+  --tone-warning-border: var(--color-gold-200);
+  --tone-warning-text: var(--color-gold-800);
+  --tone-danger-bg: var(--color-coral-50);
+  --tone-danger-border: var(--color-coral-200);
+  --tone-danger-text: var(--color-coral-800);
+  --tone-info-bg: var(--color-sky-50);
+  --tone-info-border: var(--color-sky-200);
+  --tone-info-text: var(--color-blue-800);
+}
+html.dark {
+  --tone-success-bg: rgba(63, 174, 128, 0.16);
+  --tone-success-border: rgba(155, 205, 187, 0.42);
+  --tone-success-text: #b6f0d6;
+  --tone-warning-bg: rgba(232, 162, 58, 0.16);
+  --tone-warning-border: rgba(248, 209, 140, 0.4);
+  --tone-warning-text: #f8d9a5;
+  --tone-danger-bg: rgba(255, 107, 87, 0.16);
+  --tone-danger-border: rgba(245, 181, 168, 0.42);
+  --tone-danger-text: #ffc4b8;
+  --tone-info-bg: rgba(96, 165, 250, 0.16);
+  --tone-info-border: rgba(147, 197, 253, 0.38);
+  --tone-info-text: #c7dcff;
+}
 html.dark .guigui-filter-chip {
-  background: rgba(255, 255, 255, 0.06);
+  background: #16332f;
   border-color: rgba(220, 234, 230, 0.22);
   color: #dbeae5;
 }
@@ -590,7 +645,7 @@ html.dark .guigui-filter-chip.active {
   border-color: rgba(155, 205, 187, 0.6);
   color: #ffffff;
 }
-/* Barra de navegação inferior flutuante (fundo sólido, sem glass) */
+/* Barra de navegação inferior flutuante (fundo sólido) */
 .guigui-bottom-nav__surface {
   border-radius: 9999px;
   border: 1px solid var(--color-border-subtle);
@@ -638,7 +693,16 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 button, a { min-width: 0; transition: transform 160ms var(--guigui-ease), box-shadow 180ms var(--guigui-ease), background-color 180ms ease, color 180ms ease, border-color 180ms ease, opacity 180ms ease; }
 button:active:not(:disabled) { transform: scale(.975); }
 button:disabled { cursor: not-allowed; }
-:where(button, a, input, select, textarea):focus-visible { outline: 3px solid rgba(232, 162, 58, .48); outline-offset: 3px; }
+:where(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+/* Limites de campos e placeholders com contraste suficiente nos dois temas. */
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+select,
+textarea { border-color: var(--color-border-input); }
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):focus,
+select:focus,
+textarea:focus { border-color: var(--color-green-500); }
+input::placeholder,
+textarea::placeholder { color: var(--color-text-muted); opacity: 1; }
 img, svg, video { max-width: 100%; }
 img { display: block; height: auto; }
 ::selection { background: rgba(232, 162, 58, .32); color: var(--ink); }
@@ -705,8 +769,6 @@ pre, code { white-space: pre-wrap; word-break: break-word; max-width: 100%; }
   margin: 0 0.35rem 10px;
   padding: 5px 6px 5px 8px;
   background: #fff;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
   border: 1px solid var(--line);
   border-radius: 999px;
   box-shadow: 0 6px 18px -14px rgba(11, 59, 55, 0.4);
@@ -721,6 +783,10 @@ pre, code { white-space: pre-wrap; word-break: break-word; max-width: 100%; }
 .guigui-profile-footer {
   margin-left: var(--sidebar-offset, 0px);
   transition: margin-left 300ms ease-out;
+}
+/* Rodapé escuro também no tema claro: o texto não pode herdar tons escuros. */
+html:not(.dark) .guigui-profile-footer :is(.text-slate-300, .text-slate-400, .text-slate-500) {
+  color: var(--color-green-100);
 }
 .guigui-secondary-page {
   padding-left: 0.25rem;
@@ -791,7 +857,7 @@ img, video {
   --color-bg-subtle: #f8fafc;
   --color-text-strong: #0f172a;
   --color-text-default: #1e293b;
-  /* Escurecido para >=4.5:1 sobre o fundo quente do dashboard (#f3efe9). */
+  /* Escurecido para >=4.5:1 sobre o fundo quente do dashboard (var(--color-bg-dashboard-canvas)). */
   --color-text-muted: #5b6b67;
   --color-border-default: rgba(15, 23, 42, 0.14);
   --color-border-subtle: rgba(15, 23, 42, 0.08);
@@ -805,11 +871,10 @@ html.dark .guigui-light-dashboard {
   --color-text-muted: #9bb8ad;
   --color-border-default: #285849;
   --color-border-subtle: rgba(158, 227, 195, 0.16);
+  --color-border-input: #52796b;
 }
-html.dark .guigui-light-dashboard .bg-red-50 { background-color: #fef2f2 !important; }
-html.dark .guigui-light-dashboard .bg-blue-50/80 { background-color: rgba(23, 64, 90, 0.8) !important; }
 .guigui-light-dashboard .guigui-communication-shell { color: #1b1f29; }
-html.dark .guigui-light-dashboard .guigui-communication-shell { color: #edf8f3; }
+html.dark .guigui-light-dashboard .guigui-communication-shell { color: var(--color-green-50); }
 
 /* Texto pequeno em modo escuro: evita texto claro sobre painéis escuros
    mantendo as cores do dashboard escuro. */
@@ -820,19 +885,24 @@ html.dark .guigui-light-dashboard [class*="text-[8px]"] {
   color: var(--color-text-muted) !important;
 }
 
-guigui-profile-dashboard input,
+.guigui-profile-dashboard input,
 .guigui-profile-dashboard select,
 .guigui-profile-dashboard textarea {
   max-width: 100%;
 }
 
 /* Brand and navigation */
-.guigui-navbar { position: sticky; top: 0; z-index: 100 !important; background: #f7f5f1; border-bottom: 1px solid var(--line); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.guigui-navbar { position: sticky; top: 0; z-index: 100 !important; background: #f7f5f1; border-bottom: 1px solid var(--line); }
 .guigui-navbar-inner { min-height: 72px; width: 100%; max-width: 1440px; margin: 0 auto; padding: 12px clamp(16px, 4vw, 56px); display: flex; align-items: center; gap: 18px; }
 .guigui-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; flex-shrink: 0; }
 .guigui-brand-mark { width: 34px; height: 34px; flex: 0 0 34px; }
 .guigui-brand-word { font-family: var(--font-family); font-size: 23px; font-weight: 700; letter-spacing: -.02em; }
-.guigui-brand-word .dot { color: var(--gold); }
+.guigui-brand-word .dot { color: var(--color-gold-800); }
+html.dark .guigui-brand { color: #edf7f5; }
+html.dark .guigui-navbar .guigui-brand-word { color: #edf7f5; }
+html.dark .guigui-brand-word .dot { color: var(--color-gold-400); }
+/* O corpo da estrela é verde-escuro; no navbar escuro fica quase invisível. */
+html.dark .guigui-navbar .guigui-brand-mark svg path { fill: var(--color-green-100); }
 .guigui-nav-links { display: flex; align-items: center; gap: 4px; flex: 1; }
 .guigui-nav-link { border: 0; background: transparent; color: var(--mute); padding: 10px 12px; border-radius: 10px; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; }
 .guigui-nav-link:hover, .guigui-nav-link.active { color: var(--ink); background: rgba(11,59,55,.07); }
@@ -895,18 +965,23 @@ guigui-profile-dashboard input,
 .guigui-home-hero { padding-top: clamp(30px, 5vw, 58px); padding-bottom: 34px; }
 .guigui-home-hero .guigui-hero-title { font-size: clamp(30px, 4.5vw, 52px); }
 .guigui-sponsored-banner { overflow: hidden; border: 1px solid rgba(11, 59, 55, .16); border-radius: 24px; background: var(--ink); box-shadow: 0 18px 38px -28px rgba(11, 59, 55, .55); }
-.guigui-sponsored-banner > a { min-height: 190px; }
-/* A fotografia acompanha a altura da coluna de texto: sem altura fixa,
-   deixava uma faixa vazia por baixo quando a descrição era mais alta. */
-.guigui-sponsored-banner > div,
-.guigui-sponsored-banner > a { align-items: stretch; }
+/* O primeiro filho é sempre o slide (empresa ou campanha): garante o mesmo
+   piso de altura mesmo quando o destaque não tem fotografia. */
+.guigui-sponsored-banner > :first-child { min-height: 190px; }
 .guigui-sponsored-copy { display: flex; flex-direction: column; justify-content: center; gap: 7px; padding: 18px 24px; }
 .guigui-sponsored-label { width: fit-content; border: 1px solid rgba(255,255,255,.28); border-radius: 999px; background: rgba(255,255,255,.08); padding: 6px 11px; color: var(--color-green-100); font-size: 10px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
 .guigui-sponsored-copy h2 { margin: 0; color: #fff; font-family: var(--font-family); font-size: clamp(22px, 2.4vw, 32px); font-weight: 600; line-height: 1.08; }
 .guigui-sponsored-copy p { max-width: 520px; margin: 0; color: #C5D8D3; font-size: 13px; line-height: 1.5; }
 .guigui-sponsored-link { color: var(--gold); font-size: 12px; font-weight: 600; }
-.guigui-sponsored-image { display: block; width: 100%; height: 100%; min-height: 190px; object-fit: cover; object-position: center; opacity: .92; transition: transform .3s ease; }
-.guigui-sponsored-banner a:hover .guigui-sponsored-image { transform: scale(1.03); }
+/* Moldura da fotografia: a imagem cabe sempre inteira dentro da área
+   reservada, com qualquer proporção, sem cortes nem transbordo. */
+.guigui-sponsored-media { display: flex; height: 100%; align-items: center; justify-content: center; overflow: hidden; padding: 14px; background: rgba(255, 255, 255, .035); }
+.guigui-sponsored-image { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; border-radius: 14px; box-shadow: 0 16px 30px -22px rgba(0, 0, 0, .85); }
+.guigui-sponsored-pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 2px 12px 12px; }
+.guigui-sponsored-nav { display: inline-flex; height: 26px; width: 26px; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: transparent; color: rgba(255, 255, 255, .34); cursor: pointer; transition: color .2s ease, background-color .2s ease; }
+.guigui-sponsored-nav:hover { color: rgba(255, 255, 255, .88); background: rgba(255, 255, 255, .06); }
+.guigui-sponsored-nav:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.guigui-sponsored-counter { min-width: 42px; text-align: center; color: rgba(255, 255, 255, .40); font-size: 10px; font-weight: 600; letter-spacing: .22em; font-variant-numeric: tabular-nums; }
 .guigui-search {
   display: flex;
   align-items: center;
@@ -916,13 +991,13 @@ guigui-profile-dashboard input,
   padding: 6px 7px 6px 16px;
   border: 1px solid rgba(255,255,255,0.14);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.96);
+  background: #ffffff;
   color: var(--mute);
   box-shadow: 0 20px 50px -28px rgba(0,0,0,0.55);
 }
 .guigui-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 13px; }
 .dark .guigui-search {
-  background: rgba(15, 23, 42, 0.94);
+  background: #0f172a;
   border-color: rgba(255, 255, 255, 0.14);
   color: #cbd5e1;
   box-shadow: 0 20px 50px -28px rgba(0, 0, 0, 0.9);
@@ -971,9 +1046,8 @@ guigui-profile-dashboard input,
 .guigui-panel {
   border: 1px solid rgba(16, 41, 35, 0.08);
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.88);
+  background: #ffffff;
   box-shadow: 0 18px 40px -30px rgba(11,59,55,.35);
-  backdrop-filter: blur(10px);
 }
 .guigui-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px 13px; border-bottom: 1px solid rgba(16,41,35,0.08); }
 .guigui-panel-header h3 { margin: 0; color: var(--ink); font-family: var(--font-family); font-size: 13px; font-weight: 600; }
@@ -1007,7 +1081,7 @@ guigui-profile-dashboard input,
   border: 1px solid rgba(16,41,35,0.12);
   border-radius: 999px;
   padding: 8px 13px;
-  background: rgba(255, 255, 255, 0.8);
+  background: #ffffff;
   color: var(--mute);
   font-size: 11px;
   font-weight: 600;
@@ -1028,12 +1102,21 @@ guigui-profile-dashboard input,
   transition: transform var(--duration-normal) var(--ease-standard), box-shadow var(--duration-normal) var(--ease-standard), border-color var(--duration-normal) var(--ease-standard);
 }
 .guigui-business-card:hover { transform: translateY(-3px); border-color: var(--color-border-strong); box-shadow: var(--shadow-lg); }
-.guigui-business-cover { position: relative; height: 160px; overflow: hidden; background: var(--color-bg-brand-soft); }
-.guigui-business-cover img { width: 100%; height: 100%; object-fit: cover; transition: transform 220ms var(--guigui-ease); }
-.guigui-business-card:hover .guigui-business-cover img { transform: scale(1.04); }
-.guigui-business-cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 38%, rgba(7,32,28,.55)); pointer-events: none; }
-.guigui-business-cover-badge { position: absolute; z-index: 1; top: 11px; left: 11px; border-radius: 999px; padding: 6px 9px; background: var(--gold); color: #28210a; font-size: 9px; font-weight: 600; text-transform: uppercase; }
-.guigui-business-cover-status { position: absolute; z-index: 1; top: 11px; right: 11px; border-radius: 999px; padding: 6px 9px; background: rgba(11,59,55,.88); color: #fff; font-size: 9px; font-weight: 500; }
+/* Fotografia premium: a imagem aparece inteira dentro de uma moldura com
+   fundo subtil e cantos arredondados, sem cortes — mesmo tratamento dos
+   destaques da página inicial (.guigui-sponsored-media).
+   Os badges ficam numa barra própria acima da moldura (e o "Comparar" abaixo
+   dela), alinhados com as suas margens, para nunca taparem a fotografia. */
+.guigui-business-cover { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 12px 12px 0; background: var(--color-bg-subtle); }
+.guigui-business-cover-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+.guigui-business-cover-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+/* A fotografia ocupa toda a área reservada da moldura (o espaço previsto antes
+   era este 16/9): sem margem interior, a imagem escala até às bordas e só sobra
+   fundo verde nas proporções que não coincidem com a moldura. */
+.guigui-business-cover-frame { position: relative; display: flex; width: 100%; aspect-ratio: 16 / 9; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--color-green-100); border-radius: 14px; background: var(--color-green-50); }
+html.dark .guigui-business-cover-frame { border-color: var(--color-green-900); background: var(--color-green-950); }
+.guigui-business-cover-frame img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.guigui-business-cover-footer { display: flex; align-items: center; justify-content: flex-end; padding-bottom: 12px; }
 .guigui-business-content { padding: 0; }
 .guigui-business-content h3 { margin: 0; color: var(--color-text-strong); font-family: var(--font-family); font-size: 16px; font-weight: 700; }
 .guigui-business-content p { margin: 0; color: var(--color-text-default); font-size: 13px; line-height: 1.6; }
@@ -1077,11 +1160,15 @@ html:not(.dark) .guigui-app-shell .text-emerald-600, html:not(.dark) .guigui-app
   .guigui-search-button { padding: 10px 12px; }
   .guigui-category-grid { display: flex; overflow-x: auto; margin: 0 -2px; padding-bottom: 4px; }
   .guigui-category-card { min-width: 82px; }
-  .guigui-sponsored-banner > a { height: auto; min-height: 0; }
+  .guigui-sponsored-banner > :first-child { min-height: 0; }
   .guigui-sponsored-copy { padding: 18px 20px; }
   /* Em ecrã estreito o banner empilha: a imagem ocupa uma faixa proporcional
      em vez de uma altura fixa que sobrava por baixo. */
-  .guigui-sponsored-image { height: auto; min-height: 0; aspect-ratio: 16 / 9; }
+  .guigui-sponsored-media { height: auto; min-height: 0; aspect-ratio: 16 / 9; padding: 10px; }
+  /* Cartões do diretório em ecrã estreito: margem e espaçamento ligeiramente
+     mais curtos para a moldura da foto manter área útil. */
+  .guigui-business-cover { gap: 8px; padding: 10px 10px 0; }
+  .guigui-business-cover-footer { padding-bottom: 10px; }
   .guigui-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; }
   .guigui-mini-thumb { height: 82px; }
   .guigui-directory-header { align-items: start; flex-direction: column; }
@@ -1163,42 +1250,7 @@ html:not(.dark) .guigui-app-shell .text-emerald-600, html:not(.dark) .guigui-app
    para #fff no subtree.
    ============================================================ */
 html.dark .guigui-light-dashboard,
-html.dark .guigui-light-dashboard *,
-html.dark .guigui-light-dashboard .guigui-category-card,
-html.dark .guigui-light-dashboard .guigui-category-icon,
-html.dark .guigui-light-dashboard .guigui-icon-button,
-html.dark .guigui-light-dashboard .guigui-panel,
-html.dark .guigui-light-dashboard .guigui-panel *,
-html.dark .guigui-light-dashboard .guigui-search,
-html.dark .guigui-light-dashboard .guigui-business-cover,
-html.dark .guigui-light-dashboard .guigui-card,
-html.dark .guigui-light-dashboard .guigui-card *,
-html.dark .guigui-light-dashboard .guigui-ticket-card,
-html.dark .guigui-light-dashboard .guigui-ticket-card *,
-html.dark .guigui-light-dashboard .guigui-offer-card,
-html.dark .guigui-light-dashboard .guigui-offer-card *,
-html.dark .guigui-light-dashboard .guigui-post-card,
-html.dark .guigui-light-dashboard .guigui-post-card *,
-html.dark .guigui-light-dashboard .guigui-feed-card,
-html.dark .guigui-light-dashboard .guigui-feed-card *,
-html.dark .guigui-light-dashboard .guigui-notification-card,
-html.dark .guigui-light-dashboard .guigui-notification-card *,
-html.dark .guigui-light-dashboard .guigui-tab,
-html.dark .guigui-light-dashboard .guigui-tab *,
-html.dark .guigui-light-dashboard .guigui-tab-btn,
-html.dark .guigui-light-dashboard .guigui-tab-btn *,
-html.dark .guigui-light-dashboard button,
-html.dark .guigui-light-dashboard .guigui-button,
-html.dark .guigui-light-dashboard .guigui-outline-button,
-html.dark .guigui-light-dashboard .guigui-primary-button,
-html.dark .guigui-light-dashboard .guigui-coral-button,
-html.dark .guigui-light-dashboard .guigui-search-button,
-html.dark .guigui-light-dashboard .guigui-search-input,
-html.dark .guigui-light-dashboard input,
-html.dark .guigui-light-dashboard select,
-html.dark .guigui-light-dashboard textarea,
-html.dark .guigui-light-dashboard .guigui-input,
-html.dark .guigui-light-dashboard .guigui-select {
+html.dark .guigui-light-dashboard * {
   background-color: transparent !important;
   background: transparent !important;
   box-shadow: none !important;
@@ -1207,9 +1259,6 @@ html.dark .guigui-light-dashboard .guigui-select {
 /* Parágrafos de identificação (ex.: linha de empresa+data atrás do cartão de bilhete):
    o parágrafo em si carrega o fundo branco via classe inline, por isso o seletor abaixo
    aplica o fundo escuro mesmo quando o elemento não é filho direto de .guigui-light-dashboard. */
-html.dark .guigui-light-dashboard p[class*="text-[11px]"][class*="font-semibold"][class*="text-[var(--color-text-muted)]"],
-html.dark .guigui-light-dashboard div[class*="text-[11px]"][class*="font-semibold"][class*="text-[var(--color-text-muted)]"],
-html.dark .guigui-light-dashboard span[class*="text-[11px]"][class*="font-semibold"][class*="text-[var(--color-text-muted)]"],
 html.dark .guigui-light-dashboard [class*="text-[11px]"][class*="font-semibold"][class*="text-[var(--color-text-muted)]"] {
   background-color: var(--color-bg-subtle-dark) !important;
   background: var(--color-bg-subtle-dark) !important;
@@ -1234,110 +1283,114 @@ html.dark .guigui-light-dashboard .guigui-brand-mark {
 /* Caixas de fundo claro (Tailwind e arbitrárias) — tornam-se cor de
    superfície escura para não ficarem brancas em dark mode. */
 
-html.dark .guigui-light-dashboard .bg-white,
-html.dark .guigui-light-dashboard .bg-slate-50,
-html.dark .guigui-light-dashboard .bg-slate-100,
-html.dark .guigui-light-dashboard .bg-neutral-50,
-html.dark .guigui-light-dashboard .bg-neutral-100,
-html.dark .guigui-light-dashboard .bg-zinc-50,
-html.dark .guigui-light-dashboard .bg-zinc-100,
-html.dark .guigui-light-dashboard .bg-gray-50,
-html.dark .guigui-light-dashboard .bg-gray-100,
-html.dark .guigui-light-dashboard .bg-stone-50,
-html.dark .guigui-light-dashboard .bg-stone-100,
-html.dark .guigui-light-dashboard .bg-red-50,
-html.dark .guigui-light-dashboard .bg-blue-50,
-html.dark .guigui-light-dashboard .bg-green-50,
-html.dark .guigui-light-dashboard .bg-yellow-50,
-html.dark .guigui-light-dashboard .bg-amber-50,
-html.dark .guigui-light-dashboard .bg-emerald-50,
-html.dark .guigui-light-dashboard .bg-cyan-50,
-html.dark .guigui-light-dashboard .bg-indigo-50,
-html.dark .guigui-light-dashboard .bg-violet-50,
-html.dark .guigui-light-dashboard .bg-purple-50,
-html.dark .guigui-light-dashboard .bg-pink-50,
-html.dark .guigui-light-dashboard .bg-fuchsia-50,
-html.dark .guigui-light-dashboard .bg-rose-50,
-html.dark .guigui-light-dashboard .bg-orange-50,
-html.dark .guigui-light-dashboard .bg-lime-50,
-html.dark .guigui-light-dashboard .bg-teal-50,
-html.dark .guigui-light-dashboard .bg-sky-50,
-html.dark .guigui-light-dashboard .bg-rose-100,
-html.dark .guigui-light-dashboard .bg-orange-100,
-html.dark .guigui-light-dashboard .bg-amber-100,
-html.dark .guigui-light-dashboard .bg-yellow-100,
-html.dark .guigui-light-dashboard .bg-lime-100,
-html.dark .guigui-light-dashboard .bg-green-100,
-html.dark .guigui-light-dashboard .bg-emerald-100,
-html.dark .guigui-light-dashboard .bg-teal-100,
-html.dark .guigui-light-dashboard .bg-cyan-100,
-html.dark .guigui-light-dashboard .bg-sky-100,
-html.dark .guigui-light-dashboard .bg-blue-100,
-html.dark .guigui-light-dashboard .bg-indigo-100,
-html.dark .guigui-light-dashboard .bg-violet-100,
-html.dark .guigui-light-dashboard .bg-purple-100,
-html.dark .guigui-light-dashboard .bg-fuchsia-100,
-html.dark .guigui-light-dashboard .bg-pink-100,
-html.dark .guigui-light-dashboard .bg-rose-200,
-html.dark .guigui-light-dashboard .bg-orange-200,
-html.dark .guigui-light-dashboard .bg-amber-200,
-html.dark .guigui-light-dashboard .bg-yellow-200,
-html.dark .guigui-light-dashboard .bg-lime-200,
-html.dark .guigui-light-dashboard .bg-green-200,
-html.dark .guigui-light-dashboard .bg-emerald-200,
-html.dark .guigui-light-dashboard .bg-teal-200,
-html.dark .guigui-light-dashboard .bg-cyan-200,
-html.dark .guigui-light-dashboard .bg-sky-200,
-html.dark .guigui-light-dashboard .bg-blue-200,
-html.dark .guigui-light-dashboard .bg-indigo-200,
-html.dark .guigui-light-dashboard .bg-violet-200,
-html.dark .guigui-light-dashboard .bg-purple-200,
-html.dark .guigui-light-dashboard .bg-fuchsia-200,
-html.dark .guigui-light-dashboard .bg-pink-200 {
+html.dark .guigui-light-dashboard :is(
+  .bg-white,
+  .bg-slate-50,
+  .bg-slate-100,
+  .bg-neutral-50,
+  .bg-neutral-100,
+  .bg-zinc-50,
+  .bg-zinc-100,
+  .bg-gray-50,
+  .bg-gray-100,
+  .bg-stone-50,
+  .bg-stone-100,
+  .bg-red-50,
+  .bg-blue-50,
+  .bg-green-50,
+  .bg-yellow-50,
+  .bg-amber-50,
+  .bg-emerald-50,
+  .bg-cyan-50,
+  .bg-indigo-50,
+  .bg-violet-50,
+  .bg-purple-50,
+  .bg-pink-50,
+  .bg-fuchsia-50,
+  .bg-rose-50,
+  .bg-orange-50,
+  .bg-lime-50,
+  .bg-teal-50,
+  .bg-sky-50,
+  .bg-rose-100,
+  .bg-orange-100,
+  .bg-amber-100,
+  .bg-yellow-100,
+  .bg-lime-100,
+  .bg-green-100,
+  .bg-emerald-100,
+  .bg-teal-100,
+  .bg-cyan-100,
+  .bg-sky-100,
+  .bg-blue-100,
+  .bg-indigo-100,
+  .bg-violet-100,
+  .bg-purple-100,
+  .bg-fuchsia-100,
+  .bg-pink-100,
+  .bg-rose-200,
+  .bg-orange-200,
+  .bg-amber-200,
+  .bg-yellow-200,
+  .bg-lime-200,
+  .bg-green-200,
+  .bg-emerald-200,
+  .bg-teal-200,
+  .bg-cyan-200,
+  .bg-sky-200,
+  .bg-blue-200,
+  .bg-indigo-200,
+  .bg-violet-200,
+  .bg-purple-200,
+  .bg-fuchsia-200,
+  .bg-pink-200
+) {
   background-color: var(--color-bg-subtle-dark) !important;
   background: var(--color-bg-subtle-dark) !important;
 }
 
 
-html.dark .guigui-light-dashboard [class*="bg-[#ffffff]"],
-html.dark .guigui-light-dashboard [class*="bg-[#f8fafc]"],
-html.dark .guigui-light-dashboard [class*="bg-[#f1f5f9]"],
-html.dark .guigui-light-dashboard [class*="bg-[#f3f4f6]"],
-html.dark .guigui-light-dashboard [class*="bg-[#f5f5f4]"],
-html.dark .guigui-light-dashboard [class*="bg-[#f7f5f0]"],
-html.dark .guigui-light-dashboard [class*="bg-[#fcfcfc]"],
-html.dark .guigui-light-dashboard [class*="bg-[#fafafa]"],
-html.dark .guigui-light-dashboard [class*="bg-[#fbfbfb]"],
-html.dark .guigui-light-dashboard [class*="bg-[#f9fafb]"],
-html.dark .guigui-light-dashboard [class*="bg-[#eef2f6]"],
-html.dark .guigui-light-dashboard [class*="bg-[#eef2ff]"],
-html.dark .guigui-light-dashboard [class*="bg-[#e0e7ff]"],
-html.dark .guigui-light-dashboard [class*="bg-[#c7d2fe]"],
-html.dark .guigui-light-dashboard [class*="bg-[#a5b4fc]"],
-html.dark .guigui-light-dashboard [class*="bg-[#bae6fd]"],
-html.dark .guigui-light-dashboard [class*="bg-[#7dd3fc]"],
-html.dark .guigui-light-dashboard [class*="bg-[#ccfbf1]"],
-html.dark .guigui-light-dashboard [class*="bg-[#99f6e4]"],
-html.dark .guigui-light-dashboard [class*="bg-[#5eead4]"],
-html.dark .guigui-light-dashboard [class*="bg-[#a7f3d0]"],
-html.dark .guigui-light-dashboard [class*="bg-[#6ee7b7]"],
-html.dark .guigui-light-dashboard [class*="bg-[#d1fae5]"],
-html.dark .guigui-light-dashboard [class*="bg-[#fef3c7]"],
-html.dark .guigui-light-dashboard [class*="bg-[#fde68a]"],
-html.dark .guigui-light-dashboard [class*="bg-[#fcd34d]"],
-html.dark .guigui-light-dashboard [class*="bg-[#fca5a5]"],
-html.dark .guigui-light-dashboard [class*="bg-[#f87171]"],
-html.dark .guigui-light-dashboard [class*="bg-[#fdba74]"],
-html.dark .guigui-light-dashboard [class*="bg-[#fb923c]"],
-html.dark .guigui-light-dashboard [class*="bg-[#fbbf24]"],
-html.dark .guigui-light-dashboard [class*="bg-[#fecaca]"],
-html.dark .guigui-light-dashboard [class*="bg-[#fed7aa]"],
-html.dark .guigui-light-dashboard [class*="bg-[var(--color-neutral-0)]"],
-html.dark .guigui-light-dashboard [class*="bg-[var(--color-paper)]"],
-html.dark .guigui-light-dashboard [style*="#fff"],
-html.dark .guigui-light-dashboard [style*="#ffffff"],
-html.dark .guigui-light-dashboard [style*="rgb(255, 255, 255)"],
-html.dark .guigui-light-dashboard [style*="rgb(255,255,255)"] {
+html.dark .guigui-light-dashboard :is(
+  [class*="bg-[#ffffff]"],
+  [class*="bg-[#f8fafc]"],
+  [class*="bg-[#f1f5f9]"],
+  [class*="bg-[#f3f4f6]"],
+  [class*="bg-[#f5f5f4]"],
+  [class*="bg-[#f7f5f0]"],
+  [class*="bg-[#fcfcfc]"],
+  [class*="bg-[#fafafa]"],
+  [class*="bg-[#fbfbfb]"],
+  [class*="bg-[#f9fafb]"],
+  [class*="bg-[#eef2f6]"],
+  [class*="bg-[#eef2ff]"],
+  [class*="bg-[#e0e7ff]"],
+  [class*="bg-[#c7d2fe]"],
+  [class*="bg-[#a5b4fc]"],
+  [class*="bg-[#bae6fd]"],
+  [class*="bg-[#7dd3fc]"],
+  [class*="bg-[#ccfbf1]"],
+  [class*="bg-[#99f6e4]"],
+  [class*="bg-[#5eead4]"],
+  [class*="bg-[#a7f3d0]"],
+  [class*="bg-[#6ee7b7]"],
+  [class*="bg-[#d1fae5]"],
+  [class*="bg-[#fef3c7]"],
+  [class*="bg-[#fde68a]"],
+  [class*="bg-[#fcd34d]"],
+  [class*="bg-[#fca5a5]"],
+  [class*="bg-[#f87171]"],
+  [class*="bg-[#fdba74]"],
+  [class*="bg-[#fb923c]"],
+  [class*="bg-[#fbbf24]"],
+  [class*="bg-[#fecaca]"],
+  [class*="bg-[#fed7aa]"],
+  [class*="bg-[var(--color-neutral-0)]"],
+  [class*="bg-[var(--color-paper)]"],
+  [style*="#fff"],
+  [style*="#ffffff"],
+  [style*="rgb(255, 255, 255)"],
+  [style*="rgb(255,255,255)"]
+) {
   background-color: var(--color-bg-subtle-dark) !important;
   background: var(--color-bg-subtle-dark) !important;
 }
@@ -1375,7 +1428,7 @@ html.dark .guigui-light-dashboard .bg-coral-800 {
 .guigui-navbar nav > button .guigui-icon-slot { height: 24px; }
 .guigui-navbar nav > button .guigui-icon-slot > svg { color: currentColor !important; }
 .guigui-navbar nav > button > div:last-child { background: var(--gold) !important; }
-.guigui-navbar > div:last-child { border-color: var(--line) !important; background: rgba(255,255,255,.88) !important; color: var(--mute) !important; }
+.guigui-navbar > div:last-child { border-color: var(--line) !important; color: var(--mute) !important; }
 
 /* Navegação de tabs do cabeçalho: só cabe em ecrãs grandes (4 tabs a 72px +
    pesquisa + ações). Abaixo disso a barra secundária móvel (Navbar) assume. */
@@ -1394,9 +1447,9 @@ html:not(.dark) .guigui-business-content .text-emerald-700, html:not(.dark) .gui
 .guigui-business-content .text-blue-600 { color: var(--gold-2) !important; }
 .guigui-business-cover .bg-emerald-600 { background: var(--ink) !important; }
 .guigui-business-cover .bg-amber-500 { background: var(--gold) !important; color: #28210a !important; }
-.guigui-modebar .bg-slate-800 { background: rgba(255,255,255,.10) !important; border-color: rgba(255,255,255,.18) !important; }
+.guigui-modebar .bg-slate-800 { background: var(--color-green-800) !important; border-color: #2a5a50 !important; }
 .guigui-modebar .text-blue-400 { color: var(--gold) !important; }
-.guigui-modebar .text-slate-300, .guigui-modebar .text-slate-400 { color: var(--color-green-100) !important; }
+.guigui-modebar .text-slate-300, .guigui-modebar .text-slate-500 { color: var(--color-green-100) !important; }
 
 /* Keep dense business surfaces usable on narrow screens. */
 .guigui-profile-dashboard main,
@@ -1437,7 +1490,7 @@ html:not(.dark) .guigui-business-content .text-emerald-700, html:not(.dark) .gui
 .guigui-communication-tabs button { display: flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; border: 1px solid transparent; border-radius: 13px; background: transparent; color: var(--mute); font-size: 12px; font-weight: 600; cursor: pointer; }
 .guigui-communication-tabs button span { min-width: 20px; padding: 2px 6px; border-radius: 999px; background: rgba(11,59,55,.08); font-size: 10px; }
 .guigui-communication-tabs button.is-active { background: var(--ink); color: #fff; box-shadow: 0 10px 22px -16px rgba(11,59,55,.65); }
-.guigui-communication-tabs button.is-active.is-support { background: #b97820; }
+.guigui-communication-tabs button.is-active.is-support { background: var(--color-gold-700); }
 .guigui-communication-tabs button.is-active span { background: rgba(255,255,255,.18); }
 .guigui-communication-layout { display: grid; grid-template-columns: minmax(260px, .72fr) minmax(0, 1.28fr); gap: 16px; padding: 20px 26px 24px; background: #fcfdfc; }
 .guigui-communication-sidebar, .guigui-support-list { display: grid; align-content: start; gap: 14px; min-width: 0; }
@@ -1447,11 +1500,11 @@ html:not(.dark) .guigui-business-content .text-emerald-700, html:not(.dark) .gui
 .guigui-compose-heading svg { margin-top: 2px; color: #237a64; }
 .guigui-compose-heading p { margin: 0; font-size: 12px; font-weight: 600; }
 .guigui-compose-heading span { display: block; margin-top: 3px; color: var(--mute); font-size: 10px; line-height: 1.4; }
-.guigui-communication-compose.is-support .guigui-compose-heading svg { color: #b97820; }
-.guigui-communication-compose input, .guigui-communication-compose select, .guigui-communication-compose textarea { width: 100%; min-width: 0; border: 1px solid #cfe0da; border-radius: 11px; background: #fff; padding: 10px 11px; color: var(--text); font-size: 12px; outline: none; }
+.guigui-communication-compose.is-support .guigui-compose-heading svg { color: var(--color-gold-700); }
+.guigui-communication-compose input, .guigui-communication-compose select, .guigui-communication-compose textarea { width: 100%; min-width: 0; border: 1px solid var(--color-border-default); border-radius: 11px; background: #fff; padding: 10px 11px; color: var(--text); font-size: 12px; outline: none; }
 .guigui-communication-compose input:focus, .guigui-communication-compose select:focus, .guigui-communication-compose textarea:focus, .guigui-message-reply input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(232,162,58,.16); }
 .guigui-communication-compose button { min-height: 40px; border: 0; border-radius: 11px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
-.guigui-communication-compose.is-support button { background: #b97820; }
+.guigui-communication-compose.is-support button { background: var(--color-gold-700); }
 .guigui-list-heading { display: flex; align-items: center; justify-content: space-between; padding: 0 2px; color: var(--ink); font-size: 12px; font-weight: 600; }
 .guigui-list-heading > div { min-width: 0; }
 .guigui-list-heading em { display: block; margin-top: 3px; color: var(--mute); font-size: 10px; font-style: normal; font-weight: 600; }
@@ -1485,7 +1538,7 @@ html:not(.dark) .guigui-business-content .text-emerald-700, html:not(.dark) .gui
 .guigui-new-conversation-eyebrow { margin: 0; color: var(--gold-2); font-size: 10px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; }
 .guigui-new-conversation h3 { margin: 4px 0 0; color: var(--ink); font-family: var(--font-family); font-size: clamp(20px, 3vw, 28px); font-weight: 700; line-height: 1.1; }
 .guigui-new-conversation > div > span { display: block; margin-top: 6px; color: var(--mute); font-size: 11px; line-height: 1.5; }
-.guigui-new-conversation input, .guigui-new-conversation textarea { width: 100%; border: 1px solid #cfe0da; border-radius: 12px; background: #fff; padding: 11px 12px; color: var(--text); font-size: 12px; outline: none; }
+.guigui-new-conversation input, .guigui-new-conversation textarea { width: 100%; border: 1px solid var(--color-border-default); border-radius: 12px; background: #fff; padding: 11px 12px; color: var(--text); font-size: 12px; outline: none; }
 .guigui-new-conversation input:focus, .guigui-new-conversation textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(232,162,58,.16); }
 .guigui-new-conversation button { min-height: 42px; border: 0; border-radius: 12px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
 .guigui-support-list { grid-column: 2; }
@@ -1516,25 +1569,25 @@ html:not(.dark) .guigui-business-content .text-emerald-700, html:not(.dark) .gui
 
 .dark .guigui-communication-shell { background: #0c211d; border-color: #285849; }
 .dark .guigui-communication-header, .dark .guigui-communication-layout, .dark .guigui-communication-tabs { background: #0a1c18; border-color: #285849; }
-.dark .guigui-communication-header h2, .dark .guigui-compose-heading, .dark .guigui-list-heading, .dark .guigui-thread-header p, .dark .guigui-support-card h3 { color: #edf8f3; }
-.dark .guigui-communication-header p:not(.guigui-communication-eyebrow), .dark .guigui-compose-heading span, .dark .guigui-communication-list span, .dark .guigui-thread-header span, .dark .guigui-support-description { color: #b9d0c7; }
-.dark .guigui-communication-tabs button:not(.is-active) { color: #b9d0c7; }
-.dark .guigui-communication-compose, .dark .guigui-communication-compose.is-support { background: #102e28; border-color: #39715d; }
-.dark .guigui-communication-compose input, .dark .guigui-communication-compose select, .dark .guigui-communication-compose textarea, .dark .guigui-message-reply input { background: #0d2922; border-color: #39715d; color: #f1fbf6; }
-.dark .guigui-communication-list button, .dark .guigui-communication-thread, .dark .guigui-support-card { background: #0d2924; border-color: #285849; }
-.dark .guigui-communication-list button:hover, .dark .guigui-communication-list button.is-selected { background: #15362d; border-color: #4f997c; }
-.dark .guigui-communication-list p, .dark .guigui-communication-list strong, .dark .guigui-support-card h3 { color: #edf8f3; }
-.dark .guigui-list-avatar { background: #15362d; color: #9ee3c3; }
+.dark .guigui-communication-header h2, .dark .guigui-compose-heading, .dark .guigui-list-heading, .dark .guigui-thread-header p, .dark .guigui-support-card h3 { color: var(--color-green-50); }
+.dark .guigui-communication-header p:not(.guigui-communication-eyebrow), .dark .guigui-compose-heading span, .dark .guigui-communication-list span, .dark .guigui-thread-header span, .dark .guigui-support-description { color: var(--color-green-200); }
+.dark .guigui-communication-tabs button:not(.is-active) { color: var(--color-green-200); }
+.dark .guigui-communication-compose, .dark .guigui-communication-compose.is-support { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); }
+.dark .guigui-communication-compose input, .dark .guigui-communication-compose select, .dark .guigui-communication-compose textarea, .dark .guigui-message-reply input { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #f1fbf6; }
+.dark .guigui-communication-list button, .dark .guigui-communication-thread, .dark .guigui-support-card { background: var(--color-bg-subtle); border-color: #285849; }
+.dark .guigui-communication-list button:hover, .dark .guigui-communication-list button.is-selected { background: var(--color-bg-subtle); border-color: #4f997c; }
+.dark .guigui-communication-list p, .dark .guigui-communication-list strong, .dark .guigui-support-card h3 { color: var(--color-green-50); }
+.dark .guigui-list-avatar { background: var(--color-bg-subtle); color: var(--color-green-300); }
 .dark .guigui-thread-messages { background: #081c19; }
-.dark .guigui-message-bubble { background: #102e28; border-color: #285849; color: #edf8f3; }
-.dark .guigui-message-bubble.is-own { background: #0f5a4b; border-color: #61c89d; }
-.dark .guigui-new-conversation { background: linear-gradient(145deg, #102e28, #0d2924); }
-.dark .guigui-new-conversation h3 { color: #edf8f3; }
-.dark .guigui-new-conversation > div > span { color: #b9d0c7; }
-.dark .guigui-new-conversation input, .dark .guigui-new-conversation textarea { background: #0d2922; border-color: #39715d; color: #f1fbf6; }
-.dark .guigui-message-reply, .dark .guigui-support-replies > div, .dark .guigui-support-last-reply { border-color: #285849; background: #102e28; color: #edf8f3; }
+.dark .guigui-message-bubble { background: var(--color-bg-subtle); border-color: #285849; color: var(--color-green-50); }
+.dark .guigui-message-bubble.is-own { background: var(--color-green-700); border-color: var(--color-green-400); }
+.dark .guigui-new-conversation { background: linear-gradient(145deg, var(--color-bg-subtle), var(--color-bg-subtle)); }
+.dark .guigui-new-conversation h3 { color: var(--color-green-50); }
+.dark .guigui-new-conversation > div > span { color: var(--color-green-200); }
+.dark .guigui-new-conversation input, .dark .guigui-new-conversation textarea { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #f1fbf6; }
+.dark .guigui-message-reply, .dark .guigui-support-replies > div, .dark .guigui-support-last-reply { border-color: #285849; background: var(--color-bg-subtle); color: var(--color-green-50); }
 .dark .guigui-support-replies > div.is-own { background: #163b31; }
-.dark .guigui-communication-empty, .dark .guigui-communication-notice { background: #102e28; border-color: #285849; color: #b9d0c7; }
+.dark .guigui-communication-empty, .dark .guigui-communication-notice { background: var(--color-bg-subtle); border-color: #285849; color: var(--color-green-200); }
 /* === Comunicação fim: mensagens e suporte === */
 
 /* ------------------------------------------------------------------ *
@@ -1653,45 +1706,43 @@ html:not(.dark) .guigui-business-content .text-emerald-700, html:not(.dark) .gui
 }
 
 .dark .guigui-message-search,
-.dark .guigui-message-filters button { background: #0d2922; border-color: #39715d; color: #cfe8dd; }
-.dark .guigui-message-filters button.is-active { background: #61c89d; border-color: #61c89d; color: #06231d; }
-.dark .guigui-message-filters .guigui-new-message-button { background: #15362d; border-color: #4f997c; color: #edf8f3; }
-.dark .guigui-message-date { background: rgba(255, 255, 255, .09); color: #b9d0c7; }
+.dark .guigui-message-filters button { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #cfe8dd; }
+.dark .guigui-message-filters button.is-active { background: var(--color-green-400); border-color: var(--color-green-400); color: #06231d; }
+.dark .guigui-message-filters .guigui-new-message-button { background: var(--color-bg-subtle); border-color: #4f997c; color: var(--color-green-50); }
+.dark .guigui-message-date { background: var(--color-bg-subtle); color: var(--color-green-200); }
 
 /* Vigas e capas de cartão continuam escuras no tema escuro. */
-.dark .guigui-business-cover { background: #102e28; }
-.dark .guigui-business-cover::after { background: linear-gradient(180deg, transparent 38%, rgba(4, 18, 16, .72)); }
+.dark .guigui-business-cover { background: var(--color-bg-subtle); }
 
 /* Rede de segurança: superfícies com fundo branco translúcido acompanham o tema
    escuro mesmo quando a variante dark: não chega ao elemento (ex.: barras fixas). */
-html.dark [class~="bg-white/95"],
-html.dark [class~="bg-white/90"] {
-  background-color: rgba(15, 23, 42, 0.95);
+html.dark [class~="bg-white"] {
+  background-color: #0f172a;
 }
 
 /* Componentes clássicos de superfície clara: acompanham o tema escuro. */
 .dark .guigui-panel {
-  background: rgba(13, 41, 36, 0.94);
+  background: var(--color-bg-subtle);
   border-color: #285849;
   box-shadow: 0 18px 40px -30px rgba(0, 0, 0, 0.8);
 }
 .dark .guigui-category-card {
-  background: #0d2924;
+  background: var(--color-bg-subtle);
   border-color: #285849;
   color: var(--color-green-100);
 }
-.dark .guigui-category-icon { background: #15362d; color: #9ee3c3; }
+.dark .guigui-category-icon { background: var(--color-bg-subtle); color: var(--color-green-300); }
 .dark .guigui-icon-button {
-  background: #0d2924;
+  background: var(--color-bg-subtle);
   border-color: #285849;
-  color: #edf8f3;
+  color: var(--color-green-50);
 }
-.dark .guigui-icon-button:hover { background: #15362d; border-color: #4f997c; }
+.dark .guigui-icon-button:hover { background: var(--color-bg-subtle); border-color: #4f997c; }
 .dark .guigui-nav-search,
 .dark .guigui-nav-popover {
-  background: #0d2924;
+  background: var(--color-bg-subtle);
   border-color: #285849;
-  color: #b9d0c7;
+  color: var(--color-green-200);
 }
 
 /* Barra fixa inferior (mobile): acompanha o tema escuro. */
@@ -1831,9 +1882,9 @@ html.dark .guigui-profile-dashboard table td { background-color: transparent !im
   box-shadow: 0 12px 26px -24px rgba(11, 59, 55, .75);
 }
 .guigui-message-bubble.is-own {
-  border-color: #0d3d33;
+  border-color: var(--color-bg-surface);
   border-radius: 16px 16px 5px 16px;
-  background: #0d3d33;
+  background: var(--color-bg-surface);
   color: #fff;
 }
 .guigui-message-bubble > p.guigui-message-author {
@@ -1976,20 +2027,20 @@ html.dark .guigui-profile-dashboard table td { background-color: transparent !im
 
 .dark .guigui-communication-thread,
 .dark .guigui-thread-header,
-.dark .guigui-message-reply { background: #0d2924; border-color: #285849; }
-.dark .guigui-thread-identity strong { color: #edf8f3; }
-.dark .guigui-thread-status { color: #9ee3c3; }
-.dark .guigui-thread-avatar { background: #15362d; color: #9ee3c3; }
-.dark .guigui-thread-info { background: #0d2922; border-color: #39715d; color: #cfe8dd; }
+.dark .guigui-message-reply { background: var(--color-bg-subtle); border-color: #285849; }
+.dark .guigui-thread-identity strong { color: var(--color-green-50); }
+.dark .guigui-thread-status { color: var(--color-green-300); }
+.dark .guigui-thread-avatar { background: var(--color-bg-subtle); color: var(--color-green-300); }
+.dark .guigui-thread-info { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #cfe8dd; }
 .dark .guigui-thread-messages {
   background-color: #081c19;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='none' stroke='%23cfe8dd' stroke-opacity='0.06' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M32 64c0-14 9-23 21-25'/%3E%3Cpath d='M53 39c-9 2-16 9-18 18'/%3E%3Cpath d='M53 39c4 7 6 13 6 20'/%3E%3Cpath d='M30 66h26'/%3E%3Cpath d='M116 46v18M122 46v18M128 46v18M122 64v34'/%3E%3C/g%3E%3C/svg%3E");
 }
-.dark .guigui-message-bubble { background: #102e28; border-color: #285849; color: #edf8f3; }
-.dark .guigui-message-bubble.is-own { background: #0f5a4b; border-color: #0f5a4b; color: #f1fbf6; }
-.dark .guigui-message-reply textarea { background: #0d2922; border-color: #39715d; color: #f1fbf6; }
-.dark .guigui-emoji-picker { background: #0d2924; border-color: #285849; }
-.dark .guigui-message-date { background: rgba(255, 255, 255, .09); color: #b9d0c7; }
+.dark .guigui-message-bubble { background: var(--color-bg-subtle); border-color: #285849; color: var(--color-green-50); }
+.dark .guigui-message-bubble.is-own { background: var(--color-green-700); border-color: var(--color-green-700); color: #f1fbf6; }
+.dark .guigui-message-reply textarea { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #f1fbf6; }
+.dark .guigui-emoji-picker { background: var(--color-bg-subtle); border-color: #285849; }
+.dark .guigui-message-date { background: var(--color-bg-subtle); color: var(--color-green-200); }
 
 /* === Comprovativo de levantamento (pós-compra) === */
 .guigui-voucher-modal {
@@ -2021,7 +2072,7 @@ html.dark .guigui-profile-dashboard table td { background-color: transparent !im
   justify-content: center;
   gap: 8px;
   margin: 0;
-  color: #74e3b0;
+  color: var(--color-green-300);
   font-size: 10.5px;
   font-weight: 800;
   letter-spacing: .1em;
@@ -2170,7 +2221,7 @@ html.dark .guigui-profile-dashboard table td { background-color: transparent !im
   border-top: 1px solid rgba(126, 205, 176, .28);
 }
 
-.guigui-voucher-row.is-price strong { color: #74e3b0; font-size: 17px; }
+.guigui-voucher-row.is-price strong { color: var(--color-green-300); font-size: 17px; }
 
 .guigui-voucher-buttons {
   display: grid;
@@ -2188,7 +2239,7 @@ html.dark .guigui-profile-dashboard table td { background-color: transparent !im
   padding: 10px 6px;
   border: 1px solid rgba(126, 205, 176, .35);
   border-radius: 14px;
-  background: rgba(255, 255, 255, .02);
+  background: var(--color-green-800);
   color: #eaf7f1;
   font-size: 12px;
   font-weight: 700;
@@ -2196,7 +2247,7 @@ html.dark .guigui-profile-dashboard table td { background-color: transparent !im
   transition: background .18s ease, border-color .18s ease;
 }
 
-.guigui-voucher-buttons button:hover:not(:disabled) { background: rgba(116, 227, 176, .12); border-color: #74e3b0; }
+.guigui-voucher-buttons button:hover:not(:disabled) { background: rgba(116, 227, 176, .12); border-color: var(--color-green-300); }
 .guigui-voucher-buttons button:disabled { opacity: .5; cursor: not-allowed; }
 
 .guigui-voucher-note {
@@ -2224,7 +2275,7 @@ html.dark .guigui-profile-dashboard table td { background-color: transparent !im
 
 .guigui-voucher-action.is-contact {
   border: 1px solid #1f6f59;
-  background: #0d3d33;
+  background: var(--color-bg-surface);
   color: #eaf7f1;
 }
 
@@ -2251,7 +2302,6 @@ html.dark .guigui-profile-dashboard table td { background-color: transparent !im
 html.dark button.bg-white,
 html.dark a.bg-white {
   background-color: #0f2f2b !important;
-  border-color: rgba(255, 255, 255, .18) !important;
   color: #ffffff !important;
 }
 html.dark button.bg-white:hover,
@@ -2369,7 +2419,7 @@ html.dark a.bg-white svg {
   margin: 6px 0 4px;
   padding: 4px 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, .9);
+  background: #ffffff;
   color: #5d7d74;
   font-size: 10px;
   font-weight: 800;
@@ -2627,27 +2677,27 @@ html.dark a.bg-white svg {
 
 .guigui-emoji-picker button:hover { background: #eef8f3; }
 
-html.dark .guigui-thread-header { background: #0d2924; border-color: #285849; }
+html.dark .guigui-thread-header { background: var(--color-bg-subtle); border-color: #285849; }
 html.dark .guigui-thread-identity strong { color: #f2fbf7; }
-html.dark .guigui-thread-status { color: #b9d0c7; }
+html.dark .guigui-thread-status { color: var(--color-green-200); }
 html.dark .guigui-thread-back,
-html.dark .guigui-thread-info { background: #15362d; border-color: #39715d; color: #e9f7f1; }
+html.dark .guigui-thread-info { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #e9f7f1; }
 html.dark .guigui-thread-back:hover,
 html.dark .guigui-thread-info:hover { background: #1b4639; }
 html.dark .guigui-thread-messages {
   background-color: #081c19;
   background-image: radial-gradient(rgba(158, 227, 195, .07) 1px, transparent 1px);
 }
-html.dark .guigui-message-date { background: rgba(21, 54, 45, .92); color: #b9d0c7; }
-html.dark .guigui-message-row .guigui-message-bubble { background: #12302a; color: #edf8f3; }
-html.dark .guigui-message-row.is-own .guigui-message-bubble { background: #0f5a4b; color: #ffffff; }
-html.dark .guigui-message-meta small { color: #b9d0c7; }
-html.dark .guigui-thread-notice { background: #081c19; color: #b9d0c7; }
+html.dark .guigui-message-date { background: rgba(21, 54, 45, .92); color: var(--color-green-200); }
+html.dark .guigui-message-row .guigui-message-bubble { background: var(--color-bg-subtle); color: var(--color-green-50); }
+html.dark .guigui-message-row.is-own .guigui-message-bubble { background: var(--color-green-700); color: #ffffff; }
+html.dark .guigui-message-meta small { color: var(--color-green-200); }
+html.dark .guigui-thread-notice { background: #081c19; color: var(--color-green-200); }
 html.dark .guigui-message-reply { background: #081c19; border-color: #285849; }
-html.dark .guigui-message-reply textarea { background: #0d2922; border-color: #39715d; color: #f4fdfa; }
-html.dark .guigui-message-reply .guigui-composer-action { background: #15362d; border-color: #39715d; color: #e9f7f1; }
-html.dark .guigui-reply-preview { background: #15362d; color: #cfe8dd; }
-html.dark .guigui-emoji-picker { background: #15362d; border-color: #39715d; }
+html.dark .guigui-message-reply textarea { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #f4fdfa; }
+html.dark .guigui-message-reply .guigui-composer-action { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #e9f7f1; }
+html.dark .guigui-reply-preview { background: var(--color-bg-subtle); color: #cfe8dd; }
+html.dark .guigui-emoji-picker { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); }
 html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
 
 @media (max-width: 640px) {
@@ -2961,29 +3011,29 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
 
 .dark .guigui-communication-layout,
 .dark .guigui-communication-sidebar,
-.dark .guigui-inbox-toolbar { background: #0d2924; border-color: #285849; }
-.dark .guigui-communication-sidebar .guigui-inbox-title strong { color: #edf8f3; }
-.dark .guigui-communication-sidebar .guigui-inbox-title span { background: #15362d; color: #9ee3c3; }
-.dark .guigui-communication-sidebar .guigui-inbox-new { border-color: #61c89d; background: #61c89d; color: #06231d; }
+.dark .guigui-inbox-toolbar { background: var(--color-bg-subtle); border-color: #285849; }
+.dark .guigui-communication-sidebar .guigui-inbox-title strong { color: var(--color-green-50); }
+.dark .guigui-communication-sidebar .guigui-inbox-title span { background: var(--color-bg-subtle); color: var(--color-green-300); }
+.dark .guigui-communication-sidebar .guigui-inbox-new { border-color: var(--color-green-400); background: var(--color-green-400); color: #06231d; }
 .dark .guigui-communication-sidebar .guigui-inbox-new:hover { background: #7ddcb4; }
-.dark .guigui-communication-sidebar .guigui-inbox-search { background: #0d2922; border-color: #39715d; color: #9dbcb1; }
+.dark .guigui-communication-sidebar .guigui-inbox-search { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #9dbcb1; }
 .dark .guigui-communication-sidebar .guigui-inbox-search input { color: #f1fbf6; }
-.dark .guigui-communication-sidebar .guigui-inbox-filters button { background: #0d2922; border-color: #39715d; color: #cfe8dd; }
+.dark .guigui-communication-sidebar .guigui-inbox-filters button { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #cfe8dd; }
 .dark .guigui-communication-sidebar .guigui-inbox-filters button span { background: rgba(255, 255, 255, .1); }
-.dark .guigui-communication-sidebar .guigui-inbox-filters button.is-active { background: #61c89d; border-color: #61c89d; color: #06231d; }
+.dark .guigui-communication-sidebar .guigui-inbox-filters button.is-active { background: var(--color-green-400); border-color: var(--color-green-400); color: #06231d; }
 .dark .guigui-communication-sidebar .guigui-conversation-item:hover,
 .dark .guigui-communication-sidebar .guigui-ticket-item:hover { background: #133229; }
 .dark .guigui-communication-sidebar .guigui-conversation-item.is-selected,
 .dark .guigui-communication-sidebar .guigui-ticket-item.is-selected { background: #17453a; }
-.dark .guigui-communication-sidebar .guigui-conversation-top strong { color: #edf8f3; }
+.dark .guigui-communication-sidebar .guigui-conversation-top strong { color: var(--color-green-50); }
 .dark .guigui-communication-sidebar .guigui-conversation-preview { color: #a9c7bc; }
 .dark .guigui-communication-sidebar .guigui-conversation-item.is-unread .guigui-conversation-preview { color: #e6f6ef; }
 .dark .guigui-communication-sidebar .guigui-conversation-subject { color: #8dd4b8; }
 .dark .guigui-communication-sidebar .guigui-conversation-top time { color: #8aa79c; }
-.dark .guigui-communication-sidebar .guigui-ticket-state { background: #15362d; color: #b9d0c7; }
+.dark .guigui-communication-sidebar .guigui-ticket-state { background: var(--color-bg-subtle); color: var(--color-green-200); }
 .dark .guigui-communication-thread > .guigui-thread-notice { background: #081c19; border-color: #285849; }
 /* === Mensagens: desenho de referência (barra, lista e conversa) === */.guigui-communication-shell {
-  border: 1px solid #e4eae7;
+  border: 1px solid var(--color-green-100);
   border-radius: 18px;
   background: #fff;
   box-shadow: 0 1px 2px rgba(11, 59, 55, .04);
@@ -2996,7 +3046,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   justify-content: space-between;
   gap: 16px;
   padding: 12px 18px;
-  border-bottom: 1px solid #e9eeeb;
+  border-bottom: 1px solid var(--color-border-subtle);
   background: #fff;
 }
 .guigui-communication-brand { display: flex; min-width: 0; align-items: center; gap: 10px; }
@@ -3008,23 +3058,23 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  background: #0d3d33;
+  background: var(--color-bg-surface);
   color: #eaf6f0;
 }
-.guigui-communication-brand-mark.is-support { background: #b97820; }
+.guigui-communication-brand-mark.is-support { background: var(--color-gold-700); }
 .guigui-communication-brand-label {
-  color: #7c8d86;
+  color: var(--color-text-muted);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
   white-space: nowrap;
 }
-.guigui-communication-brand-divider { width: 1px; height: 20px; flex: 0 0 1px; background: #e4eae7; }
+.guigui-communication-brand-divider { width: 1px; height: 20px; flex: 0 0 1px; background: var(--color-green-100); }
 .guigui-communication-topbar-title {
   overflow: hidden;
   margin: 0;
-  color: #152420;
+  color: var(--color-text-strong);
   font-size: 15px;
   font-weight: 700;
   letter-spacing: -.01em;
@@ -3054,17 +3104,17 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.guigui-communication-tabs { padding: 10px 18px; border-bottom: 1px solid #e9eeeb; background: #fff; }
+.guigui-communication-tabs { padding: 10px 18px; border-bottom: 1px solid var(--color-border-subtle); background: #fff; }
 .guigui-communication-tabs button { min-height: 36px; font-size: 12px; font-weight: 600; }
-.guigui-communication-tabs button.is-active { background: #0d3d33; box-shadow: none; }
+.guigui-communication-tabs button.is-active { background: var(--color-bg-surface); box-shadow: none; }
 
 .guigui-communication-layout {
   grid-template-columns: clamp(280px, 33%, 380px) minmax(0, 1fr);
   background: #f6f8f7;
 }
-.guigui-communication-sidebar { border-right: 1px solid #e9eeeb; background: #fff; }
+.guigui-communication-sidebar { border-right: 1px solid var(--color-border-subtle); background: #fff; }
 .guigui-inbox-toolbar { gap: 12px; padding: 16px 16px 14px; border-bottom: 1px solid #eef1ef; }
-.guigui-communication-sidebar .guigui-inbox-title strong { color: #152420; font-size: 20px; font-weight: 700; }
+.guigui-communication-sidebar .guigui-inbox-title strong { color: var(--color-text-strong); font-size: 20px; font-weight: 700; }
 .guigui-communication-sidebar .guigui-inbox-title span {
   background: #eef2f0;
   color: #48605a;
@@ -3074,19 +3124,19 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
 .guigui-communication-sidebar .guigui-inbox-new {
   min-height: 36px;
   gap: 7px;
-  border-color: #0d3d33;
+  border-color: var(--color-bg-surface);
   border-radius: 10px;
-  background: #0d3d33;
+  background: var(--color-bg-surface);
   font-size: 11.5px;
   font-weight: 600;
 }
 .guigui-communication-sidebar .guigui-inbox-new:hover { background: #115347; }
 .guigui-communication-sidebar .guigui-inbox-search {
   min-height: 38px;
-  border-color: #e4eae7;
+  border-color: var(--color-green-100);
   border-radius: 10px;
   background: #f5f7f6;
-  color: #7c8d86;
+  color: var(--color-text-muted);
   font-weight: 400;
 }
 .guigui-communication-sidebar .guigui-inbox-search:focus-within {
@@ -3098,13 +3148,13 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
 .guigui-communication-sidebar .guigui-inbox-search input::placeholder { color: #96a7a0; font-weight: 400; }
 .guigui-communication-sidebar .guigui-inbox-filters button {
   min-height: 30px;
-  border-color: #e4eae7;
+  border-color: var(--color-green-100);
   color: #5b7169;
   font-size: 11.5px;
   font-weight: 600;
 }
 .guigui-communication-sidebar .guigui-inbox-filters button span { background: #eef2f0; color: #6b7f77; }
-.guigui-communication-sidebar .guigui-inbox-filters button.is-active { border-color: #0d3d33; background: #0d3d33; color: #fff; }
+.guigui-communication-sidebar .guigui-inbox-filters button.is-active { border-color: var(--color-bg-surface); background: var(--color-bg-surface); color: #fff; }
 .guigui-communication-sidebar .guigui-inbox-filters button.is-active span { background: rgba(255, 255, 255, .2); color: #fff; }
 
 .guigui-communication-sidebar > .guigui-communication-list { gap: 2px; padding: 6px; }
@@ -3131,7 +3181,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
 .guigui-communication-sidebar .guigui-unread-badge {
   min-width: 18px;
   height: 18px;
-  background: #0d3d33;
+  background: var(--color-bg-surface);
   color: #fff;
   font-size: 9.5px;
   font-weight: 700;
@@ -3144,15 +3194,15 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   width: 34px;
   height: 34px;
   flex-basis: 34px;
-  border: 1px solid #e4eae7;
+  border: 1px solid var(--color-green-100);
   background: #fff;
   color: #46605a;
   font-size: 13px;
 }
 .guigui-thread-back:hover,
-.guigui-thread-info:hover { background: #f2f7f4; color: #0d3d33; }
+.guigui-thread-info:hover { background: #f2f7f4; color: var(--color-bg-surface); }
 .guigui-thread-avatar { width: 40px; height: 40px; flex-basis: 40px; background: #e2f0e8; color: #1d5a47; font-size: 13px; font-weight: 700; }
-.guigui-thread-identity strong { color: #152420; font-size: 15px; font-weight: 700; }
+.guigui-thread-identity strong { color: var(--color-text-strong); font-size: 15px; font-weight: 700; }
 .guigui-thread-status { gap: 6px; margin-top: 2px; color: #5f7a71; font-size: 11.5px; font-weight: 500; }
 .guigui-thread-status i { width: 7px; height: 7px; flex-basis: 7px; }
 .guigui-thread-status i.is-online { background: #2fae77; box-shadow: none; }
@@ -3173,7 +3223,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   border: 1px solid #e6ebe8;
   border-radius: 999px;
   background: #fff;
-  color: #7c8d86;
+  color: var(--color-text-muted);
   font-size: 10px;
   font-weight: 600;
   white-space: nowrap;
@@ -3189,9 +3239,9 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   box-shadow: none;
 }
 .guigui-message-row.is-own .guigui-message-bubble {
-  border-color: #0d3d33;
+  border-color: var(--color-bg-surface);
   border-radius: 12px 12px 4px 12px;
-  background: #0d3d33;
+  background: var(--color-bg-surface);
   color: #f4faf7;
 }
 .guigui-message-content { display: grid; gap: 4px; }
@@ -3217,7 +3267,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
 .guigui-message-reply textarea {
   min-height: 42px;
   padding: 11px 16px;
-  border-color: #e4eae7;
+  border-color: var(--color-green-100);
   border-radius: 12px;
   background: #fff;
   font-size: 13px;
@@ -3228,12 +3278,12 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   width: 38px;
   height: 38px;
   flex-basis: 38px;
-  border: 1px solid #e4eae7;
+  border: 1px solid var(--color-green-100);
   background: #f5f7f6;
   color: #5b7169;
   font-size: 16px;
 }
-.guigui-message-reply .guigui-composer-action:hover { background: #eef4f1; color: #0d3d33; }
+.guigui-message-reply .guigui-composer-action:hover { background: #eef4f1; color: var(--color-bg-surface); }
 .guigui-message-reply > button.guigui-composer-send {
   display: inline-flex;
   width: auto;
@@ -3244,7 +3294,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   padding: 0 16px;
   border: 0;
   border-radius: 10px;
-  background: #0d3d33;
+  background: var(--color-bg-surface);
   color: #fff;
   font-size: 12px;
   font-weight: 600;
@@ -3268,7 +3318,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
 }
 @media (max-width: 860px) {
   .guigui-communication-layout { grid-template-columns: 1fr; }
-  .guigui-communication-sidebar { border-right: 0; border-bottom: 1px solid #e9eeeb; }
+  .guigui-communication-sidebar { border-right: 0; border-bottom: 1px solid var(--color-border-subtle); }
   .guigui-communication-layout.is-mobile-thread > .guigui-communication-sidebar { display: none; }
   .guigui-communication-layout.is-mobile-list > .guigui-communication-thread { display: none; }
   .guigui-communication-account-name { display: none; }
@@ -3276,7 +3326,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   .guigui-communication-brand-divider { display: none; }
 }@media (max-width: 767px) {
   .guigui-communication-layout { grid-template-columns: 1fr; }
-  .guigui-communication-sidebar { border-right: 0; border-bottom: 1px solid #e9eeeb; overflow-y: auto; }
+  .guigui-communication-sidebar { border-right: 0; border-bottom: 1px solid var(--color-border-subtle); overflow-y: auto; }
   .guigui-communication-layout.is-mobile-thread > .guigui-communication-sidebar { display: none; }
   .guigui-communication-layout.is-mobile-list > .guigui-communication-thread { display: none; }
   .guigui-communication-account-name { display: none; }
@@ -3305,24 +3355,24 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
 .dark .guigui-communication-sidebar,
 .dark .guigui-inbox-toolbar,
 .dark .guigui-thread-header,
-.dark .guigui-message-reply { background: #0d2924; border-color: #285849; }
+.dark .guigui-message-reply { background: var(--color-bg-subtle); border-color: #285849; }
 .dark .guigui-communication-topbar-title,
 .dark .guigui-communication-sidebar .guigui-inbox-title strong,
-.dark .guigui-thread-identity strong { color: #edf8f3; }
+.dark .guigui-thread-identity strong { color: var(--color-green-50); }
 .dark .guigui-communication-brand-label,
 .dark .guigui-communication-account-name { color: #a9c7bc; }
 .dark .guigui-communication-brand-divider { background: #285849; }
-.dark .guigui-communication-account-avatar { background: #15362d; color: #9ee3c3; }
+.dark .guigui-communication-account-avatar { background: var(--color-bg-subtle); color: var(--color-green-300); }
 .dark .guigui-communication-layout { background: #0a1c18; }
 .dark .guigui-thread-messages { background-color: #081c19; }
 .dark .guigui-message-date::before,
 .dark .guigui-message-date::after { background: #285849; }
-.dark .guigui-message-date > span { background: #0d2924; border-color: #285849; color: #b9d0c7; }
-.dark .guigui-message-row .guigui-message-bubble { background: #12302a; border-color: #285849; color: #edf8f3; }
-.dark .guigui-message-row.is-own .guigui-message-bubble { background: #0f5a4b; border-color: #0f5a4b; }
-.dark .guigui-message-reply textarea { background: #0d2922; border-color: #39715d; color: #f4fdfa; }
-.dark .guigui-message-reply .guigui-composer-action { background: #15362d; border-color: #39715d; color: #cfe8dd; }
-.dark .guigui-message-reply > button.guigui-composer-send { background: #61c89d; color: #06231d; }
+.dark .guigui-message-date > span { background: var(--color-bg-subtle); border-color: #285849; color: var(--color-green-200); }
+.dark .guigui-message-row .guigui-message-bubble { background: var(--color-bg-subtle); border-color: #285849; color: var(--color-green-50); }
+.dark .guigui-message-row.is-own .guigui-message-bubble { background: var(--color-green-700); border-color: var(--color-green-700); }
+.dark .guigui-message-reply textarea { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #f4fdfa; }
+.dark .guigui-message-reply .guigui-composer-action { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #cfe8dd; }
+.dark .guigui-message-reply > button.guigui-composer-send { background: var(--color-green-400); color: #06231d; }
 .dark .guigui-communication-thread > .guigui-thread-notice { background: #081c19; border-color: #285849; }
 /* === Anexos nas mensagens === */
 .guigui-message-reply { flex-wrap: wrap; }
@@ -3333,7 +3383,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   gap: 10px;
   margin-bottom: 2px;
   padding: 8px 10px;
-  border: 1px solid #e4eae7;
+  border: 1px solid var(--color-green-100);
   border-radius: 10px;
   background: #f7faf8;
 }
@@ -3364,7 +3414,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.guigui-composer-attachment-meta small { color: #7c8d86; font-size: 10.5px; font-weight: 400; }
+.guigui-composer-attachment-meta small { color: var(--color-text-muted); font-size: 10.5px; font-weight: 400; }
 .guigui-composer-attachment button {
   display: inline-flex;
   width: 28px;
@@ -3375,7 +3425,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: #7c8d86;
+  color: var(--color-text-muted);
   cursor: pointer;
 }
 .guigui-composer-attachment button:hover { background: #e8efec; color: #17211e; }
@@ -3400,7 +3450,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   padding: 8px 10px;
   border: 1px solid rgba(11, 59, 55, .12);
   border-radius: 10px;
-  background: rgba(255, 255, 255, .7);
+  background: #ffffff;
   color: inherit;
   font-size: 12px;
   font-weight: 600;
@@ -3409,13 +3459,13 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
 .guigui-message-attachment.is-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .guigui-message-row.is-own .guigui-message-attachment.is-file {
   border-color: rgba(255, 255, 255, .24);
-  background: rgba(255, 255, 255, .12);
+  background: #2a745f;
   color: #f4faf7;
 }
-.dark .guigui-composer-attachment { background: #12302a; border-color: #285849; }
-.dark .guigui-composer-attachment-meta strong { color: #edf8f3; }
-.dark .guigui-composer-attachment-icon { background: #15362d; color: #9ee3c3; }
-.dark .guigui-message-attachment.is-file { background: rgba(255, 255, 255, .08); border-color: #39715d; }
+.dark .guigui-composer-attachment { background: var(--color-bg-subtle); border-color: #285849; }
+.dark .guigui-composer-attachment-meta strong { color: var(--color-green-50); }
+.dark .guigui-composer-attachment-icon { background: var(--color-bg-subtle); color: var(--color-green-300); }
+.dark .guigui-message-attachment.is-file { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); }
 /* === Estados de envio e erros das mensagens === */
 .guigui-message-state {
   display: inline-block;
@@ -3423,7 +3473,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   font-size: 10px;
   font-weight: 700;
 }
-.guigui-message-state.is-sending { color: #7c8d86; }
+.guigui-message-state.is-sending { color: var(--color-text-muted); }
 .guigui-message-state.is-failed { color: #b3462f; }
 .guigui-message-retry {
   margin-left: 8px;
@@ -3472,5 +3522,210 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   textarea,
   select {
     font-size: max(16px, 1em);
+  }
+}
+
+/* ------------------------------------------------------------------
+   Composição de email externo (hub de mensagens e administração)
+   ------------------------------------------------------------------ */
+.guigui-communication-topbar-actions { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.guigui-communication-external-email {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border: 1px solid #d7e3dd;
+  border-radius: 999px;
+  background: #f6faf8;
+  color: var(--color-bg-surface);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+.guigui-communication-external-email:hover { border-color: var(--color-bg-surface); background: #eaf4ef; }
+.guigui-communication-external-email:focus-visible { outline: 2px solid var(--color-bg-surface); outline-offset: 2px; }
+
+.guigui-email-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(8, 26, 22, .55);
+}
+.guigui-email-card {
+  display: flex;
+  width: min(620px, 100%);
+  max-height: calc(100vh - 32px);
+  flex-direction: column;
+  gap: 14px;
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid #e2ebe6;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 26px 70px rgba(6, 32, 26, .28);
+  color: var(--color-text-strong);
+  font-size: 12px;
+}
+.guigui-email-card.is-inline { width: 100%; max-height: none; box-shadow: none; }
+.guigui-email-head { display: flex; align-items: flex-start; gap: 10px; }
+.guigui-email-mark {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--color-bg-surface);
+  color: #eaf6f0;
+}
+.guigui-email-heading { min-width: 0; flex: 1; }
+.guigui-email-heading h2 { margin: 0; color: var(--color-text-strong); font-size: 15px; font-weight: 800; letter-spacing: -.01em; }
+.guigui-email-heading p { margin: 4px 0 0; color: #58706a; font-size: 11px; line-height: 1.5; }
+.guigui-email-close {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2ebe6;
+  border-radius: 999px;
+  background: #fff;
+  color: #58706a;
+  cursor: pointer;
+}
+.guigui-email-close:hover { border-color: var(--color-bg-surface); color: var(--color-bg-surface); }
+
+.guigui-email-identity {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 8px 11px;
+  border-radius: 10px;
+  background: #f4f8f6;
+  color: #4c635c;
+  font-size: 10.5px;
+}
+.guigui-email-identity strong { color: var(--color-text-strong); font-weight: 800; }
+
+.guigui-email-form { display: flex; flex-direction: column; gap: 12px; }
+.guigui-email-field { display: flex; flex-direction: column; gap: 5px; }
+.guigui-email-field label { color: var(--color-text-strong); font-size: 11px; font-weight: 800; }
+.guigui-email-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.guigui-email-counter { color: var(--color-text-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.guigui-email-counter.is-near-limit { color: var(--color-gold-700); font-weight: 700; }
+.guigui-email-field input,
+.guigui-email-field textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid #5e827a;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--color-text-strong);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.guigui-email-field textarea { min-height: 150px; resize: vertical; }
+.guigui-email-field input:focus-visible,
+.guigui-email-field textarea:focus-visible { outline: 2px solid #8fc7b1; outline-offset: 1px; border-color: #2b5548; }
+.guigui-email-field input:disabled,
+.guigui-email-field textarea:disabled { background: #f4f8f6; color: var(--color-text-muted); }
+.guigui-email-hint { margin: 0; color: var(--color-text-muted); font-size: 10.5px; line-height: 1.5; }
+
+.guigui-email-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #d7e3dd;
+  border-radius: 12px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.guigui-email-status svg { margin-top: 1px; flex: 0 0 auto; }
+.guigui-email-status strong { display: block; font-size: 11.5px; font-weight: 800; }
+.guigui-email-status p { margin: 2px 0 0; }
+.guigui-email-status.is-accepted { border-color: #bfe3d0; background: #eef7f2; color: #17603f; }
+.guigui-email-status.is-failed,
+.guigui-email-status.is-invalid { border-color: #f3c8bd; background: #fdf1ee; color: #94331c; }
+.guigui-email-status.is-limited { border-color: #f2ddb4; background: #fff6e6; color: #8a5211; }
+.guigui-email-status.is-unconfigured { border-color: #cadcf5; background: #eef3fb; color: #274b7a; }
+.guigui-email-status.is-internal { border-color: #cfe2d9; background: #f2f7f5; color: #2b5548; }
+
+.guigui-email-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.guigui-email-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border: 1px solid var(--color-green-800);
+  border-radius: 11px;
+  background: var(--color-green-800);
+  color: #f2fbf6;
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.guigui-email-submit:hover:not(:disabled) { background: #125245; }
+.guigui-email-submit:disabled { cursor: progress; opacity: .7; }
+.guigui-email-secondary {
+  padding: 9px 14px;
+  border: 1px solid #d7e3dd;
+  border-radius: 11px;
+  background: #fff;
+  color: var(--color-bg-surface);
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.guigui-email-secondary:hover { border-color: var(--color-bg-surface); background: #f6faf8; }
+
+@media (max-width: 640px) {
+  .guigui-communication-external-email span { display: none; }
+  .guigui-communication-external-email { padding: 7px; }
+  .guigui-email-card { padding: 16px; }
+}
+
+.dark .guigui-communication-external-email { border-color: #285849; background: var(--color-bg-subtle); color: #bfe8d5; }
+.dark .guigui-communication-external-email:hover { border-color: var(--color-green-300); background: var(--color-bg-subtle); }
+.dark .guigui-email-card { border-color: #285849; background: var(--color-bg-subtle); color: var(--color-green-50); }
+.dark .guigui-email-heading h2,
+.dark .guigui-email-field label,
+.dark .guigui-email-identity strong { color: var(--color-green-50); }
+.dark .guigui-email-heading p,
+.dark .guigui-email-identity,
+.dark .guigui-email-hint,
+.dark .guigui-email-counter { color: #a9c7bc; }
+.dark .guigui-email-identity { background: var(--color-bg-subtle); }
+.dark .guigui-email-close { border-color: #285849; background: var(--color-bg-subtle); color: #a9c7bc; }
+.dark .guigui-email-field input,
+.dark .guigui-email-field textarea { border-color: #285849; background: #0a1c18; color: var(--color-green-50); }
+.dark .guigui-email-field input:disabled,
+.dark .guigui-email-field textarea:disabled { background: var(--color-bg-subtle); color: #8aa79c; }
+.dark .guigui-email-status.is-internal { border-color: #285849; background: var(--color-bg-subtle); color: var(--color-green-200); }
+.dark .guigui-email-secondary { border-color: #285849; background: var(--color-bg-subtle); color: #bfe8d5; }
+
+/* Linhas de tabela: o reset escuro anula o hover claro; repõe um destaque escuro.
+   Fica dentro de @layer utilities para vencer o `background` importante do reset. */
+@layer utilities {
+  html.dark .guigui-light-dashboard tbody tr:hover {
+    background-color: var(--color-bg-subtle-dark) !important;
+  }
+  /* O reset escuro do dashboard anula o fundo; mantém o botão verde legível. */
+  html.dark .guigui-light-dashboard .guigui-email-submit {
+    background-color: var(--color-green-800) !important;
+    border-color: var(--color-green-800) !important;
+    color: #f2fbf6 !important;
+  }
+  html.dark .guigui-light-dashboard .guigui-email-submit:hover:not(:disabled) {
+    background-color: #125245 !important;
   }
 }

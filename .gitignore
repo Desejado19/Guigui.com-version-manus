@@ -28,3 +28,34 @@ test-results/
 *.tmp
 *.out
 *.err
+
+# Artefactos de diagnóstico local (scratch de investigação, capturas de cookies,
+# dumps de sessões/HTML e binários de ferramentas). Não são código do projecto.
+.diag/
+.quarantine/
+.tmp-*
+.audit-*
+.esbuild-*.exe
+.esbuild-bin.exe
+.esbuild-vite.exe
+cloudflared.exe
+*-cookie*.txt
+*-cookies*.txt
+cookie-*.txt
+session-cookie.txt
+screenshots/
+tests/screenshots/
+public/uploads/
+server.ts.orig
+server.ts.fixed
+server.ts.truncated-backup
+server/*.ts.bak
+# Relatórios de diagnóstico gerados localmente (contraste, vitest) e binários de ferramentas
+.contrast-*.json
+.vitest-report*.json
+.tools/
+*.bak
+preview-concepts.html
+
+# Capturas temporárias de validação visual
+tmp-*.png

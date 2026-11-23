@@ -66,9 +66,9 @@ export const UsersActivityPage: React.FC<UsersActivityPageProps> = ({ onBack }) 
         </ManagementActionButton>
       }
     >
-      {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-bold text-rose-800">{error}</div>}
+      {error && <div role="alert" className="rounded-xl border border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] px-3 py-2 text-[11px] font-bold text-[var(--tone-danger-text)]">{error}</div>}
       {loading && logs.length === 0 ? (
-        <div className="rounded-2xl border border-[#e6dac8] bg-white p-8 text-center text-[11px] font-bold text-slate-500">A carregar histórico…</div>
+        <div className="rounded-2xl border border-[var(--color-border-default)] bg-white p-8 text-center text-[11px] font-bold text-slate-500">A carregar histórico…</div>
       ) : (
         <AdminAuditLogsHub logs={logs} currentLang="pt" onRefreshLogs={() => void loadLogs()} />
       )}

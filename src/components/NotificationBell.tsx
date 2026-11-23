@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Bell,
   CheckCircle2,
@@ -204,7 +204,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
           </div>
 
           {/* Filter Pills */}
-          <div className="flex items-center gap-1.5 p-2 bg-[var(--color-bg-subtle)]/70 bg-[var(--color-bg-subtle)]/50 border-b border-[var(--color-border-subtle)]/60 border-[var(--color-border-subtle)]800 text-[11px] font-bold">
+          <div className="flex items-center gap-1.5 p-2 bg-[var(--color-bg-subtle)]/70 bg-[var(--color-bg-subtle)]/50 border-b border-[var(--color-border-subtle)]/60 text-[11px] font-bold">
             <button
               type="button"
               onClick={() => setActiveFilter('all')}
@@ -264,7 +264,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                 >
                   {/* Category Icon */}
                   <div
-                    className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 border border-[var(--color-border-subtle)]/60 border-[var(--color-border-subtle)]00/60 ${getCategoryBg(
+                    className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 border border-[var(--color-border-subtle)]/60 ${getCategoryBg(
                       notif.category,
                       !notif.read
                     )}`}

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 const ADMIN = { email: 'admin.teste@guigui.com', password: 'Guigui@2026!' };
 const TARGET_EMAIL = 'cidadao.teste@guigui.com';

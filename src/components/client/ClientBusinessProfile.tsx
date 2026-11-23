@@ -296,8 +296,8 @@ export const ClientBusinessProfile: React.FC<ClientBusinessProfileProps> = ({
     { label: 'Pagamentos Orange Money / Telecel', icon: CreditCard },
   ];
 
-  const mediaInputClass = 'w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 px-3.5 py-2.5 text-xs font-mono text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
-  const textInputClass = 'w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 px-3.5 py-2.5 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
+  const mediaInputClass = 'w-full rounded-xl border border-[var(--color-border-default)] dark:border-slate-600 bg-slate-50 dark:bg-slate-800 px-3.5 py-2.5 text-xs font-mono text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
+  const textInputClass = 'w-full rounded-xl border border-[var(--color-border-default)] dark:border-slate-600 bg-slate-50 dark:bg-slate-800 px-3.5 py-2.5 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
 
   return (
     <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
@@ -320,7 +320,7 @@ export const ClientBusinessProfile: React.FC<ClientBusinessProfileProps> = ({
           <button
             type="button"
             onClick={() => setShowPreview((value) => !value)}
-            className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50"
+            className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[var(--color-border-default)] dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50"
             aria-expanded={showPreview}
           >
             <Globe className="h-4 w-4 text-blue-600" />
@@ -329,7 +329,7 @@ export const ClientBusinessProfile: React.FC<ClientBusinessProfileProps> = ({
         </div>
       </div>
 
-      <section className="space-y-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4" aria-labelledby="business-profile-completion-heading">
+      <section className="space-y-2 rounded-xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4" aria-labelledby="business-profile-completion-heading">
         <div className="flex items-center justify-between gap-3">
           <h3 id="business-profile-completion-heading" className="text-sm font-black text-slate-900">Completude do perfil</h3>
           <span className="text-sm font-black text-blue-700">{profileCompletion.percentage}%</span>
@@ -484,7 +484,7 @@ export const ClientBusinessProfile: React.FC<ClientBusinessProfileProps> = ({
                 </label>
                 <input type="text" value={logo.startsWith('data:') ? '' : logo} onChange={(e) => setLogo(e.target.value)} className={mediaInputClass} placeholder="URL do logotipo" />
               </div>
-              {logo && <img src={logo} alt="Pré-visualização do logotipo" className="h-24 w-24 rounded-2xl border border-slate-200 dark:border-slate-700 object-cover" />}
+              {logo && <img src={logo} alt="Pré-visualização do logotipo" className="h-24 w-24 rounded-2xl border border-[var(--color-border-subtle)] dark:border-slate-700 object-cover" />}
             </div>
             <div className="space-y-2">
               <label className="mb-1 block text-xs font-bold text-slate-700"><ImageIcon className="mr-1 inline h-3.5 w-3.5" />Foto de capa / fachada</label>
@@ -495,11 +495,11 @@ export const ClientBusinessProfile: React.FC<ClientBusinessProfileProps> = ({
                 </label>
                 <input type="text" value={coverImage.startsWith('data:') ? '' : coverImage} onChange={(e) => setCoverImage(e.target.value)} className={mediaInputClass} placeholder="URL da capa" />
               </div>
-              {coverImage && <img src={coverImage} alt="Pré-visualização da capa" className="h-24 w-full rounded-2xl border border-slate-200 dark:border-slate-700 object-cover" />}
+              {coverImage && <img src={coverImage} alt="Pré-visualização da capa" className="h-24 w-full rounded-2xl border border-[var(--color-border-subtle)] dark:border-slate-700 object-cover" />}
             </div>
           </div>
 
-          <div className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 p-4">
+          <div className="space-y-3 rounded-2xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-slate-50/70 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h4 className="text-xs font-black text-slate-900">Galeria de fotos</h4>
@@ -518,7 +518,7 @@ export const ClientBusinessProfile: React.FC<ClientBusinessProfileProps> = ({
             {gallery.length > 0 && (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {gallery.map((image, index) => (
-                  <div key={`${image}-${index}`} className="group relative h-24 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+                  <div key={`${image}-${index}`} className="group relative h-24 overflow-hidden rounded-xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-white dark:bg-slate-900">
                     <img src={image} alt={`Foto ${index + 1} da empresa`} className="h-full w-full object-cover" />
                     <button type="button" onClick={() => setGallery((previous) => previous.filter((_, itemIndex) => itemIndex !== index))} className="absolute right-1 top-1 rounded-full bg-red-600 p-1 text-white opacity-0 transition group-hover:opacity-100" aria-label={`Remover foto ${index + 1}`} title="Remover foto"><X className="h-3 w-3" /></button>
                   </div>
@@ -569,7 +569,7 @@ export const ClientBusinessProfile: React.FC<ClientBusinessProfileProps> = ({
               </div>
             </div>
           </div>
-          <fieldset className="rounded-xl border border-slate-200 dark:border-slate-700 p-3" disabled={notApplicableFields.includes('serviceLanguages')}>
+          <fieldset className="rounded-xl border border-[var(--color-border-subtle)] dark:border-slate-700 p-3" disabled={notApplicableFields.includes('serviceLanguages')}>
             <legend className="px-1 text-xs font-bold text-slate-700">Idiomas de atendimento</legend>
             <div className="flex flex-wrap gap-3">
               {(['pt', 'fr', 'en', 'es'] as Language[]).map((language) => (
@@ -598,7 +598,7 @@ export const ClientBusinessProfile: React.FC<ClientBusinessProfileProps> = ({
             {DEFAULT_AMENITIES.map((amenity) => {
               const Icon = amenity.icon;
               const selected = services.includes(amenity.label);
-              return <button key={amenity.label} type="button" onClick={() => handleToggleService(amenity.label)} className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${selected ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-700 hover:bg-slate-200'}`}><Icon className="mr-1.5 inline h-3.5 w-3.5" />{amenity.label}</button>;
+              return <button key={amenity.label} type="button" onClick={() => handleToggleService(amenity.label)} className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${selected ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-[var(--color-border-subtle)] dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-700 hover:bg-slate-200'}`}><Icon className="mr-1.5 inline h-3.5 w-3.5" />{amenity.label}</button>;
             })}
           </div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">

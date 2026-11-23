@@ -229,7 +229,7 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
         </button>
       </div>
 
-      <p className="text-[9px] text-slate-400 dark:text-slate-500 italic leading-snug">{t('qrSingleUse')}</p>
+      <p className="text-[9px] text-slate-500 dark:text-slate-500 italic leading-snug">{t('qrSingleUse')}</p>
     </div>
   );
 };

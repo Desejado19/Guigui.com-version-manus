@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import { expect, test, type APIRequestContext } from './fixtures';
 import http from 'node:http';
 
 /**
@@ -16,7 +16,7 @@ import http from 'node:http';
  *   usados para o encaminhamento (`userId`/`businessId`).
  */
 
-const BASE_URL = process.env.PW_BASE_URL?.trim() || `http://127.0.0.1:${process.env.PW_PORT?.trim() || '3000'}`;
+const BASE_URL = process.env.PW_BASE_URL?.trim() || `http://localhost:${process.env.PW_PORT?.trim() || '3000'}`;
 const { hostname, port } = new URL(BASE_URL);
 const CITIZEN = { email: 'cidadao.teste@guigui.com', password: 'Guigui@2026!' };
 const OUTSIDER = { email: 'cidadao.seed02@guigui.test', password: 'Guigui2026!' };

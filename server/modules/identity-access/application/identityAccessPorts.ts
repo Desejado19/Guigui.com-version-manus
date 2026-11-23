@@ -12,6 +12,9 @@ import type {
 export interface IdentityAccountRepository {
   findByEmail(email: string): Promise<IdentityAccount | null>;
   findById(id: string): Promise<IdentityAccount | null>;
+  findByGoogleSubject(googleSubject: string): Promise<IdentityAccount | null>;
+  /** Liga a identidade Google apenas se a conta ainda não tiver outra. */
+  linkGoogleSubject(userId: string, googleSubject: string): Promise<boolean>;
   create(input: CreateIdentityAccount): Promise<IdentityAccount | null>;
   changePassword(email: string, currentPassword: string, newPassword: string): Promise<boolean>;
   deactivate(email: string): Promise<boolean>;
@@ -19,7 +22,7 @@ export interface IdentityAccountRepository {
 }
 
 export interface IdentityCredentialRepository {
-  changeDemoPassword?(email: string, currentPassword: string, newPassword: string): Promise<boolean>;
+  changeDemoPassword?(email: string, currentPassword: string, newPassword: string, fallbackPassword?: string): Promise<boolean>;
   createPasswordReset(email: string): Promise<string | null>;
   resetPassword(token: string, newPassword: string): Promise<boolean>;
 }

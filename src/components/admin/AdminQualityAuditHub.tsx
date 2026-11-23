@@ -86,20 +86,20 @@ interface QualityFinding {
 }
 
 const PRIORITY_META: Record<Priority, { label: string; className: string }> = {
-  critical: { label: 'Crítica', className: 'bg-red-50 text-red-700 border-red-200' },
-  high: { label: 'Alta', className: 'bg-amber-50 text-amber-700 border-amber-200' },
-  medium: { label: 'Média', className: 'bg-blue-50 text-blue-700 border-blue-200' },
-  low: { label: 'Baixa', className: 'bg-slate-50 text-slate-600 border-slate-200' },
+  critical: { label: 'Crítica', className: 'bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)] border-[var(--tone-danger-border)]' },
+  high: { label: 'Alta', className: 'bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)] border-[var(--tone-warning-border)]' },
+  medium: { label: 'Média', className: 'bg-[var(--tone-info-bg)] text-[var(--tone-info-text)] border-[var(--tone-info-border)]' },
+  low: { label: 'Baixa', className: 'bg-slate-50 text-slate-600 border-[var(--color-border-default)]' },
 };
 
 const STATUS_META: Record<FindingStatus, { label: string; className: string }> = {
-  identified: { label: 'Identificado', className: 'bg-slate-100 text-slate-700 border-slate-200' },
-  analyzing: { label: 'Em análise', className: 'bg-blue-50 text-blue-700 border-blue-200' },
-  fixing: { label: 'Em correção', className: 'bg-purple-50 text-purple-700 border-purple-200' },
+  identified: { label: 'Identificado', className: 'bg-slate-100 text-slate-700 border-[var(--color-border-default)]' },
+  analyzing: { label: 'Em análise', className: 'bg-[var(--tone-info-bg)] text-[var(--tone-info-text)] border-[var(--tone-info-border)]' },
+  fixing: { label: 'Em correção', className: 'bg-[var(--tone-info-bg)] text-[var(--tone-info-text)] border-[var(--tone-info-border)]' },
   fixed: { label: 'Corrigido', className: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-  validating: { label: 'Em validação', className: 'bg-amber-50 text-amber-700 border-amber-200' },
-  resolved: { label: 'Resolvido', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  reopened: { label: 'Reaberto', className: 'bg-red-50 text-red-700 border-red-200' },
+  validating: { label: 'Em validação', className: 'bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)] border-[var(--tone-warning-border)]' },
+  resolved: { label: 'Resolvido', className: 'bg-[var(--tone-success-bg)] text-[var(--tone-success-text)] border-[var(--tone-success-border)]' },
+  reopened: { label: 'Reaberto', className: 'bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)] border-[var(--tone-danger-border)]' },
 };
 
 const STATUS_OPTIONS: FindingStatus[] = ['identified', 'analyzing', 'fixing', 'fixed', 'validating', 'resolved', 'reopened'];
@@ -283,15 +283,15 @@ export const AdminQualityAuditHub: React.FC = () => {
   const summary = selectedRun?.run.summary;
 
   const kpis = [
-    { label: 'Telas analisadas', value: formatCount(summary?.screensTested), icon: Monitor, tone: 'text-blue-700 bg-blue-50' },
-    { label: 'Botões testados', value: formatCount(summary?.buttonsTested), icon: CheckCircle2, tone: 'text-emerald-700 bg-emerald-50' },
-    { label: 'Formulários testados', value: formatCount(summary?.formsTested), icon: FileText, tone: 'text-purple-700 bg-purple-50' },
+    { label: 'Telas analisadas', value: formatCount(summary?.screensTested), icon: Monitor, tone: 'text-[var(--tone-info-text)] bg-[var(--tone-info-bg)]' },
+    { label: 'Botões testados', value: formatCount(summary?.buttonsTested), icon: CheckCircle2, tone: 'text-[var(--tone-success-text)] bg-[var(--tone-success-bg)]' },
+    { label: 'Formulários testados', value: formatCount(summary?.formsTested), icon: FileText, tone: 'text-[var(--tone-info-text)] bg-[var(--tone-info-bg)]' },
     { label: 'Funcionalidades', value: formatCount(summary?.featuresTested), icon: ClipboardCheck, tone: 'text-cyan-700 bg-cyan-50' },
-    { label: 'Testes aprovados', value: formatCount(summary?.testsPassed), icon: CheckCircle2, tone: 'text-emerald-700 bg-emerald-50' },
-    { label: 'Testes reprovados', value: formatCount(summary?.testsFailed), icon: AlertTriangle, tone: 'text-red-700 bg-red-50' },
-    { label: 'Problemas corrigidos', value: formatCount(selectedRun?.run.findingsResolved), icon: Wrench, tone: 'text-emerald-700 bg-emerald-50' },
-    { label: 'Problemas pendentes', value: formatCount(selectedRun?.run.findingsPending), icon: Clock, tone: 'text-amber-700 bg-amber-50' },
-    { label: 'Erros críticos', value: formatCount(selectedRun?.run.criticalOpen), icon: ShieldAlert, tone: 'text-red-700 bg-red-50' },
+    { label: 'Testes aprovados', value: formatCount(summary?.testsPassed), icon: CheckCircle2, tone: 'text-[var(--tone-success-text)] bg-[var(--tone-success-bg)]' },
+    { label: 'Testes reprovados', value: formatCount(summary?.testsFailed), icon: AlertTriangle, tone: 'text-[var(--tone-danger-text)] bg-[var(--tone-danger-bg)]' },
+    { label: 'Problemas corrigidos', value: formatCount(selectedRun?.run.findingsResolved), icon: Wrench, tone: 'text-[var(--tone-success-text)] bg-[var(--tone-success-bg)]' },
+    { label: 'Problemas pendentes', value: formatCount(selectedRun?.run.findingsPending), icon: Clock, tone: 'text-[var(--tone-warning-text)] bg-[var(--tone-warning-bg)]' },
+    { label: 'Erros críticos', value: formatCount(selectedRun?.run.criticalOpen), icon: ShieldAlert, tone: 'text-[var(--tone-danger-text)] bg-[var(--tone-danger-bg)]' },
   ];
 
   const handleExportCSV = () => {
@@ -400,19 +400,19 @@ export const AdminQualityAuditHub: React.FC = () => {
       </div>
 
       {error && (
-        <div role="alert" className="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 font-semibold text-red-700">
+        <div role="alert" className="flex items-start gap-2 rounded-2xl border border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] px-4 py-3 font-semibold text-[var(--tone-danger-text)]">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           {error}
         </div>
       )}
       {message && (
-        <div role="status" className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 font-semibold text-emerald-700">
+        <div role="status" className="flex items-start gap-2 rounded-2xl border border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] px-4 py-3 font-semibold text-[var(--tone-success-text)]">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
           {message}
         </div>
       )}
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-5">
+      <div className="rounded-2xl border border-[var(--color-border-default)] bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-5">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <div>
             <h3 className="flex items-center gap-1.5 text-sm font-black text-slate-900 dark:text-white">
@@ -443,7 +443,7 @@ export const AdminQualityAuditHub: React.FC = () => {
       </div>
 
       {loading && !selectedRun ? (
-        <div className="flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-16 text-slate-500 dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex items-center justify-center rounded-2xl border border-[var(--color-border-default)] bg-white px-4 py-16 text-slate-500 dark:border-slate-700 dark:bg-slate-900">
           <Loader2 className="mr-2 h-5 w-5 animate-spin" />
           A carregar a auditoria de qualidade…
         </div>
@@ -457,8 +457,8 @@ export const AdminQualityAuditHub: React.FC = () => {
         </div>
       ) : (
         <>
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3 dark:border-slate-800">
+          <div className="rounded-2xl border border-[var(--color-border-default)] bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border-subtle)] pb-3 dark:border-slate-800">
               <div>
                 <h3 className="text-sm font-black text-slate-900 dark:text-white">
                   Execução de {formatDateTime(selectedRun.run.startedAt)}
@@ -476,7 +476,7 @@ export const AdminQualityAuditHub: React.FC = () => {
 
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {kpis.map(({ label, value, icon: Icon, tone }) => (
-                <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+                <div key={label} className="rounded-2xl border border-[var(--color-border-default)] bg-slate-50/60 p-3 dark:border-slate-700 dark:bg-slate-800/50">
                   <div className={`mb-2 inline-flex h-7 w-7 items-center justify-center rounded-xl ${tone}`}>
                     <Icon className="h-3.5 w-3.5" />
                   </div>
@@ -486,14 +486,14 @@ export const AdminQualityAuditHub: React.FC = () => {
               ))}
             </div>
             {summary?.coverageNote && (
-              <p className="mt-3 rounded-xl bg-blue-50 px-3 py-2 text-[11px] font-semibold leading-relaxed text-blue-800">
+              <p className="mt-3 rounded-xl bg-[var(--tone-info-bg)] px-3 py-2 text-[11px] font-semibold leading-relaxed text-[var(--tone-info-text)]">
                 {summary.coverageNote}
               </p>
             )}
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 lg:col-span-2">
+            <div className="rounded-2xl border border-[var(--color-border-default)] bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 lg:col-span-2">
               <h3 className="mb-3 flex items-center gap-1.5 text-sm font-black text-slate-900 dark:text-white">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                 Verificações automáticas
@@ -503,7 +503,7 @@ export const AdminQualityAuditHub: React.FC = () => {
               ) : (
                 <div className="space-y-2">
                   {selectedRun.run.checks.map((check) => (
-                    <div key={check.id} className="flex flex-col justify-between gap-1 rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-700 sm:flex-row sm:items-center">
+                    <div key={check.id} className="flex flex-col justify-between gap-1 rounded-xl border border-[var(--color-border-default)] px-3 py-2.5 dark:border-slate-700 sm:flex-row sm:items-center">
                       <div className="flex items-start gap-2">
                         {check.status === 'passed' ? (
                           <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
@@ -519,10 +519,10 @@ export const AdminQualityAuditHub: React.FC = () => {
                       </div>
                       <span className={`self-start rounded-full px-2 py-0.5 text-[10px] font-extrabold sm:self-center ${
                         check.status === 'passed'
-                          ? 'bg-emerald-50 text-emerald-700'
+                          ? 'bg-[var(--tone-success-bg)] text-[var(--tone-success-text)]'
                           : check.status === 'failed'
-                            ? 'bg-red-50 text-red-700'
-                            : 'bg-amber-50 text-amber-700'
+                            ? 'bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)]'
+                            : 'bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)]'
                       }`}>
                         {check.status === 'passed' ? 'Aprovada' : check.status === 'failed' ? 'Reprovada' : 'Aviso'} · {check.durationMs} ms
                       </span>
@@ -532,7 +532,7 @@ export const AdminQualityAuditHub: React.FC = () => {
               )}
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div className="rounded-2xl border border-[var(--color-border-default)] bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
               <h3 className="mb-3 flex items-center gap-1.5 text-sm font-black text-slate-900 dark:text-white">
                 <History className="h-4 w-4 text-blue-600" />
                 Comparação
@@ -575,12 +575,12 @@ export const AdminQualityAuditHub: React.FC = () => {
                   É necessária pelo menos uma execução anterior para comparar indicadores.
                 </p>
               )}
-              {selectedRun.run.notes && <p className="mt-3 border-t border-slate-100 pt-3 text-[11px] text-slate-500 dark:border-slate-800">{selectedRun.run.notes}</p>}
+              {selectedRun.run.notes && <p className="mt-3 border-t border-[var(--color-border-subtle)] pt-3 text-[11px] text-slate-500 dark:border-slate-800">{selectedRun.run.notes}</p>}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-5">
-            <div className="flex flex-col justify-between gap-3 border-b border-slate-100 pb-3 dark:border-slate-800 lg:flex-row lg:items-center">
+          <div className="rounded-2xl border border-[var(--color-border-default)] bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-5">
+            <div className="flex flex-col justify-between gap-3 border-b border-[var(--color-border-subtle)] pb-3 dark:border-slate-800 lg:flex-row lg:items-center">
               <div>
                 <h3 className="flex items-center gap-1.5 text-sm font-black text-slate-900 dark:text-white">
                   <ShieldAlert className="h-4 w-4 text-amber-600" />
@@ -645,7 +645,7 @@ export const AdminQualityAuditHub: React.FC = () => {
                 const priority = PRIORITY_META[finding.priority];
                 const status = STATUS_META[finding.status];
                 return (
-                  <article key={finding.id} className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+                  <article key={finding.id} className="overflow-hidden rounded-xl border border-[var(--color-border-default)] dark:border-slate-700">
                     <button
                       type="button"
                       onClick={() => setExpandedId(expanded ? null : finding.id)}
@@ -670,7 +670,7 @@ export const AdminQualityAuditHub: React.FC = () => {
                     </button>
 
                     {expanded && (
-                      <div className="border-t border-slate-100 px-3 py-3 dark:border-slate-800">
+                      <div className="border-t border-[var(--color-border-subtle)] px-3 py-3 dark:border-slate-800">
                         <p className="text-[11px] leading-relaxed text-slate-700 dark:text-slate-300">{finding.description}</p>
                         <dl className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                           {[
@@ -691,7 +691,7 @@ export const AdminQualityAuditHub: React.FC = () => {
                             </div>
                           ))}
                         </dl>
-                        <div className="mt-3 flex flex-col justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800 sm:flex-row sm:items-center">
+                        <div className="mt-3 flex flex-col justify-between gap-2 border-t border-[var(--color-border-subtle)] pt-3 dark:border-slate-800 sm:flex-row sm:items-center">
                           <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
                             <Filter className="h-3 w-3" />
                             Atualizar estado com registo persistente

@@ -90,7 +90,7 @@ const capabilityGroups: CapabilityGroup[] = [
     label: 'Dashboard',
     description: 'Indicadores executivos, actividade e visão geral da plataforma.',
     icon: Activity,
-    tone: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
+    tone: 'text-emerald-500 bg-emerald-900/10 border-emerald-700/20',
     items: [
       { id: 'dashboard-home', label: 'Dashboard', description: 'KPIs, crescimento, finanças e actividade recente.', tab: 'overview', status: 'integrated' },
     ],
@@ -141,7 +141,7 @@ const capabilityGroups: CapabilityGroup[] = [
     label: 'Moderação',
     description: 'Controlo de qualidade, denúncias e conteúdo removido.',
     icon: ShieldCheck,
-    tone: 'text-amber-500 bg-amber-500/10 border-amber-500/20',
+    tone: 'text-amber-500 bg-amber-900/10 border-amber-700/20',
     items: [
       { id: 'moderation-pending', label: 'Pendentes', description: 'Itens que aguardam decisão humana.', tab: 'moderation', status: 'integrated' },
       { id: 'moderation-reports', label: 'Denúncias', description: 'Sinalizações enviadas pela comunidade.', tab: 'moderation', status: 'prepared' },
@@ -168,7 +168,7 @@ const capabilityGroups: CapabilityGroup[] = [
     label: 'Financeiro',
     description: 'Pagamentos, receitas, comissões e reembolsos.',
     icon: Wallet,
-    tone: 'text-green-500 bg-green-500/10 border-green-500/20',
+    tone: 'text-green-500 bg-emerald-900/10 border-emerald-700/20',
     items: [
       { id: 'finance-payments', label: 'Pagamentos', description: 'Transacções Mobile Money e estados.', tab: 'financials', status: 'integrated' },
       { id: 'finance-revenue', label: 'Receitas', description: 'Receita consolidada e desempenho financeiro.', tab: 'financials', status: 'integrated' },
@@ -194,7 +194,7 @@ const capabilityGroups: CapabilityGroup[] = [
     label: 'Publicidade',
     description: 'Campanhas, anúncios e estatísticas de divulgação.',
     icon: Megaphone,
-    tone: 'text-orange-500 bg-orange-500/10 border-orange-500/20',
+    tone: 'text-orange-500 bg-amber-900/10 border-orange-500/20',
     items: [
       { id: 'advertising-campaigns', label: 'Campanhas', description: 'Planeamento de campanhas comerciais.', tab: 'reports', status: 'prepared' },
       { id: 'advertising-ads', label: 'Anúncios', description: 'Gestão de criativos e placements.', tab: 'reports', status: 'prepared' },
@@ -226,7 +226,7 @@ const capabilityGroups: CapabilityGroup[] = [
     label: 'Relatórios',
     description: 'Exportação e leitura executiva de utilizadores, empresas e plataforma.',
     icon: BarChart3,
-    tone: 'text-teal-500 bg-teal-500/10 border-teal-500/20',
+    tone: 'text-teal-500 bg-emerald-900/10 border-emerald-700/20',
     items: [
       { id: 'reports-users', label: 'Utilizadores', description: 'Crescimento e actividade de cidadãos.', tab: 'reports', status: 'integrated' },
       { id: 'reports-businesses', label: 'Empresas', description: 'Cadastro, planos e estados.', tab: 'reports', status: 'integrated' },
@@ -283,7 +283,7 @@ const capabilityGroups: CapabilityGroup[] = [
     label: 'Backup',
     description: 'Backups, restauração e exportação de segurança.',
     icon: HardDrive,
-    tone: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+    tone: 'text-emerald-400 bg-emerald-900/10 border-emerald-700/20',
     items: [
       { id: 'backup-list', label: 'Backups', description: 'Execução e verificação de cópias.', tab: 'architecture', status: 'integrated' },
       { id: 'backup-restore', label: 'Restauração', description: 'Plano de recuperação e validação.', tab: 'architecture', status: 'prepared' },
@@ -333,7 +333,7 @@ export const AdminCapabilityHub: React.FC<AdminCapabilityHubProps> = ({ onNaviga
       <div className="border-b border-slate-800 bg-gradient-to-r from-slate-950 via-emerald-950/50 to-slate-950 p-4">
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-300">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-700/30 bg-emerald-900/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-300">
               <ShieldCheck className="h-3.5 w-3.5" /> Administração Guigui.com
             </div>
             <h2 className="mt-3 text-2xl sm:text-3xl font-black tracking-tight">{t('admin.capabilitiesMap')}</h2>
@@ -342,13 +342,13 @@ export const AdminCapabilityHub: React.FC<AdminCapabilityHubProps> = ({ onNaviga
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 min-w-[210px]">
-            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-3">
+            <div className="rounded-2xl border border-emerald-700/20 bg-emerald-900/10 p-3">
               <div className="text-[10px] uppercase tracking-wider text-emerald-300">{t('admin.groups')}</div>
               <div className="mt-1 text-2xl font-black">{capabilityGroups.length}</div>
             </div>
             <div className="rounded-2xl border border-slate-700 bg-slate-900/80 p-3">
               <div className="text-[10px] uppercase tracking-wider text-slate-400">{t('admin.capabilities')}</div>
-              <div className="mt-1 text-2xl font-black">{integratedCount}<span className="text-sm text-slate-500">/{totalCount}</span></div>
+              <div className="mt-1 text-2xl font-black">{integratedCount}<span className="text-sm text-slate-400">/{totalCount}</span></div>
             </div>
           </div>
         </div>
@@ -368,7 +368,7 @@ export const AdminCapabilityHub: React.FC<AdminCapabilityHubProps> = ({ onNaviga
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-sm font-black">{group.label}</h3>
-                      <span className="text-[9px] font-bold text-slate-500">{groupIntegrated}/{group.items.length} integradas</span>
+                      <span className="text-[9px] font-bold text-slate-400">{groupIntegrated}/{group.items.length} integradas</span>
                     </div>
                     <p className="mt-1 text-[10px] leading-relaxed text-slate-400">{group.description}</p>
                   </div>
@@ -381,7 +381,7 @@ export const AdminCapabilityHub: React.FC<AdminCapabilityHubProps> = ({ onNaviga
                         type="button"
                         key={item.id}
                         onClick={() => selectCapability(item)}
-                        className={`flex w-full items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition ${isSelected ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-transparent hover:border-slate-700 hover:bg-slate-800/80'}`}
+                        className={`flex w-full items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition ${isSelected ? 'border-emerald-700/40 bg-emerald-900/10' : 'border-transparent hover:border-slate-700 hover:bg-slate-800/80'}`}
                       >
                         {item.status === 'integrated' ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> : <MoreHorizontal className="h-3.5 w-3.5 shrink-0 text-amber-400" />}
                         <span className="min-w-0 flex-1 truncate text-[11px] font-bold text-slate-200">{item.label}</span>
@@ -402,7 +402,7 @@ export const AdminCapabilityHub: React.FC<AdminCapabilityHubProps> = ({ onNaviga
           </div>
           <h3 className="mt-3 text-xl font-black">{selected.label}</h3>
           <p className="mt-2 text-xs leading-relaxed text-slate-300">{selected.description}</p>
-          <div className={`mt-5 rounded-2xl border p-3 ${selected.status === 'integrated' ? 'border-emerald-500/25 bg-emerald-500/10' : 'border-amber-500/25 bg-amber-500/10'}`}>
+          <div className={`mt-5 rounded-2xl border p-3 ${selected.status === 'integrated' ? 'border-emerald-700/25 bg-emerald-900/10' : 'border-amber-700/25 bg-amber-900/10'}`}>
             <div className="flex items-center gap-2 text-xs font-black">
               {selected.status === 'integrated' ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <MoreHorizontal className="h-4 w-4 text-amber-400" />}
               {selected.status === 'integrated' ? t('admin.integratedPreview') : t('admin.preparedArea')}
@@ -419,7 +419,7 @@ export const AdminCapabilityHub: React.FC<AdminCapabilityHubProps> = ({ onNaviga
                    {selectedData.records.map((record) => (
                      <div key={`${record.label}-${record.status || 'record'}`} className="flex items-center justify-between gap-2 text-[10px]">
                        <span className="truncate text-slate-300">{record.label}</span>
-                       {record.status && <span className="shrink-0 text-slate-500">{record.status}</span>}
+                       {record.status && <span className="shrink-0 text-slate-400">{record.status}</span>}
                      </div>
                    ))}
                  </div>
@@ -435,7 +435,7 @@ export const AdminCapabilityHub: React.FC<AdminCapabilityHubProps> = ({ onNaviga
                  [t('admin.audit'), dataSummary.auditLogs],
                ].map(([label, count]) => (
                  <div key={label} className="rounded-xl border border-slate-800 bg-slate-950/40 px-2.5 py-2">
-                   <div className="text-[9px] font-bold uppercase tracking-[0.1em] text-slate-500">{label}</div>
+                   <div className="text-[9px] font-bold uppercase tracking-[0.1em] text-slate-400">{label}</div>
                    <div className="mt-0.5 text-base font-black text-slate-100">{count}</div>
                  </div>
                ))}
@@ -451,11 +451,11 @@ export const AdminCapabilityHub: React.FC<AdminCapabilityHubProps> = ({ onNaviga
             type="button"
             onClick={() => selected.tab && onNavigateTab(selected.tab)}
             disabled={!selected.tab}
-            className="mt-5 inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-black text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-5 inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-black text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {t('admin.openModule')} <ChevronRight className="h-4 w-4" />
           </button>
-          <div className="mt-6 border-t border-slate-800 pt-4 text-[10px] leading-relaxed text-slate-500">
+          <div className="mt-6 border-t border-slate-800 pt-4 text-[10px] leading-relaxed text-slate-400">
             <div className="flex items-center gap-2 text-slate-300 font-bold"><Search className="h-3.5 w-3.5" /> Navegação sem becos sem saída</div>
             <p className="mt-1">Os separadores existentes continuam disponíveis abaixo do mapa; áreas ainda preparadas estão identificadas em vez de fingirem dados que ainda não existem.</p>
           </div>

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 // Validacao visual dos dados seed: directorio, paineis e fila do admin.
 // Nota: a app faz polling continuo, por isso usa-se domcontentloaded +

@@ -5,15 +5,12 @@ import path from 'node:path';
 // O Windows limita qualquer caminho passado ao CreateProcess a 260 caracteres
 // (MAX_PATH). O binário nativo do esbuild que o Vite usa vive dentro do
 // node_modules/.pnpm do projecto:
-//
-//   <cwd>\node_modules\.pnpm\@esbuild+win32-x64@0.25.12\node_modules\@esbuild\win32-x64\esbuild.exe
-//
-// Quando `cwd` é fundo (por exemplo ...\local-projects\<uuid>\threads\<hash>\g\Guigui),
+//   <cwd>\\node_modules\\.pnpm\\@esbuild+win32-x64@0.25.12\\node_modules\\@esbuild\\win32-x64\\esbuild.exe
+// Quando `cwd` é fundo (por exemplo ...\\local-projects\\<uuid>\\threads\\<hash>\\g\\Guigui),
 // esse caminho fica com 260 caracteres e o `spawn` falha com ENOENT. Sem esbuild,
 // o Vite não transforma .tsx: `/src/App.tsx` cai no fallback SPA, o browser recebe
 // `text/html` no lugar de JavaScript e a página fica em branco
 // ("Failed to load module script ... MIME type of text/html").
-//
 // Solução: expor o MESMO binário num caminho curto (node_modules/.esbuild-bin) e
 // apontar ESBUILD_BINARY_PATH para ele. Só actua quando o caminho original excede
 // o limite, e usa a versão exacta do esbuild que o Vite carrega para não haver
@@ -25,24 +22,15 @@ const PROACTIVE_THRESHOLD = 200;
 const WINDOWS_MAX_PATH = 260;
 
 /**
- * Aponta `ESBUILD_BINARY_PATH` para uma cópia curta do esbuild que o Vite usa.
- *
- * Pode haver duas versões de esbuild no mesmo processo de desenvolvimento: a do
- * `tsx` (que transforma o servidor) e a do Vite (que transforma a app). Cada uma
- * arranca o seu serviço nativo na primeira utilização, por isso esta função é
- * chamada depois de o tsx já ter o serviço dele a correr — aqui só se troca o
- * caminho para a versão do Vite.
- */
-/**
  * Força o serviço nativo do esbuild do `tsx` a arrancar antes de
  * `ensureShortEsbuildBinaryPath` trocar `ESBUILD_BINARY_PATH`.
- *
+ * 
  * O `tsx` transforma os ficheiros de forma preguiçosa (e o Node 24 consegue
  * despachar TypeScript simples sem esbuild), pelo que o primeiro trabalho que
  * realmente precisa do serviço pode chegar depois da troca da variável — e
  * então o host 0.28.2 arranca com o binário 0.25.12 do Vite e falha com
  * "Host version ... does not match binary version ...".
- *
+ * 
  * Aqui carrega-se a MESMA instância do esbuild que o `tsx` usa e faz-se uma
  * transformação trivial enquanto `ESBUILD_BINARY_PATH` ainda aponta para o
  * binário do `tsx`. O serviço fica vivo até ao fim do processo; a troca
@@ -76,13 +64,14 @@ export function ensureShortEsbuildBinaryPath(projectDirectory = process.cwd()): 
   let binaryPath: string;
   let version: string;
   try {
-    const esbuildPackagePath = createRequire(projectRequire.resolve('vite/package.json')).resolve(
+    // Use tsx's esbuild version (0.28.2) to match the host, not Vite's (0.25.12)
+    const tsxEsbuildPackagePath = createRequire(projectRequire.resolve('tsx/package.json')).resolve(
       'esbuild/package.json',
     );
     version = String(
-      (JSON.parse(fs.readFileSync(esbuildPackagePath, 'utf8')) as { version?: string }).version || 'unknown',
+      (JSON.parse(fs.readFileSync(tsxEsbuildPackagePath, 'utf8')) as { version?: string }).version || 'unknown',
     );
-    binaryPath = createRequire(esbuildPackagePath).resolve('@esbuild/win32-x64/esbuild.exe');
+    binaryPath = createRequire(tsxEsbuildPackagePath).resolve('@esbuild/win32-x64/esbuild.exe');
   } catch {
     // Sem esbuild resolvível não há nada a corrigir aqui.
     return null;

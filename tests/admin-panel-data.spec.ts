@@ -1,4 +1,4 @@
-﻿import { test, expect, type Page } from '@playwright/test';
+﻿import { test, expect, type Page } from './fixtures';
 
 const ADMIN_EMAIL = 'admin.teste@guigui.com';
 const ADMIN_PASSWORD = 'Guigui2026!';

@@ -69,6 +69,27 @@
         "security": [{ "sessionCookie": [] }],
         "responses": { "200": { "description": "Notificações" }, "401": { "description": "Autenticação necessária" } }
       }
+    },
+    "/emails/external": {
+      "post": {
+        "summary": "Envia um email escrito pelo utilizador para fora da plataforma",
+        "description": "Requer sessao. Colaboradores administrativos com acesso granular precisam do modulo external_email (acao create). Nao existe modo simulado: sem fornecedor configurado responde 503.",
+        "security": [{ "sessionCookie": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["to", "subject", "message"], "properties": { "to": { "type": "string", "format": "email" }, "subject": { "type": "string", "maxLength": 150 }, "message": { "type": "string", "maxLength": 4000 }, "requestId": { "type": "string", "description": "Chave de idempotencia; repetir nao reenvia" } } } } }
+        },
+        "responses": {
+          "202": { "description": "Fornecedor aceitou a mensagem", "content": { "application/json": { "schema": { "type": "object", "properties": { "state": { "type": "string", "enum": ["accepted"] }, "reference": { "type": "string" } } } } } },
+          "400": { "description": "Destinatario, assunto ou mensagem invalidos (SUBJECT_MISSING, SUBJECT_TOO_LONG, MESSAGE_MISSING, MESSAGE_TOO_LONG, RECIPIENT_INVALID, RECIPIENT_IS_SENDER, EXTERNAL_EMAIL_INVALID)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+          "401": { "description": "Autenticacao necessaria", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+          "403": { "description": "MODULE_FORBIDDEN: colaborador administrativo sem o modulo external_email", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+          "409": { "description": "ACCOUNT_EMAIL_REQUIRED (conta sem email) ou RECIPIENT_IS_PLATFORM_MEMBER (destinatario com conta na plataforma)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+          "429": { "description": "EXTERNAL_EMAIL_RATE_LIMITED: limite de 20 emails por hora por utilizador", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+          "502": { "description": "EXTERNAL_EMAIL_FAILED: o fornecedor recusou ou falhou apos as tentativas", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+          "503": { "description": "EMAIL_NOT_CONFIGURED: sem fornecedor real configurado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
+        }
+      }
     }
   }
 }

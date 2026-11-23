@@ -75,6 +75,7 @@ export const ADMIN_ACCESS_MODULES: Array<{ id: string; label: string; actions: T
   { id: 'moderation', label: 'Moderação', actions: ['view', 'approve', 'reject'] },
   { id: 'reports', label: 'Relatórios', actions: ['view', 'export'] },
   { id: 'support', label: 'Suporte', actions: ['view', 'edit'] },
+  { id: 'external_email', label: 'Email externo', actions: ['view', 'create'] },
   { id: 'notifications', label: 'Notificações em massa', actions: ['view', 'create', 'publish'] },
   { id: 'roles', label: 'Permissões', actions: ['view', 'edit', 'manage'] },
   { id: 'admin_staff', label: 'Equipa', actions: ['view', 'create', 'edit', 'delete', 'manage'] },

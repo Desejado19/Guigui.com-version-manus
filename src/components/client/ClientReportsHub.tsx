@@ -175,6 +175,15 @@ export const ClientReportsHub: React.FC<ClientReportsHubProps> = ({
   const [query, setQuery] = useState('');
   const [format, setFormat] = useState<ExportHistoryFormat>('csv');
   const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  /**
+   * Estado dos bilhetes vindos de `/api/tickets/sold`. A API limita a resposta
+   * aos 500 registos mais recentes e pode falhar; em qualquer dos casos os
+   * relatórios que dependem dela (Clientes, Eventos) ficam incompletos e não
+   * podem ser exportados como se estivessem completos.
+   */
+  const [ticketsIssue, setTicketsIssue] = useState<{ kind: 'truncated' | 'error'; limit: number } | null>(null);
 
   const [tickets, setTickets] = useState<SoldTicketRow[]>([]);
   const [transactions, setTransactions] = useState<PaymentTransaction[]>([]);
@@ -191,14 +200,20 @@ export const ClientReportsHub: React.FC<ClientReportsHubProps> = ({
         fetch(`/api/payments/transactions?businessId=${encodeURIComponent(business.id)}`, { credentials: 'include', cache: 'no-store' }),
       ]);
       if (ticketsResponse.status === 401 || transactionsResponse.status === 401) {
+        setTickets([]);
+        setTicketsIssue({ kind: 'error', limit: 500 });
         setError('A sessão expirou. Inicie sessão novamente.');
         return;
       }
       if (ticketsResponse.ok) {
-        const payload = await ticketsResponse.json() as { tickets?: SoldTicketRow[] };
+        const payload = await ticketsResponse.json() as { tickets?: SoldTicketRow[]; truncated?: boolean; limit?: number };
         setTickets(payload.tickets || []);
+        setTicketsIssue(payload.truncated
+          ? { kind: 'truncated', limit: typeof payload.limit === 'number' && payload.limit > 0 ? payload.limit : 500 }
+          : null);
       } else {
         setTickets([]);
+        setTicketsIssue({ kind: 'error', limit: 500 });
       }
       if (transactionsResponse.ok) {
         const payload = await transactionsResponse.json() as PaymentTransaction[];
@@ -208,6 +223,8 @@ export const ClientReportsHub: React.FC<ClientReportsHubProps> = ({
       }
       setLastUpdated(new Date().toISOString());
     } catch {
+      setTickets([]);
+      setTicketsIssue({ kind: 'error', limit: 500 });
       setError('Não foi possível actualizar os dados do servidor.');
     } finally {
       setLoading(false);
@@ -497,6 +514,15 @@ export const ClientReportsHub: React.FC<ClientReportsHubProps> = ({
     }
   }, [category, commercial, operations, financial, customers, ticketReport, marketing, team, currentLang]);
 
+  /** Categorias cujos números dependem dos bilhetes de `/api/tickets/sold`. */
+  const ticketsDependent = category === 'clientes' || category === 'eventos';
+  const exportBlocked = ticketsDependent && ticketsIssue !== null;
+  const ticketsIssueMessage = ticketsIssue
+    ? ticketsIssue.kind === 'truncated'
+      ? `A API de bilhetes devolve apenas os ${ticketsIssue.limit} registos mais recentes. Existem bilhetes fora desta vista: os totais de Clientes e Eventos estão incompletos e a exportação destas categorias está bloqueada.`
+      : 'Não foi possível carregar os bilhetes vendidos. Os totais de Clientes e Eventos estão incompletos e a exportação destas categorias está bloqueada até os dados voltarem a carregar.'
+    : null;
+
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return table.rows;
@@ -511,6 +537,13 @@ export const ClientReportsHub: React.FC<ClientReportsHubProps> = ({
   });
 
   const exportReport = () => {
+    setExportError(null);
+    if (exportBlocked) {
+      setExportError(ticketsIssue?.kind === 'truncated'
+        ? `Exportação bloqueada: a lista de bilhetes está limitada aos ${ticketsIssue.limit} registos mais recentes. Um ficheiro agora ficaria incompleto.`
+        : 'Exportação bloqueada: não foi possível obter os bilhetes vendidos. Um ficheiro agora ficaria incompleto.');
+      return;
+    }
     const slug = `${business.name.replace(/[^a-zA-Z0-9]+/g, '_')}_${category}_${new Date().toISOString().slice(0, 10)}`;
     const rows = filteredRows.map((row) => row.cells);
     const title = `Relatório ${CATEGORY_LABELS[category]} — ${business.name}`;
@@ -549,10 +582,10 @@ export const ClientReportsHub: React.FC<ClientReportsHubProps> = ({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+            <span className="rounded-full border border-[var(--color-border-subtle)] bg-slate-50 px-2.5 py-1 text-[10px] font-black text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
               {periodLabel(preset)}
             </span>
-            <button type="button" onClick={() => void loadServerData()} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-1.5 text-[10px] font-black text-slate-700 dark:border-slate-600 dark:text-slate-200">
+            <button type="button" onClick={() => void loadServerData()} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[var(--color-border-default)] px-3 py-1.5 text-[10px] font-black text-slate-700 dark:border-slate-600 dark:text-slate-200">
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Actualizar
             </button>
           </div>
@@ -560,7 +593,7 @@ export const ClientReportsHub: React.FC<ClientReportsHubProps> = ({
 
         <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Período
-            <select aria-label="Período" value={preset} onChange={(event) => setPreset(event.target.value as PeriodPreset)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-black text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white">
+            <select aria-label="Período" value={preset} onChange={(event) => setPreset(event.target.value as PeriodPreset)} className="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-white px-2.5 py-2 text-xs font-black text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white">
               <option value="7d">{t('business.UltimosDias')}</option>
               <option value="30d">{t('business.UltimosDias2')}</option>
               <option value="90d">{t('business.UltimosDias90')}</option>
@@ -572,20 +605,26 @@ export const ClientReportsHub: React.FC<ClientReportsHubProps> = ({
           {preset === 'custom' && (
             <>
               <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">De
-                <input type="date" value={customFrom} onChange={(event) => setCustomFrom(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-bold text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
+                <input type="date" value={customFrom} onChange={(event) => setCustomFrom(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-white px-2.5 py-2 text-xs font-bold text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
               </label>
               <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Até
-                <input type="date" value={customTo} onChange={(event) => setCustomTo(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-bold text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
+                <input type="date" value={customTo} onChange={(event) => setCustomTo(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-white px-2.5 py-2 text-xs font-bold text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
               </label>
             </>
           )}
           <label className="flex items-end gap-2 pb-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
-            <input type="checkbox" checked={compare} onChange={(event) => setCompare(event.target.checked)} className="h-4 w-4 rounded border-slate-300" />
+            <input type="checkbox" checked={compare} onChange={(event) => setCompare(event.target.checked)} className="h-4 w-4 rounded border-[var(--color-border-default)]" />
             Comparar com período anterior
           </label>
         </div>
-        {lastUpdated && <p className="mt-2 text-[10px] text-slate-400 dark:text-slate-500">Dados actualizados em {new Date(lastUpdated).toLocaleTimeString(currentLang === 'pt' ? 'pt-PT' : currentLang)}.</p>}
+        {lastUpdated && <p className="mt-2 text-[10px] text-slate-500 dark:text-slate-500">Dados actualizados em {new Date(lastUpdated).toLocaleTimeString(currentLang === 'pt' ? 'pt-PT' : currentLang)}.</p>}
         {error && <p role="alert" className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">{error}</p>}
+        {ticketsIssueMessage && (
+          <p role="alert" className="mt-2 flex items-start gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span>{ticketsIssueMessage}</span>
+          </p>
+        )}
       </section>
 
       <SubmoduleNavbar
@@ -628,10 +667,10 @@ export const ClientReportsHub: React.FC<ClientReportsHubProps> = ({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <label className="relative">
-              <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pesquisar na tabela" className="min-h-9 w-48 rounded-xl border border-slate-300 bg-white pl-7 pr-2 text-[11px] font-bold text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
+              <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pesquisar na tabela" className="min-h-9 w-48 rounded-xl border border-[var(--color-border-default)] bg-white pl-7 pr-2 text-[11px] font-bold text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
             </label>
-            <select value={format} onChange={(event) => setFormat(event.target.value as ExportHistoryFormat)} aria-label="Formato de exportação" className="min-h-9 rounded-xl border border-slate-300 bg-white px-2 text-[11px] font-black text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white">
+            <select value={format} onChange={(event) => setFormat(event.target.value as ExportHistoryFormat)} aria-label="Formato de exportação" className="min-h-9 rounded-xl border border-[var(--color-border-default)] bg-white px-2 text-[11px] font-black text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white">
               <option value="csv">CSV</option>
               <option value="xlsx">XLSX</option>
               <option value="pdf">PDF</option>
@@ -640,7 +679,7 @@ export const ClientReportsHub: React.FC<ClientReportsHubProps> = ({
               <Download className="h-3.5 w-3.5" /> Exportar relatório
             </button>
             {onOpenExport && (
-              <button type="button" onClick={onOpenExport} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-1.5 text-[10px] font-black text-slate-700 dark:border-slate-600 dark:text-slate-200">
+              <button type="button" onClick={onOpenExport} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[var(--color-border-default)] px-3 py-1.5 text-[10px] font-black text-slate-700 dark:border-slate-600 dark:text-slate-200">
                 <FileSpreadsheet className="h-3.5 w-3.5" /> Abrir Exportação
               </button>
             )}
@@ -648,10 +687,14 @@ export const ClientReportsHub: React.FC<ClientReportsHubProps> = ({
         </div>
 
         {exportNotice && <p role="status" className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">{exportNotice}</p>}
+        {exportError && <p role="alert" className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-bold text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">{exportError}</p>}
+        {exportBlocked && !exportError && (
+          <p className="mt-2 text-[10px] font-bold text-amber-800 dark:text-amber-300">A exportação desta categoria está bloqueada enquanto os bilhetes estiverem incompletos.</p>
+        )}
 
         {filteredRows.length === 0 ? (
-          <div className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center dark:border-slate-700 dark:bg-slate-900">
-            <FileText className="mx-auto h-6 w-6 text-slate-400" />
+          <div className="mt-3 rounded-2xl border border-dashed border-[var(--color-border-default)] bg-slate-50 p-6 text-center dark:border-slate-700 dark:bg-slate-900">
+            <FileText className="mx-auto h-6 w-6 text-slate-500" />
             <p className="mt-2 text-xs font-black text-slate-700 dark:text-slate-200">Sem registos para os filtros actuais</p>
             <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Alargue o período ou limpe a pesquisa para ver os dados desta categoria.</p>
           </div>
@@ -704,7 +747,7 @@ export const ClientReportsHub: React.FC<ClientReportsHubProps> = ({
       )}
 
       {category === 'marketing' && (
-        <p className="text-[10px] text-slate-400 dark:text-slate-500">
+        <p className="text-[10px] text-slate-500 dark:text-slate-500">
           As interacções vêm do estado partilhado das publicações ({marketing.likes} curtidas, {marketing.comments} comentários, {marketing.shares} partilhas). O alcance não é apresentado por não existir medição de impressões no sistema.
         </p>
       )}
@@ -712,7 +755,7 @@ export const ClientReportsHub: React.FC<ClientReportsHubProps> = ({
         <p className="flex items-center gap-1.5 text-[10px] text-amber-700 dark:text-amber-300"><AlertTriangle className="h-3.5 w-3.5" /> {financial.now.pending} transacção(ões) pendente(s) — valores não contam como receita confirmada.</p>
       )}
       {category === 'comercial' && (
-        <p className="flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-slate-500"><TrendingUp className="h-3.5 w-3.5" /> {t('business.periodoRelatorio')}: {periodLabel(preset)}</p>
+        <p className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-500"><TrendingUp className="h-3.5 w-3.5" /> {t('business.periodoRelatorio')}: {periodLabel(preset)}</p>
       )}
     </div>
   );

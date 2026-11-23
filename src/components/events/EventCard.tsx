@@ -113,7 +113,7 @@ export const EventCard: React.FC<EventCardProps> = ({ event, currentLang, onOpen
             onClick={() => onOpen(event)}
             className={`shrink-0 rounded-full px-5 py-3 text-sm font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-green-700)] ${
               canBuy
-                ? 'bg-[var(--color-coral-500)] text-white hover:bg-[var(--color-coral-600)]'
+                ? 'bg-[var(--color-coral-700)] text-white hover:bg-[var(--color-coral-800)]'
                 : 'border border-[var(--color-green-700)] text-[var(--color-green-800)] hover:bg-[var(--color-green-50)]'
             }`}
           >

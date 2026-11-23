@@ -78,7 +78,7 @@ export const FeaturedBusinessesAdmin: React.FC<FeaturedBusinessesAdminProps> = (
   };
 
   return (
-    <section aria-labelledby="featured-businesses-admin-title" className="space-y-5 rounded-2xl border border-amber-200 bg-amber-50/50 p-5">
+    <section aria-labelledby="featured-businesses-admin-title" className="space-y-5 rounded-2xl border border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)]/50 p-5">
       <div className="flex items-start gap-3">
         <Star aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
         <div>
@@ -92,10 +92,10 @@ export const FeaturedBusinessesAdmin: React.FC<FeaturedBusinessesAdminProps> = (
       <fieldset disabled={isSaving} className="space-y-2">
         <legend className="mb-2 text-xs font-bold text-slate-700">Empresas ativas disponíveis</legend>
         {activeBusinesses.length === 0 ? (
-          <p className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 text-xs text-slate-500">Não existem empresas ativas para selecionar.</p>
+          <p className="rounded-xl border border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 p-3 text-xs text-slate-500">Não existem empresas ativas para selecionar.</p>
         ) : (
           activeBusinesses.map((business) => (
-            <label key={business.id} className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-800">
+            <label key={business.id} className="flex min-h-11 items-center gap-3 rounded-xl border border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-800">
               <input
                 type="checkbox"
                 aria-label={`Selecionar ${business.name}`}
@@ -116,7 +116,7 @@ export const FeaturedBusinessesAdmin: React.FC<FeaturedBusinessesAdminProps> = (
         ) : (
           <ol aria-label="Ordem das empresas em destaque" className="space-y-2">
             {orderedBusinesses.map((business, index) => (
-              <li key={business.id} className="flex min-h-11 items-center justify-between gap-2 rounded-xl border border-amber-200 bg-white dark:bg-slate-900 px-3 py-2">
+              <li key={business.id} className="flex min-h-11 items-center justify-between gap-2 rounded-xl border border-[var(--tone-warning-border)] bg-white dark:bg-slate-900 px-3 py-2">
                 <span className="min-w-0 truncate text-sm font-semibold text-slate-800">{index + 1}. {business.name}</span>
                 <div className="flex shrink-0 items-center gap-1">
                   <button
@@ -142,7 +142,7 @@ export const FeaturedBusinessesAdmin: React.FC<FeaturedBusinessesAdminProps> = (
                     aria-label={`Remover ${business.name}`}
                     disabled={isSaving}
                     onClick={() => toggleBusiness(business.id, false)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--tone-danger-text)] hover:bg-[var(--tone-danger-bg)] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <X aria-hidden="true" className="h-4 w-4" />
                   </button>
@@ -153,7 +153,7 @@ export const FeaturedBusinessesAdmin: React.FC<FeaturedBusinessesAdminProps> = (
         )}
       </div>
 
-      {saveError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{saveError}</p>}
+      {saveError && <p role="alert" className="rounded-xl border border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] p-3 text-sm text-[var(--tone-danger-text)]">{saveError}</p>}
       <button
         type="button"
         onClick={() => void saveOrder()}

@@ -787,14 +787,18 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
       `"${o.redeemedAt ? new Date(o.redeemedAt).toLocaleString('pt-PT') : 'N/A'}"`,
     ]);
 
-    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
+    // Blob UTF-8 com BOM: acentos e cedilha abrem corretamente no Excel e
+    // evitam o limite de tamanho dos URLs `data:`.
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
+    link.setAttribute('href', url);
     link.setAttribute('download', `pedidos_${business.name.toLowerCase().replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleValidateCode = async (e: React.FormEvent) => {
@@ -1847,7 +1851,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
         ].filter((item) => canTab(item.id as BusinessDashboardTab))}
       />
       <div className="flex min-h-[calc(100vh-72px)] w-full bg-[var(--color-bg-surface)]">
-        <div className={`${mobileSidebarOpen ? 'block' : 'hidden'} fixed inset-0 z-40 bg-[var(--color-bg-surface)]/60 backdrop-blur-[1px] md:hidden`} onClick={() => setMobileSidebarOpen(false)} />
+        <div className={`${mobileSidebarOpen ? 'block' : 'hidden'} fixed inset-0 z-40 bg-[var(--color-bg-surface)]/60 md:hidden`} onClick={() => setMobileSidebarOpen(false)} />
 
         <aside
           style={{ width: sidebarCollapsed ? 72 : 248 }}
@@ -1862,7 +1866,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                 {!sidebarCollapsed && (
                   <div className="min-w-0">
                     <div className="text-lg font-black leading-none text-white">Guigui<span className="text-[#e8a23a]">.com</span></div>
-                    <div className="mt-1.5 text-[8.5px] font-black uppercase tracking-[0.2em] text-[#8fb3ac]">{t('merchantRole')}</div>
+                    <div className="mt-1.5 text-[8.5px] font-black uppercase tracking-[0.2em] text-[var(--color-text-muted-dark)]">{t('merchantRole')}</div>
                   </div>
                 )}
               </div>
@@ -1873,7 +1877,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                     label={t('collapseMenu')}
                     variant="secondary"
                     size="sm"
-                    className="h-8 w-8 rounded-full border-0 bg-transparent text-[#8fb3ac] shadow-none hover:bg-white/10 hover:text-white"
+                    className="h-8 w-8 rounded-full border-0 bg-transparent text-[var(--color-text-muted-dark)] shadow-none hover:bg-[var(--color-green-800)] hover:text-white"
                     onClick={() => setSidebarCollapsed(true)}
                     title={t('collapseMenu')}
                   >
@@ -1883,7 +1887,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                     label={`Fechar menu lateral`}
                     variant="secondary"
                     size="sm"
-                    className="h-8 w-8 rounded-full border-0 bg-transparent text-[#8fb3ac] shadow-none hover:bg-white/10 hover:text-white md:hidden"
+                    className="h-8 w-8 rounded-full border-0 bg-transparent text-[var(--color-text-muted-dark)] shadow-none hover:bg-[var(--color-green-800)] hover:text-white md:hidden"
                     onClick={() => setMobileSidebarOpen(false)}
                   >
                     <X className="h-4 w-4" />
@@ -1895,7 +1899,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                   label={t('expandMenu')}
                   variant="secondary"
                   size="sm"
-                  className="absolute right-1 top-3 h-6 w-6 rounded-full border-0 bg-transparent text-[#8fb3ac] shadow-none hover:bg-white/10 hover:text-white"
+                  className="absolute right-1 top-3 h-6 w-6 rounded-full border-0 bg-transparent text-[var(--color-text-muted-dark)] shadow-none hover:bg-[var(--color-green-800)] hover:text-white"
                   onClick={() => setSidebarCollapsed(false)}
                   title={t('expandMenu')}
                 >
@@ -1912,27 +1916,27 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                     setActiveTab('my_business');
                     setMobileSidebarOpen(false);
                   }}
-                  className="mb-2 flex w-full items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.045] p-2.5 text-left transition hover:bg-white/[0.08]"
+                  className="mb-2 flex w-full items-center gap-3 rounded-2xl border border-[#1b4a43] bg-[#0d3a34] p-2.5 text-left transition hover:bg-[var(--color-green-800)]"
                 >
                   {business.logo ? (
-                    <img src={business.logo} alt={business.name} className="h-10 w-10 shrink-0 rounded-full border border-white/10 object-cover" />
+                    <img src={business.logo} alt={business.name} className="h-10 w-10 shrink-0 rounded-full border border-[var(--color-green-800)] object-cover" />
                   ) : (
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#155048] text-xs font-black text-[#d8e6e2]">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-green-800)] text-xs font-black text-[var(--color-green-100)]">
                       {business.name.slice(0, 2).toUpperCase()}
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[12px] font-black text-white">{business.name}</div>
-                    <div className="mt-0.5 text-[10px] font-semibold text-[#8fb3ac]">{t('merchantRole')}</div>
+                    <div className="mt-0.5 text-[10px] font-semibold text-[var(--color-text-muted-dark)]">{t('merchantRole')}</div>
                   </div>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-[#6f8f89]" />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[var(--color-text-muted-dark)]" />
                 </button>
               )}
 
               {visibleBusinessNavigationGroups.map((group) => (
                 <div key={group.heading} className={sidebarCollapsed ? 'mb-2 space-y-1.5' : 'mb-3 space-y-1'}>
                   {!sidebarCollapsed && group.heading !== t('businessNavSummary') && (
-                    <div className="px-3 pb-1 pt-1.5 text-[8px] font-black uppercase tracking-[0.22em] text-[#6f8f89]">
+                    <div className="px-3 pb-1 pt-1.5 text-[8px] font-black uppercase tracking-[0.22em] text-[var(--color-text-muted-dark)]">
                       {group.heading}
                     </div>
                   )}
@@ -1953,24 +1957,24 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                           aria-label={item.label}
                           aria-current={isActive ? 'page' : undefined}
                           title={item.label}
-                          className={`group relative flex w-full items-center rounded-full text-left transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[#3fae80]/50 ${
+                          className={`group relative flex w-full items-center rounded-full text-left transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[var(--color-green-700)]/50 ${
                             sidebarCollapsed
                               ? 'justify-center p-2.5'
                               : 'gap-3 px-3 py-2'
                           } ${
                             isActive
-                              ? 'bg-[#3fae80] text-white shadow-[0_16px_28px_-16px_rgba(63,174,128,0.9)]'
-                              : 'text-[#d8e6e2] hover:bg-white/[0.05]'
+                              ? 'bg-[var(--color-green-700)] text-white shadow-[0_16px_28px_-16px_rgba(23,97,88,0.9)]'
+                              : 'text-[var(--color-green-100)] hover:bg-[var(--color-green-800)]'
                           }`}
                         >
-                          <div className={`flex shrink-0 items-center justify-center rounded-full ${sidebarCollapsed ? 'h-8 w-8' : 'h-9 w-9'} ${isActive ? 'bg-black/10 text-white' : 'bg-white/[0.06] text-[#a9c4be] group-hover:bg-white/[0.1] group-hover:text-white'}`}>
+                          <div className={`flex shrink-0 items-center justify-center rounded-full ${sidebarCollapsed ? 'h-8 w-8' : 'h-9 w-9'} ${isActive ? 'bg-black/10 text-white' : 'bg-[#124039] text-[#a9c4be] group-hover:bg-[var(--color-green-800)] group-hover:text-white'}`}>
                             <Icon className="h-4 w-4" />
                           </div>
 
                           {!sidebarCollapsed && (
                             <div className="min-w-0 flex-1">
                               <div className={`truncate text-[11.5px] font-black leading-snug ${isActive ? 'text-white' : 'text-[#eef6f4]'}`}>{item.label}</div>
-                              <div className={`mt-0.5 truncate text-[9.5px] font-medium leading-relaxed ${isActive ? 'text-white/75' : 'text-[#8fb3ac]'}`}>
+                              <div className={`mt-0.5 truncate text-[9.5px] font-medium leading-relaxed ${isActive ? 'text-white/75' : 'text-[var(--color-text-muted-dark)]'}`}>
                                 {item.help}
                               </div>
                             </div>
@@ -1989,19 +1993,19 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
               ))}
             </div>
 
-            <div className="mt-auto border-t border-white/10 px-2 py-2.5">
+            <div className="mt-auto border-t border-[var(--color-green-800)] px-2 py-2.5">
               {!sidebarCollapsed && (
                 <div className="flex items-center gap-3 rounded-2xl px-1 py-1.5">
                   {business.logo ? (
-                    <img src={business.logo} alt={business.name} className="h-9 w-9 shrink-0 rounded-full border border-white/10 object-cover" />
+                    <img src={business.logo} alt={business.name} className="h-9 w-9 shrink-0 rounded-full border border-[var(--color-green-800)] object-cover" />
                   ) : (
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#155048] text-[10px] font-black text-[#d8e6e2]">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-green-800)] text-[10px] font-black text-[var(--color-green-100)]">
                       {business.name.slice(0, 2).toUpperCase()}
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[11.5px] font-black text-white">{business.name}</div>
-                    <div className="text-[9.5px] font-semibold text-[#8fb3ac]">{t('merchantRole')}</div>
+                    <div className="text-[9.5px] font-semibold text-[var(--color-text-muted-dark)]">{t('merchantRole')}</div>
                   </div>
                 </div>
               )}
@@ -2009,7 +2013,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                 type="button"
                 onClick={onLogout}
                 title="Terminar sessão"
-                className={`mt-1 flex w-full items-center rounded-2xl py-2.5 text-left text-[#d8e6e2] transition hover:bg-white/[0.07] hover:text-white ${sidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-2'}`}
+                className={`mt-1 flex w-full items-center rounded-2xl py-2.5 text-left text-[var(--color-green-100)] transition hover:bg-[var(--color-green-800)] hover:text-white ${sidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-2'}`}
               >
                 <LogOut className="h-5 w-5 shrink-0 text-[#a9c4be]" />
                 {!sidebarCollapsed && <span className="text-[12px] font-black">Terminar sessão</span>}
@@ -2231,7 +2235,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                     {overviewActivityData.map((entry, index) => <Cell key={entry.name} fill={[chartColors.primary, chartColors.accent, chartColors.info, chartColors.warm][index % 4]} />)}
                   </Pie>
                   <Tooltip content={<ChartTooltip />} />
-                  <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 10, paddingTop: 8, fontWeight: 600 }} />
+                  <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 10, paddingTop: 8, fontWeight: 600 }} formatter={(value) => <span style={{ color: 'var(--color-text-strong)' }}>{value}</span>} />
                 </PieChart>
               </ResponsiveContainer>
             </ChartFrame>
@@ -2943,7 +2947,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                     onClick={() => setBillingSection(area.id)}
                     className={`flex items-start gap-3 rounded-2xl border p-3 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] ${active ? 'border-[var(--color-green-700)] bg-[var(--color-green-700)] text-white shadow-sm' : 'border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] text-[var(--color-text-strong)] hover:border-[var(--color-green-300)] hover:bg-[var(--color-green-50)]'}`}
                   >
-                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${active ? 'bg-white/15 text-white' : 'bg-[var(--color-bg-surface)] text-[var(--color-green-700)]'}`}>
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${active ? 'bg-[#2f8f6e] text-white' : 'bg-[var(--color-bg-surface)] text-[var(--color-green-700)]'}`}>
                       <AreaIcon className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <span className="min-w-0 flex-1">
@@ -3184,13 +3188,13 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <span className="bg-[var(--color-gold-400)] text-[var(--color-text-strong)] px-2.5 py-0.5 rounded-lg font-black text-[10px] uppercase tracking-wider">{t('business.ConfiguracaoGestaoComercial')}</span>
-                <span className="bg-[var(--color-green-50)]0/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded text-[10px] font-bold">{t('business.AcessoAdministradorGestao')}</span>
+                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded text-[10px] font-bold">{t('business.AcessoAdministradorGestao')}</span>
               </div>
 
               <div className="flex items-center gap-2">
                 <Button type="button" size="sm" variant="secondary"
                   onClick={handleExportPricingCsv}
-                  className="bg-white/10 hover:bg-white/20 text-white font-bold px-3 py-1.5 rounded-xl border border-white/20 transition flex items-center gap-1.5 min-h-[34px]"
+                  className="bg-[var(--color-green-800)] hover:bg-[#236d5b] text-white font-bold px-3 py-1.5 rounded-xl border border-[#3c8574] transition flex items-center gap-1.5 min-h-[34px]"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Exportar CSV</span>
@@ -3356,13 +3360,13 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                     <span>{t('business.SimuladorDinamicoExemplo')}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 pt-1 text-[10px]">
-                    <div className="bg-white/80 p-2 rounded-xl border border-[var(--color-green-200)]">
-                      <span className="text-[var(--color-text-muted)] block">Comiss�o ({pricingConfig.ticketCommissionPercent}%):</span>
+                    <div className="bg-white p-2 rounded-xl border border-[var(--color-green-200)]">
+                      <span className="text-[var(--color-text-muted)] block">Comissão ({pricingConfig.ticketCommissionPercent}%):</span>
                       <span className="font-extrabold text-[var(--color-emerald-800)] font-mono">
                         {(5000 * (pricingConfig.ticketCommissionPercent / 100)).toLocaleString('pt-PT')} XOF
                       </span>
                     </div>
-                    <div className="bg-white/80 p-2 rounded-xl border border-[var(--color-green-200)]">
+                    <div className="bg-white p-2 rounded-xl border border-[var(--color-green-200)]">
                       <span className="text-[var(--color-text-muted)] block">Taxa Guigui Total:</span>
                       <span className="font-black text-[var(--color-blue-800)] font-mono">
                         {(5000 * (pricingConfig.ticketCommissionPercent / 100) + pricingConfig.ticketFixedFeeXOF).toLocaleString('pt-PT')} XOF
@@ -3469,7 +3473,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
           {/* Header Banner */}
           <div className="bg-[var(--color-bg-surface-dark)] border border-[var(--color-border-strong)] rounded-2xl p-6 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-md">
             <div className="flex items-center gap-3">
-              <span className="p-3 bg-[var(--color-green-50)]0/20 text-emerald-400 rounded-2xl shrink-0">
+              <span className="p-3 bg-emerald-500/20 text-emerald-400 rounded-2xl shrink-0">
                 <ShoppingBag className="w-6 h-6" />
               </span>
               <div>
@@ -3477,7 +3481,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                   <h2 className="text-lg sm:text-xl font-black">
                     {activeTab === 'tickets' ? 'Bilhetes — Levantamentos e vendas' : t('business.orderHistory')}
                   </h2>
-                  <span className="bg-[var(--color-green-50)]0/20 text-emerald-300 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase border border-emerald-500/30">
+                  <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase border border-emerald-500/30">
                     {filteredOrderHistory.length} de {myBusinessOrders.length} Pedidos
                   </span>
                 </div>
@@ -3492,7 +3496,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
             <div className="flex items-center gap-2 self-start md:self-auto">
               <button type="button"
                 onClick={handleExportOrdersCsv}
-                className="px-4 py-2.5 bg-[var(--color-green-600)] hover:bg-[var(--color-green-50)]0 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-xs transition flex items-center gap-2"
+                className="px-4 py-2.5 bg-[var(--color-green-600)] hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-xs transition flex items-center gap-2"
                 title={t('business.DescarregarRelatorioPedidos')}
               >
                 <FileDown className="w-4 h-4" />
@@ -3501,7 +3505,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
 
               <button type="button"
                 onClick={handleResetOrderFilters}
-                className="px-3.5 py-2.5 bg-[var(--color-bg-surface-dark)] hover:bg-[var(--color-bg-surface-dark)]/80 text-[var(--color-text-muted-dark)] hover:text-white font-bold text-xs rounded-xl border border-[var(--color-border-subtle-dark)]700 transition flex items-center gap-1.5"
+                className="px-3.5 py-2.5 bg-[var(--color-bg-surface-dark)] hover:bg-[var(--color-bg-surface-dark)]/80 text-[var(--color-text-muted-dark)] hover:text-white font-bold text-xs rounded-xl border dark:border-slate-700 transition flex items-center gap-1.5"
                 title="Limpar todos os filtros"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -4098,7 +4102,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
           {/* Modal de Detalhes do Pedido & Recibo Imprimível */}
           {selectedOrderDetails && (
             <div
-              className="fixed inset-0 z-50 bg-[var(--color-bg-surface-dark)]/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in"
+              className="fixed inset-0 z-50 bg-[var(--color-bg-surface-dark)]/70 flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in"
               onClick={(e) => {
                 if (e.target === e.currentTarget) setSelectedOrderDetails(null);
               }}
@@ -4239,7 +4243,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
         <div className="space-y-4">
           <div className="bg-[var(--color-bg-surface-dark)] border border-[var(--color-border-strong)] rounded-2xl p-6 text-white space-y-3">
             <div className="flex items-center gap-2">
-              <span className="p-2 bg-[var(--color-green-50)]0/20 text-emerald-400 rounded-xl">
+              <span className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl">
                 <QrCode className="w-5 h-5" />
               </span>
               <div>
@@ -5172,7 +5176,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                   <XAxis dataKey="name" tick={{ fontSize: 10, fontWeight: 600, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} dy={8} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} width={34} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 10, paddingTop: 8, fontWeight: 600 }} />
+                  <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 10, paddingTop: 8, fontWeight: 600 }} formatter={(value) => <span style={{ color: 'var(--color-text-strong)' }}>{value}</span>} />
                   <Area type="monotone" dataKey="alcance" name={t('business.Alcance')} stroke={chartColors.primary} fill="url(#marketingReach)" strokeWidth={2.5} activeDot={{ r: 5, strokeWidth: 3, stroke: 'var(--color-bg-surface)', fill: chartColors.primary }} dot={{ r: 3, strokeWidth: 2, stroke: 'var(--color-bg-surface)', fill: chartColors.primary }} />
                   <Area type="monotone" dataKey="contactos" name={t('business.Contactos')} stroke={chartColors.accent} fill="transparent" strokeWidth={2.5} activeDot={{ r: 5, strokeWidth: 3, stroke: 'var(--color-bg-surface)', fill: chartColors.accent }} dot={{ r: 3, strokeWidth: 2, stroke: 'var(--color-bg-surface)', fill: chartColors.accent }} />
                 </AreaChart>
@@ -5748,6 +5752,14 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
           accountEmail={currentUser.email}
           notificationPreferences={notificationPreferences}
           onNotificationPreferencesChange={onNotificationPreferencesChange}
+          currentThemeMode={currentThemeMode}
+          onThemeModeChange={onThemeModeChange}
+          onLanguageChange={onLanguageChange}
+          onSaveBusiness={async (updatedBusiness) => {
+            if (!denyPermission('profile')) throw new Error('Não tem permissão para editar os dados da empresa.');
+            if (!onSaveBusinessProfile) throw new Error('A gravação do perfil da empresa não está disponível.');
+            await onSaveBusinessProfile(updatedBusiness);
+          }}
         />
       )}
 
@@ -5776,7 +5788,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
 
       {selectedBusinessPost && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--color-bg-surface-dark)]/60 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--color-bg-surface-dark)]/60 p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="business-post-detail-title"
@@ -5819,7 +5831,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
 
       {/* Buy Extra Post Modal (4.3) */}
       {showBuyPostModal && activeTab === 'my_business' && (
-        <div className="fixed inset-0 bg-[var(--color-bg-surface-dark)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overscroll-contain">
+        <div className="fixed inset-0 bg-[var(--color-bg-surface-dark)]/60 z-50 flex items-center justify-center p-4 overscroll-contain">
           <div className="bg-[var(--color-neutral-0)] rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 overscroll-contain">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="font-extrabold text-[var(--color-text-strong)] text-base flex items-center gap-2">
@@ -5906,7 +5918,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
       )}
       {/* Buy Extra Promotion Modal */}
       {showBuyPromoModal && (
-        <div className="fixed inset-0 bg-[var(--color-bg-surface-dark)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overscroll-contain">
+        <div className="fixed inset-0 bg-[var(--color-bg-surface-dark)]/60 z-50 flex items-center justify-center p-4 overscroll-contain">
           <div className="bg-[var(--color-neutral-0)] rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 overscroll-contain">
             <div className="flex items-center justify-between border-b pb-3"><h3 className="font-extrabold text-[var(--color-text-strong)] text-base flex items-center gap-2"><Tag className="w-5 h-5 text-[var(--color-gold-600)]" /><span>{t('business.ComprarPromocaoExtra')}</span></h3><button type="button" onClick={() => setShowBuyPromoModal(false)} className="guigui-close-button" aria-label={t('business.FecharCompraPromocao')} title="Fechar"><X className="w-4 h-4" /></button></div>
             <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">{t('business.EscolhaPacotePromocoes')}</p>
@@ -5918,7 +5930,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
 
       {/* Upgrade Plan Modal */}
       {showUpgradeModal && (
-        <div className="fixed inset-0 bg-[var(--color-bg-surface-dark)]/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overscroll-contain">
+        <div className="fixed inset-0 bg-[var(--color-bg-surface-dark)]/70 z-50 flex items-center justify-center p-4 overscroll-contain">
           <div className="bg-[var(--color-bg-surface)] rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 overscroll-contain">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="font-extrabold text-[var(--color-text-strong)] text-base flex items-center gap-2">
@@ -6013,7 +6025,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
 
       {/* QR Code Modal for Purchase Order */}
       {selectedOrderForQr && (
-        <div className="fixed inset-0 z-50 bg-[var(--color-bg-surface-dark)]/70 backdrop-blur-sm flex items-center justify-center p-4 overscroll-contain">
+        <div className="fixed inset-0 z-50 bg-[var(--color-bg-surface-dark)]/70 flex items-center justify-center p-4 overscroll-contain">
           <div className="bg-[var(--color-bg-surface)] rounded-2xl max-w-md w-full p-6 text-[var(--color-text-strong)] relative shadow-2xl space-y-4 overscroll-contain">
             <IconButton label="Fechar QR Code" variant="secondary"
               onClick={() => setSelectedOrderForQr(null)}

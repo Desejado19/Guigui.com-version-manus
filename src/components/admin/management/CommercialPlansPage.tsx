@@ -255,8 +255,8 @@ export const CommercialPlansPage: React.FC<{ onBack: () => void }> = ({ onBack }
     { key: 'plan', label: 'Plano', sortable: true, render: (plan) => <div><div className="font-black text-slate-900">{plan.name}</div><div className="text-[9.5px] text-slate-500">{plan.code} · v{plan.version}</div></div> },
     { key: 'price', label: 'Preço de referência', sortable: true, render: (plan) => <div><div className="font-bold">{plan.priceXOF > 0 ? formatCommercialXOF(plan.priceXOF) : 'Negociado'}</div><div className="text-[9px] text-slate-500">Anual: {plan.annualPriceXOF ? formatCommercialXOF(plan.annualPriceXOF) : 'personalizado'}</div></div> },
     { key: 'posts', label: 'Publicações', render: (plan) => { const config = configValue(plan, 'posts'); return <span className="font-bold">{config?.limitKind === 'unlimited' ? 'Ilimitado' : config?.limitKind === 'negotiated' ? 'Negociado' : `${config?.numericValue ?? 0}/mês`}</span>; } },
-    { key: 'subscribers', label: 'Assinantes', sortable: true, render: (plan) => <button type="button" onClick={() => void openSubscribers(plan)} className="font-black text-[#123e3b] underline decoration-dotted">{plan.subscribers}</button> },
-    { key: 'status', label: 'Estado', render: (plan) => <div className="flex flex-wrap gap-1"><span className={`rounded-full px-2 py-0.5 text-[9px] font-black ${plan.isActive ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>{plan.isActive ? 'Ativo' : 'Inativo'}</span>{plan.isPublic && <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[9px] font-black text-sky-700">Público</span>}</div> },
+    { key: 'subscribers', label: 'Assinantes', sortable: true, render: (plan) => <button type="button" onClick={() => void openSubscribers(plan)} className="font-black text-[var(--color-green-800)] underline decoration-dotted">{plan.subscribers}</button> },
+    { key: 'status', label: 'Estado', render: (plan) => <div className="flex flex-wrap gap-1"><span className={`rounded-full px-2 py-0.5 text-[9px] font-black ${plan.isActive ? 'bg-[var(--tone-success-bg)] text-[var(--tone-success-text)]' : 'bg-slate-100 text-slate-600'}`}>{plan.isActive ? 'Ativo' : 'Inativo'}</span>{plan.isPublic && <span className="rounded-full bg-[var(--tone-info-bg)] px-2 py-0.5 text-[9px] font-black text-[var(--tone-info-text)]">Público</span>}</div> },
     {
       key: 'actions',
       label: 'Ações',
@@ -320,7 +320,7 @@ export const CommercialPlansPage: React.FC<{ onBack: () => void }> = ({ onBack }
               <CommercialField label="Benefícios (um por linha)" className="sm:col-span-2"><textarea className={`${commercialInputClass} min-h-24`} value={draft.benefitsText} onChange={(event) => setDraft({ ...draft, benefitsText: event.target.value })} /></CommercialField>
               <CommercialField label="Motivo da alteração" className="sm:col-span-2"><input className={commercialInputClass} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Registado na auditoria" /></CommercialField>
             </div>
-            <div className="flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[10px] font-bold text-slate-700">
+            <div className="flex flex-wrap gap-3 rounded-xl border border-[var(--color-border-default)] bg-slate-50 p-3 text-[10px] font-bold text-slate-700">
               <label className="flex items-center gap-1.5"><input type="checkbox" checked={draft.isActive} onChange={(event) => setDraft({ ...draft, isActive: event.target.checked })} className="h-3.5 w-3.5 accent-[#123e3b]" /> Ativo</label>
               <label className="flex items-center gap-1.5"><input type="checkbox" checked={draft.isPublic} onChange={(event) => setDraft({ ...draft, isPublic: event.target.checked })} className="h-3.5 w-3.5 accent-[#123e3b]" /> Público</label>
               <label className="flex items-center gap-1.5"><input type="checkbox" checked={draft.annualContract} onChange={(event) => setDraft({ ...draft, annualContract: event.target.checked })} className="h-3.5 w-3.5 accent-[#123e3b]" /> Contrato anual</label>
@@ -340,14 +340,14 @@ export const CommercialPlansPage: React.FC<{ onBack: () => void }> = ({ onBack }
       >
         <div className="space-y-3">
           <CommercialField label="Motivo"><input className={commercialInputClass} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Registado na auditoria" /></CommercialField>
-          <div className="overflow-x-auto rounded-xl border border-slate-200">
+          <div className="overflow-x-auto rounded-xl border border-[var(--color-border-default)]">
             <table className="w-full min-w-[720px] text-left text-[10.5px]">
               <thead className="bg-slate-50 text-[9px] uppercase tracking-wide text-slate-500"><tr><th className="p-2.5">Funcionalidade</th><th className="p-2.5">Ativa</th><th className="p-2.5">Tipo de limite</th><th className="p-2.5">Valor</th></tr></thead>
               <tbody>
                 {features.filter((feature) => feature.isActive).map((feature) => {
                   const config = configs[feature.id] || { featureId: feature.id, enabled: false, limitKind: 'flag', numericValue: null, textValue: null };
                   return (
-                    <tr key={feature.id} className="border-t border-slate-100">
+                    <tr key={feature.id} className="border-t border-[var(--color-border-subtle)]">
                       <td className="p-2.5"><div className="font-black text-slate-900">{feature.name}</div><div className="text-[9px] text-slate-500">{feature.description}{feature.unit ? ` · ${feature.unit}` : ''}</div></td>
                       <td className="p-2.5"><input type="checkbox" aria-label={`Ativar ${feature.name}`} checked={config.enabled} onChange={(event) => updateConfig(feature.id, { enabled: event.target.checked })} className="h-4 w-4 accent-[#123e3b]" /></td>
                       <td className="p-2.5">
@@ -378,14 +378,14 @@ export const CommercialPlansPage: React.FC<{ onBack: () => void }> = ({ onBack }
       </CommercialModal>
 
       <CommercialModal open={Boolean(historyPlan)} title={`Versões — ${historyPlan?.name || ''}`} onClose={() => setHistoryPlan(null)} wide>
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-[var(--color-border-subtle)]">
           {history.map((version) => <div key={version.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-[10.5px]"><div><strong>v{version.version}</strong> · {version.reason || 'Alteração do plano'}<div className="text-[9px] text-slate-500">{version.changedBy} · {formatCommercialDate(version.createdAt, true)}</div></div><span className="rounded-full bg-slate-100 px-2 py-0.5 font-black text-slate-600">catálogo v{version.catalogVersion}</span></div>)}
           {history.length === 0 && <p className="py-6 text-center text-[10.5px] text-slate-500">Sem versões registadas.</p>}
         </div>
       </CommercialModal>
 
       <CommercialModal open={Boolean(subscribersPlan)} title={`Assinantes — ${subscribersPlan?.name || ''}`} onClose={() => setSubscribersPlan(null)} wide>
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-[var(--color-border-subtle)]">
           {subscribers.map((subscription) => <div key={subscription.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-[10.5px]"><div><strong>{subscription.companyName}</strong><div className="text-[9px] text-slate-500">{subscription.id} · {subscription.status} · {formatCommercialDate(subscription.endsAt)}</div></div><span className="font-bold">{formatCommercialXOF(subscription.priceXOF)}</span></div>)}
           {subscribers.length === 0 && <p className="py-6 text-center text-[10.5px] text-slate-500">Este plano ainda não tem assinantes.</p>}
         </div>

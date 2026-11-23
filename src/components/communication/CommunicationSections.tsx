@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { Building2, LifeBuoy, Search, SquarePen } from "lucide-react";
 import type {
   Conversation,

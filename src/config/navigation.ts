@@ -11,6 +11,7 @@ import {
   HelpCircle,
   Home,
   LayoutDashboard,
+  Mail,
   Megaphone,
   MessageCircle,
   ScanLine,
@@ -34,10 +35,8 @@ export type CitizenAccountModule =
   | 'notifications'
   | 'messages'
   | 'support'
-  | 'account-data'
-  | 'system-settings'
-  | 'personal-settings'
-  | 'privacy-settings';
+  | 'account-profile'
+  | 'security-settings';
 
 export type BusinessModule =
   | 'overview'
@@ -72,6 +71,7 @@ export type AdminModule =
   | 'roles'
   | 'admin_staff'
   | 'support'
+  | 'external_email'
   | 'reports'
   | 'pricing'
   | 'audit_logs'
@@ -124,10 +124,8 @@ export const CITIZEN_ACCOUNT_NAVIGATION: NavigationGroup<CitizenAccountModule>[]
     id: 'account',
     label: 'Gestão da conta',
     items: [
-      { id: 'account-data', label: 'Dados e conta', icon: CircleUserRound, help: 'Perfil e dados' },
-      { id: 'system-settings', label: 'Definições do sistema', icon: Settings, help: 'Tema e idioma' },
-      { id: 'personal-settings', label: 'Configurações pessoais', icon: CircleUserRound, help: 'Preferências' },
-      { id: 'privacy-settings', label: 'Privacidade', icon: ShieldCheck, help: 'Visibilidade' },
+      { id: 'account-profile', label: 'Conta e perfil', icon: CircleUserRound, help: 'Dados e preferências' },
+      { id: 'security-settings', label: 'Segurança e definições', icon: ShieldCheck, help: 'Privacidade e sistema' },
     ],
   },
 ];
@@ -212,6 +210,7 @@ export const ADMIN_NAVIGATION: NavigationGroup<AdminModule>[] = [
     label: 'Suporte',
     items: [
       { id: 'support', label: 'Suporte', icon: HelpCircle, badgeKey: 'pendingAdminSupport' },
+      { id: 'external_email', label: 'Email externo', icon: Mail },
       { id: 'notifications', label: 'Notificações em Massa', icon: Bell },
     ],
   },

@@ -118,7 +118,8 @@ describe('identity session routes', () => {
     const cookie = response.headers.get('set-cookie');
     expect(cookie).toContain('guigui_session=');
     const session = await getJson('/api/auth/session', cookie!.split(';')[0]);
-    expect(await session.json()).toMatchObject({
+    const sessionBody = await session.json();
+    expect(sessionBody).toMatchObject({
       authenticated: true,
       userId: payload.user.id,
       role: 'user',
@@ -171,7 +172,8 @@ describe('identity credential routes', () => {
       neighborhood: 'Bissau',
     });
 
-    const response = await postJson('/api/auth/change-password', undefined, {
+    const cookie = await login(email, 'CorrectHorse42');
+    const response = await postJson('/api/auth/change-password', cookie, {
       email: email.toUpperCase(),
       currentPassword: 'CorrectHorse42',
       newPassword: 'UpdatedHorse42',
@@ -180,7 +182,7 @@ describe('identity credential routes', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       success: true,
-      message: 'Palavra-passe actualizada com sucesso.',
+      message: 'Palavra-passe atualizada com sucesso.',
     });
     expect((await fetch(`${baseUrl}/api/auth/login`, {
       method: 'POST',

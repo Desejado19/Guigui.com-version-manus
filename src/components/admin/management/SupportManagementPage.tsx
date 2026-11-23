@@ -47,7 +47,7 @@ const SupportDetail: React.FC<{
         ) : (
           <ul className="space-y-2">
             {(request.replies || []).map((item) => (
-              <li key={item.id} className="rounded-xl border border-slate-200 p-2.5">
+              <li key={item.id} className="rounded-xl border border-[var(--color-border-default)] p-2.5">
                 <div className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">{item.senderRole} · {formatManagementDate(item.createdAt)}</div>
                 <p className="mt-1 whitespace-pre-wrap text-slate-700">{item.text}</p>
               </li>
@@ -56,10 +56,10 @@ const SupportDetail: React.FC<{
         )}
       </div>
 
-      <div className="space-y-2 rounded-xl border border-[#e6dac8] bg-[#faf7f2] p-3">
+      <div className="space-y-2 rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] p-3">
         <label className="flex flex-col gap-1">
           <span className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">Responder ao pedido</span>
-          <textarea value={reply} onChange={(event) => setReply(event.target.value)} rows={3} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-800 outline-none focus:border-[#123e3b]" placeholder="Escreva a resposta administrativa…" />
+          <textarea value={reply} onChange={(event) => setReply(event.target.value)} rows={3} className="rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2 text-[11px] text-slate-800 outline-none focus:border-[var(--color-focus-ring)]" placeholder="Escreva a resposta administrativa…" />
         </label>
         <div className="flex flex-wrap items-center gap-2">
           <ManagementActionButton
@@ -156,9 +156,9 @@ export const SupportManagementPage: React.FC<SupportManagementPageProps> = ({
         { key: 'category', label: 'Categoria', render: (request) => request.category || '—' },
         { key: 'status', label: 'Estado', sortable: true, render: (request) => (
           <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-black ${
-            request.status === 'resolved' ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-              : request.status === 'in_progress' ? 'border-sky-200 bg-sky-50 text-sky-800'
-                : 'border-amber-200 bg-amber-50 text-amber-800'
+            request.status === 'resolved' ? 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)]'
+              : request.status === 'in_progress' ? 'border-[var(--tone-info-border)] bg-[var(--tone-info-bg)] text-[var(--tone-info-text)]'
+                : 'border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)]'
           }`}>{STATUS_LABELS[request.status]}</span>
         ) },
         { key: 'updatedAt', label: 'Atualizado', sortable: true, render: (request) => <span className="whitespace-nowrap">{formatManagementDate(request.updatedAt)}</span> },

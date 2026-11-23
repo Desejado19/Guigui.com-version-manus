@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 type Role = 'user' | 'business' | 'admin';
 
@@ -188,8 +188,11 @@ async function traverseVisibleSections(page: Page) {
   for (let index = 0; index < count; index += 1) {
     const button = buttons.nth(index);
     if (!(await button.isVisible().catch(() => false))) continue;
-    await button.click().catch(() => undefined);
-    await page.waitForTimeout(120);
+    // Alguns botões abrem overlays/modais que cobrem os seguintes: um clique com
+    // timeout curto evita que cada um espere os 30s por omissão e esgote o
+    // tempo total do teste (falso negativo por ambiente, não por tema).
+    await button.click({ timeout: 1500, force: true }).catch(() => undefined);
+    await page.waitForTimeout(60);
     leaks.push(...await collectDarkSurfaceLeaks(page));
   }
   return leaks;

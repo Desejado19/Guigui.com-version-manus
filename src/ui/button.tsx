@@ -114,7 +114,7 @@ const sizeClasses: Record<ButtonSize, string> = {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    'bg-[var(--color-bg-brand)] text-[var(--color-text-on-brand)] shadow-[0_1px_0_var(--color-border-strong)] hover:brightness(96) active:shadow-[0_1px_0_0_var(--color-bg-brand)]',
+    'bg-[var(--color-bg-brand)] text-[var(--color-text-on-brand)] shadow-[0_1px_0_var(--color-border-strong)] hover:bg-[var(--color-green-800)] active:bg-[var(--color-green-950)]',
   secondary:
     'bg-[var(--color-bg-surface)] text-[var(--color-text-strong)] shadow-[0_1px_0_var(--color-border-subtle)] hover:bg-[var(--color-bg-subtle)] active:bg-[var(--color-bg-strong)]',
   outline:
@@ -122,13 +122,13 @@ const variantClasses: Record<ButtonVariant, string> = {
   ghost: 'bg-transparent text-[var(--color-text-strong)] hover:bg-[var(--color-bg-subtle)] active:bg-[var(--color-bg-strong)]',
   link: 'bg-transparent text-[var(--color-text-link)] hover:bg-[var(--color-bg-brand-soft)]',
   destructive:
-    'bg-[var(--color-red-600)] text-white shadow-[0_1px_0_0_var(--color-border-strong)] hover:brightness(96) active:shadow-[0_1px_0_0_var(--color-red-500)]',
+    'bg-[var(--color-red-700)] text-white shadow-[0_1px_0_0_var(--color-border-strong)] hover:bg-[var(--color-red-800)] active:bg-[var(--color-red-900)]',
   accent:
-    'bg-[var(--color-accent-600)] text-white shadow-[0_1px_0_0_var(--color-border-strong)] hover:brightness(96) active:shadow-[0_1px_0_0_var(--color-accent-500)]',
+    'bg-[var(--color-coral-700)] text-white shadow-[0_1px_0_0_var(--color-border-strong)] hover:bg-[var(--color-coral-800)] active:bg-[var(--color-coral-900)]',
   danger:
-    'bg-[var(--color-red-600)] text-white shadow-[0_1px_0_0_var(--color-border-strong)] hover:brightness(96) active:shadow-[0_1px_0_0_var(--color-red-500)]',
+    'bg-[var(--color-red-700)] text-white shadow-[0_1px_0_0_var(--color-border-strong)] hover:bg-[var(--color-red-800)] active:bg-[var(--color-red-900)]',
   success:
-    'bg-[var(--color-green-600)] text-white shadow-[0_1px_0_0_var(--color-border-strong)] hover:brightness(96) active:shadow-[0_1px_0_0_var(--color-green-500)]',
+    'bg-[var(--color-green-700)] text-white shadow-[0_1px_0_0_var(--color-border-strong)] hover:bg-[var(--color-green-800)] active:bg-[var(--color-green-900)]',
 };
 
 export const Spinner = ({ size = 'sm', className = '' }: { size?: 'xs' | 'sm' | 'md'; className?: string }) => {

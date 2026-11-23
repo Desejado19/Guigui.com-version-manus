@@ -78,12 +78,12 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   }
 
   return (
-    <div className="flex min-h-[220px] flex-col items-center justify-center gap-2 p-6 text-center text-slate-500">
-      <span className={`flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 shadow-sm`}>
+    <div className="flex min-h-[220px] flex-col items-center justify-center gap-2 p-6 text-center text-[var(--color-text-muted)]">
+      <span className={`flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] shadow-sm`}>
         <IconComp className={sizeScale[size]} />
       </span>
       {title && <p className={sizeText[size]}>{title}</p>}
-      {description && <p className="text-sm text-slate-400">{description}</p>}
+      {description && <p className="text-sm text-[var(--color-text-muted)]">{description}</p>}
       {(actions || onAction) && (
         <div className="mt-2 flex flex-wrap justify-center gap-2">
           {actions}

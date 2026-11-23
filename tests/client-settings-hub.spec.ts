@@ -1,10 +1,10 @@
 /** 
  * E2E tests for Client Settings Hub and account data form validation 
  * 
- * Requires: Development server running at http://127.0.0.1:3000 
+ * Requires: Development server running at http://localhost:3000 
  */ 
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 /** 
  * Axe-core accessibility scanner configuration 

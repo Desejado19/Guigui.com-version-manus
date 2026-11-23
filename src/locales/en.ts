@@ -628,6 +628,10 @@ const en = {
   'business.VideoComercial': 'Commercial video',
   'business.periodoRelatorio': 'Report period',
   'business.UltimosDias90': 'Last 90 days',
+
+  'business.PeriodoEsteMes': 'This month',
+
+  'business.PeriodoEsteAno': 'This year',
   'business.AnoCorrente': 'Current year',
   'business.TodoHistorico': 'Full history',
   'business.IntervaloPersonalizado': 'Custom range',

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 import type { Business } from '../src/types';
 import { DEFAULT_MONETIZATION_CATALOG } from '../src/data/monetizationCatalog';
 
@@ -75,7 +75,7 @@ async function signInDemo(page: Page, email: string): Promise<Record<string, unk
       await page.context().addCookies([{
         name: 'guigui_session',
         value: cookieMatch[1],
-        url: test.info().project.use.baseURL ?? 'http://127.0.0.1:3000',
+        url: test.info().project.use.baseURL ?? 'http://localhost:3000',
         httpOnly: true,
         sameSite: 'Lax',
         secure: false,
@@ -196,7 +196,20 @@ test.describe('perfis empresariais e destaques públicos', () => {
       body: JSON.stringify({ error: 'Falha de persistência simulada.' }),
     }));
 
-    await page.goto('/');
+    await page.addInitScript(() => {
+    if (typeof localStorage === 'undefined') return;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('guigui_onboarding_v1')) {
+        localStorage.removeItem(key);
+      }
+    }
+    localStorage.removeItem('guigui_onboarding_v1');
+    // Remove any existing overlay
+    const overlay = document.querySelector('div.fixed.inset-0.z-5');
+    if (overlay) overlay.remove();
+  });
+  await page.goto('/');
     await openRoleDashboard(page, 'Área da Minha Empresa');
     await page.getByRole('button', { name: 'Minha Empresa' }).first().click();
     await page.getByRole('button', { name: 'Actualizar dados da empresa' }).click();
@@ -273,7 +286,21 @@ test.describe('perfis empresariais e destaques públicos', () => {
   });
 
   test('saves administrator ordering using active records only', async ({ page }) => {
-    await signInDemo(page, 'admin.teste@guigui.com');
+  // Remove onboarding tour state before any page interactions
+  await page.addInitScript(() => {
+    if (typeof localStorage === 'undefined') return;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('guigui_onboarding_v1')) {
+        localStorage.removeItem(key);
+      }
+    }
+    localStorage.removeItem('guigui_onboarding_v1');
+    // Remove any existing overlay
+    const overlay = document.querySelector('div.fixed.inset-0.z-5');
+    if (overlay) overlay.remove();
+  });
+  await signInDemo(page, 'admin.teste@guigui.com');
     const businesses = [
       createBusiness({ id: 'e2e-featured-first', name: 'Primeiro destaque', homepageFeaturedOrder: 0 }),
       createBusiness({ id: 'e2e-featured-next', name: 'Segundo destaque' }),
@@ -291,6 +318,20 @@ test.describe('perfis empresariais e destaques públicos', () => {
     });
 
     await page.goto('/');
+    // Remove onboarding tour state so the welcome modal does not auto-open and block pointers (using addInitScript to run BEFORE page load)
+    await page.addInitScript(() => {
+      if (typeof localStorage === 'undefined') return;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('guigui_onboarding_v1')) {
+          localStorage.removeItem(key);
+        }
+      }
+      localStorage.removeItem('guigui_onboarding_v1');
+      // Remove any existing overlay
+      const overlay = document.querySelector('div.fixed.inset-0.z-5');
+      if (overlay) overlay.remove();
+    });
     await openRoleDashboard(page, 'Administração Guigui.com');
     await page.getByRole('button', { name: 'Empresas & Negócios' }).click();
     await page.getByRole('button', { name: /^Empresas em destaque/ }).first().click();

@@ -19,6 +19,8 @@ function credentialDependencies(overrides: {
   const accounts: IdentityAccountRepository = {
     findByEmail: async () => null,
     findById: async () => null,
+    findByGoogleSubject: async () => null,
+    linkGoogleSubject: async () => false,
     create: async () => null,
     changePassword: vi.fn(async () => overrides.changePassword ?? false),
     deactivate: async () => false,

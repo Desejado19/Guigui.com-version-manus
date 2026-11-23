@@ -22,4 +22,4 @@ export const Field: React.FC<FieldProps> = ({ label, hint, error, required, chil
   </div>
 );
 
-export const fieldClassName = 'min-h-11 w-full rounded-[var(--radius-md)] border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] dark:bg-slate-800 px-3 text-sm text-[var(--color-text-strong)] outline-none transition focus:border-[var(--color-border-strong)] focus:ring-4 focus:ring-[var(--color-focus-ring)]';
+export const fieldClassName = 'min-h-11 w-full rounded-[var(--radius-md)] border border-[var(--color-border-input)] bg-[var(--color-bg-surface)] placeholder:text-[var(--color-text-muted)] px-3 text-sm text-[var(--color-text-strong)] outline-none transition focus:border-[var(--color-border-strong)] focus:ring-4 focus:ring-[var(--color-focus-ring)]';

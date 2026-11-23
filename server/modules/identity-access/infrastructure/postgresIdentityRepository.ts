@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { databasePool } from '../../../db';
-import { accessFromLegacyPermissions, normalizeTeamAccess } from '../../../../src/config/teamAccess';
+import { accessFromLegacyPermissions, BUSINESS_ACCESS_MODULES, legacyPermissionsFromAccess, normalizeTeamAccess } from '../../../../src/config/teamAccess';
 import { hashPassword, verifyPassword } from './jsonIdentityRepository';
 import type { IdentityAccountRepository } from '../application/identityAccessPorts';
 import type { PublicUser } from './jsonIdentityRepository';
@@ -65,6 +65,7 @@ function mapUser(row: Record<string, unknown>): StoredPostgresUser {
     adminAccess: adminAccess ? normalizeTeamAccess(adminAccess, 'admin') : undefined,
     passwordHash: String(row.password_hash),
     createdAt: String(row.created_at),
+    ...(row.google_sub ? { googleSubject: String(row.google_sub) } : {}),
   };
 }
 
@@ -88,13 +89,28 @@ export async function findPostgresUserById(id: string): Promise<StoredPostgresUs
   return result.rows[0] ? mapUser(result.rows[0]) : null;
 }
 
-export async function createPostgresUser(input: Omit<PublicUser, 'id' | 'avatarUrl'> & { avatarUrl?: string; password: string }): Promise<StoredPostgresUser | null> {
+export async function findPostgresUserByGoogleSubject(googleSubject: string): Promise<StoredPostgresUser | null> {
+  const result = await requirePool().query(`${USER_WITH_MEMBERSHIP_SELECT} WHERE u.google_sub=$1 LIMIT 1`, [googleSubject]);
+  return result.rows[0] ? mapUser(result.rows[0]) : null;
+}
+
+export async function linkPostgresUserGoogleSubject(userId: string, googleSubject: string): Promise<boolean> {
+  const result = await requirePool().query(
+    `UPDATE users SET google_sub=$2, updated_at=NOW()
+      WHERE id=$1 AND (google_sub IS NULL OR google_sub=$2)
+      RETURNING id`,
+    [userId, googleSubject],
+  );
+  return result.rowCount === 1;
+}
+
+export async function createPostgresUser(input: Omit<PublicUser, 'id' | 'avatarUrl'> & { avatarUrl?: string; password: string; googleSubject?: string }): Promise<StoredPostgresUser | null> {
   const pool = requirePool();
   const email = input.email.trim().toLowerCase();
   const id = `usr-${Date.now()}-${randomBytes(3).toString('hex')}`;
   const result = await pool.query(
-    `INSERT INTO users (id, name, email, phone, neighborhood, avatar_url, role, account_status, password_hash, access_status, job_title, access_permissions)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,'active',$8,$9,$10,$11)
+    `INSERT INTO users (id, name, email, phone, neighborhood, avatar_url, role, account_status, password_hash, access_status, job_title, access_permissions, google_sub)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,'active',$8,$9,$10,$11,$12)
      ON CONFLICT DO NOTHING
      RETURNING *`,
     [
@@ -109,6 +125,7 @@ export async function createPostgresUser(input: Omit<PublicUser, 'id' | 'avatarU
       input.accessStatus || 'active',
       input.jobTitle || null,
       input.adminAccess ? JSON.stringify(input.adminAccess) : null,
+      input.googleSubject || null,
     ],
   );
   const row = result.rows[0];
@@ -116,6 +133,17 @@ export async function createPostgresUser(input: Omit<PublicUser, 'id' | 'avatarU
 
   const user = mapUser(row);
   if (input.role === 'business' && input.businessId) {
+    // O titular criado no registo não traz equipa configurada: sem permissões
+    // explícitas, dar acesso total de empresa em vez de gravar NULL (a coluna
+    // company_members.permissions é NOT NULL e o registo falhava com 500).
+    const teamAccess = input.teamAccess
+      ?? (input.teamPermissions
+        ? accessFromLegacyPermissions(input.teamPermissions)
+        : normalizeTeamAccess(
+          Object.fromEntries(BUSINESS_ACCESS_MODULES.map((module) => [module.id, module.actions])),
+          'business',
+        ));
+    const teamPermissions = input.teamPermissions ?? legacyPermissionsFromAccess(teamAccess);
     try {
       await pool.query(
         `INSERT INTO company_members (company_id,user_id,member_role,accepted_at,permissions,access,status,job_title)
@@ -125,9 +153,9 @@ export async function createPostgresUser(input: Omit<PublicUser, 'id' | 'avatarU
         [
           input.businessId,
           user.id,
-          input.teamRole || 'manager',
-          input.teamPermissions ? JSON.stringify(input.teamPermissions) : null,
-          input.teamAccess ? JSON.stringify(input.teamAccess) : null,
+          input.teamRole || 'owner',
+          JSON.stringify(teamPermissions),
+          JSON.stringify(teamAccess),
           input.accessStatus || 'active',
           input.jobTitle || null,
         ],
@@ -177,6 +205,8 @@ export function createPostgresIdentityRepository(): IdentityAccountRepository {
   return {
     findByEmail: async (email) => findPostgresUserByEmail(email),
     findById: async (id) => findPostgresUserById(id),
+    findByGoogleSubject: async (googleSubject) => findPostgresUserByGoogleSubject(googleSubject),
+    linkGoogleSubject: async (userId, googleSubject) => linkPostgresUserGoogleSubject(userId, googleSubject),
     create: async (input) => createPostgresUser(input),
     changePassword: async (email, currentPassword, newPassword) => changePostgresUserPassword(email, currentPassword, newPassword),
     deactivate: async (email) => deactivatePostgresUser(email),

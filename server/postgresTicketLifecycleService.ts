@@ -127,13 +127,78 @@ export type SoldTicketRow = {
   status: string;
   priceXOF: number;
   buyerName: string | null;
+  buyerPhone: string | null;
   holderName: string | null;
   holderPhone: string | null;
+  ticketTypeName: string | null;
   purchasedAt: string | null;
   eventId: string;
   eventTitle: string | null;
   refundStatus: string | null;
 };
+
+export type BuyerExportRow = {
+  buyerName: string;
+  buyerPhone: string;
+  ticketTypeName: string;
+  eventId: string;
+  eventTitle: string;
+  quantity: number;
+  totalXOF: number;
+  paid: boolean;
+  pending: boolean;
+  cancelled: boolean;
+};
+
+/**
+ * Exportação de compradores: a agregação é feita no PostgreSQL (por comprador
+ * e tipo de bilhete, sem LIMIT), para que eventos grandes saiam completos sem
+ * carregar todos os bilhetes para o browser.
+ */
+export async function exportPostgresTicketsByBuyer(companyId: string, eventId?: string): Promise<BuyerExportRow[]> {
+  if (!databasePool) return [];
+  const result = await databasePool.query(
+    `SELECT COALESCE(NULLIF(BTRIM(t.buyer_name), ''), NULLIF(BTRIM(t.holder_name), ''), 'Comprador não identificado') AS buyer_name,
+            COALESCE(NULLIF(BTRIM(t.buyer_phone), ''), NULLIF(BTRIM(t.holder_phone), ''), '') AS buyer_phone,
+            COALESCE(tt.name, 'Entrada Geral') AS ticket_type_name,
+            t.event_id AS event_id,
+            COALESCE(NULLIF(BTRIM(e.title), ''), 'Evento sem título') AS event_title,
+            COUNT(*)::int AS quantity,
+            SUM(CASE WHEN t.status IN ('valid','used') THEN COALESCE(tt.price_xof, 0) ELSE 0 END)::bigint AS total_xof,
+            BOOL_OR(t.status IN ('valid','used')) AS paid,
+            BOOL_OR(t.status = 'pending') AS pending,
+            BOOL_OR(t.status = 'cancelled') AS cancelled
+       FROM tickets t
+       JOIN events e ON e.id = t.event_id
+       LEFT JOIN ticket_types tt ON tt.id = t.ticket_type_id
+      WHERE e.company_id = $1 AND ($2::text IS NULL OR t.event_id = $2)
+      GROUP BY 1, 2, 3, 4, 5
+      ORDER BY 1, 5, 3`,
+    [companyId, eventId || null],
+  );
+  return result.rows.map((row) => ({
+    buyerName: String(row.buyer_name || ''),
+    buyerPhone: String(row.buyer_phone || ''),
+    ticketTypeName: String(row.ticket_type_name || ''),
+    eventId: String(row.event_id || ''),
+    eventTitle: String(row.event_title || ''),
+    quantity: Number(row.quantity || 0),
+    totalXOF: Number(row.total_xof || 0),
+    paid: Boolean(row.paid),
+    pending: Boolean(row.pending),
+    cancelled: Boolean(row.cancelled),
+  }));
+}
+
+export async function findPostgresEventTitleForCompany(companyId: string, eventId: string): Promise<string | null> {
+  if (!databasePool) return null;
+  const result = await databasePool.query(
+    'SELECT title FROM events WHERE id=$1 AND company_id=$2 LIMIT 1',
+    [eventId, companyId],
+  );
+  const title = result.rows[0]?.title;
+  return title ? String(title) : null;
+}
 
 /**
  * Bilhetes vendidos pela empresa, para a vista de participantes e reembolsos.
@@ -143,8 +208,9 @@ export type SoldTicketRow = {
 export async function listPostgresTicketsForCompany(companyId: string, eventId?: string, limit = 500): Promise<SoldTicketRow[]> {
   if (!databasePool) return [];
   const result = await databasePool.query(
-    `SELECT t.id, t.ticket_code, t.status, t.buyer_name, t.holder_name, t.holder_phone,
+    `SELECT t.id, t.ticket_code, t.status, t.buyer_name, t.buyer_phone, t.holder_name, t.holder_phone,
             t.created_at, t.event_id, e.title AS event_title,
+            tt.name AS ticket_type_name,
             COALESCE(tt.price_xof, 0) AS price_xof,
             (SELECT r.status FROM ticket_refunds r WHERE r.ticket_id = t.id ORDER BY r.created_at DESC LIMIT 1) AS refund_status
      FROM tickets t
@@ -161,8 +227,10 @@ export async function listPostgresTicketsForCompany(companyId: string, eventId?:
     status: row.status,
     priceXOF: Number(row.price_xof || 0),
     buyerName: row.buyer_name || null,
+    buyerPhone: row.buyer_phone || null,
     holderName: row.holder_name || null,
     holderPhone: row.holder_phone || null,
+    ticketTypeName: row.ticket_type_name || null,
     purchasedAt: row.created_at ? new Date(row.created_at).toISOString() : null,
     eventId: row.event_id,
     eventTitle: row.event_title || null,

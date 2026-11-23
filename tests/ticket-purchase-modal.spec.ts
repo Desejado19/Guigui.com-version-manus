@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 const EVENT_TITLE = 'Festival Cultural da Lusofonia & Gumbe Bissau 2026';
 const CITIZEN = { email: 'cidadao.teste@guigui.com', password: 'Guigui@2026!' };
@@ -15,7 +15,7 @@ async function signInCitizen(page: Page, event: { id: string; title: string; dat
       await page.context().addCookies([{
         name: 'guigui_session',
         value: match[1],
-        url: test.info().project.use.baseURL ?? 'http://127.0.0.1:3000',
+        url: test.info().project.use.baseURL ?? 'http://localhost:3000',
         httpOnly: true,
         sameSite: 'Lax',
         secure: false,

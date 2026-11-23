@@ -12,7 +12,7 @@ export const ChartTooltip = ({ active, label, payload, valueFormatter, formatter
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="min-w-[168px] rounded-2xl border border-[var(--color-border-default)] bg-[var(--color-bg-surface)]/95 p-3.5 shadow-[var(--shadow-lg)] backdrop-blur-xl">
+    <div className="min-w-[168px] rounded-2xl border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] p-3.5 shadow-[var(--shadow-lg)]">
       <div className="mb-2.5 flex items-center justify-between gap-4 border-b border-[var(--color-border-subtle)] pb-2.5">
         <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--color-text-muted)]">
           {label ?? 'Período'}

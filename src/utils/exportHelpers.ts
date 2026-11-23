@@ -129,18 +129,60 @@ export interface ExcelWorkbookSheet {
 /** Livro Excel com uma folha por conjunto de dados da empresa. */
 export function downloadExcelWorkbook(filename: string, sheets: ExcelWorkbookSheet[]) {
   if (sheets.length === 0) return;
-  const workbook = sheets.map((sheet) => ({
-    data: buildSheetData(sheet.title, sheet.headers, sheet.rows),
-    sheet: toSheetName(sheet.title),
-    columns: getColumnWidths(sheet.headers, sheet.rows),
-    stickyRowsCount: 4,
-  }));
+  // O Excel exige nomes de folha únicos; relatórios diferentes podem partilhar
+  // um título curto, por isso desambiguamos com um sufixo numerado.
+  const usedNames = new Set<string>();
+  const workbook = sheets.map((sheet) => {
+    const baseName = toSheetName(sheet.title);
+    let uniqueName = baseName;
+    let suffix = 2;
+    while (usedNames.has(uniqueName.toLowerCase())) {
+      uniqueName = toSheetName(`${baseName.slice(0, 28)} ${suffix}`);
+      suffix += 1;
+    }
+    usedNames.add(uniqueName.toLowerCase());
+    return {
+      data: buildSheetData(sheet.title, sheet.headers, sheet.rows),
+      sheet: uniqueName,
+      columns: getColumnWidths(sheet.headers, sheet.rows),
+      stickyRowsCount: 4,
+    };
+  });
 
   void writeXlsxFile(workbook)
     .toFile(toXlsxFilename(filename))
     .catch((error: unknown) => {
       console.error('excel-workbook-export-failed', error);
     });
+}
+
+/**
+ * CSV único com vários relatórios, separados por um bloco de título.
+ *
+ * O CSV não tem folhas, por isso cada relatório mantém o seu cabeçalho e um
+ * marcador `# Relatório`, para que a exportação conjunta não misture colunas
+ * de conjuntos diferentes.
+ */
+export function downloadCSVWorkbook(filename: string, sheets: ExcelWorkbookSheet[]) {
+  if (sheets.length === 0) return;
+  const escape = (cell: string | number | null | undefined) =>
+    `"${String(cell ?? '').replace(/"/g, '""')}"`;
+  const blocks = sheets.map((sheet) => [
+    escape(`# Relatório: ${sheet.title}`),
+    sheet.headers.map(escape).join(';'),
+    ...sheet.rows.map((row) => row.map(escape).join(';')),
+  ].join('\r\n'));
+  const csvContent = blocks.join('\r\n\r\n');
+
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename.endsWith('.csv') ? filename : `${filename}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 export function triggerPrintReport(title: string, htmlContent: string) {

@@ -36,7 +36,10 @@ import { INITIAL_ADMIN_STAFF } from './data/adminStaffData';
 import { INITIAL_AUDIT_LOGS } from './data/auditLogsData';
 import { INITIAL_NOTIFICATIONS } from './data/notificationsData';
 import { foldForSearch, matchesSearch } from '../shared/textNormalization';
-import { motion, AnimatePresence } from 'motion/react';
+import { BUSINESS_ACCESS_MODULES, hasModuleAccess } from './config/teamAccess';
+import { WelcomeTour } from './components/onboarding/WelcomeTour';
+import { TeamInviteActivation } from './components/TeamInviteActivation';
+import { motion } from 'motion/react';
 import { resolveNotificationTarget, focusKeyForTarget, type NotificationTarget } from './utils/notificationTarget';
 import { calculateBusinessRating } from './utils/reviews';
 import { setPersistentStateScope, usePersistentState } from './utils/persistentState';
@@ -302,12 +305,24 @@ export default function App() {
     const reconcileSession = async () => {
       try {
         const response = await fetch('/api/auth/session', { credentials: 'same-origin', cache: 'no-store' });
+        // `/api/auth/session` devolve a mesma projecção de `/api/auth/login`,
+        // pelo que a sessão é restaurada sem completar campos no cliente.
         const body = response.ok
-          ? (await response.json()) as { authenticated?: boolean } | null
+          ? (await response.json()) as {
+              authenticated?: boolean;
+              user?: UserProfile;
+              role?: UserRole;
+            } | null
           : null;
         if (cancelled) return;
         if (body?.authenticated) {
           setSessionGate('authenticated');
+          if (body.user) {
+            setCurrentUser(body.user);
+            setCurrentRole(body.user.role);
+          } else if (body.role) {
+            setCurrentRole(body.role);
+          }
           return;
         }
         // Sessão ausente, expirada ou revogada: a barra inferior volta ao estado
@@ -323,7 +338,8 @@ export default function App() {
     };
     void reconcileSession();
     const revalidate = () => {
-      if (document.visibilityState === 'visible') void reconcileSession();
+      if (document.visibilityState !== 'visible') return;
+      void reconcileSession();;
     };
     document.addEventListener('visibilitychange', revalidate);
     window.addEventListener('focus', revalidate);
@@ -332,8 +348,6 @@ export default function App() {
       document.removeEventListener('visibilitychange', revalidate);
       window.removeEventListener('focus', revalidate);
     };
-    // Só no arranque: o login/logout actualizam o estado directamente.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [teamInviteToken, setTeamInviteToken] = useState<string | null>(() => {
@@ -341,11 +355,23 @@ export default function App() {
     return new URLSearchParams(window.location.search).get('team_invite');
   });
   const [loginNotice, setLoginNotice] = useState<string | null>(null);
+  // Convite de colaborador: link enviado por e-mail (`/ativar-convite?token=…`).
+  const activationToken = React.useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    if (window.location.pathname.replace(/\/+$/, '') !== '/ativar-convite') return null;
+    return new URLSearchParams(window.location.search).get('token');
+  }, []);
   const [currentRole, setCurrentRole] = useState<UserRole>('user');
+  // `/sobre-nos` tem endereço público próprio: o servidor injecta os metadados
+  // da última publicação e a SPA abre directamente o conteúdo institucional.
+  const isInstitutionalPath = typeof window !== 'undefined'
+    && window.location.pathname.replace(/\/+$/, '') === '/sobre-nos';
   const [currentTab, setCurrentTab] = useState<
     'feed' | 'directory' | 'map' | 'promotions' | 'events' | 'scanner' | 'client' | 'messages' | 'support' | 'admin' | 'institutional'
-  >(() => getRoleLandingTab(currentUser?.role || null));
-  const [navigationStack, setNavigationStack] = useState<Array<typeof currentTab>>(() => [getRoleLandingTab(currentUser?.role || null)]);
+  >(() => (isInstitutionalPath ? 'institutional' : getRoleLandingTab(currentUser?.role || null)));
+  const [navigationStack, setNavigationStack] = useState<Array<typeof currentTab>>(() => [
+    isInstitutionalPath ? 'institutional' : getRoleLandingTab(currentUser?.role || null),
+  ]);
   const [feedRefreshToken, setFeedRefreshToken] = useState(0);
   const [businessDashboardStartTab, setBusinessDashboardStartTab] = useState<BusinessDashboardTab>('overview');
   const [adminDashboardStartTab, setAdminDashboardStartTab] = useState<
@@ -357,6 +383,12 @@ export default function App() {
   React.useEffect(() => {
     if (teamInviteToken) setShowLoginModal(true);
   }, [teamInviteToken]);
+  // Regresso do login Google por redireccionamento com erro: abre o modal para
+  // o LoginModal explicar o motivo devolvido pelo callback.
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (new URLSearchParams(window.location.search).get('google_login') === 'error') setShowLoginModal(true);
+  }, []);
   const [adminSidebarCollapsed, setAdminSidebarCollapsed] = useState(false);
   const [messageBusinessId, setMessageBusinessId] = useState<string | null>(null);
 
@@ -575,6 +607,53 @@ export default function App() {
       return !followedBusinessId || !mutedBusinessIds.has(String(followedBusinessId));
     });
   }, [systemNotifications, currentRole, currentUser?.id, currentUser?.businessId, currentUser?.role, notificationPreferences, mutedFollowNotificationsByUser]);
+
+  // Uma notificação de boas-vindas por conta, no primeiro acesso autenticado.
+  // O marcador local impede repetições mesmo que a lista de avisos seja limpa.
+  React.useEffect(() => {
+    const user = currentUser;
+    if (!user) return;
+    const storageKey = `guigui_welcome_notification_v1:${user.id}`;
+    try {
+      if (window.localStorage.getItem(storageKey)) return;
+      window.localStorage.setItem(storageKey, new Date().toISOString());
+    } catch {
+      return;
+    }
+    const isTeamMember = user.role === 'business' && Boolean(user.teamRole);
+    const assignedModules = isTeamMember
+      ? BUSINESS_ACCESS_MODULES
+        .filter((module) => hasModuleAccess(user.teamAccess, module.id))
+        .map((module) => module.label)
+      : [];
+    const audience = user.role === 'admin'
+      ? 'administração'
+      : isTeamMember
+        ? 'colaborador'
+        : user.role === 'business'
+          ? 'empresa'
+          : 'cidadão';
+    const notification: AppNotification = {
+      id: `welcome-${user.id}`,
+      title: `Bem-vindo ao Guigui.com, ${user.name.split(' ')[0]}`,
+      message: isTeamMember
+        ? `A sua conta de colaborador está ativa. O guia mostra as tarefas atribuídas${assignedModules.length ? `: ${assignedModules.join(', ')}` : ''}.`
+        : `A sua conta de ${audience} está ativa. O guia rápido mostra o essencial para começar.`,
+      targetRole: user.role,
+      targetUserId: user.id,
+      eventType: 'WELCOME',
+      entityType: 'system',
+      category: 'system',
+      priority: 'info',
+      channels: ['in_app'],
+      read: false,
+      createdAt: new Date().toISOString(),
+      actionLabel: 'Fechar',
+    };
+    setSystemNotifications((previous) => (
+      previous.some((item) => item.id === notification.id) ? previous : [notification, ...previous]
+    ));
+  }, [currentUser, setSystemNotifications]);
 
   const updateNotificationPreferences = (next: import('./types').NotificationPreferences) => {
     setNotificationPreferences((previous) => ({ ...previous, [notificationPreferenceKey]: next }));
@@ -1211,9 +1290,6 @@ export default function App() {
     setFocusedConversationId(null);
     setFocusedSupportId(null);
     ensureNotificationPreferences(normalizedUser.role, normalizedUser.id);
-    if (!systemNotifications.some((notification) => notification.eventType === 'WELCOME' && notification.targetUserId === normalizedUser.id)) {
-      emitSystemEvent({ eventType: 'WELCOME', userId: normalizedUser.id, userName: normalizedUser.name, entityType: 'user', entityId: normalizedUser.id });
-    }
     if (isNewBusinessRegistration && normalizedUser.businessId) {
       emitSystemEvent({
         eventType: 'BUSINESS_CREATED',
@@ -1243,18 +1319,6 @@ export default function App() {
     } else if (normalizedUser.role === 'business') {
       setBusinessDashboardStartTab('overview');
     }
-  };
-
-  const handleCitizenPasswordChange = async (currentPassword: string, newPassword: string) => {
-    if (!currentUser?.email) throw new Error('A conta não possui um e-mail válido.');
-    const response = await fetch('/api/auth/change-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: currentUser.email, currentPassword, newPassword }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || 'Não foi possível atualizar a palavra-passe.');
-    setCurrentUser((previous) => previous ? { ...previous, passwordChangedAt: new Date().toISOString() } : previous);
   };
 
   const handleLogout = () => {
@@ -1658,7 +1722,9 @@ export default function App() {
     if (!node || typeof IntersectionObserver === 'undefined') return;
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) loadMoreFeed();
-    });
+      // A zona de pré-carregamento inclui 400px abaixo do viewport: a página
+      // seguinte começa a chegar antes de o utilizador ver o fim da lista.
+    }, { rootMargin: '0px 0px 400px 0px' });
     observer.observe(node);
     return () => observer.disconnect();
   }, [feedHasMore, feedLoadingMore, feedLoadError, loadMoreFeed, serverFeedPosts?.length]);
@@ -2289,6 +2355,12 @@ export default function App() {
   return (
     <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm font-bold text-slate-600 dark:bg-slate-950 dark:text-slate-300">A carregar o painel...</div>}>
 
+      {activationToken && (
+        <div className="fixed inset-0 z-[200] overflow-y-auto bg-slate-50 dark:bg-slate-950">
+          <TeamInviteActivation token={activationToken} />
+        </div>
+      )}
+
       <PostEngagementProvider currentUserId={currentUser?.id ?? null}>
              <div className={`guigui-app-shell flex min-h-screen flex-col antialiased ${currentUser?.role === 'user' ? 'pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:pb-0' : ''}`}>
       {/* Login Overlay Modal */}
@@ -2357,7 +2429,9 @@ export default function App() {
           activeId={
             currentTab === 'messages'
               ? 'messages'
-              : currentTab === 'client'
+              : currentTab === 'support'
+                ? 'support'
+                : currentTab === 'client'
                 ? 'account'
                 : currentTab === 'events'
                   ? 'events'
@@ -2386,17 +2460,17 @@ export default function App() {
         />
       )}
 
-      {/* Main Container Layout with Fluid Framer-Motion Transitions */}
+      {/* Entrada animada por navegação. O `key` remonta a página e reinicia a
+          animação; não usar `AnimatePresence mode="wait"`, que atrasava a
+          montagem e podia perder mudanças rápidas de separador. */}
       <div className="guigui-main flex-1">
-        <AnimatePresence mode="wait">
-          <motion.main
-            key={currentTab}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            transition={{ duration: 0.22, ease: [0.25, 1, 0.5, 1] }}
-            className="w-full min-w-0 space-y-6"
-          >
+        <motion.main
+          key={currentTab}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.22, ease: [0.25, 1, 0.5, 1] }}
+          className="w-full min-w-0 space-y-6"
+        >
             {/* Dedicated Return / Voltar Navigation Bar whenever inside any sub-page/place */}
             {!['feed', 'directory', 'events', 'promotions', 'client'].includes(currentTab) && (
               <div
@@ -2415,7 +2489,7 @@ export default function App() {
               >
                 <button type="button"
                   onClick={handleGoBack}
-                  className="group flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-black text-slate-700 transition hover:bg-slate-900/5 hover:text-slate-950 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-white"
+                  className="group flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-black text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
                 >
                   <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
                   <span className="max-w-[42vw] truncate sm:max-w-none">{currentTab === 'directory' ? 'Diretório de Empresas' : currentTab === 'map' ? 'Mapa de Empresas e Serviços' : currentTab === 'promotions' ? 'Ofertas & Descontos' : currentTab === 'events' ? 'Agenda Cultural & Bilhetes' : currentTab === 'scanner' ? 'Validador de Bilhetes' : currentTab === 'messages' ? 'Mensagens' : currentTab === 'support' ? 'Suporte' : currentTab === 'client' ? (currentUser?.role === 'user' ? 'Área Pessoal' : 'Painel Comercial') : currentTab === 'admin' ? 'Administração' : 'Institucional'}</span>
@@ -2436,7 +2510,7 @@ export default function App() {
               <div className="space-y-6">
                 {/* Active Search Results Feedback Banner */}
                 {searchQuery.trim() && (
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm space-y-3">
+                  <div className="bg-white dark:bg-slate-900 border border-[var(--color-border-subtle)] dark:border-slate-800 rounded-3xl p-5 shadow-sm space-y-3">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
                       <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center font-black text-sm">
@@ -2587,7 +2661,7 @@ export default function App() {
                 {feedRefreshToken > 0 && (
                   <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">
                     <span>Feed actualizado — a mostrar uma ordem diferente de publicações.</span>
-                    <span className="rounded-full bg-white/70 px-2 py-1 text-[10px] text-emerald-700 dark:bg-emerald-900/70 dark:text-emerald-200">Actualização {feedRefreshToken}</span>
+                    <span className="rounded-full bg-white px-2 py-1 text-[10px] text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200">Actualização {feedRefreshToken}</span>
                   </div>
                 )}
                 <div className="w-full space-y-0">
@@ -2605,7 +2679,7 @@ export default function App() {
                           onRequireLogin={handleRequireLogin}
                           isHighlighted={focusedPostId === post.id}
                         />
-                        {showSentinel && <div ref={feedSentinelRef} aria-hidden="true" />}
+                        {showSentinel && <div ref={feedSentinelRef} aria-hidden="true" className="h-px w-full" />}
                       </React.Fragment>
                     );
                   })}
@@ -2629,7 +2703,7 @@ export default function App() {
                       </div>
                     )}
                     {!feedLoadingMore && !feedHasMore && serverFeedPosts !== null && feedPosts.length > FEED_FIRST_PAGE && (
-                      <div className="py-4 text-center text-[11px] font-bold text-slate-400">
+                      <div className="py-4 text-center text-[11px] font-bold text-slate-500">
                         Fim do feed — {feedPosts.length} publicações carregadas.
                       </div>
                     )}
@@ -2656,21 +2730,21 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setCurrentTab('directory')}
-                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                    className="rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                   >
                     Ver lista completa
                   </button>
                 </div>
               </div>
 
-              <div className="relative min-h-[520px] overflow-hidden rounded-3xl border border-slate-200 bg-[#e7f0e9] shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="relative min-h-[520px] overflow-hidden rounded-3xl border border-[var(--color-border-subtle)] bg-[#e7f0e9] shadow-sm dark:border-slate-700 dark:bg-slate-800">
                 <div className="absolute inset-0 opacity-60" aria-hidden="true">
-                  <div className="absolute left-[12%] top-[18%] h-px w-[76%] rotate-[18deg] bg-white/90" />
-                  <div className="absolute left-[8%] top-[52%] h-px w-[84%] -rotate-[12deg] bg-white/90" />
-                  <div className="absolute left-[32%] top-0 h-full w-px rotate-[12deg] bg-white/80" />
-                  <div className="absolute left-[68%] top-0 h-full w-px -rotate-[18deg] bg-white/80" />
+                  <div className="absolute left-[12%] top-[18%] h-px w-[76%] rotate-[18deg] bg-white" />
+                  <div className="absolute left-[8%] top-[52%] h-px w-[84%] -rotate-[12deg] bg-white" />
+                  <div className="absolute left-[32%] top-0 h-full w-px rotate-[12deg] bg-white" />
+                  <div className="absolute left-[68%] top-0 h-full w-px -rotate-[18deg] bg-white" />
                 </div>
-                <div className="absolute left-4 top-4 rounded-2xl border border-white/80 bg-white/90 px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-900 shadow-sm">
+                <div className="absolute left-4 top-4 rounded-2xl border border-white/80 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-900 shadow-sm">
                   {filteredBusinesses.length} locais encontrados
                 </div>
                 {filteredBusinesses.map((business, index) => {
@@ -2688,7 +2762,7 @@ export default function App() {
                       <span className="flex h-10 w-10 items-center justify-center rounded-full border-4 border-white bg-emerald-700 text-white shadow-lg transition hover:scale-110">
                         <MapPin className="h-5 w-5" />
                       </span>
-                      <span className="mt-1 block max-w-32 truncate rounded-lg border border-white/80 bg-white/95 px-2 py-1 text-[10px] font-black text-slate-800 shadow-sm">
+                      <span className="mt-1 block max-w-32 truncate rounded-lg border border-white/80 bg-white px-2 py-1 text-[10px] font-black text-slate-800 shadow-sm">
                         {business.name}
                       </span>
                     </button>
@@ -2696,7 +2770,7 @@ export default function App() {
                 })}
                 {filteredBusinesses.length === 0 && (
                   <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
-                    <p className="rounded-2xl bg-white/90 px-5 py-4 text-sm font-bold text-slate-600 shadow-sm">Nenhuma empresa corresponde aos filtros atuais.</p>
+                    <p className="rounded-2xl bg-white px-5 py-4 text-sm font-bold text-slate-600 shadow-sm">Nenhuma empresa corresponde aos filtros atuais.</p>
                   </div>
                 )}
               </div>
@@ -2706,28 +2780,29 @@ export default function App() {
           {/* TAB 3: Directório Commercial & Marketplace */}
           {currentTab === 'directory' && (
             <div className="space-y-6">
-              {/* Directory Header & Filter Pills */}
-              <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-                  <div>
-                    <h1 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-2">
-                      <Store className="w-6 h-6 text-emerald-600" />
-                      <span>Guia de Empresas e Serviços</span>
-                    </h1>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Explore restaurantes, hotéis, lojas e serviços profissionais no Guigui.com.
-                    </p>
+              {/* Directory Header: mesmo padrão de cores do banner de Promoções e Eventos */}
+              <div className="guigui-hero text-white">
+                <div className="guigui-hero-inner">
+                  <div className="guigui-eyebrow">
+                    <Store className="h-3.5 w-3.5" />
+                    Empresas e serviços de Bissau
                   </div>
+                  <h1 className="guigui-hero-title">
+                    Descubra. Contacte. <em>Compre.</em>
+                  </h1>
+                  <p className="guigui-hero-copy">
+                    Explore restaurantes, hotéis, lojas e serviços profissionais no Guigui.com.
+                  </p>
 
-                  <div className="flex flex-wrap items-center gap-3 self-start sm:self-auto">
+                  <div className="relative z-10 flex flex-wrap items-center justify-center gap-3">
                     {/* View Switcher: Horizontal List vs Grid */}
-                    <div className="bg-slate-100 p-1 rounded-2xl flex items-center border border-slate-200">
+                    <div className="bg-white/10 p-1 rounded-2xl flex items-center border border-white/20">
                       <button type="button"
                         onClick={() => setDirectoryViewMode('horizontal')}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
                           directoryViewMode === 'horizontal'
-                            ? 'bg-slate-900 text-emerald-400 shadow-sm'
-                            : 'text-slate-600 hover:text-slate-900'
+                            ? 'bg-white text-slate-900 shadow-sm'
+                            : 'text-white/85 hover:bg-white/10 hover:text-white'
                         }`}
                         title="Lista Horizontal de Empresas em Bissau"
                       >
@@ -2738,8 +2813,8 @@ export default function App() {
                         onClick={() => setDirectoryViewMode('grid')}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
                           directoryViewMode === 'grid'
-                            ? 'bg-slate-900 text-emerald-400 shadow-sm'
-                            : 'text-slate-600 hover:text-slate-900'
+                            ? 'bg-white text-slate-900 shadow-sm'
+                            : 'text-white/85 hover:bg-white/10 hover:text-white'
                         }`}
                         title="Grelha de Cartões"
                       >
@@ -2747,15 +2822,15 @@ export default function App() {
                         <span className="hidden xs:inline">Grelha</span>
                       </button>
                     </div>
-                    <span className="text-xs font-black text-emerald-800 bg-emerald-50 px-3.5 py-2 rounded-2xl border border-emerald-200">
+                    <span className="text-xs font-black text-white bg-white/10 px-3.5 py-2 rounded-2xl border border-white/20">
                       {filteredBusinesses.length} empresas
                     </span>
-                    <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                    <label className="flex items-center gap-2 text-xs font-bold text-white/90">
                       <span className="sr-only">Ordenar empresas</span>
                       <select
                         value={directorySort}
                         onChange={(event) => setDirectorySort(event.target.value as typeof directorySort)}
-                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 font-bold text-slate-700 outline-none focus:border-emerald-500"
+                        className="rounded-2xl border border-white/20 bg-white/10 px-3 py-2 font-bold text-white outline-none focus:border-white/60 [&>option]:text-slate-900"
                         aria-label="Ordenar empresas"
                       >
                         <option value="relevance">Relevância</option>
@@ -2765,6 +2840,31 @@ export default function App() {
                       </select>
                     </label>
                   </div>
+                </div>
+              </div>
+
+              <div className="bg-white border border-[var(--color-border-subtle)] rounded-3xl p-6 shadow-sm space-y-4">
+                {/* Pesquisa directa de uma empresa no directório */}
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" aria-hidden="true" />
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Pesquisar empresa por nome, categoria ou bairro..."
+                    aria-label="Pesquisar empresa no diretório"
+                    enterKeyHint="search"
+                    className="w-full rounded-2xl border border-[var(--color-border-subtle)] bg-slate-50 py-3 pl-11 pr-24 text-sm font-semibold text-slate-900 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                  {searchQuery.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-slate-200 px-3 py-1.5 text-[11px] font-black text-slate-700 transition hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
+                    >
+                      Limpar
+                    </button>
+                  )}
                 </div>
 
                 {/* Filtro de categoria: uma única entrada que abre a lista completa */}
@@ -2793,7 +2893,7 @@ export default function App() {
                       <div
                         role="dialog"
                         aria-label="Categorias de empresas"
-                        className="absolute left-0 top-full z-50 mt-2 w-[min(92vw,340px)] overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+                        className="absolute left-0 top-full z-50 mt-2 w-[min(92vw,340px)] overflow-hidden rounded-2xl border border-[var(--color-border-subtle)] bg-white text-left shadow-2xl dark:border-slate-700 dark:bg-slate-900"
                       >
                         <div className="max-h-[min(60vh,420px)] overflow-y-auto p-1.5" role="listbox" aria-label="Lista de categorias">
                           <button
@@ -2825,12 +2925,22 @@ export default function App() {
                       </div>
                     )}
                   </div>
+                  {/* O bairro escolhido no feed continua a filtrar o diretório;
+                      sem este controlo o utilizador não conseguia vê-lo nem
+                      alterá-lo depois de navegar. */}
+                  <LocationFilter
+                    locations={bissauLocations}
+                    selectedLocation={selectedNeighborhood}
+                    onSelect={setSelectedNeighborhood}
+                    triggerLabel="Todos os bairros"
+                    allLabel="Todos os bairros"
+                  />
                 </div>
               </div>
 
               {/* Businesses Marketplace Directory Display */}
               {filteredBusinesses.length === 0 ? (
-                <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center text-slate-600 space-y-3 shadow-sm">
+                <div className="bg-white border border-[var(--color-border-subtle)] rounded-3xl p-12 text-center text-slate-600 space-y-3 shadow-sm">
                   <div className="text-base font-bold text-slate-900">
                     Nenhuma empresa encontrada com os filtros selecionados
                   </div>
@@ -2862,7 +2972,7 @@ export default function App() {
                           const container = document.getElementById('horizontal-biz-container');
                           if (container) container.scrollBy({ left: -340, behavior: 'smooth' });
                         }}
-                        className="p-2 rounded-full bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 shadow-sm transition"
+                        className="p-2 rounded-full bg-white border border-[var(--color-border-subtle)] hover:bg-slate-100 text-slate-700 shadow-sm transition"
                         title="Deslizar para a esquerda"
                       >
                         <ChevronLeft className="w-5 h-5" />
@@ -2872,7 +2982,7 @@ export default function App() {
                           const container = document.getElementById('horizontal-biz-container');
                           if (container) container.scrollBy({ left: 340, behavior: 'smooth' });
                         }}
-                        className="p-2 rounded-full bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 shadow-sm transition"
+                        className="p-2 rounded-full bg-white border border-[var(--color-border-subtle)] hover:bg-slate-100 text-slate-700 shadow-sm transition"
                         title="Deslizar para a direita"
                       >
                         <ChevronRight className="w-5 h-5" />
@@ -3035,7 +3145,7 @@ export default function App() {
                 />
               </div>
             ) : (
-              <div className="mx-auto my-8 max-w-xl rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <div className="mx-auto my-8 max-w-xl rounded-3xl border border-[var(--color-border-subtle)] bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <h2 className="text-lg font-black text-slate-900 dark:text-white">Área de mensagens</h2>
                 <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-300">Inicie sessão para ver a sua caixa de mensagens e conversar com as empresas do Guigui.com.</p>
                 <button type="button" onClick={() => setShowLoginModal(true)} className="mt-4 rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white hover:bg-blue-700">Entrar</button>
@@ -3066,7 +3176,7 @@ export default function App() {
                 />
               </div>
             ) : (
-              <div className="mx-auto my-8 max-w-xl rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <div className="mx-auto my-8 max-w-xl rounded-3xl border border-[var(--color-border-subtle)] bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <h2 className="text-lg font-black text-slate-900 dark:text-white">Suporte do Guigui.com</h2>
                 <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-300">Entre na sua conta para abrir um ticket de suporte ou acompanhar as respostas da equipa.</p>
                 <button type="button" onClick={() => setShowLoginModal(true)} className="mt-4 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white hover:bg-emerald-700">Entrar</button>
@@ -3105,7 +3215,6 @@ export default function App() {
                 notificationPreferences={activeNotificationPreferences}
                 onNotificationPreferencesChange={updateNotificationPreferences}
                 onProfileChange={(profile) => setCurrentUser((previous) => previous ? { ...previous, ...profile } : previous)}
-                onPasswordChange={handleCitizenPasswordChange}
                 onDeactivateAccount={handleCitizenDeactivateAccount}
                 onDeleteAccount={handleCitizenDeleteAccount}
                 initialSection={clientStartSection}
@@ -3172,8 +3281,8 @@ export default function App() {
                 </div>
               )
             ) : (
-              <div className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-12 text-center max-w-xl mx-auto space-y-4 shadow-sm my-8">
-                <div className="w-16 h-16 rounded-2xl bg-slate-100 text-slate-700 font-bold flex items-center justify-center mx-auto border border-slate-200">
+              <div className="bg-white border border-[var(--color-border-subtle)] rounded-3xl p-8 sm:p-12 text-center max-w-xl mx-auto space-y-4 shadow-sm my-8">
+                <div className="w-16 h-16 rounded-2xl bg-slate-100 text-slate-700 font-bold flex items-center justify-center mx-auto border border-[var(--color-border-subtle)]">
                   <Building2 className="w-8 h-8 text-blue-600" />
                 </div>
                 <h2 className="text-xl font-black text-slate-900">
@@ -3220,12 +3329,13 @@ export default function App() {
                 onUpdateSupportStatus={handleUpdateSupportStatus}
                 focusSupportId={focusedSupportId}
                 initialTab={adminDashboardStartTab}
+                currentUser={currentUser}
                 sidebarCollapsed={adminSidebarCollapsed}
                 onSidebarCollapsedChange={setAdminSidebarCollapsed}
               />
               </ErrorBoundary>
             ) : (
-              <div className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-12 text-center max-w-xl mx-auto space-y-4 shadow-sm my-8">
+              <div className="bg-white border border-[var(--color-border-subtle)] rounded-3xl p-8 sm:p-12 text-center max-w-xl mx-auto space-y-4 shadow-sm my-8">
                 <div className="w-16 h-16 rounded-2xl bg-slate-900 text-white font-bold flex items-center justify-center mx-auto">
                   <ShieldCheck className="w-8 h-8 text-blue-400" />
                 </div>
@@ -3238,7 +3348,7 @@ export default function App() {
                 <div className="pt-2 flex justify-center">
                   <button type="button"
                     onClick={() => setCurrentTab('feed')}
-                    className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-2xl text-xs transition border border-slate-200"
+                    className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-2xl text-xs transition border border-[var(--color-border-subtle)]"
                   >
                     Voltar ao Feed Principal
                   </button>
@@ -3252,12 +3362,11 @@ export default function App() {
             <InstitutionalPages currentLang={currentLang} />
           )}
         </motion.main>
-      </AnimatePresence>
     </div>
 
       {/* Floating Comparison Bar */}
       {currentTab === 'directory' && comparedBusinessIds.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 text-white backdrop-blur-md px-4 sm:px-5 py-3 rounded-2xl shadow-2xl border border-slate-700/60 flex items-center justify-between gap-3 max-w-lg w-[92vw]">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white px-4 sm:px-5 py-3 rounded-2xl shadow-2xl border border-slate-700/60 flex items-center justify-between gap-3 max-w-lg w-[92vw]">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="flex -space-x-2 shrink-0">
               {businesses
@@ -3284,7 +3393,7 @@ export default function App() {
           <div className="flex items-center gap-2 shrink-0">
             <button type="button"
               onClick={() => setComparedBusinessIds([])}
-              className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-xl transition"
+              className="p-2 text-slate-300 hover:text-red-400 hover:bg-slate-800 rounded-xl transition"
               title="Limpar Seleção"
             >
               <Trash2 className="w-4 h-4" />
@@ -3344,11 +3453,22 @@ export default function App() {
         events={events}
       />
 
+      {/* Guia de boas-vindas por tipo de conta (cidadão, empresa, colaborador, admin) */}
+      {currentUser && (
+        <WelcomeTour
+          role={currentUser.role}
+          userId={currentUser.id}
+          currentLang={currentLang}
+          teamRole={currentUser.teamRole}
+          teamAccess={currentUser.teamAccess}
+        />
+      )}
+
       {/* Global Simulated SMS Gateway Toast */}
       <SmsSimulatorToast currentLang={currentLang} />
 
       {selectedNotification && (
-        <div className="fixed inset-0 z-[65] flex items-start justify-center overflow-y-auto bg-[var(--color-bg-canvas)]/50 p-4 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" onClick={(event) => { if (event.target === event.currentTarget) setSelectedNotification(null); }}>
+        <div className="fixed inset-0 z-[65] flex items-start justify-center overflow-y-auto bg-[var(--color-bg-canvas)]/50 p-4 sm:items-center" role="dialog" aria-modal="true" onClick={(event) => { if (event.target === event.currentTarget) setSelectedNotification(null); }}>
           <Panel className="my-auto max-h-[calc(100vh-2rem)] w-full max-w-lg overflow-y-auto shadow-[var(--shadow-md)] ring-1 ring-[var(--color-border-subtle)]">
             <PanelHeader
               eyebrow="Notificação"

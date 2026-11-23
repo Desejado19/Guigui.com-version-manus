@@ -31,6 +31,8 @@ function authDependencies(overrides: {
   const accounts: IdentityAccountRepository = {
     findByEmail: async () => overrides.account === undefined ? account : overrides.account,
     findById: async () => account,
+    findByGoogleSubject: async () => null,
+    linkGoogleSubject: async () => true,
     create: async () => account,
     changePassword: async () => false,
     deactivate: async () => false,

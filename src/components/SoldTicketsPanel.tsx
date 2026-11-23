@@ -83,7 +83,7 @@ const TAB_DESCRIPTIONS: Record<StatusTab, Record<Language, string>> = {
 
 const STATUS_STYLES: Record<string, string> = {
   valid: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  used: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700',
+  used: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-[var(--color-border-subtle)] dark:border-slate-700',
   cancelled: 'bg-red-100 text-red-700 border-red-200',
   expired: 'bg-amber-100 text-amber-800 border-amber-200',
 };
@@ -109,7 +109,7 @@ export const SoldTicketsPanel: React.FC<{ currentLang: Language }> = ({ currentL
   const [tickets, setTickets] = useState<SoldTicket[]>([]);
   const [totals, setTotals] = useState<SoldTotals>(EMPTY_TOTALS);
   const [loading, setLoading] = useState(true);
-  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const [notice, setNotice] = useState<{ tone: 'success' | 'error' | 'warning'; text: string } | null>(null);
   const [statusTab, setStatusTab] = useState<StatusTab>('all');
   const [query, setQuery] = useState('');
 
@@ -121,9 +121,12 @@ export const SoldTicketsPanel: React.FC<{ currentLang: Language }> = ({ currentL
         setNotice({ tone: 'error', text: t('soldTicketsLoadFailed') });
         return;
       }
-      const payload = await response.json() as { tickets?: SoldTicket[]; totals?: SoldTotals };
+      const payload = await response.json() as { tickets?: SoldTicket[]; totals?: SoldTotals; truncated?: boolean };
       setTickets(payload.tickets || []);
       setTotals(payload.totals || EMPTY_TOTALS);
+      // A API limita a vista aos 500 bilhetes mais recentes: avisar em vez de
+      // apresentar contagens parciais como se fossem o total da empresa.
+      setNotice(payload.truncated ? { tone: 'warning', text: t('soldTicketsTruncated') } : null);
     } catch {
       setNotice({ tone: 'error', text: t('soldTicketsLoadFailed') });
     } finally {
@@ -173,7 +176,7 @@ export const SoldTicketsPanel: React.FC<{ currentLang: Language }> = ({ currentL
   ];
 
   return (
-    <Card className="border-slate-200 dark:border-slate-700 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+    <Card className="border-[var(--color-border-subtle)] dark:border-slate-700 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-600">{t('soldTicketsTitle')}</p>
@@ -186,7 +189,7 @@ export const SoldTicketsPanel: React.FC<{ currentLang: Language }> = ({ currentL
 
       <div className="mb-1 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {stats.map((stat) => (
-          <div key={stat.label} className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center dark:border-slate-700 dark:bg-slate-800">
+          <div key={stat.label} className="rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 p-3 text-center dark:border-slate-700 dark:bg-slate-800">
             <stat.icon className="mx-auto mb-1 h-4 w-4 text-indigo-600" aria-hidden="true" />
             <div className="text-lg font-black text-slate-900 dark:text-white">{stat.value}</div>
             <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{stat.label}</div>
@@ -215,7 +218,7 @@ export const SoldTicketsPanel: React.FC<{ currentLang: Language }> = ({ currentL
         actionsStyle={{ width: 'min(320px, 100%)' }}
         actions={(
           <div className="relative w-full">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500 dark:text-slate-500" aria-hidden="true" />
             <input
               type="search"
               value={query}
@@ -223,7 +226,7 @@ export const SoldTicketsPanel: React.FC<{ currentLang: Language }> = ({ currentL
               placeholder={SEARCH_PLACEHOLDER[currentLang]}
               aria-label={SEARCH_PLACEHOLDER[currentLang]}
               style={{ fontSize: 12 }}
-              className="min-h-10 w-full min-w-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 pl-8 pr-3 font-bold text-slate-700 dark:text-slate-200 placeholder:font-normal placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none"
+              className="min-h-10 w-full min-w-0 rounded-xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-slate-50 dark:bg-slate-800 pl-8 pr-3 font-bold text-slate-700 dark:text-slate-200 placeholder:font-normal placeholder:text-slate-300 focus:border-indigo-400 focus:outline-none"
             />
           </div>
         )}
@@ -231,8 +234,8 @@ export const SoldTicketsPanel: React.FC<{ currentLang: Language }> = ({ currentL
 
       {notice && (
         <div
-          className={`mb-4 flex items-start gap-2 rounded-xl border p-3 text-xs font-bold ${notice.tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200' : 'border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200'}`}
-          role="status"
+          className={`mb-4 flex items-start gap-2 rounded-xl border p-3 text-xs font-bold ${notice.tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200' : notice.tone === 'warning' ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200' : 'border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200'}`}
+          role={notice.tone === 'error' ? 'alert' : 'status'}
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <span>{notice.text}</span>
@@ -250,7 +253,7 @@ export const SoldTicketsPanel: React.FC<{ currentLang: Language }> = ({ currentL
           {pagination.pageItems.map((ticket) => {
             const label = STATUS_LABELS[ticket.status]?.[currentLang] || ticket.status;
             return (
-              <div key={ticket.id} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3.5 dark:border-slate-700 dark:bg-slate-900 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
+              <div key={ticket.id} className="grid gap-3 rounded-xl border border-[var(--color-border-subtle)] bg-white p-3.5 dark:border-slate-700 dark:bg-slate-900 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
                 <div className="min-w-0 flex-1">
                   <p className="line-clamp-2 text-sm font-black text-slate-900 dark:text-white dark:text-slate-100">{ticket.eventTitle || t('events.all')}</p>
                   <p className="mt-1 text-[11px] font-semibold leading-relaxed text-slate-600 dark:text-slate-100">
@@ -263,7 +266,7 @@ export const SoldTicketsPanel: React.FC<{ currentLang: Language }> = ({ currentL
                 </div>
                 <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                   <span className="text-xs font-black text-slate-900 dark:text-white">{formatCurrencyXOF(ticket.priceXOF, currentLang)}</span>
-                  <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase ${STATUS_STYLES[ticket.status] || 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-600'}`}>{label}</span>
+                  <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase ${STATUS_STYLES[ticket.status] || 'border-[var(--color-border-subtle)] dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-600'}`}>{label}</span>
                 </div>
               </div>
             );

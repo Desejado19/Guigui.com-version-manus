@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 /**
  * Falha de rede no feed: sem a página seguinte a lista já carregada mantém-se
@@ -80,13 +80,32 @@ test('falha de rede na primeira página mantém a lista local visível', async (
   expect(await articleCount(page)).toBeGreaterThanOrEqual(LOCAL_POSTS.length);
 
   // 3. Tudo o que está no ecrã existe na lista guardada localmente.
-  const feedIds = await page.evaluate(() => {
-    const read = (key: string) => {
-      try { return JSON.parse(window.localStorage.getItem(key) || '[]'); } catch { return []; }
-    };
+  const feedIds = await page.evaluate(async () => {
+    // As colecções grandes vivem no IndexedDB; o localStorage legado é migrado
+    // e removido no arranque (src/utils/browserStorage.ts).
+    const read = (key: string) => new Promise<Array<Record<string, unknown>>>((resolve) => {
+      const request = indexedDB.open('guigui-browser-cache', 1);
+      request.onupgradeneeded = () => {
+        if (!request.result.objectStoreNames.contains('state')) {
+          request.result.createObjectStore('state', { keyPath: 'key' });
+        }
+      };
+      request.onerror = () => resolve([]);
+      request.onsuccess = () => {
+        try {
+          const get = request.result.transaction('state', 'readonly').objectStore('state').get(key);
+          get.onsuccess = () => resolve(Array.isArray(get.result?.value) ? get.result.value : []);
+          get.onerror = () => resolve([]);
+        } catch { resolve([]); }
+      };
+    });
+    const [userPosts, businesses] = await Promise.all([
+      read('guigui:state:anon:guigui_user_posts'),
+      read('guigui_businesses'),
+    ]);
     const localPosts = [
-      ...read('guigui:state:anon:guigui_user_posts'),
-      ...read('guigui_businesses').flatMap((business: { posts?: unknown[] }) => business.posts || []),
+      ...userPosts,
+      ...businesses.flatMap((business) => (business.posts as unknown[]) || []),
     ] as Array<{ id: string; status: string }>;
     const visible = Array.from(document.querySelectorAll('article'))
       .map((article) => article.getAttribute('data-post-id') || '');
@@ -163,7 +182,11 @@ test('falha de rede na página seguinte mostra aviso e recupera ao tentar novame
   await expect.poll(() => articleCount(page), { timeout: 20_000 }).toBe(INITIAL_PAGE);
 
   // 1. Chegar ao limiar dispara o pedido da página seguinte, que falha.
-  await reachPreloadThreshold(page);
+  //    Repetir a rolagem cobre a ligação tardia do observador.
+  await expect.poll(async () => {
+    await reachPreloadThreshold(page);
+    return nextPageOffsets.length;
+  }, { timeout: 20_000 }).toBeGreaterThan(0);
 
   const retryButton = page.getByRole('button', { name: 'Tentar novamente' });
   await expect(retryButton).toBeVisible({ timeout: 20_000 });

@@ -110,24 +110,24 @@ export const AdminSubscriptionGovernance: React.FC<AdminSubscriptionGovernancePr
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge variant="info" className="bg-indigo-100 text-indigo-800 border-0 px-3 py-1 text-[10px] font-black">v2 — Governança</Badge>
+          <Badge variant="info" className="bg-[var(--tone-info-bg)] text-[var(--tone-info-text)] border-0 px-3 py-1 text-[10px] font-black">v2 — Governança</Badge>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => setSubTab('catalog')} className={`rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-wider transition ${subTab === 'catalog' ? 'border-indigo-600 bg-indigo-600/10 text-indigo-800' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:border-slate-300'}`}>
+        <button type="button" onClick={() => setSubTab('catalog')} className={`rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-wider transition ${subTab === 'catalog' ? 'border-indigo-600 bg-indigo-600/10 text-[var(--tone-info-text)]' : 'border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:border-slate-300'}`}>
           <ShieldCheck className="inline h-3.5 w-3.5" />
           Catálogo de funcionalidades
         </button>
-        <button type="button" onClick={() => setSubTab('plans')} className={`rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-wider transition ${subTab === 'plans' ? 'border-indigo-600 bg-indigo-600/10 text-indigo-800' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:border-slate-300'}`}>
+        <button type="button" onClick={() => setSubTab('plans')} className={`rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-wider transition ${subTab === 'plans' ? 'border-indigo-600 bg-indigo-600/10 text-[var(--tone-info-text)]' : 'border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:border-slate-300'}`}>
           <History className="inline h-3.5 w-3.5" />
           Versões de plano
         </button>
-        <button type="button" onClick={() => setSubTab('usage')} className={`rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-wider transition ${subTab === 'usage' ? 'border-indigo-600 bg-indigo-600/10 text-indigo-800' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:border-slate-300'}`}>
+        <button type="button" onClick={() => setSubTab('usage')} className={`rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-wider transition ${subTab === 'usage' ? 'border-indigo-600 bg-indigo-600/10 text-[var(--tone-info-text)]' : 'border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:border-slate-300'}`}>
           <BarChart3 className="inline h-3.5 w-3.5" />
           Alertas de uso
         </button>
-        <button type="button" onClick={() => setSubTab('entitlements')} className={`rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-wider transition ${subTab === 'entitlements' ? 'border-indigo-600 bg-indigo-600/10 text-indigo-800' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:border-slate-300'}`}>
+        <button type="button" onClick={() => setSubTab('entitlements')} className={`rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-wider transition ${subTab === 'entitlements' ? 'border-indigo-600 bg-indigo-600/10 text-[var(--tone-info-text)]' : 'border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:border-slate-300'}`}>
           <ShieldCheck className="inline h-3.5 w-3.5" />
           Concessão
         </button>
@@ -143,15 +143,15 @@ export const AdminSubscriptionGovernance: React.FC<AdminSubscriptionGovernancePr
             <div className="flex items-center gap-2 text-[11px] text-slate-500">
               <span className="font-bold">{activeVersions.length} versão(ões)</span>
               <span className="text-slate-300">·</span>
-              <span className="font-bold text-indigo-700">{activePlans.length} planos ativos</span>
+              <span className="font-bold text-[var(--tone-info-text)]">{activePlans.length} planos ativos</span>
             </div>
           </div>
 
           {activeVersions.length === 0 ? (
             <EmptyState title="Sem histórico de versões" description="As versões aparecem quando um plano é criado ou editado no painel de planos." icon={<History className="h-6 w-6" />} />
           ) : (
-            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm">
-              <div className="divide-y divide-slate-100 text-xs">
+            <div className="rounded-2xl border border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm">
+              <div className="divide-y divide-[var(--color-border-subtle)] text-xs">
                 {versionPagination.pageItems.map((version) => {
                   const plan = activePlans.find((p) => p.id === version.planId);
                   return (
@@ -162,7 +162,7 @@ export const AdminSubscriptionGovernance: React.FC<AdminSubscriptionGovernancePr
                           <Badge variant={plan?.isActive ? 'success' : 'warning'} className="bg-slate-100 dark:bg-slate-800 text-slate-700 border-0 px-2 py-0.5 text-[9px] uppercase tracking-wider">
                             v{version.version}
                           </Badge>
-                          {plan?.isActive && <Badge variant="success" className="bg-emerald-100 text-emerald-800 border-0 px-2 py-0.5 text-[9px]">ativo</Badge>}
+                          {plan?.isActive && <Badge variant="success" className="bg-[var(--tone-success-bg)] text-[var(--tone-success-text)] border-0 px-2 py-0.5 text-[9px]">ativo</Badge>}
                         </div>
                         <div className="mt-1 text-[11px] text-slate-500">
                           {version.changedBy} · {new Date(version.changedAt).toLocaleString('pt-PT')} · política {version.changePolicy}
@@ -170,7 +170,7 @@ export const AdminSubscriptionGovernance: React.FC<AdminSubscriptionGovernancePr
                         {version.changes.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1">
                             {version.changes.slice(0, 6).map((change) => (
-                              <span key={change.field} className="rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 text-[9px] font-bold text-slate-700">
+                              <span key={change.field} className="rounded-full border border-[var(--color-border-default)] dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 text-[9px] font-bold text-slate-700">
                                 {change.field}: {JSON.stringify(change.oldValue).slice(0, 18)} → {JSON.stringify(change.newValue).slice(0, 18)}
                               </span>
                             ))}
@@ -180,7 +180,7 @@ export const AdminSubscriptionGovernance: React.FC<AdminSubscriptionGovernancePr
                       </div>
                       <div className="text-right flex-shrink-0">
                         <div className="text-[11px] text-slate-500">preço base</div>
-                        <div className="font-mono font-black text-indigo-700">
+                        <div className="font-mono font-black text-[var(--tone-info-text)]">
                           {plan && plan.price > 0 ? `${plan.price.toLocaleString('pt-PT')} ${plan.currency}` : 'negociado'}
                         </div>
                       </div>
@@ -210,7 +210,7 @@ export const AdminSubscriptionGovernance: React.FC<AdminSubscriptionGovernancePr
                 <span className="inline-block h-2 w-2 rounded-full bg-amber-600" />
                 aviso {severityCounts.warning}
               </div>
-              <div className="flex items-center gap-1.5 text-[11px] font-bold text-red-700">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--tone-danger-text)]">
                 <span className="inline-block h-2 w-2 rounded-full bg-red-600" />
                 crítico {severityCounts.critical}
               </div>
@@ -222,24 +222,24 @@ export const AdminSubscriptionGovernance: React.FC<AdminSubscriptionGovernancePr
               Todos
             </Button>
             {(['info', 'warning', 'critical'] as const).map((sev) => (
-              <Button key={sev} type="button" size="sm" variant={usageFilter.severity === sev ? 'primary' : 'secondary'} onClick={() => setUsageFilter((prev) => ({ ...prev, severity: sev }))} className={sev === 'critical' ? 'rounded-xl bg-red-100 hover:bg-red-200 text-red-800' : 'rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700'}>
+              <Button key={sev} type="button" size="sm" variant={usageFilter.severity === sev ? 'primary' : 'secondary'} onClick={() => setUsageFilter((prev) => ({ ...prev, severity: sev }))} className={sev === 'critical' ? 'rounded-xl bg-[var(--tone-danger-bg)] hover:bg-red-200 text-[var(--tone-danger-text)]' : 'rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700'}>
                 {sev}
               </Button>
             ))}
           </div>
 
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm">
+          <div className="rounded-2xl border border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm">
             {filteredAlerts.length === 0 ? (
               <div className="p-4 text-center text-[11px] text-slate-500">
                 {paginatedBusinesses.length === 0 ? 'Nenhuma empresa nesta página.' : 'Nenhum alerta relevante nesta página com os filtros seleccionados.'}
               </div>
             ) : (
-              <div className="divide-y divide-slate-100 text-xs">
+              <div className="divide-y divide-[var(--color-border-subtle)] text-xs">
                 {filteredAlerts.map((alert) => (
                   <div key={alert.id} className="flex flex-wrap items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${alert.severity === 'critical' ? 'bg-red-100 text-red-800' : alert.severity === 'warning' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}`}>
+                        <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${alert.severity === 'critical' ? 'bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)]' : alert.severity === 'warning' ? 'bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)]' : 'bg-[var(--tone-info-bg)] text-[var(--tone-info-text)]'}`}>
                           {alert.severity}
                         </span>
                         <span className="font-bold text-slate-900">{alert.businessName}</span>
@@ -263,7 +263,7 @@ export const AdminSubscriptionGovernance: React.FC<AdminSubscriptionGovernancePr
                       <Badge variant={alert.tier === 'enterprise' ? 'success' : alert.tier === 'premium' ? 'info' : alert.tier === 'professional' ? 'neutral' : 'warning'} className="bg-slate-100 dark:bg-slate-800 text-slate-700 border-0 px-2 py-0.5 text-[9px] uppercase tracking-wider">
                         {alert.tier}
                       </Badge>
-                      {alert.acknowledged ? <span className="text-[9px] text-slate-400">lido</span> : <span className="text-[9px] text-red-700 font-bold">pendente</span>}
+                      {alert.acknowledged ? <span className="text-[9px] text-slate-400">lido</span> : <span className="text-[9px] text-[var(--tone-danger-text)] font-bold">pendente</span>}
                     </div>
                   </div>
                 ))}
@@ -291,12 +291,12 @@ export const AdminSubscriptionGovernance: React.FC<AdminSubscriptionGovernancePr
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <div className="xl:col-span-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm">
-              <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 pb-3 mb-3">
+            <div className="xl:col-span-2 rounded-2xl border border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm">
+              <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-border-subtle)] pb-3 mb-3">
                 <select
                   value={activeBusinessId ?? ''}
                   onChange={(e) => { setActiveBusinessId(e.target.value || null); setPage(1); }}
-                  className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs font-bold text-slate-800 max-w-[220px]"
+                  className="rounded-lg border border-[var(--color-border-default)] dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs font-bold text-slate-800 max-w-[220px]"
                 >
                   <option value="">Empresa (exemplo)…</option>
                   {featuredBusinesses.map((business) => (
@@ -337,15 +337,15 @@ export const AdminSubscriptionGovernance: React.FC<AdminSubscriptionGovernancePr
                       const hasFeature = planIncludesFeature(resolved, slug, allFeatures);
                       const allowed = hasFeature && (meta.limit === 'unlimited' || meta.limit === 'negotiated' || typeof meta.limit === 'number' && meta.used < meta.limit);
                       return (
-                        <div key={slug} className={`rounded-xl border p-3 ${allowed ? 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900' : 'border-red-200 bg-red-50/50'}`}>
+                        <div key={slug} className={`rounded-xl border p-3 ${allowed ? 'border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900' : 'border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)]/50'}`}>
                           <div className="font-bold text-slate-800 uppercase tracking-wider text-[9px]">{slug.replace(/_/g, ' ')}</div>
                           <div className="mt-1 flex items-center gap-1.5">
-                            <span className={allowed ? 'text-emerald-700 font-mono font-bold' : 'text-red-700 font-mono font-bold'}>{limitLabel(meta.limit)}</span>
+                            <span className={allowed ? 'text-[var(--tone-success-text)] font-mono font-bold' : 'text-[var(--tone-danger-text)] font-mono font-bold'}>{limitLabel(meta.limit)}</span>
                             <span className="text-slate-400">·</span>
                             <span className="font-mono text-slate-600">{meta.used} usados</span>
                           </div>
                           <div className="mt-1">
-                            <span className={allowed ? 'text-emerald-700 font-bold' : 'text-red-700 font-bold'}>
+                            <span className={allowed ? 'text-[var(--tone-success-text)] font-bold' : 'text-[var(--tone-danger-text)] font-bold'}>
                               {allowed ? 'concedido' : 'não incluído'}
                             </span>
                           </div>
@@ -354,10 +354,10 @@ export const AdminSubscriptionGovernance: React.FC<AdminSubscriptionGovernancePr
                     })}
                   </div>
 
-                  <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-3 text-[11px] text-slate-700">
-                    <span className="font-black text-indigo-800">Resumo de concessão: </span>
+                  <div className="rounded-xl border border-[var(--tone-info-border)] bg-[var(--tone-info-bg)]/50 p-3 text-[11px] text-slate-700">
+                    <span className="font-black text-[var(--tone-info-text)]">Resumo de concessão: </span>
                     {allPlanFeatures(resolvePlan(sampleBusiness, activePlans), allFeatures).map((feature) => (
-                      <span key={feature.id} className="inline-block rounded-full bg-white dark:bg-slate-900 border border-indigo-200 px-2 py-0.5 text-[9px] font-bold text-indigo-800 mr-1 mb-1">
+                      <span key={feature.id} className="inline-block rounded-full bg-white dark:bg-slate-900 border border-[var(--tone-info-border)] px-2 py-0.5 text-[9px] font-bold text-[var(--tone-info-text)] mr-1 mb-1">
                         {feature.name}
                       </span>
                     ))}
@@ -368,7 +368,7 @@ export const AdminSubscriptionGovernance: React.FC<AdminSubscriptionGovernancePr
               )}
             </div>
 
-            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm">
+            <div className="rounded-2xl border border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm">
               <h4 className="text-xs font-black uppercase tracking-wide text-slate-800 mb-3">Regra de concessão</h4>
               <ul className="space-y-2 text-[11px] text-slate-600">
                 <li className="flex items-start gap-2">
@@ -401,12 +401,12 @@ export const AdminSubscriptionGovernance: React.FC<AdminSubscriptionGovernancePr
         <AdminFeatureCatalog currentLang={currentLang} />
       )}
 
-      <div className="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-4 text-[11px] text-slate-700 flex flex-wrap items-start justify-between gap-3 shadow-sm">
+      <div className="rounded-2xl border border-[var(--tone-info-border)] bg-[var(--tone-info-bg)]/40 p-4 text-[11px] text-slate-700 flex flex-wrap items-start justify-between gap-3 shadow-sm">
         <div>
-          <span className="font-black text-indigo-800">Nota de governança: </span>
+          <span className="font-black text-[var(--tone-info-text)]">Nota de governança: </span>
           O painel de governança agrupa catálogo, versões, alertas e concessão num fluxo continuo. O plano e o uso fornecidos pela aplicação alimentam os cálculos; o catálogo é editável pela administração.
         </div>
-        <Badge variant="info" className="bg-indigo-100 text-indigo-800 border-0 px-3 py-1 text-[10px] font-black">Governança SaaS · v2</Badge>
+        <Badge variant="info" className="bg-[var(--tone-info-bg)] text-[var(--tone-info-text)] border-0 px-3 py-1 text-[10px] font-black">Governança SaaS · v2</Badge>
       </div>
     </section>
   );

@@ -130,7 +130,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
   const currentTotalLikes = baseLikes;
 
   const reactionsList: { type: ReactionType; emoji: string; label: string; color: string }[] = [
-    { type: 'like', emoji: '👍', label: 'Gostar', color: 'text-[#1877F2]' },
+    { type: 'like', emoji: '👍', label: 'Gostar', color: 'text-[#0B5ED7] dark:text-[#8AB4FF]' },
     { type: 'love', emoji: '❤️', label: 'Amei', color: 'text-red-500' },
     { type: 'haha', emoji: '😂', label: 'Riso', color: 'text-amber-500' },
     { type: 'wow', emoji: '😮', label: 'Uau', color: 'text-amber-500' },
@@ -230,12 +230,12 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
       <img
         src={comment.authorAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}
         alt=""
-        className="w-7 h-7 rounded-full object-cover border border-slate-200 flex-shrink-0"
+        className="w-7 h-7 rounded-full object-cover border border-[var(--color-border-subtle)] flex-shrink-0"
       />
-      <div className="bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-slate-200 p-2.5 rounded-2xl flex-1 shadow-2xs">
+      <div className="bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-[var(--color-border-subtle)] p-2.5 rounded-2xl flex-1 shadow-2xs">
         <div className="font-extrabold text-slate-900 dark:text-slate-300 text-xs">{comment.authorName}</div>
         <p className="text-slate-700 mt-0.5 text-xs">{comment.content}</p>
-        <div className="flex items-center gap-3 text-[10px] text-slate-400 font-bold mt-1">
+        <div className="flex items-center gap-3 text-[10px] text-slate-500 font-bold mt-1">
           {depth === 0 && (
             <button
               type="button"
@@ -251,13 +251,13 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
     </div>
   );
   return (
-    <article ref={articleRef} data-post-id={post.id} className={`bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-slate-200 rounded-3xl shadow-sm overflow-hidden text-slate-800 dark:text-slate-300 space-y-3 transition hover:border-slate-300 ${isHighlighted ? 'ring-4 ring-emerald-400 ring-offset-4 ring-offset-slate-50' : ''}`}>
+    <article ref={articleRef} data-post-id={post.id} className={`bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-[var(--color-border-subtle)] rounded-3xl shadow-sm overflow-hidden text-slate-800 dark:text-slate-300 space-y-3 transition hover:border-[var(--color-border-default)] ${isHighlighted ? 'ring-4 ring-emerald-400 ring-offset-4 ring-offset-slate-50' : ''}`}>
       {/* Post Author Header */}
       <div className="p-4 sm:p-5 pb-0 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div
             onClick={() => business && onSelectBusiness?.(business)}
-            className="w-11 h-11 rounded-2xl overflow-hidden border border-slate-200 cursor-pointer flex-shrink-0"
+            className="w-11 h-11 rounded-2xl overflow-hidden border border-[var(--color-border-subtle)] cursor-pointer flex-shrink-0"
           >
             <img
               src={post.businessLogo || business?.logo || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=300&q=80'}
@@ -289,7 +289,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
           </div>
         </div>
 
-        <button type="button" aria-label="Mais opções da publicação" className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-[var(--color-bg-surface)] dark:hover:bg-[var(--color-bg-surface-dark)]">
+        <button type="button" aria-label="Mais opções da publicação" className="text-slate-500 hover:text-slate-600 p-1.5 rounded-full hover:bg-[var(--color-bg-surface)] dark:hover:bg-[var(--color-bg-surface-dark)]">
           <MoreHorizontal className="w-5 h-5" />
         </button>
       </div>
@@ -330,7 +330,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
                 poster={post.imageUrl}
               />
             )}
-            <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-xs text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1 border border-white/20">
+            <div className="absolute top-3 left-3 bg-black/70 text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1 border border-white/20">
               <Video className="w-3 h-3 text-red-400" />
               <span>Vídeo HD • Plano Guigui</span>
             </div>
@@ -342,7 +342,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
       {post.mediaGallery && post.mediaGallery.length > 0 && !post.videoUrl && (
         <div className="px-3 sm:px-4 space-y-2">
           {/* Main Selected Image */}
-          <div className="w-full bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] rounded-2xl overflow-hidden max-h-[400px] border border-slate-200">
+          <div className="w-full bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] rounded-2xl overflow-hidden max-h-[400px] border border-[var(--color-border-subtle)]">
             <img
               src={post.mediaGallery[activeMediaGalleryIndex] || post.imageUrl}
               alt=""
@@ -367,7 +367,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
                   <img src={imgUrl} alt="" className="w-full h-full object-cover" />
                 </button>
               ))}
-              <span className="text-[10px] font-bold text-slate-400 pl-1 shrink-0">
+              <span className="text-[10px] font-bold text-slate-500 pl-1 shrink-0">
                 {post.mediaGallery.length} fotos
               </span>
             </div>
@@ -390,8 +390,8 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
       <div className="px-3.5 sm:px-4 py-2 flex items-center justify-between text-xs text-slate-500 border-b border-slate-100">
         <div className="flex items-center gap-1">
           <div className="flex -space-x-1">
-            <span className="w-4 h-4 rounded-full bg-[#1877F2] text-white flex items-center justify-center text-[9px]">👍</span>
-            <span className="w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[9px]">❤️</span>
+            <span aria-hidden="true" className="w-4 h-4 rounded-full bg-[#1877F2] text-white flex items-center justify-center text-[9px]">👍</span>
+            <span aria-hidden="true" className="w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[9px]">❤️</span>
           </div>
           <span className="font-bold text-slate-700 ml-1" data-testid="post-likes">{currentTotalLikes}</span>
         </div>
@@ -409,7 +409,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
       <div className="px-2 sm:px-4 relative flex items-center justify-between text-xs font-bold text-slate-600 border-b border-slate-100 pb-1">
         {/* Reaction Hover Picker Box */}
         {showReactionPicker && (
-          <div className="absolute -top-12 left-2 z-30 bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-slate-200 rounded-full px-3 py-1.5 shadow-2xl flex items-center gap-2 animate-in zoom-in-95 duration-150">
+          <div className="absolute -top-12 left-2 z-30 bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-[var(--color-border-subtle)] rounded-full px-3 py-1.5 shadow-2xl flex items-center gap-2 animate-in zoom-in-95 duration-150">
             {reactionsList.map((r) => (
               <button
                 type="button"
@@ -431,7 +431,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
           onClick={() => handleSelectReaction(selectedReaction ? selectedReaction : 'like')}
           className={`flex-1 py-2 rounded-xl hover:bg-[#F0F2F5] transition flex items-center justify-center gap-1.5 ${
             selectedReaction
-              ? reactionsList.find((r) => r.type === selectedReaction)?.color || 'text-[#1877F2]'
+              ? reactionsList.find((r) => r.type === selectedReaction)?.color || 'text-[#0B5ED7] dark:text-[#8AB4FF]'
               : 'text-slate-600'
           }`}
         >
@@ -469,7 +469,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
           <button
             type="button"
             onClick={() => onSelectBusiness?.(business)}
-            className="flex-1 py-2 rounded-xl hover:bg-[#F0F2F5] transition flex items-center justify-center gap-1.5 text-[#1877F2]"
+            className="flex-1 py-2 rounded-xl hover:bg-[#F0F2F5] transition flex items-center justify-center gap-1.5 text-[#0B5ED7] dark:text-[#8AB4FF]"
           >
             <ExternalLink className="w-4 h-4" />
             <span className="hidden sm:inline">Ver Ficha</span>
@@ -507,7 +507,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
               <img
                 src={currentUser.avatarUrl}
                 alt=""
-                className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
+                className="w-8 h-8 rounded-full object-cover border border-[var(--color-border-subtle)] shrink-0"
               />
             ) : (
               <div className="w-8 h-8 rounded-full bg-slate-800 text-white font-bold flex items-center justify-center text-xs flex-shrink-0">
@@ -523,7 +523,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
                   ? `Comentar como ${currentUser.name}...`
                   : 'Escreva um comentário (requer início de sessão)...'
               }
-              className="flex-1 bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-slate-200 rounded-full px-4 py-2 text-xs text-slate-900 dark:text-slate-300 focus:outline-none focus:border-blue-600"
+              className="flex-1 bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-[var(--color-border-subtle)] rounded-full px-4 py-2 text-xs text-slate-900 dark:text-slate-300 focus:outline-none focus:border-blue-600"
             />
             <button
               type="submit"
@@ -553,7 +553,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
                       onChange={(event) => setReplyDrafts((previous) => ({ ...previous, [c.id]: event.target.value }))}
                       placeholder={`Responder a ${c.authorName}...`}
                       aria-label={`Responder a ${c.authorName}`}
-                      className="flex-1 bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-slate-200 rounded-full px-4 py-2 text-xs text-slate-900 dark:text-slate-300 focus:outline-none focus:border-blue-600"
+                      className="flex-1 bg-[var(--color-bg-surface)] dark:bg-[var(--color-bg-surface-dark)] border border-[var(--color-border-subtle)] rounded-full px-4 py-2 text-xs text-slate-900 dark:text-slate-300 focus:outline-none focus:border-blue-600"
                     />
                     <button
                       type="submit"

@@ -385,7 +385,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       <button
         type="button"
         onClick={() => toggleSetting(key)}
-        className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left dark:border-slate-700 dark:bg-slate-800/60"
+        className="flex w-full items-center justify-between rounded-2xl border border-[var(--color-border-subtle)] bg-slate-50 p-3 text-left dark:border-slate-700 dark:bg-slate-800"
       >
         <div>
           <div className="text-sm font-black text-slate-900 dark:text-white">{label}</div>
@@ -401,7 +401,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       case 'account':
         return (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60">
+            <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
               <div className="flex items-center gap-3">
                 <img src={currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80'} alt={currentUser?.name || t('user.placeholder')} className="h-12 w-12 rounded-full object-cover" />
                 <div>
@@ -411,18 +411,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </div>
             {currentRole === 'user' && (
-              <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+              <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
                 <div className="text-sm font-black text-slate-900 dark:text-white">{t('settings.user.systemSettings')}</div>
                 <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{t('settings.user.personalSettings')}</div>
               </div>
             )}
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+              <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
                 <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{t('settings.user.email')}</div>
                 <div className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{currentUser?.email || t('settings.user.emailFallback')}</div>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+              <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
                 <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{t('settings.user.region')}</div>
                 <div className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{currentUser?.neighborhood || t('settings.user.regionFallback')}</div>
               </div>
@@ -441,7 +441,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {renderToggleRow('Alertas de sessão', 'pushAlerts', 'Receba avisos quando houver acesso a partir de uma nova sessão ou dispositivo.')}
             {renderToggleRow('Comunicação protegida', 'autoBackup', 'Mantém mensagens e pedidos de suporte acessíveis apenas aos participantes autorizados.')}
             {renderToggleRow('Personalização de dados', 'emailAlerts', 'Permite usar favoritos e histórico para melhorar a sua experiência.')}
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-[11px] leading-relaxed text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-[11px] leading-relaxed text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
               Pode alterar estas opções a qualquer momento. As preferências aplicam-se à sua conta e ficam guardadas neste dispositivo.
             </div>
           </div>
@@ -449,7 +449,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       case 'tickets':
         return (
           <div className="space-y-3">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60">
+            <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
               <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Último bilhete</div>
               <div className="mt-2 text-base font-black text-slate-900 dark:text-white">Festival de Música de Bissau</div>
               <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">Lugar: Sala de Eventos ⬢ 12 de Julho ⬢ QR ativo</div>
@@ -461,7 +461,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       case 'support':
         return (
           <div className="space-y-3">
-            <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+            <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
               <div className="text-sm font-black text-slate-900 dark:text-white">Contacto oficial</div>
               <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">WhatsApp: +245 955 000 000</div>
               <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">Email: apoio@guigui.com</div>
@@ -473,7 +473,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       case 'company':
         return (
           <div className="space-y-3">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60">
+            <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
               <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Negócio principal</div>
               <div className="mt-2 text-base font-black text-slate-900 dark:text-white">{currentUser?.businessName || 'Guigui Business'}</div>
               <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">{t('settings.business.mainCategory')}</div>
@@ -486,7 +486,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       case 'billing':
         return (
           <div className="space-y-3">
-            <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+            <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Plano actual</div>
@@ -503,7 +503,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       case 'events':
         return (
           <div className="space-y-3">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60">
+            <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
               <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Agenda activa</div>
               <div className="mt-2 text-base font-black text-slate-900 dark:text-white">3 eventos em destaque</div>
               <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">1 show, 2 campanhas promocionais</div>
@@ -533,7 +533,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       case 'analytics':
         return (
           <div className="space-y-3">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60">
+            <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
               <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Estado geral</div>
               <div className="mt-2 text-base font-black text-slate-900 dark:text-white">Sistema estável e operacional</div>
               <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">Última sincronização há 6 minutos</div>
@@ -549,7 +549,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {languages.map((option) => {
               const selected = currentLang === option.code;
               return (
-                <button key={option.code} type="button" onClick={() => handleLanguageApply(option.code)} className={`w-full rounded-2xl border p-3 text-left transition ${selected ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/30' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-700/60'}`}>
+                <button key={option.code} type="button" onClick={() => handleLanguageApply(option.code)} className={`w-full rounded-2xl border p-3 text-left transition ${selected ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950' : 'border-[var(--color-border-subtle)] bg-slate-50 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700'}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <span className="text-xl">{option.flag}</span>
@@ -558,7 +558,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         <div className="text-[11px] text-slate-500 dark:text-slate-400">{formatLanguageCode(option.code)}</div>
                       </div>
                     </div>
-                    <div className={`flex h-5 w-5 items-center justify-center rounded-full border ${selected ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 dark:border-slate-600'}`}>
+                    <div className={`flex h-5 w-5 items-center justify-center rounded-full border ${selected ? 'border-emerald-500 bg-emerald-500' : 'border-[var(--color-border-default)] dark:border-slate-600'}`}>
                       {selected && <span className="h-2 w-2 rounded-full bg-white dark:bg-slate-900" />}
                     </div>
                   </div>
@@ -569,7 +569,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         );
       default:
         return (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+          <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
             {summary}
           </div>
         );
@@ -661,12 +661,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* Clean Smart Search Bar */}
             <form className="relative hidden min-w-0 flex-1 items-center sm:flex sm:max-w-[240px] lg:w-64" onSubmit={handleSearchSubmit}>
-              <div className={`relative flex items-center w-full bg-slate-100/90 dark:bg-slate-800/90 rounded-full px-3 py-1.5 transition border ${
+              <div className={`relative flex items-center w-full bg-slate-100 dark:bg-slate-800 rounded-full px-3 py-1.5 transition border ${
                 isListening
                   ? 'border-red-500 ring-2 ring-red-500/20 bg-red-50/10'
-                  : 'border-slate-200/80 dark:border-slate-700/80 focus-within:border-emerald-500 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-2 focus-within:ring-emerald-500/20'
+                  : 'border-[var(--color-border-subtle)]/80 dark:border-slate-700/80 focus-within:border-emerald-500 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-2 focus-within:ring-emerald-500/20'
               }`}>
-                <Search className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
+                <Search className="w-3.5 h-3.5 text-slate-500 mr-2 shrink-0" />
                 <input
                   type="text"
                   value={searchQuery}
@@ -684,7 +684,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       onSearchChange('');
                       if (onSearchSubmit) onSearchSubmit('');
                     }}
-                    className="p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-xs font-bold transition mr-1"
+                    className="p-0.5 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 text-xs font-bold transition mr-1"
                     title={t('clearSearch')}
                   >
                     <X className="w-3 h-3" />
@@ -698,7 +698,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className={`p-1 rounded-full transition shrink-0 flex items-center gap-1 ${
                     isListening
                       ? 'bg-red-500 text-white animate-pulse shadow-xs'
-                      : 'text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-200/60 dark:hover:bg-slate-700'
+                      : 'text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-200/60 dark:hover:bg-slate-700'
                   }`}
                   title={isListening ? t('voiceListeningStop') : t('voiceSearchBtn')}
                 >
@@ -729,7 +729,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className={`group relative flex h-full min-w-[72px] max-w-[112px] flex-1 flex-col items-center justify-center rounded-none px-2 py-1 transition lg:px-3 ${
                     isActive
                       ? 'text-emerald-600 dark:text-emerald-400 font-extrabold'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100/50 dark:hover:bg-slate-800/50'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}
                   aria-label={tabItem.label}
                 >
@@ -750,7 +750,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                   {/* Hover Tooltip displaying Title & Subtitle */}
                   <div className="pointer-events-none absolute left-1/2 top-full z-50 mt-1.5 hidden -translate-x-1/2 flex max-w-[260px] flex-col items-center whitespace-normal text-center animate-in fade-in zoom-in-95 duration-150 hidden">
-                    <div className="flex max-w-[260px] flex-col items-center rounded-xl border border-slate-800 bg-slate-900/95 px-3 py-1.5 text-center text-[11px] leading-snug text-white shadow-xl">
+                    <div className="flex max-w-[260px] flex-col items-center rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-center text-[11px] leading-snug text-white shadow-xl">
                       <span className="font-extrabold text-emerald-400 text-xs">{tabItem.label}</span>
                       <span className="text-[10px] text-slate-300 font-medium">{tabItem.subtitle}</span>
                     </div>
@@ -803,7 +803,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     setTopLanguageMenuOpen((open) => !open);
                     setTopThemeMenuOpen(false);
                   }}
-                  className="guigui-pref-button h-9 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center gap-1.5 px-2 sm:px-2.5 text-slate-700 dark:text-slate-200 transition border border-slate-200 dark:border-slate-700"
+                  className="guigui-pref-button h-9 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center gap-1.5 px-2 sm:px-2.5 text-slate-700 dark:text-slate-200 transition border border-[var(--color-border-subtle)] dark:border-slate-700"
                   aria-haspopup="menu"
                   aria-expanded={topLanguageMenuOpen}
                   aria-label={`${t('language.select')}: ${formatLanguageCode(currentLang)}`}
@@ -820,7 +820,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     setTopThemeMenuOpen((open) => !open);
                     setTopLanguageMenuOpen(false);
                   }}
-                  className="guigui-pref-button h-9 w-9 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 transition border border-slate-200 dark:border-slate-700"
+                  className="guigui-pref-button h-9 w-9 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 transition border border-[var(--color-border-subtle)] dark:border-slate-700"
                   aria-haspopup="menu"
                   aria-expanded={topThemeMenuOpen}
                   aria-label={themeOptions.find((option) => option.value === themeMode)?.label}
@@ -837,7 +837,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div
                   role="menu"
                   aria-label={t('language.select')}
-                  className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 dark:border-slate-800 rounded-2xl shadow-2xl p-2 z-[110] text-xs space-y-1"
+                  className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-[var(--color-border-subtle)] dark:border-slate-700 dark:border-slate-800 rounded-2xl shadow-2xl p-2 z-[110] text-xs space-y-1"
                 >
                   {languages.map((option) => {
                     const selected = currentLang === option.code;
@@ -864,7 +864,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               {topThemeMenuOpen && (
                 <div
                   role="menu"
-                  className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 dark:border-slate-800 rounded-2xl shadow-2xl p-2 z-[110] text-xs space-y-1"
+                  className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-[var(--color-border-subtle)] dark:border-slate-700 dark:border-slate-800 rounded-2xl shadow-2xl p-2 z-[110] text-xs space-y-1"
                 >
                   {themeOptions.map((option) => {
                     const selected = themeMode === option.value;
@@ -903,7 +903,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       ? 'bg-slate-900 text-white border-slate-700 hover:bg-slate-800'
                       : currentRole === 'business'
                       ? 'bg-emerald-700 text-white border-emerald-600 hover:bg-emerald-800'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 border-[var(--color-border-subtle)] dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
                   }`}
                   title="Sessão Iniciada"
                 >
@@ -929,7 +929,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               {/* User Dropdown */}
               {roleMenuOpen && currentUser && (
-                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 dark:border-slate-800 rounded-2xl shadow-2xl p-2 z-[110] text-xs space-y-1">
+                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-[var(--color-border-subtle)] dark:border-slate-700 dark:border-slate-800 rounded-2xl shadow-2xl p-2 z-[110] text-xs space-y-1">
                   {currentRole === 'user' && (
                     <button type="button"
                       onClick={() => {
@@ -969,7 +969,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </button>
                   )}
                   {/* Preferências (idioma + tema): disponíveis dentro da conta em todos os perfis com sessão. */}
-                  <div className="my-1 border-t border-slate-200 pt-1 space-y-1 dark:border-slate-700">
+                  <div className="my-1 border-t border-[var(--color-border-subtle)] pt-1 space-y-1 dark:border-slate-700">
                     <button
                       type="button"
                       onClick={() => {
@@ -987,7 +987,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition ${profileLanguageOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
                     </button>
                     {profileLanguageOpen && (
-                      <div role="menu" aria-label={t('language.select')} className="space-y-0.5 rounded-xl border border-slate-200 bg-slate-50/70 p-1 dark:border-slate-700 dark:bg-slate-800/40">
+                      <div role="menu" aria-label={t('language.select')} className="space-y-0.5 rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800">
                         {languages.map((option) => {
                           const selected = currentLang === option.code;
                           return (
@@ -1027,7 +1027,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition ${profileThemeOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
                     </button>
                     {profileThemeOpen && (
-                      <div role="menu" className="space-y-0.5 rounded-xl border border-slate-200 bg-slate-50/70 p-1 dark:border-slate-700 dark:bg-slate-800/40">
+                      <div role="menu" className="space-y-0.5 rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800">
                         {themeOptions.map((option) => {
                           const selected = themeMode === option.value;
                           return (
@@ -1072,10 +1072,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           />
 
           {/* Sliding Menu Panel */}
-          <div className="relative w-full max-w-sm sm:w-96 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 dark:border-slate-800 h-full shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-200">
+          <div className="relative w-full max-w-sm sm:w-96 bg-white dark:bg-slate-900 border-r border-[var(--color-border-subtle)] dark:border-slate-700 dark:border-slate-800 h-full shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-200">
              
             {/* Drawer Header */}
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-900/80">
+            <div className="p-4 border-b border-[var(--color-border-subtle)] dark:border-slate-700 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-slate-900 via-emerald-800 to-emerald-600 text-amber-400 flex items-center justify-center shadow-xs">
                   <GuiguiStar className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} />
@@ -1104,7 +1104,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                
               {/* User Profile Card inside Drawer */}
               {currentUser ? (
-                <div className="p-3 bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/40 rounded-2xl flex items-center justify-between">
+                <div className="p-3 bg-emerald-50/70 dark:bg-emerald-950 border border-emerald-200/80 dark:border-emerald-800/40 rounded-2xl flex items-center justify-between">
                   <div className="flex items-center gap-2.5 overflow-hidden">
                     <img
                       src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80'}
@@ -1125,7 +1125,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       setLeftMenuOpen(false);
                       if (onOpenLoginModal) onOpenLoginModal();
                     }}
-                    className="px-2.5 py-1 bg-white dark:bg-slate-900 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-[10px] rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 transition shrink-0"
+                    className="px-2.5 py-1 bg-white dark:bg-slate-900 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-[10px] rounded-lg border border-[var(--color-border-subtle)] dark:border-slate-700 hover:bg-slate-50 transition shrink-0"
                   >
                     Trocar
                   </button>
@@ -1151,7 +1151,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               {!currentUser ? (
                 <>
-                <div className="space-y-1.5 rounded-[18px] border border-slate-200/80 bg-slate-50/70 p-2 dark:border-slate-700 dark:bg-slate-800/40">
+                <div className="space-y-1.5 rounded-[18px] border border-[var(--color-border-subtle)]/80 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-800">
                   <div className="px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.24em] text-slate-600 dark:text-slate-300">
                     Conta & Sistema
                   </div>
@@ -1169,7 +1169,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </>
               ) : (
                 <>
-                  <div className="space-y-1.5 rounded-[18px] border border-slate-200/80 bg-slate-50/70 p-2 dark:border-slate-700 dark:bg-slate-800/40">
+                  <div className="space-y-1.5 rounded-[18px] border border-[var(--color-border-subtle)]/80 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-800">
                    <div className="px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.24em] text-slate-600 dark:text-slate-300">
                      Conta & Sistema
                    </div>
@@ -1231,7 +1231,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                setSelectedSettingsSection(item.id);
                                setActiveSettingsPanel('settings');
                              }}
-                             className="flex w-full items-center gap-2.5 rounded-[12px] border border-slate-200 bg-white px-2.5 py-2 text-left transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
+                             className="flex w-full items-center gap-2.5 rounded-[12px] border border-[var(--color-border-subtle)] bg-white px-2.5 py-2 text-left transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
                            >
                              <div className={`flex h-7 w-7 items-center justify-center rounded-xl ${item.accentClass}`}>
                                <Icon className="h-3.5 w-3.5" />
@@ -1246,7 +1246,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                      })}
                    </div>
 
-                   <div className="mt-2 space-y-1.5 rounded-[18px] border border-slate-200/80 bg-slate-50/70 p-2 dark:border-slate-700 dark:bg-slate-800/40">
+                   <div className="mt-2 space-y-1.5 rounded-[18px] border border-[var(--color-border-subtle)]/80 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-800">
                      <button type="button" onClick={() => { setLeftMenuOpen(false); handleSelectTab('institutional'); }} className="w-full rounded-[14px] p-2 transition flex items-center gap-2.5 text-left font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
                        <div className="w-8 h-8 rounded-xl bg-gray-500/10 text-gray-600 dark:text-gray-400 flex items-center justify-center shrink-0"><ShieldCheck className="w-4 h-4" /></div>
                        <div className="flex-1 min-w-0"><div className="text-[13px] font-black leading-snug tracking-[-0.02em]">Sobre o Guigui</div><div className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">Quem somos e como funciona</div></div>
@@ -1274,7 +1274,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {/* Drawer Footer */}
-            <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-700 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900 text-center text-[9px] text-slate-400 font-medium leading-none">
+            <div className="px-3 py-2 border-t border-[var(--color-border-subtle)] dark:border-slate-700 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900 text-center text-[9px] text-slate-300 font-medium leading-none">
               Guigui.com v2.4 ⬢ Feito com paixão em Bissau
             </div>
           </div>
@@ -1283,8 +1283,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {(activeSettingsPanel || accountDialogOpen || showLogoutConfirm) && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => { setActiveSettingsPanel(null); setSelectedSettingsSection(null); setAccountDialogOpen(false); setShowLogoutConfirm(false); }} />
-          <div className="relative z-10 w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+          <div className="absolute inset-0 bg-slate-950/60" onClick={() => { setActiveSettingsPanel(null); setSelectedSettingsSection(null); setAccountDialogOpen(false); setShowLogoutConfirm(false); }} />
+          <div className="relative z-10 w-full max-w-md rounded-3xl border border-[var(--color-border-subtle)] bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
@@ -1301,9 +1301,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {activeSettingsPanel === 'settings' && (
               <div className="space-y-3">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60">
+                <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900/5 text-slate-700 dark:bg-slate-700/30 dark:text-slate-200"><Settings className="h-4 w-4" /></div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200"><Settings className="h-4 w-4" /></div>
                     <div>
                       <div className="text-sm font-black text-slate-900 dark:text-white">Definições do sistema</div>
                       <div className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -1327,7 +1327,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                           }
                           setSelectedSettingsSection(item.id);
                         }}
-                        className="rounded-2xl border border-slate-200 bg-white p-3 text-left transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
+                        className="rounded-2xl border border-[var(--color-border-subtle)] bg-white p-3 text-left transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
                       >
                         <div className="flex items-center gap-2">
                           <div className={`flex h-8 w-8 items-center justify-center rounded-xl ${item.accentClass}`}>
@@ -1342,7 +1342,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
 
                 {selectedSettingsSection && (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60">
+                  <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
                     <button type="button" onClick={() => setSelectedSettingsSection(null)} className="text-xs font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
                       {t('back')} aos módulos
                     </button>
@@ -1357,7 +1357,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {activeSettingsPanel === 'settings' && selectedSettingsSection && renderSettingsDetail() && (
               <div className="mt-3 space-y-3">
-                <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-800/60">
+                <div className="flex items-center justify-between rounded-2xl border border-[var(--color-border-subtle)] bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-800">
                   <button type="button" onClick={() => setSelectedSettingsSection(null)} className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-slate-600 dark:text-slate-300">
                     <ArrowLeft className="h-3.5 w-3.5" />
                     {t('back')}
@@ -1387,13 +1387,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {themeOptions.map((option) => {
                     const selected = themeMode === option.value;
                     return (
-                      <button key={option.value} type="button" onClick={() => handleThemeApply(option.value)} className={`w-full rounded-2xl border p-3 text-left transition ${selected ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/30' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-700/60'}`}>
+                      <button key={option.value} type="button" onClick={() => handleThemeApply(option.value)} className={`w-full rounded-2xl border p-3 text-left transition ${selected ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950' : 'border-[var(--color-border-subtle)] bg-slate-50 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700'}`}>
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <div className="text-sm font-black text-slate-900 dark:text-white">{option.label}</div>
                             <div className="text-[11px] text-slate-500 dark:text-slate-400">{option.description}</div>
                           </div>
-                          <div className={`flex h-5 w-5 items-center justify-center rounded-full border ${selected ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 dark:border-slate-600'}`}>
+                          <div className={`flex h-5 w-5 items-center justify-center rounded-full border ${selected ? 'border-emerald-500 bg-emerald-500' : 'border-[var(--color-border-default)] dark:border-slate-600'}`}>
                             {selected && <span className="h-2 w-2 rounded-full bg-white dark:bg-slate-900" />}
                           </div>
                         </div>
@@ -1407,12 +1407,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {languages.map((option) => {
                     const selected = currentLang === option.code;
                     return (
-                      <button key={option.code} type="button" onClick={() => handleLanguageApply(option.code)} className={`w-full rounded-2xl border p-3 text-left transition ${selected ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/30' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-700/60'}`}>
+                      <button key={option.code} type="button" onClick={() => handleLanguageApply(option.code)} className={`w-full rounded-2xl border p-3 text-left transition ${selected ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950' : 'border-[var(--color-border-subtle)] bg-slate-50 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700'}`}>
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <div className="text-sm font-black text-slate-900 dark:text-white">{option.flag} {option.name}</div>
                           </div>
-                          <div className={`flex h-5 w-5 items-center justify-center rounded-full border ${selected ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 dark:border-slate-600'}`}>
+                          <div className={`flex h-5 w-5 items-center justify-center rounded-full border ${selected ? 'border-emerald-500 bg-emerald-500' : 'border-[var(--color-border-default)] dark:border-slate-600'}`}>
                             {selected && <span className="h-2 w-2 rounded-full bg-white dark:bg-slate-900" />}
                           </div>
                         </div>
@@ -1433,7 +1433,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {languages.map((option) => {
                   const selected = currentLang === option.code;
                   return (
-                    <button key={option.code} type="button" onClick={() => handleLanguageApply(option.code)} className={`w-full rounded-2xl border p-3 text-left transition ${selected ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/30' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-700/60'}`}>
+                    <button key={option.code} type="button" onClick={() => handleLanguageApply(option.code)} className={`w-full rounded-2xl border p-3 text-left transition ${selected ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950' : 'border-[var(--color-border-subtle)] bg-slate-50 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700'}`}>
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
                           <span className="text-xl">{option.flag}</span>
@@ -1442,7 +1442,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                             <div className="text-[11px] text-slate-500 dark:text-slate-400">{formatLanguageCode(option.code)}</div>
                           </div>
                         </div>
-                        <div className={`flex h-5 w-5 items-center justify-center rounded-full border ${selected ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 dark:border-slate-600'}`}>
+                        <div className={`flex h-5 w-5 items-center justify-center rounded-full border ${selected ? 'border-emerald-500 bg-emerald-500' : 'border-[var(--color-border-default)] dark:border-slate-600'}`}>
                           {selected && <span className="h-2 w-2 rounded-full bg-white dark:bg-slate-900" />}
                         </div>
                       </div>
@@ -1454,7 +1454,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {accountDialogOpen && (
               <div className="space-y-4">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60">
+                <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
                   <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Perfil ativo</div>
                   <div className="mt-2 text-base font-black text-slate-900 dark:text-white">
                     {currentRole === 'admin' ? 'Administrador Guigui System' : currentRole === 'business' ? 'Empresa Guigui' : 'Utilizador Guigui'}
@@ -1464,11 +1464,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <button type="button" onClick={() => handleAccountSwitch('admin')} className="rounded-2xl border border-slate-200 bg-white p-3 text-left transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800">
+                  <button type="button" onClick={() => handleAccountSwitch('admin')} className="rounded-2xl border border-[var(--color-border-subtle)] bg-white p-3 text-left transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800">
                     <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Admin</div>
                     <div className="mt-2 text-sm font-black text-slate-900 dark:text-white">Super Admin</div>
                   </button>
-                  <button type="button" onClick={() => handleAccountSwitch('business')} className="rounded-2xl border border-slate-200 bg-white p-3 text-left transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800">
+                  <button type="button" onClick={() => handleAccountSwitch('business')} className="rounded-2xl border border-[var(--color-border-subtle)] bg-white p-3 text-left transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800">
                     <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Negócios</div>
                     <div className="mt-2 text-sm font-black text-slate-900 dark:text-white">Conta Comercial</div>
                   </button>

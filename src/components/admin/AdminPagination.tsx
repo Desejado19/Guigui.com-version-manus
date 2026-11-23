@@ -66,12 +66,12 @@ export const AdminPagination: React.FC<AdminPaginationProps> = ({
   if (end < totalPages) pages.push(totalPages);
 
   const navButton =
-    'inline-flex min-h-[34px] items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1 font-bold text-slate-700 transition hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed';
+    'inline-flex min-h-[34px] items-center gap-1 rounded-lg border border-[var(--color-border-default)] dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1 font-bold text-slate-700 transition hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed';
 
   return (
     <nav
       aria-label={t('pagination.label')}
-      className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3 text-xs shadow-sm ${className}`}
+      className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3 text-xs shadow-sm ${className}`}
     >
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-1.5">
@@ -79,7 +79,7 @@ export const AdminPagination: React.FC<AdminPaginationProps> = ({
           <select
             value={pageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1 text-[11px] font-bold text-slate-800"
+            className="rounded-lg border border-[var(--color-border-default)] dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1 text-[11px] font-bold text-slate-800"
           >
             {pageSizeOptions.map((size) => (
               <option key={size} value={size}>
@@ -135,7 +135,7 @@ export const AdminPagination: React.FC<AdminPaginationProps> = ({
               className={`inline-flex min-h-[34px] min-w-9 items-center justify-center rounded-lg border text-[11px] font-bold transition ${
                 page === safePage
                   ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
-                  : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 hover:bg-slate-100'
+                  : 'border-[var(--color-border-default)] dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 hover:bg-slate-100'
               }`}
             >
               {page}

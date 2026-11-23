@@ -1,5 +1,7 @@
 import { randomBytes } from 'node:crypto';
+import { normaliseEmailForAccount } from '../../../../shared/emailAddress';
 import { normalizeUserText } from '../../../../shared/textNormalization';
+import { toPublicIdentity } from '../domain/identityTypes';
 import type {
   CreateIdentityAccount,
   IdentityAccount,
@@ -22,7 +24,12 @@ export interface AuthenticationInput {
 
 export type AuthenticationResult =
   | { kind: 'authenticated'; user: PublicIdentity; sessionToken: string }
-  | { kind: 'rejected'; reason: 'invalid_credentials' | 'deactivated' | 'suspended' | 'disabled' | 'mfa_required' | 'mfa_invalid' | 'google_failed' };
+  | {
+    kind: 'rejected';
+    reason: 'invalid_credentials' | 'deactivated' | 'suspended' | 'disabled' | 'mfa_required' | 'mfa_invalid' | 'google_failed' | 'google_link_required' | 'google_link_conflict';
+    /** E-mail verificado do Google, para o cliente pedir a confirmação da conta. */
+    email?: string;
+  };
 
 /** Identidade devolvida depois de o ID token do Google ser verificado na assinatura e nas claims. */
 export interface VerifiedGoogleIdentity {
@@ -84,9 +91,10 @@ export interface RegistrationDependencies {
   persistBusinessProfile: boolean;
 }
 
-function toPublicIdentity(account: IdentityAccount): PublicIdentity {
-  const { passwordHash: _passwordHash, createdAt: _createdAt, ...identity } = account;
-  return identity;
+function isUniqueConstraintError(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  const message = error instanceof Error ? error.message : '';
+  return code === '23505' || /duplicate key|unique constraint/i.test(message);
 }
 
 export async function authenticateUser(
@@ -101,28 +109,95 @@ export async function authenticateUser(
       : null;
     if (!identity) return { kind: 'rejected', reason: 'google_failed' };
 
-    let account = await dependencies.accounts.findByEmail(identity.email);
-    if (account?.accountStatus === 'deactivated') return { kind: 'rejected', reason: 'deactivated' };
-    if (account?.accessStatus === 'suspended') return { kind: 'rejected', reason: 'suspended' };
-    if (account?.accessStatus === 'disabled') return { kind: 'rejected', reason: 'disabled' };
-
-    // Conta nova criada como cidadã, com uma palavra-passe aleatória que nunca é
-    // revelada: o acesso passa a ser feito pela própria Google.
-    if (!account) {
-      const name = identity.name || identity.email.split('@')[0];
-      account = await dependencies.accounts.create({
-        name,
-        email: identity.email,
-        password: randomBytes(32).toString('hex'),
-        role: 'user',
-        phone: '',
-        neighborhood: 'Bissau',
-        ...(identity.avatarUrl ? { avatarUrl: identity.avatarUrl } : {}),
-      });
-      if (!account) return { kind: 'rejected', reason: 'google_failed' };
+    // O verificador já exigiu `email_verified`, por isso a existência da caixa
+    // é atestada pelo Google; aqui garantimos apenas que o endereço é válido.
+    if (!normaliseEmailForAccount(identity.email).ok) {
+      return { kind: 'rejected', reason: 'google_failed' };
     }
 
-    // MFA obrigatório para administradores, tal como no login por palavra-passe.
+    // O `sub` do Google é a chave estável da identidade: se já estiver ligado a
+    // uma conta, é essa a conta usada mesmo que o e-mail mude.
+    let account = await dependencies.accounts.findByGoogleSubject(identity.googleId);
+
+    if (!account) {
+      const byEmail = await dependencies.accounts.findByEmail(identity.email);
+      if (byEmail) {
+        // Nunca ligar automaticamente uma conta com palavra-passe só porque o
+        // e-mail coincide: isso permitiria a alguém pré-registar o e-mail de
+        // outra pessoa e manter acesso à conta depois da ligação Google.
+        if (byEmail.googleSubject && byEmail.googleSubject !== identity.googleId) {
+          return { kind: 'rejected', reason: 'google_link_conflict', email: identity.email };
+        }
+        if (!byEmail.googleSubject) {
+          const passwordConfirmsOwnership = Boolean(input.password)
+            && dependencies.verifyPassword(input.password || '', byEmail.passwordHash);
+          if (!passwordConfirmsOwnership) {
+            return { kind: 'rejected', reason: 'google_link_required', email: identity.email };
+          }
+          let linked = false;
+          try {
+            linked = await dependencies.accounts.linkGoogleSubject(byEmail.id, identity.googleId);
+          } catch (error) {
+            // Corrida com outro vínculo: a restrição única de google_sub não pode
+            // transformar-se num 500. O cliente recebe um conflito explícito.
+            if (isUniqueConstraintError(error)) {
+              return { kind: 'rejected', reason: 'google_link_conflict', email: identity.email };
+            }
+            throw error;
+          }
+          if (!linked) {
+            const owner = await dependencies.accounts.findByGoogleSubject(identity.googleId);
+            if (!owner || owner.id !== byEmail.id) {
+              return { kind: 'rejected', reason: 'google_link_conflict', email: identity.email };
+            }
+            account = owner;
+          } else {
+            account = { ...byEmail, googleSubject: identity.googleId };
+          }
+        } else {
+          account = byEmail;
+        }
+      } else {
+        // Conta nova criada como cidadã, com uma palavra-passe aleatória que
+        // nunca é revelada: o acesso passa a ser feito pela própria Google.
+        const name = identity.name || identity.email.split('@')[0];
+        account = await dependencies.accounts.create({
+          name,
+          email: identity.email,
+          password: randomBytes(32).toString('hex'),
+          role: 'user',
+          phone: '',
+          neighborhood: 'Bissau',
+          googleSubject: identity.googleId,
+          ...(identity.avatarUrl ? { avatarUrl: identity.avatarUrl } : {}),
+        });
+        if (!account) {
+          // Corrida entre pedidos: outro pedido pode ter criado a conta (ou
+          // ligado a identidade) entretanto. Nunca criar uma segunda e nunca
+          // ligar automaticamente uma conta que entretanto ganhou palavra-passe.
+          account = await dependencies.accounts.findByGoogleSubject(identity.googleId);
+          if (!account) {
+            const racedEmail = await dependencies.accounts.findByEmail(identity.email);
+            if (racedEmail) {
+              return { kind: 'rejected', reason: 'google_link_required', email: identity.email };
+            }
+            return { kind: 'rejected', reason: 'google_failed' };
+          }
+        }
+      }
+    }
+
+    if (account.accountStatus === 'deactivated') return { kind: 'rejected', reason: 'deactivated' };
+    if (account.accessStatus === 'suspended') return { kind: 'rejected', reason: 'suspended' };
+    if (account.accessStatus === 'disabled') return { kind: 'rejected', reason: 'disabled' };
+
+    // Uma conta só pode estar ligada a uma identidade Google. Se este e-mail já
+    // pertence a outra identidade Google, recusa em vez de a substituir.
+    if (account.googleSubject && account.googleSubject !== identity.googleId) {
+      return { kind: 'rejected', reason: 'google_link_conflict', email: identity.email };
+    }
+
+        // MFA obrigatório para administradores (igual ao login por palavra-passe).
     if (account.role === 'admin' && await dependencies.mfa.hasEnabledMfa(account.id)) {
       if (!input.mfaCode) return { kind: 'rejected', reason: 'mfa_required' };
       if (!await dependencies.mfa.verifyUserMfa(account.id, input.mfaCode)) {
@@ -137,6 +212,7 @@ export async function authenticateUser(
     });
     return { kind: 'authenticated', user: toPublicIdentity(account), sessionToken };
   }
+
   const email = (input.email || '').trim().toLowerCase();
   const account = await dependencies.accounts.findByEmail(email);
 

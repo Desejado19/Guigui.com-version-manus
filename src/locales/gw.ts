@@ -570,6 +570,8 @@ const gw = {
   'business.VideoComercial': 'vídiu komérsial',
   'business.periodoRelatorio': 'perídu di relatóriu',
   'business.UltimosDias90': 'últimu 90 dian',
+  'business.PeriodoEsteMes': 'Es mes li',
+  'business.PeriodoEsteAno': 'Es anu li',
   'business.AnoCorrente': 'anu korrenti',
   'business.TodoHistorico': 'istóriku tudu',
   'business.IntervaloPersonalizado': 'intervalu pesusal',

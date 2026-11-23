@@ -33,7 +33,7 @@ import { getBusinessProfileCompletion } from '../utils/businessProfile';
 import { useLocationCatalog } from '../hooks/useLocationCatalog';
 import { DEFAULT_SUBSCRIPTION_PLANS, getAnnualPlanPrice, getPlanById, limitLabel, normaliseSubscriptionPlans } from '../data/subscriptionCatalog';
 import { getTranslation } from '../utils/i18n';
-import { isGoogleSignInConfigured, mountGoogleSignInButton } from '../services/googleIdentity';
+import { GOOGLE_SIGN_IN_URL, googleLoginErrorMessage, isGoogleSignInConfigured } from '../services/googleIdentity';
 import { Button } from './ui';
 
 interface LoginModalProps {
@@ -100,24 +100,14 @@ export const DEMO_ACCOUNTS: UserProfile[] = [
   },
 ];
 
-const GoogleSignInSlot: React.FC<{ onCredential: (credential: string) => void; onError: (message: string) => void }> = ({ onCredential, onError }) => {
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const callbacks = React.useRef({ onCredential, onError });
-  callbacks.current = { onCredential, onError };
-
-  React.useEffect(() => {
-    const node = containerRef.current;
-    if (!node || !isGoogleSignInConfigured()) return;
-    void mountGoogleSignInButton(node, {
-      locale: 'pt-PT',
-      onCredential: (credential) => callbacks.current.onCredential(credential),
-    }).catch((error) => {
-      callbacks.current.onError(error instanceof Error ? error.message : 'Não foi possível carregar o início de sessão da Google.');
-    });
-  }, []);
-
-  return <div ref={containerRef} className="flex w-full justify-center [&>div]:!w-full [&_iframe]:!w-full [&_iframe]:!max-w-full" />;
-};
+const GoogleGlyph: React.FC = () => (
+  <svg viewBox="0 0 48 48" className="h-4 w-4 shrink-0" aria-hidden="true">
+    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+    <path fill="#FBBC05" d="M10.53 28.59A14.5 14.5 0 0 1 9.77 24c0-1.6.27-3.14.76-4.59l-7.98-6.19A23.94 23.94 0 0 0 0 24c0 3.88.93 7.54 2.56 10.78l7.97-6.19z" />
+    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.46-9.91l-7.97 6.19C6.51 42.62 14.62 48 24 48z" />
+  </svg>
+);
 
 export const LoginModal: React.FC<LoginModalProps> = ({
   isOpen,
@@ -133,7 +123,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const [modalView, setModalView] = useState<'login' | 'register' | 'forgot' | 'team_invite'>('login');
   const [mfaCode, setMfaCode] = useState<string | null>(null);
   const [mfaRequired, setMfaRequired] = useState<boolean>(false);
-  const [googleMountError, setGoogleMountError] = useState<string | null>(null);
+  // Credenciais já validadas que aguardam o segundo factor. Nunca são enviadas
+  // ao servidor antes de o utilizador introduzir o código MFA.
+  const [pendingMfa, setPendingMfa] = useState<
+    | { kind: 'password'; email: string; password: string; googleIdToken?: string }
+    | { kind: 'google'; credential: string }
+    | null
+  >(null);
+  // Google verificado cujo e-mail já pertence a uma conta com palavra-passe.
+  // Só fica ligado depois de o utilizador confirmar a palavra-passe dessa conta.
+  const [pendingGoogleLink, setPendingGoogleLink] = useState<{ credential: string; email: string } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
@@ -144,7 +143,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       document.body.classList.add('modal-open');
       setModalView(teamInviteToken ? 'team_invite' : 'login');
       setError(null);
+      // Regresso do login Google por redireccionamento: mostra o motivo e retira
+      // os parâmetros do URL para não repetirem o aviso em recarregamentos.
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('google_login') === 'error') {
+        setError(googleLoginErrorMessage(params.get('google_reason')));
+        params.delete('google_login');
+        params.delete('google_reason');
+        const query = params.toString();
+        window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`);
+      }
       setMfaRequired(false);
+      setPendingMfa(null);
+      setPendingGoogleLink(null);
       setMfaCode('');
       return () => {
         document.body.style.overflow = prevOverflow;
@@ -220,14 +231,40 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [paymentMethod, setPaymentMethod] = useState<'orange_money' | 'telecel'>('orange_money');
   const [paymentPhone, setPaymentPhone] = useState('');
-  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success'>('idle');
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'pending' | 'success'>('idle');
   const [transactionRef, setTransactionRef] = useState('');
+  // Modo devolvido pelo backend para cada provider. A UI adapta-se a simulated,
+  // sandbox ou live sem precisar de conhecer a API concreta da operadora.
+  const [paymentProviderModes, setPaymentProviderModes] = useState<Partial<Record<'orange_money' | 'telecel', 'simulated' | 'sandbox' | 'live'>>>({});
+  const [transactionMode, setTransactionMode] = useState<'simulated' | 'sandbox' | 'live'>('simulated');
+  const [paymentInstructions, setPaymentInstructions] = useState('');
+  const [paymentCheckoutUrl, setPaymentCheckoutUrl] = useState('');
   const [subscriptionPlans] = usePersistentState<SubscriptionPlan[]>('guigui_subscription_plans', DEFAULT_SUBSCRIPTION_PLANS);
   const [businessModelConfig] = usePersistentState<BusinessModelConfig>('guigui_admin_business_model_config', {
     ticketCommissionPercent: 10, ticketFixedFeeXOF: 200, extraPostPriceXOF: 5000, extraPromotionPriceXOF: 10000, bannerWeeklyPriceXOF: 50000, annualDiscountPercent: 15, includedPostsPerMonth: 3, automaticSubscriptionSuspensionEnabled: true,
   });
 
   const formScrollRef = React.useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    void fetch('/api/payments/config', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((body: { providers?: Array<{ id?: string; mode?: string }> } | null) => {
+        if (cancelled || !Array.isArray(body?.providers)) return;
+        const next: Partial<Record<'orange_money' | 'telecel', 'simulated' | 'sandbox' | 'live'>> = {};
+        for (const provider of body.providers) {
+          if (provider.id !== 'orange_money' && provider.id !== 'telecel') continue;
+          if (provider.mode === 'simulated' || provider.mode === 'sandbox' || provider.mode === 'live') {
+            next[provider.id] = provider.mode;
+          }
+        }
+        setPaymentProviderModes(next);
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -253,6 +290,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
   const availablePlans = normaliseSubscriptionPlans(subscriptionPlans).filter((plan) => plan.isActive && plan.isPublic);
   const selectedPlan = getPlanById(availablePlans.length > 0 ? availablePlans : DEFAULT_SUBSCRIPTION_PLANS, selectedPlanId, selectedTier);
+  const selectedProviderMode = paymentProviderModes[paymentMethod] || 'simulated';
+  const isSimulatedPayment = selectedProviderMode === 'simulated';
   const getMonthlyPrice = (groupId: CategoryGroupId, tier: SubscriptionTier) => {
     const plan = getPlanById(availablePlans.length > 0 ? availablePlans : DEFAULT_SUBSCRIPTION_PLANS, selectedPlanId, tier);
     return plan.price > 0 ? plan.price : (CATEGORY_GROUP_PRICES[groupId]?.prices[tier] || 0);
@@ -269,10 +308,26 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          ...(pendingGoogleLink ? { googleIdToken: pendingGoogleLink.credential } : {}),
+        }),
       });
       const payload = await response.json().catch(() => ({}));
+      if (payload.code === 'MFA_REQUIRED') {
+        setPendingMfa({
+          kind: 'password',
+          email: email.trim(),
+          password,
+          ...(pendingGoogleLink ? { googleIdToken: pendingGoogleLink.credential } : {}),
+        });
+        setMfaRequired(true);
+        setMfaCode('');
+        return;
+      }
       if (!response.ok || !payload.user) throw new Error(payload.error || t('requestFailed'));
+      setPendingGoogleLink(null);
       onLogin(payload.user as UserProfile);
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : t('requestFailed'));
@@ -323,48 +378,39 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       setError('Indique o código MFA.');
       return;
     }
+    if (!pendingMfa) {
+      setError('Volte a iniciar sessão para pedir um novo código MFA.');
+      setMfaRequired(false);
+      return;
+    }
+    const credentials = pendingMfa.kind === 'google'
+      ? { googleIdToken: pendingMfa.credential, mfaCode: mfaCode.trim() }
+      : {
+          email: pendingMfa.email,
+          password: pendingMfa.password,
+          ...(pendingMfa.googleIdToken ? { googleIdToken: pendingMfa.googleIdToken } : {}),
+          mfaCode: mfaCode.trim(),
+        };
     fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ googleIdToken: '' })
+      body: JSON.stringify(credentials),
     })
       .then(async (res) => {
         const payload = await res.json().catch(() => ({}));
         if (!res.ok) {
           setError(payload.error || 'Falha na verificação MFA.');
           setMfaRequired(false);
+          setPendingMfa(null);
           setMfaCode('');
           return;
         }
         const { user } = payload;
+        setPendingGoogleLink(null);
         onLogin(user, user.business || undefined);
         setMfaRequired(false);
+        setPendingMfa(null);
         setMfaCode('');
-      })
-      .catch(() => setError('Erro de conexão com o servidor'));
-  };
-
-  const handleGoogleCredential = (credential: string) => {
-    setError(null);
-    // Send Google ID token to backend /api/auth/login
-    fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ googleIdToken: credential })
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          const err = await res.json();
-          if (err.error === 'MFA_REQUIRED') {
-            setMfaRequired(true);
-            setMfaCode('');
-          } else {
-            setError(err.error || 'Falha ao fazer login com Google');
-          }
-          return;
-        }
-        const { user } = await res.json();
-        onLogin(user, user.business || undefined);
       })
       .catch(() => setError('Erro de conexão com o servidor'));
   };
@@ -419,8 +465,21 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload.transaction) throw new Error(payload.error || 'Não foi possível criar o pagamento.');
-      setTransactionRef(payload.transaction.providerRef || payload.transaction.id);
-      setPaymentStatus('success');
+      const transaction = payload.transaction as {
+        id?: string;
+        providerRef?: string;
+        providerMode?: 'simulated' | 'sandbox' | 'live';
+        status?: string;
+        checkoutUrl?: string;
+        paymentInstructions?: string;
+      };
+      setTransactionRef(transaction.providerRef || transaction.id || '');
+      setTransactionMode(transaction.providerMode || selectedProviderMode);
+      setPaymentCheckoutUrl(transaction.checkoutUrl || '');
+      setPaymentInstructions(transaction.paymentInstructions || '');
+      // Um adapter real pode devolver pending_provider (USSD/checkout à espera do
+      // cliente). Só uma confirmação imediata deve abrir a conclusão do registo.
+      setPaymentStatus(transaction.status === 'pending_provider' ? 'pending' : 'success');
     } catch (paymentError) {
       setPaymentStatus('idle');
       setError(paymentError instanceof Error ? paymentError.message : 'Não foi possível processar o pagamento.');
@@ -512,7 +571,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-stretch justify-center overflow-y-auto overscroll-contain bg-slate-950/80 p-0 backdrop-blur-md no-scrollbar sm:items-center sm:p-4"
+      className="fixed inset-0 z-[200] flex items-stretch justify-center overflow-y-auto overscroll-contain bg-slate-950/80 p-0 no-scrollbar sm:items-center sm:p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget && onClose) onClose();
       }}
@@ -520,7 +579,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       <div className="relative flex h-[100dvh] max-h-[100dvh] w-full max-w-6xl flex-col overflow-hidden bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-200 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-3xl lg:h-auto lg:max-h-[min(900px,calc(100dvh-3rem))] lg:flex-row">
 
         {/* Brand hero panel */}
-        <div className="relative hidden shrink-0 flex-col justify-between overflow-hidden p-10 text-white lg:flex lg:w-[53%]">
+        <div className="relative hidden shrink-0 flex-col justify-between overflow-hidden bg-[#0B3B37] p-10 text-white lg:flex lg:w-[53%]">
           <img
             src="https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=1400&q=80"
             alt=""
@@ -554,7 +613,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 { icon: Drama, title: 'Cultura e Entretenimento', text: 'Viva a cultura guineense' },
               ].map((item) => (
                 <li key={item.title} className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15 backdrop-blur-sm">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-green-800)] ring-1 ring-[#3c8574]">
                     <item.icon className="h-5 w-5 text-[#F0B65B]" />
                   </span>
                   <span>
@@ -574,11 +633,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         </div>
 
         {/* Form panel */}
-        <div className="relative flex h-full min-h-0 w-full flex-col bg-white dark:bg-[#0B2320] sm:h-auto lg:w-[47%]">
+        <div className="relative flex h-full min-h-0 w-full flex-col bg-white dark:bg-[var(--color-bg-surface-dark)] sm:h-auto lg:w-[47%]">
           {onClose && (
                           <button type="button"
                 onClick={onClose}
-                className="absolute right-3 top-3 z-20 rounded-full border border-slate-200 bg-white/90 p-2 text-slate-500 shadow-sm transition hover:bg-slate-100 hover:text-slate-900 dark:border-[#1f4a44] dark:bg-[#102d2b] dark:text-[#EEF7F4] dark:hover:bg-[#16332f] dark:hover:text-white sm:right-4 sm:top-4"
+                className="absolute right-3 top-3 z-20 rounded-full border border-[var(--color-border-subtle)] bg-white p-2 text-slate-500 shadow-sm transition hover:bg-slate-100 hover:text-slate-900 dark:border-[var(--color-green-800)] dark:bg-[var(--color-bg-subtle)] dark:text-[#EEF7F4] dark:hover:bg-[#16332f] dark:hover:text-white sm:right-4 sm:top-4"
               title={`${t('close')} / Navegar como Visitante`}
               aria-label={`${t('close')} janela de autenticação`}
             >
@@ -602,7 +661,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             </div>
 
             {(modalView === 'login' || modalView === 'register' || modalView === 'forgot') && (
-              <div role="tablist" aria-label="Entrar ou criar conta" className="grid grid-cols-2 gap-1 rounded-2xl bg-[#EEF7F4] p-1.5 dark:bg-[#102d2b]">
+              <div role="tablist" aria-label="Entrar ou criar conta" className="grid grid-cols-2 gap-1 rounded-2xl bg-[#EEF7F4] p-1.5 dark:bg-[var(--color-bg-subtle)]">
                 <button
                   type="button"
                   role="tab"
@@ -653,13 +712,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 {invite && <div className="mt-1 text-emerald-700">{invite.email}</div>}
               </div>
               <label className="block text-xs font-bold text-slate-700">Telemóvel (opcional)
-                <input value={invitePhone} onChange={(event) => setInvitePhone(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 text-slate-900" placeholder="+245 ..." />
+                <input value={invitePhone} onChange={(event) => setInvitePhone(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-white dark:bg-slate-900 p-3 text-slate-900" placeholder="+245 ..." />
               </label>
               <label className="block text-xs font-bold text-slate-700">Nova palavra-passe
-                <input required minLength={6} type="password" value={invitePassword} onChange={(event) => setInvitePassword(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 text-slate-900" />
+                <input required minLength={6} type="password" value={invitePassword} onChange={(event) => setInvitePassword(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-white dark:bg-slate-900 p-3 text-slate-900" />
               </label>
               <label className="block text-xs font-bold text-slate-700">Confirmar palavra-passe
-                <input required minLength={6} type="password" value={inviteConfirm} onChange={(event) => setInviteConfirm(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 text-slate-900" />
+                <input required minLength={6} type="password" value={inviteConfirm} onChange={(event) => setInviteConfirm(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-white dark:bg-slate-900 p-3 text-slate-900" />
               </label>
               <button type="submit" disabled={!invite} className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-xs font-black text-white disabled:opacity-50">Aceitar convite e entrar</button>
             </form>
@@ -669,22 +728,25 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           {modalView === 'login' && (
             <div className="space-y-5">
               {isGoogleSignInConfigured() ? (
-                <div className="space-y-2">
-                  <GoogleSignInSlot onCredential={handleGoogleCredential} onError={setGoogleMountError} />
-                  {googleMountError && (
-                    <p className="text-center text-[11px] font-semibold text-[#A86516]">{googleMountError}</p>
-                  )}
-                </div>
+                // Redireccionamento completo para o servidor, que troca o código
+                // de autorização pelo ID token com o client secret.
+                <a
+                  href={GOOGLE_SIGN_IN_URL}
+                  className="flex w-full items-center justify-center gap-2.5 rounded-full border border-[var(--color-border-default)] bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-[var(--color-green-800)] dark:bg-[var(--color-bg-surface-dark)] dark:text-slate-100 dark:hover:bg-[#0f2f2a]"
+                >
+                  <GoogleGlyph />
+                  <span>Continuar com a Google</span>
+                </a>
               ) : (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-center text-[11px] font-semibold text-slate-500 dark:border-[#1f4a44] dark:bg-[#0b2320] dark:text-[#9BCDBB]">
+                <div className="rounded-xl border border-dashed border-[var(--color-border-default)] bg-slate-50 px-4 py-3 text-center text-[11px] font-semibold text-slate-500 dark:border-[var(--color-green-800)] dark:bg-[var(--color-bg-surface-dark)] dark:text-[#9BCDBB]">
                   Login com Google indisponível. Configure VITE_GOOGLE_CLIENT_ID.
                 </div>
               )}
 
-              <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-[#9BCDBB]">
-                <span className="h-px flex-1 bg-slate-200 dark:bg-[#1f4a44]" />
+              <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-[#9BCDBB]">
+                <span className="h-px flex-1 bg-slate-200 dark:bg-[var(--color-green-800)]" />
                 <span>ou</span>
-                <span className="h-px flex-1 bg-slate-200 dark:bg-[#1f4a44]" />
+                <span className="h-px flex-1 bg-slate-200 dark:bg-[var(--color-green-800)]" />
               </div>
 
               {mfaRequired && (
@@ -715,17 +777,32 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               )}
 
               <form onSubmit={handleManualLogin} className="space-y-4">
+                {pendingGoogleLink && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                    <p className="font-black">Confirmação necessária</p>
+                    <p className="mt-1">
+                      {pendingGoogleLink.email || 'Este e-mail'} já pertence a uma conta Guigui.com. Introduza a palavra-passe dessa conta para confirmar que é o titular e ligar o Google.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => { setPendingGoogleLink(null); setError(null); }}
+                      className="mt-2 font-bold underline underline-offset-2"
+                    >
+                      Cancelar ligação
+                    </button>
+                  </div>
+                )}
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-[#DCEAE6]">Endereço de email</span>
                   <div className="relative">
-                    <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                     <input
                       type="email"
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="o.seu.email@exemplo.com"
-                      className="w-full rounded-xl border border-[#C2DFD4] bg-[#F7F5F1] dark:border-[#1f4a44] dark:bg-[#0b2320] py-3 pl-11 pr-4 text-base font-semibold text-slate-900 transition placeholder:text-slate-400 focus:border-[#0B3B37] focus:bg-white dark:text-[#EEF7F4] dark:placeholder:text-[#5f7f78] dark:focus:border-[#66BE9C] dark:focus:bg-[#102d2b] focus:outline-none focus:ring-2 focus:ring-[#0B3B37]/20 sm:text-sm"
+                      className="w-full rounded-xl border border-[#C2DFD4] bg-[#F7F5F1] dark:border-[var(--color-green-800)] dark:bg-[var(--color-bg-surface-dark)] py-3 pl-11 pr-4 text-base font-semibold text-slate-900 transition placeholder:text-slate-500 focus:border-[#0B3B37] focus:bg-white dark:text-[#EEF7F4] dark:placeholder:text-[var(--color-text-muted)] dark:focus:border-[#66BE9C] dark:focus:bg-[var(--color-bg-subtle)] focus:outline-none focus:ring-2 focus:ring-[#0B3B37]/20 sm:text-sm"
                     />
                   </div>
                 </label>
@@ -733,20 +810,20 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-[#DCEAE6]">Senha</span>
                   <div className="relative">
-                    <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Introduza a sua senha"
-                      className="w-full rounded-xl border border-[#C2DFD4] bg-[#F7F5F1] dark:border-[#1f4a44] dark:bg-[#0b2320] py-3 pl-11 pr-12 text-base font-semibold text-slate-900 transition placeholder:text-slate-400 focus:border-[#0B3B37] focus:bg-white dark:text-[#EEF7F4] dark:placeholder:text-[#5f7f78] dark:focus:border-[#66BE9C] dark:focus:bg-[#102d2b] focus:outline-none focus:ring-2 focus:ring-[#0B3B37]/20 sm:text-sm"
+                      className="w-full rounded-xl border border-[#C2DFD4] bg-[#F7F5F1] dark:border-[var(--color-green-800)] dark:bg-[var(--color-bg-surface-dark)] py-3 pl-11 pr-12 text-base font-semibold text-slate-900 transition placeholder:text-slate-500 focus:border-[#0B3B37] focus:bg-white dark:text-[#EEF7F4] dark:placeholder:text-[var(--color-text-muted)] dark:focus:border-[#66BE9C] dark:focus:bg-[var(--color-bg-subtle)] focus:outline-none focus:ring-2 focus:ring-[#0B3B37]/20 sm:text-sm"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((value) => !value)}
                       aria-label={showPassword ? 'Esconder senha' : 'Mostrar senha'}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 transition hover:text-slate-700 dark:text-[#9BCDBB] dark:hover:text-white"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-500 transition hover:text-slate-700 dark:text-[#9BCDBB] dark:hover:text-white"
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -759,7 +836,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                       type="checkbox"
                       checked={rememberMe}
                       onChange={(e) => setRememberMe(e.target.checked)}
-                      className="h-4 w-4 rounded border-slate-300 accent-[#0B3B37]"
+                      className="h-4 w-4 rounded border-[var(--color-border-default)] accent-[#0B3B37]"
                     />
                     Lembrar-me
                   </label>
@@ -792,19 +869,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 </button>
               </p>
 
-              <div className="space-y-3 rounded-2xl border border-[#C2DFD4] bg-[#EEF7F4] p-4 dark:border-[#1f4a44] dark:bg-[#0b2320]">
+              <div className="space-y-3 rounded-2xl border border-[#C2DFD4] bg-[#EEF7F4] p-4 dark:border-[var(--color-green-800)] dark:bg-[var(--color-bg-surface-dark)]">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-[#0B3B37] dark:text-[#F0B65B]">
                     <Key className="h-3.5 w-3.5 text-[#0B3B37]" />
                     Contas de demonstração
                   </h3>
-                  <code className="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-700 shadow-sm dark:bg-[#102d2b] dark:text-[#DCEAE6]">Guigui@2026!</code>
+                  <code className="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-700 shadow-sm dark:bg-[var(--color-bg-subtle)] dark:text-[#DCEAE6]">Guigui@2026!</code>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => void handleDemoLogin(DEMO_ACCOUNTS[0])}
-                    className="flex flex-col items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-2 text-[11px] font-bold text-[#0B3B37] transition hover:border-[#0B3B37] hover:text-[#0B3B37] sm:flex-row sm:gap-2 sm:text-xs"
+                    className="flex flex-col items-center justify-center gap-1 rounded-xl border border-[var(--color-border-subtle)] bg-white px-2 py-2 text-[11px] font-bold text-[#0B3B37] transition hover:border-[#0B3B37] hover:text-[#0B3B37] sm:flex-row sm:gap-2 sm:text-xs"
                   >
                     <User className="h-4 w-4" />
                     Cidadão
@@ -812,7 +889,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   <button
                     type="button"
                     onClick={() => void handleDemoLogin(DEMO_ACCOUNTS[1])}
-                    className="flex flex-col items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-2 text-[11px] font-bold text-[#0B3B37] transition hover:border-[#176158] hover:text-[#176158] sm:flex-row sm:gap-2 sm:text-xs"
+                    className="flex flex-col items-center justify-center gap-1 rounded-xl border border-[var(--color-border-subtle)] bg-white px-2 py-2 text-[11px] font-bold text-[#0B3B37] transition hover:border-[#176158] hover:text-[#176158] sm:flex-row sm:gap-2 sm:text-xs"
                   >
                     <Building2 className="h-4 w-4" />
                     Empresa
@@ -820,7 +897,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   <button
                     type="button"
                     onClick={() => void handleDemoLogin(DEMO_ACCOUNTS[2])}
-                    className="flex flex-col items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-2 text-[11px] font-bold text-[#0B3B37] transition hover:border-[#C9852A] hover:text-[#A86516] sm:flex-row sm:gap-2 sm:text-xs"
+                    className="flex flex-col items-center justify-center gap-1 rounded-xl border border-[var(--color-border-subtle)] bg-white px-2 py-2 text-[11px] font-bold text-[#0B3B37] transition hover:border-[#C9852A] hover:text-[#A86516] sm:flex-row sm:gap-2 sm:text-xs"
                   >
                     <ShieldCheck className="h-4 w-4" />
                     Admin
@@ -835,7 +912,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
           {modalView === 'forgot' && (
             <div className="space-y-5">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
+              <div className="flex items-center justify-between pb-2 border-b border-[var(--color-border-subtle)]/80">
                 <button type="button" onClick={() => { setModalView('login'); setError(null); }} className="text-xs font-bold text-[#176158] hover:text-[#0B3B37] flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-slate-200/60">
                   <ArrowLeft className="w-4 h-4" /> Voltar ao login
                 </button>
@@ -843,17 +920,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </div>
               <form onSubmit={handleRequestPasswordReset} className="space-y-3">
                 <label className="block text-xs font-bold text-slate-700">E-mail da conta
-                  <input type="email" required value={resetEmail} onChange={(event) => setResetEmail(event.target.value)} placeholder="ex: cidadao.teste@guigui.com" className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input type="email" required value={resetEmail} onChange={(event) => setResetEmail(event.target.value)} placeholder="ex: cidadao.teste@guigui.com" className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </label>
                 <button type="submit" className="w-full px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl">Enviar código de recuperação</button>
               </form>
               {resetMessage && <p className="rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-700">{resetMessage}</p>}
-              {resetToken && <form onSubmit={handleResetPassword} className="space-y-3 border-t border-slate-200 dark:border-slate-700 pt-4">
+              {resetToken && <form onSubmit={handleResetPassword} className="space-y-3 border-t border-[var(--color-border-subtle)] dark:border-slate-700 pt-4">
                 <label className="block text-xs font-bold text-slate-700">Código de recuperação
-                  <input required value={resetToken} onChange={(event) => setResetToken(event.target.value)} className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-mono text-slate-900" />
+                  <input required value={resetToken} onChange={(event) => setResetToken(event.target.value)} className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-xs font-mono text-slate-900" />
                 </label>
-                <input type="password" required minLength={8} value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} placeholder="Nova palavra-passe (mínimo 8)" className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900" />
-                <input type="password" required minLength={8} value={resetConfirmation} onChange={(event) => setResetConfirmation(event.target.value)} placeholder="Confirmar nova palavra-passe" className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900" />
+                <input type="password" required minLength={8} value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} placeholder="Nova palavra-passe (mínimo 8)" className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900" />
+                <input type="password" required minLength={8} value={resetConfirmation} onChange={(event) => setResetConfirmation(event.target.value)} placeholder="Confirmar nova palavra-passe" className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900" />
                 <button type="submit" className="w-full px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl">Redefinir palavra-passe</button>
               </form>}
               {error && <p className="text-xs font-bold text-rose-600">{error}</p>}
@@ -864,7 +941,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           {modalView === 'register' && (
             <div className="space-y-5">
               {/* Back button */}
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
+              <div className="flex items-center justify-between pb-2 border-b border-[var(--color-border-subtle)]/80">
                 <button
                   type="button"
                   onClick={() => {
@@ -888,7 +965,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
               {/* Step Bar for Business Registration */}
               {regType === 'business' && (
-                <div className="rounded-2xl border border-slate-200 bg-slate-100 p-2.5 dark:border-slate-700 dark:bg-slate-800 sm:p-3">
+                <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-slate-100 p-2.5 dark:border-slate-700 dark:bg-slate-800 sm:p-3">
                   <div className="flex items-center justify-between gap-1 text-[10px] font-bold text-slate-600 sm:text-[11px]">
                     <div className={`flex items-center gap-1.5 ${regStep >= 1 ? 'text-blue-600 font-extrabold' : ''}`}>
                       <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${regStep >= 1 ? 'bg-blue-600 text-white' : 'bg-slate-300 text-slate-700'}`}>1</span>
@@ -925,8 +1002,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         }}
                         className={`flex items-center gap-2.5 rounded-2xl border p-2.5 text-left transition sm:gap-3 sm:p-3 ${
                           regType === 'user'
-                            ? 'bg-blue-50 border-blue-600 text-blue-900 font-bold shadow-sm dark:border-[#3FAE80] dark:bg-[#102d2b] dark:text-[#EEF7F4]'
-                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 hover:bg-slate-100'
+                            ? 'bg-blue-50 border-blue-600 text-blue-900 font-bold shadow-sm dark:border-[#3FAE80] dark:bg-[var(--color-bg-subtle)] dark:text-[#EEF7F4]'
+                            : 'bg-white dark:bg-slate-900 border-[var(--color-border-subtle)] dark:border-slate-700 text-slate-700 hover:bg-slate-100'
                         }`}
                       >
                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${regType === 'user' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600'}`}>
@@ -943,8 +1020,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         onClick={() => setRegType('business')}
                         className={`flex items-center gap-2.5 rounded-2xl border p-2.5 text-left transition sm:gap-3 sm:p-3 ${
                           regType === 'business'
-                            ? 'bg-blue-50 border-blue-600 text-blue-900 font-bold shadow-sm dark:border-[#3FAE80] dark:bg-[#102d2b] dark:text-[#EEF7F4]'
-                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 hover:bg-slate-100'
+                            ? 'bg-blue-50 border-blue-600 text-blue-900 font-bold shadow-sm dark:border-[#3FAE80] dark:bg-[var(--color-bg-subtle)] dark:text-[#EEF7F4]'
+                            : 'bg-white dark:bg-slate-900 border-[var(--color-border-subtle)] dark:border-slate-700 text-slate-700 hover:bg-slate-100'
                         }`}
                       >
                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${regType === 'business' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600'}`}>
@@ -969,7 +1046,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         value={regName}
                         onChange={(e) => setRegName(e.target.value)}
                         placeholder={regType === 'business' ? 'ex: Restaurante Coqueiros' : 'ex: Manuel Fernandes'}
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
+                        className="w-full rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                       />
                     </div>
 
@@ -981,7 +1058,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         <select
                           value={regCategoryGroup}
                           onChange={(e) => setRegCategoryGroup(e.target.value as CategoryGroupId)}
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
+                          className="w-full rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                         >
                           <option value="restauracao">Restauração, Cafés e Pequeno Comércio</option>
                           <option value="hotelaria_saude_educacao">Hotelaria, Clínicas, Escolas e Comércio Médio</option>
@@ -1005,7 +1082,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                             value={regSubcategory}
                             onChange={(e) => setRegSubcategory(e.target.value)}
                             placeholder="ex: Costura, Padaria, Clínica"
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
+                            className="w-full rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                           />
                         </div>
                         <div className="sm:col-span-2">
@@ -1020,7 +1097,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                             value={regDescription}
                             onChange={(e) => setRegDescription(e.target.value)}
                             placeholder="Descreva os produtos ou serviços da empresa (mínimo 30 caracteres)."
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
+                            className="w-full rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                           />
                         </div>
                         <div>
@@ -1034,7 +1111,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                             value={regBusinessPhone}
                             onChange={(e) => setRegBusinessPhone(e.target.value)}
                             placeholder="ex: +245 955 88 99"
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
+                            className="w-full rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                           />
                         </div>
                         <div>
@@ -1046,7 +1123,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                             required
                             value={regBusinessNeighborhood}
                             onChange={(e) => setRegBusinessNeighborhood(e.target.value)}
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
+                            className="w-full rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                           >
                             <option value="">Selecione o bairro da empresa</option>
                             {bissauLocations.map((entry) => (
@@ -1064,7 +1141,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                             value={regPublicEmail}
                             onChange={(e) => setRegPublicEmail(e.target.value)}
                             placeholder="contacto@empresa.com"
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
+                            className="w-full rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                           />
                         </div>
                       </>
@@ -1080,7 +1157,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         value={regEmail}
                         onChange={(e) => setRegEmail(e.target.value)}
                         placeholder="ex: contacto@exemplo.com"
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
+                        className="w-full rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                       />
                     </div>
 
@@ -1095,7 +1172,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         value={regPhone}
                         onChange={(e) => setRegPhone(e.target.value)}
                         placeholder="+245 955 88 99"
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
+                        className="w-full rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                       />
                     </div>
 
@@ -1107,7 +1184,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         <select
                           value={regNeighborhood}
                           onChange={(e) => setRegNeighborhood(e.target.value)}
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
+                          className="w-full rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                         >
                           {bissauLocations.map((entry) => (
                             <option key={entry.id} value={entry.name}>{entry.name}</option>
@@ -1128,7 +1205,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
                         placeholder="⬢⬢⬢⬢⬢⬢⬢⬢"
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
+                        className="w-full rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                       />
                     </div>
 
@@ -1144,12 +1221,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         value={regPasswordConfirm}
                         onChange={(e) => setRegPasswordConfirm(e.target.value)}
                         placeholder="Repita a palavra-passe"
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
+                        className="w-full rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 sm:text-xs"
                       />
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-3 border-t border-slate-200 pt-3 dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col gap-3 border-t border-[var(--color-border-subtle)] pt-3 dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-[11px] text-slate-500 font-medium">
                       {regType === 'business'
                         ? 'Irá escolher o escalão no próximo passo.'
@@ -1170,7 +1247,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               {/* STEP 2: Tier Selection (Básico, Profissional, Premium, Enterprise) */}
               {regStep === 2 && regType === 'business' && (
                 <div className="space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-blue-200 bg-blue-50/80 p-3 text-xs dark:border-[#1f4a44] dark:bg-[#102d2b]">
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-blue-200 bg-blue-50/80 p-3 text-xs dark:border-[var(--color-green-800)] dark:bg-[var(--color-bg-subtle)]">
                     <div className="min-w-0">
                       <span className="text-slate-500 font-medium dark:text-[#9BCDBB]">Sector da Empresa:</span>
                       <div className="break-words font-extrabold text-blue-900 dark:text-[#EEF7F4]">
@@ -1217,7 +1294,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                       const isSelected = selectedPlanId === plan.id;
                       const monthlyPrice = plan.price > 0 ? plan.price : getMonthlyPrice(regCategoryGroup, plan.legacyTier || selectedTier);
                       return (
-                        <div key={plan.id} onClick={() => { setSelectedPlanId(plan.id); if (plan.legacyTier) setSelectedTier(plan.legacyTier); }} className={`p-3.5 rounded-2xl border-2 cursor-pointer transition space-y-1.5 relative select-none ${isSelected ? 'bg-blue-50/80 border-blue-600 ring-2 ring-blue-500/20 shadow-md dark:border-[#3FAE80] dark:bg-[#123a34] dark:ring-[#3FAE80]/25' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}>
+                        <div key={plan.id} onClick={() => { setSelectedPlanId(plan.id); if (plan.legacyTier) setSelectedTier(plan.legacyTier); }} className={`p-3.5 rounded-2xl border-2 cursor-pointer transition space-y-1.5 relative select-none ${isSelected ? 'bg-blue-50/80 border-blue-600 ring-2 ring-blue-500/20 shadow-md dark:border-[#3FAE80] dark:bg-[#123a34] dark:ring-[#3FAE80]/25' : 'bg-white dark:bg-slate-900 border-[var(--color-border-subtle)] dark:border-slate-700 hover:border-[var(--color-border-default)]'}`}>
                           <div className="flex items-center justify-between"><span className="min-w-0 break-words pr-2 font-black text-slate-900 text-sm">{plan.name}</span>{isSelected && <CheckCircle2 className="w-5 h-5 text-blue-600" />}</div>
                           <div className="font-mono text-base font-black text-slate-900">{monthlyPrice > 0 ? `${monthlyPrice.toLocaleString('pt-PT')} ${plan.currency}` : 'Preço negociado'}<span className="text-[10px] text-slate-500 font-normal"> /mês</span></div>
                           <ul className="space-y-1 text-[11px] text-slate-600"><li className="flex items-center gap-1.5 font-bold text-blue-700"><Check className="w-3.5 h-3.5 text-blue-600" /><span>{limitLabel(plan.postsPerMonth)} posts/mês</span></li><li className="flex items-center gap-1.5 font-bold text-amber-700"><Check className="w-3.5 h-3.5 text-amber-600" /><span>{limitLabel(plan.promotionsPerMonth)} promoções/mês</span></li><li className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-600" /><span>{limitLabel(plan.maxCategories)} categoria(s) · {plan.featureSlugs.slice(0, 2).join(', ').replaceAll('_', ' ')}</span></li></ul>
@@ -1226,7 +1303,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                     })}
                   </div>
 
-                  <div className="flex flex-col gap-3 border-t border-slate-200 pt-3 dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col gap-3 border-t border-[var(--color-border-subtle)] pt-3 dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
                     <button
                       type="button"
                       onClick={() => setRegStep(1)}
@@ -1254,12 +1331,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   <div className="bg-slate-900 text-white p-4 sm:p-5 rounded-3xl space-y-3">
                     <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-2.5">
                       <div className="min-w-0">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Empresa</span>
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Empresa</span>
                         <h4 className="break-words text-sm font-extrabold text-white">{regName}</h4>
                       </div>
 
                       <div className="shrink-0 text-right">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Escalão</span>
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Escalão</span>
                         <span className="text-xs font-black uppercase text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
                           {selectedTier} ({billingCycle === 'annual' ? 'Anual' : 'Mensal'})
                         </span>
@@ -1274,6 +1351,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                     </div>
                   </div>
 
+                  {isSimulatedPayment && (
+                    <div className="rounded-2xl border border-amber-300 bg-amber-50 p-3.5 text-[11px] leading-relaxed text-amber-950 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
+                      <strong className="block text-xs font-black">Modo de simulação ativo</strong>
+                      A API da Orange Money/Telecel ainda não está ligada. Nenhum valor será debitado e nenhuma operadora será contactada; o pagamento é confirmado localmente para testar todo o fluxo empresarial.
+                    </div>
+                  )}
+
                   {/* Payment Method Selector */}
                   <div className="space-y-2.5">
                     <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-[#DCEAE6]">
@@ -1287,7 +1371,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         className={`flex items-center gap-2 rounded-2xl border p-2.5 text-left transition sm:gap-2.5 sm:p-3 ${
                           paymentMethod === 'orange_money'
                             ? 'bg-amber-500/10 border-amber-500 text-amber-950 font-black shadow-sm ring-2 ring-amber-500 dark:bg-amber-500/15 dark:text-amber-50'
-                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 hover:bg-slate-50'
+                            : 'bg-white dark:bg-slate-900 border-[var(--color-border-subtle)] dark:border-slate-700 text-slate-700 hover:bg-slate-50'
                         }`}
                       >
                         <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black shrink-0">
@@ -1305,7 +1389,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         className={`flex items-center gap-2 rounded-2xl border p-2.5 text-left transition sm:gap-2.5 sm:p-3 ${
                           paymentMethod === 'telecel'
                             ? 'bg-yellow-500/10 border-yellow-500 text-yellow-950 font-black shadow-sm ring-2 ring-yellow-500 dark:bg-yellow-500/15 dark:text-yellow-50'
-                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 hover:bg-slate-50'
+                            : 'bg-white dark:bg-slate-900 border-[var(--color-border-subtle)] dark:border-slate-700 text-slate-700 hover:bg-slate-50'
                         }`}
                       >
                         <div className="w-8 h-8 rounded-xl bg-yellow-400 text-slate-950 flex items-center justify-center font-black shrink-0">
@@ -1321,13 +1405,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
                   {/* Phone Input for Orange Money Payment */}
                   {paymentStatus === 'idle' && (
-                    <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
+                    <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-[var(--color-border-subtle)] dark:border-slate-700 space-y-3">
                       <div>
                         <label htmlFor="payment-phone" className="block text-xs font-bold text-slate-800 mb-1">
                           Número para Débito ({paymentMethod === 'orange_money' ? 'Orange Money +245 95...' : 'Telecel +245 96...'})
                         </label>
                         <div className="relative">
-                          <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                          <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                           <input
                             id="payment-phone"
                             type="text"
@@ -1335,13 +1419,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                             value={paymentPhone}
                             onChange={(e) => setPaymentPhone(e.target.value)}
                             placeholder="+245 955 88 99"
-                            className="w-full rounded-xl border border-slate-300 bg-slate-50 py-2.5 pl-9 pr-3 text-base font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800 sm:text-xs"
+                            className="w-full rounded-xl border border-[var(--color-border-default)] bg-slate-50 py-2.5 pl-9 pr-3 text-base font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800 sm:text-xs"
                           />
                         </div>
                       </div>
 
                       <div className="text-[11px] text-slate-500 leading-relaxed">
-                        Ao clicar em confirmar, receberá uma notificação USSD para introduzir o seu código PIN e autorizar o débito de <strong>{calculateFinalAmount().toLocaleString('pt-PT')} XOF</strong>.
+                        {isSimulatedPayment
+                          ? <>Ao simular, nenhum pedido é enviado à operadora. O pagamento de <strong>{calculateFinalAmount().toLocaleString('pt-PT')} XOF</strong> será confirmado apenas para testar a ativação do plano.</>
+                          : <>Ao clicar em confirmar, será aberto o pedido de pagamento de <strong>{calculateFinalAmount().toLocaleString('pt-PT')} XOF</strong> no provider selecionado.</>}
                       </div>
 
                       <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1359,7 +1445,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                           className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-xs font-black text-slate-950 shadow-md transition hover:bg-amber-600 sm:w-auto"
                         >
                           <Zap className="w-4 h-4 text-slate-950" />
-                          <span>Pagar {calculateFinalAmount().toLocaleString('pt-PT')} XOF</span>
+                          <span>{isSimulatedPayment ? 'Simular' : 'Pagar'} {calculateFinalAmount().toLocaleString('pt-PT')} XOF</span>
                         </button>
                       </div>
                     </div>
@@ -1370,11 +1456,29 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                     <div className="p-5 bg-amber-50 border border-amber-300 rounded-3xl text-center space-y-2.5 animate-pulse">
                       <Loader2 className="w-9 h-9 text-amber-600 animate-spin mx-auto" />
                       <div className="font-extrabold text-amber-950 text-sm">
-                        Instrução USSD enviada para {paymentPhone}!
+                        {isSimulatedPayment ? 'A processar pagamento simulado...' : 'A contactar o provider de pagamento...'}
                       </div>
                       <p className="text-xs text-amber-800 max-w-sm mx-auto leading-relaxed">
-                        Consulte o ecrã do seu telemóvel e digite o seu PIN para autorizar o pagamento de <strong>{calculateFinalAmount().toLocaleString('pt-PT')} XOF</strong>.
+                        {isSimulatedPayment
+                          ? <>Nenhuma operadora está a ser contactada. A confirmar <strong>{calculateFinalAmount().toLocaleString('pt-PT')} XOF</strong> em modo de teste.</>
+                          : <>A aguardar a resposta do provider para o pagamento de <strong>{calculateFinalAmount().toLocaleString('pt-PT')} XOF</strong>.</>}
                       </p>
+                    </div>
+                  )}
+
+                  {paymentStatus === 'pending' && (
+                    <div className="space-y-2 rounded-3xl border border-sky-300 bg-sky-50 p-5 text-center">
+                      <Loader2 className="mx-auto h-8 w-8 text-sky-600" />
+                      <h4 className="text-sm font-black text-sky-950">Pagamento pendente de confirmação</h4>
+                      <p className="mx-auto max-w-sm text-xs leading-relaxed text-sky-800">
+                        {paymentInstructions || 'O provider ainda não confirmou o pagamento. Conclua o pedido e aguarde a confirmação.'}
+                      </p>
+                      {paymentCheckoutUrl && (
+                        <a href={paymentCheckoutUrl} target="_blank" rel="noreferrer" className="inline-flex rounded-xl bg-sky-600 px-4 py-2 text-xs font-black text-white hover:bg-sky-700">
+                          Abrir página de pagamento
+                        </a>
+                      )}
+                      <div className="font-mono text-[11px] text-sky-900">Ref.: {transactionRef} · Modo: {transactionMode}</div>
                     </div>
                   )}
 
@@ -1386,15 +1490,23 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                           <CheckCircle2 className="w-6 h-6" />
                         </div>
                         <div>
-                          <h4 className="font-black text-emerald-950 text-sm sm:text-base">Pagamento Confirmado com Sucesso!</h4>
-                          <p className="text-xs text-emerald-800">Recibo Digital Orange Money & Subscrição Ativa</p>
+                          <h4 className="font-black text-emerald-950 text-sm sm:text-base">
+                            {transactionMode === 'simulated' ? 'Pagamento Simulado Confirmado!' : 'Pagamento Confirmado com Sucesso!'}
+                          </h4>
+                          <p className="text-xs text-emerald-800">
+                            {transactionMode === 'simulated' ? 'Recibo de demonstração · Subscrição ativa para testes' : 'Recibo Digital do Provider & Subscrição Ativa'}
+                          </p>
                         </div>
                       </div>
 
-                      <div className="bg-white/80 p-3 rounded-2xl border border-emerald-200 space-y-1 text-xs text-slate-800 font-mono">
+                      <div className="bg-white p-3 rounded-2xl border border-emerald-200 space-y-1 text-xs text-slate-800 font-mono">
                         <div className="flex justify-between">
                           <span className="text-slate-500">Ref. Transacção:</span>
                           <span className="font-bold text-slate-900">{transactionRef}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Modo:</span>
+                          <span className="font-bold uppercase text-slate-900">{transactionMode}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">Empresa:</span>
@@ -1404,8 +1516,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                           <span className="text-slate-500">Escalão:</span>
                           <span className="font-bold text-blue-700 uppercase">{selectedTier} (3 posts/mês)</span>
                         </div>
-                        <div className="flex justify-between border-t pt-1 border-slate-200 dark:border-slate-700">
-                          <span className="text-slate-500">Valor Pago:</span>
+                        <div className="flex justify-between border-t pt-1 border-[var(--color-border-subtle)] dark:border-slate-700">
+                          <span className="text-slate-500">{transactionMode === 'simulated' ? 'Valor Simulado:' : 'Valor Pago:'}</span>
                           <span className="font-black text-emerald-700">{calculateFinalAmount().toLocaleString('pt-PT')} XOF</span>
                         </div>
                       </div>

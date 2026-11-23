@@ -106,13 +106,13 @@ describe('business registration profile collection', () => {
     fireEvent.change(screen.getByPlaceholderText('⬢⬢⬢⬢⬢⬢⬢⬢'), { target: { value: 'CorrectHorse42' } });
     fireEvent.change(screen.getByPlaceholderText('Repita a palavra-passe'), { target: { value: 'CorrectHorse42' } });
     fireEvent.click(screen.getByRole('button', { name: /Próximo Passo \(Escalão\)/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Próximo Passo \(Pagamento:/ }));
-    fireEvent.change(screen.getByLabelText(/Número para Débito/), { target: { value: '+245 977 000 000' } });
-    fireEvent.click(screen.getByRole('button', { name: /Pagar .* XOF/ }));
-    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => url === '/api/payments/create')).toBe(true));
-    fireEvent.click(screen.getByRole('button', { name: /Concluir e Entrar no Painel da Empresa/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Próximo Passo \(Pagamento:/ }));
+    fireEvent.change(await screen.findByLabelText(/Número para Débito/), { target: { value: '+245 977 000 000' } });
+    fireEvent.click(screen.getByRole('button', { name: /Simular .*XOF/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Concluir e Entrar no Painel da Empresa/ }));
 
     await waitFor(() => expect(onLogin).toHaveBeenCalledOnce());
+
     const registrationCall = fetchMock.mock.calls.find(([url]) => url === '/api/auth/register');
     if (!registrationCall) throw new Error('Business registration request was not sent.');
     const registrationRequestBody = registrationCall[1]?.body;

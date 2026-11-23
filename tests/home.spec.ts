@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 /**
  * As rotas de escrita de estado, empresas e eventos exigem sessão autenticada
@@ -27,11 +27,11 @@ async function signInDemo(page: Page, email: string) {
   ).toBeTruthy();
 
   // Injeta o cookie de sessão no contexto do browser sem a flag Secure para
-  // que `page.request` o envie automaticamente nas chamadas de API subsequentes.
-  // O `url` do cookie tem de corresponder ao host do `baseURL` resolvido do
-  // projeto (`127.0.0.1`, ver playwright.config.ts): um cookie de `localhost`
-  // NÃO é enviado em pedidos a `http://127.0.0.1:...`, e as chamadas ficavam
-  // sem sessão (AUTHENTICATION_REQUIRED).
+  // que `page.request` o envie automaticamente nas chamadas de API
+  // subsequentes. O `url` do cookie tem de corresponder ao host do `baseURL`
+  // resolvido do projeto (`localhost`, ver playwright.config.ts); o servidor
+  // marca o cookie como Secure por correr em modo produção, e sem esta
+  // reinjeção as chamadas de API ficavam sem sessão (AUTHENTICATION_REQUIRED).
   const setCookie = response.headers()['set-cookie'];
   if (setCookie) {
     const cookieString = Array.isArray(setCookie) ? setCookie.join('; ') : String(setCookie);

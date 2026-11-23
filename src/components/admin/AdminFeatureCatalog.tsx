@@ -348,7 +348,7 @@ export const AdminFeatureCatalog: React.FC<AdminFeatureCatalogProps> = ({ curren
         </div>
       </div>
 
-      {notice && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-800">{notice}</div>}
+      {notice && <div role="status" className="rounded-xl border border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] px-3 py-2 text-[11px] font-bold text-[var(--tone-success-text)]">{notice}</div>}
 
       <div className="flex flex-wrap gap-2">
         {catalog.map((module) => (
@@ -358,8 +358,8 @@ export const AdminFeatureCatalog: React.FC<AdminFeatureCatalogProps> = ({ curren
             onClick={() => setActiveModuleId(module.id)}
             className={`rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-wider transition ${
               activeModuleId === module.id
-                ? 'border-indigo-600 bg-indigo-600/10 text-indigo-800'
-                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:border-slate-300'
+                ? 'border-indigo-600 bg-indigo-600/10 text-[var(--tone-info-text)]'
+                : 'border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:border-slate-300'
             }`}
           >
             {module.name}
@@ -372,7 +372,7 @@ export const AdminFeatureCatalog: React.FC<AdminFeatureCatalogProps> = ({ curren
           <div className="lg:col-span-2 space-y-4">
             {activeModule.subModules.map((sub) => (
               <Card key={sub.id} className="p-4">
-                <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-3 mb-3">
+                <div className="flex items-start justify-between gap-2 border-b border-[var(--color-border-subtle)] pb-3 mb-3">
                   <div>
                     <h4 className="text-sm font-black text-slate-900">{sub.name}</h4>
                     <p className="text-[11px] text-slate-500 mt-0.5">{sub.description}</p>
@@ -392,18 +392,18 @@ export const AdminFeatureCatalog: React.FC<AdminFeatureCatalogProps> = ({ curren
                         key={binding.featureId}
                         className={`flex flex-wrap items-center justify-between gap-2 rounded-xl border p-3 text-xs transition ${
                           isEditing
-                            ? 'border-indigo-300 bg-indigo-50/70'
+                            ? 'border-[var(--tone-info-border)] bg-[var(--tone-info-bg)]/70'
                             : binding.active
-                            ? 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900'
-                            : 'border-slate-100 bg-slate-50/70'
+                            ? 'border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900'
+                            : 'border-[var(--color-border-subtle)] bg-slate-50/70'
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <div className={`h-2 w-2 rounded-full flex-shrink-0 ${binding.active ? 'bg-emerald-600' : 'bg-slate-300'}`} />
                           <span className="font-bold text-slate-800">{name}</span>
                           {binding.required && <Badge variant="info" className="bg-slate-900 text-white border-0 text-[9px] px-1.5 py-0.5">obrigatória</Badge>}
-                          {binding.active && isActiveFeature && <Badge variant="success" className="bg-emerald-100 text-emerald-800 border-0 text-[9px] px-1.5 py-0.5">ativa</Badge>}
-                          {!isActiveFeature && <Badge variant="neutral" className="bg-amber-100 text-amber-800 border-0 text-[9px] px-1.5 py-0.5">feature inactiva</Badge>}
+                          {binding.active && isActiveFeature && <Badge variant="success" className="bg-[var(--tone-success-bg)] text-[var(--tone-success-text)] border-0 text-[9px] px-1.5 py-0.5">ativa</Badge>}
+                          {!isActiveFeature && <Badge variant="neutral" className="bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)] border-0 text-[9px] px-1.5 py-0.5">feature inactiva</Badge>}
                         </div>
                         <div className="flex items-center gap-1.5">
                           {isEditing ? (
@@ -421,8 +421,8 @@ export const AdminFeatureCatalog: React.FC<AdminFeatureCatalogProps> = ({ curren
                               onClick={() => setEditingBinding({ moduleId: activeModule.id, subModuleId: sub.id, featureId: binding.featureId })}
                               className={`inline-flex min-h-[28px] min-w-[28px] items-center justify-center rounded-lg border text-[10px] font-black transition ${
                                 binding.active
-                                  ? 'border-slate-200 dark:border-slate-700 text-slate-600 hover:border-slate-300 hover:bg-slate-100'
-                                  : 'border-dashed border-slate-200 dark:border-slate-700 text-slate-400 hover:border-indigo-300 hover:text-indigo-700'
+                                  ? 'border-[var(--color-border-default)] dark:border-slate-700 text-slate-600 hover:border-slate-300 hover:bg-slate-100'
+                                  : 'border-dashed border-[var(--color-border-default)] dark:border-slate-700 text-slate-400 hover:border-[var(--tone-info-border)] hover:text-[var(--tone-info-text)]'
                               }`}
                               title={binding.active ? 'Alterar registo no catálogo' : 'Ativar funcionalidade'}
                             >
@@ -438,7 +438,7 @@ export const AdminFeatureCatalog: React.FC<AdminFeatureCatalogProps> = ({ curren
             ))}
           </div>
 
-          <div className="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-4 shadow-sm">
+          <div className="rounded-2xl border border-[var(--tone-info-border)] bg-[var(--tone-info-bg)]/40 p-4 space-y-4 shadow-sm">
             <h4 className="text-xs font-black uppercase tracking-wide text-slate-800">Funcionalidades disponíveis</h4>
             <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
               {features
@@ -448,18 +448,18 @@ export const AdminFeatureCatalog: React.FC<AdminFeatureCatalogProps> = ({ curren
                   return (
                     <div
                       key={feature.id}
-                      className={`flex items-center justify-between gap-2 rounded-lg border p-2 text-[11px] ${bound ? 'border-indigo-200 bg-indigo-50/50' : 'border-slate-100 bg-slate-50 dark:bg-slate-800'}`}
+                      className={`flex items-center justify-between gap-2 rounded-lg border p-2 text-[11px] ${bound ? 'border-[var(--tone-info-border)] bg-[var(--tone-info-bg)]/50' : 'border-[var(--color-border-subtle)] bg-slate-50 dark:bg-slate-800'}`}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="font-bold text-slate-800">{feature.name}</div>
                         <div className="text-[9px] text-slate-500 capitalize">{feature.type}</div>
                       </div>
-                      {bound && <span className="text-[9px] font-black text-indigo-700 uppercase tracking-wider">ligado</span>}
+                      {bound && <span className="text-[9px] font-black text-[var(--tone-info-text)] uppercase tracking-wider">ligado</span>}
                     </div>
                   );
                 })}
             </div>
-            <div className="text-[10px] text-slate-500 leading-relaxed border-t border-indigo-100 pt-3">
+            <div className="text-[10px] text-slate-500 leading-relaxed border-t border-[var(--tone-info-border)] pt-3">
               {usedFeatureCount === 0 ? 'Nenhuma funcionalidade associada a este módulo.' : `${usedFeatureCount} funcionalidade(s) ativa(s) neste módulo.`}
             </div>
           </div>
@@ -469,7 +469,7 @@ export const AdminFeatureCatalog: React.FC<AdminFeatureCatalogProps> = ({ curren
       {editingBinding && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
           <div className="max-w-sm w-full rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center justify-between border-b border-[var(--color-border-subtle)] pb-3">
               <h4 className="text-sm font-black text-slate-900">Atribuir funcionalidade</h4>
               <IconButton label="Fechar" variant="secondary" size="sm" onClick={() => setEditingBinding(null)} aria-label="Fechar">
                 <X className="h-4 w-4" />

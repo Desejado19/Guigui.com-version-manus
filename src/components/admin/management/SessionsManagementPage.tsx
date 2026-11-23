@@ -148,9 +148,9 @@ export const SessionsManagementPage: React.FC<SessionsManagementPageProps> = ({ 
         { key: 'expires_at', label: 'Expira', sortable: true, render: (row) => <span className="whitespace-nowrap">{formatManagementDate(row.expires_at)}</span> },
         { key: 'status', label: 'Estado', render: (row) => (
           <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${
-            row.derivedStatus === 'active' ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-              : row.derivedStatus === 'expired' ? 'border-amber-200 bg-amber-50 text-amber-800'
-                : 'border-rose-200 bg-rose-50 text-rose-800'
+            row.derivedStatus === 'active' ? 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)]'
+              : row.derivedStatus === 'expired' ? 'border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)]'
+                : 'border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)]'
           }`}>{STATUS_LABELS[row.derivedStatus]}</span>
         ) },
       ]}
@@ -172,9 +172,9 @@ export const SessionsManagementPage: React.FC<SessionsManagementPageProps> = ({ 
       ]}
       notice={
         <>
-          {loading && <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-[11px] font-bold text-sky-800">A carregar sessões…</div>}
-          {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-bold text-rose-800">{error}</div>}
-          {feedback && <div role="status" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-700">{feedback}</div>}
+          {loading && <div className="rounded-xl border border-[var(--tone-info-border)] bg-[var(--tone-info-bg)] px-3 py-2 text-[11px] font-bold text-[var(--tone-info-text)]">A carregar sessões…</div>}
+          {error && <div role="alert" className="rounded-xl border border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] px-3 py-2 text-[11px] font-bold text-[var(--tone-danger-text)]">{error}</div>}
+          {feedback && <div role="status" className="rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2 text-[11px] font-bold text-slate-700">{feedback}</div>}
         </>
       }
       exportSpec={{

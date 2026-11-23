@@ -140,7 +140,7 @@ export const FinanceRefundsPage: React.FC<Props> = ({ onBack }) => {
     { key: 'transaction', label: 'Transação original', render: (refund) => <div className="min-w-[150px]"><div className="font-mono text-[9.5px] font-bold">{refund.transactionId}</div><div className="text-[9.5px] text-slate-500">{refund.originalReference || '—'}</div></div> },
     { key: 'payer', label: 'Cliente', render: (refund) => <span className="block min-w-[120px] text-[10px]">{refund.payerName}</span> },
     { key: 'amount', label: 'Valor', className: 'text-right', render: (refund) => <span className="whitespace-nowrap font-black">{formatXOF(refund.amountXOF)}</span> },
-    { key: 'reason', label: 'Motivo', render: (refund) => <div className="max-w-[180px] text-[9.5px] text-slate-600"><span className="block">{refund.reason}</span>{refund.rejectionReason && <span className="mt-0.5 block text-rose-700">Rejeição: {refund.rejectionReason}</span>}</div> },
+    { key: 'reason', label: 'Motivo', render: (refund) => <div className="max-w-[180px] text-[9.5px] text-slate-600"><span className="block">{refund.reason}</span>{refund.rejectionReason && <span className="mt-0.5 block text-[var(--tone-danger-text)]">Rejeição: {refund.rejectionReason}</span>}</div> },
     { key: 'status', label: 'Estado', render: (refund) => <span className={`inline-block whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-black ${financeStatusTone(refund.status)}`}>{refund.statusLabel}</span> },
     { key: 'responsible', label: 'Responsáveis', render: (refund) => <div className="min-w-[130px] text-[9px]"><div><strong>Solicitou:</strong> {refund.requestedByName || '—'}</div><div><strong>Autorizou:</strong> {refund.authorizedByName || '—'}</div><div><strong>Efetuou:</strong> {refund.processedByName || '—'}</div></div> },
     {
@@ -171,13 +171,13 @@ export const FinanceRefundsPage: React.FC<Props> = ({ onBack }) => {
         { label: 'Valor efetuado', value: formatXOF(refunds.filter((item) => item.status === 'processed').reduce((sum, item) => sum + item.amountXOF, 0)), tone: 'danger' },
       ]}
     >
-      <div className="rounded-2xl border border-violet-200 bg-violet-50 p-3 text-[10px] leading-relaxed text-violet-900">
+      <div className="rounded-2xl border border-[var(--tone-info-border)] bg-[var(--tone-info-bg)] p-3 text-[10px] leading-relaxed text-[var(--tone-info-text)]">
         <strong className="font-black">Política:</strong> pedido, autorização e efetivação são passos separados. O valor não pode exceder a transação original.
         Reembolsos de bilhetes pertencem ao financeiro da empresa organizadora e não são processados nesta área.
       </div>
       {message && <FinanceMessage tone={message.tone}>{message.text}</FinanceMessage>}
 
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#e6dac8] bg-white p-3.5 shadow-sm">
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--color-border-default)] bg-white p-3.5 shadow-sm">
         <div className="relative min-w-[230px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <input type="search" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Pesquisar por reembolso, transação, cliente ou motivo…" className={`${financeInputClass} pl-8`} />
@@ -251,7 +251,7 @@ export const FinanceRefundsPage: React.FC<Props> = ({ onBack }) => {
           </div>
         ) : target && (
           <div className="space-y-3">
-            <div className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[10px] sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 rounded-xl border border-[var(--color-border-default)] bg-slate-50 p-3 text-[10px] sm:grid-cols-2">
               <div><span className="block font-black text-slate-500">Transação</span>{target.transactionId}</div>
               <div><span className="block font-black text-slate-500">Referência original</span>{target.originalReference || '—'}</div>
               <div><span className="block font-black text-slate-500">Valor</span>{formatXOF(target.amountXOF)}</div>

@@ -6,10 +6,10 @@ import {
   Clock,
   MapPin,
   DollarSign,
-  Users,
   CheckCircle2,
   AlertCircle,
   Eye,
+  Download,
   Trash2,
   X,
   Image as ImageIcon,
@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { Business, EventItem, Language, PurchaseOrder } from '../../types';
 import { getTranslation } from '../../utils/i18n';
+import { downloadBuyerListCsv } from '../../utils/buyerListExport';
+import { EventControlCenter } from '../events/EventControlCenter';
 
 const readLocalMedia = (file: File): Promise<string> => new Promise((resolve, reject) => {
   const reader = new FileReader();
@@ -68,6 +70,8 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
   const [mediaError, setMediaError] = useState('');
   const [successMsg, setSuccessMsg] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
+  const [isExportingAllBuyers, setIsExportingAllBuyers] = useState(false);
+  const [allBuyersNotice, setAllBuyersNotice] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (showCreateModal) {
@@ -128,6 +132,31 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
     setDate('');
   };
 
+  /** Lista de compradores de todos os eventos da empresa, sem eventId. */
+  const handleDownloadAllBuyers = async () => {
+    setIsExportingAllBuyers(true);
+    setAllBuyersNotice(null);
+    try {
+      const result = await downloadBuyerListCsv();
+      setAllBuyersNotice(result.message);
+    } finally {
+      setIsExportingAllBuyers(false);
+    }
+  };
+
+  const describeOrderTicketTypes = (order: PurchaseOrder) => {
+    const types = new Map<string, number>();
+    if (order.ticketCredentials?.length) {
+      for (const credential of order.ticketCredentials) {
+        const name = credential.ticketTypeName || order.itemTitle || 'Entrada Geral';
+        types.set(name, (types.get(name) || 0) + 1);
+      }
+    } else if (order.itemTitle) {
+      types.set(order.itemTitle, Math.max(1, order.quantity || 1));
+    }
+    return Array.from(types.entries()).map(([type, count]) => `${type} x${count}`).join(' + ');
+  };
+
   const handleCancelEvent = (id: string) => {
     const cancelledEvent = myEvents.find((event) => event.id === id);
     setMyEvents(myEvents.map((e) => (e.id === id ? { ...e, status: 'cancelled' } : e)));
@@ -152,14 +181,33 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
             </p>
           </div>
 
-          <button type="button"
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-2xl transition flex items-center gap-2 shadow-xs"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{t('createNewEvent')}</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {myEvents.length > 0 && (
+              <button type="button"
+                onClick={() => void handleDownloadAllBuyers()}
+                disabled={isExportingAllBuyers}
+                className="px-4 py-2.5 bg-[var(--color-bg-subtle)] hover:bg-[var(--color-border-subtle)] text-[var(--color-text-default)] border border-[var(--color-border-default)] font-extrabold text-xs rounded-2xl transition flex items-center gap-2 disabled:opacity-60"
+              >
+                <Download className="w-4 h-4" />
+                <span>{isExportingAllBuyers ? 'A preparar...' : 'Exportar todos os compradores'}</span>
+              </button>
+            )}
+            <button type="button"
+              onClick={() => setShowCreateModal(true)}
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-2xl transition flex items-center gap-2 shadow-xs"
+            >
+              <Plus className="w-4 h-4" />
+              <span>{t('createNewEvent')}</span>
+            </button>
+          </div>
         </div>
+
+        {allBuyersNotice && (
+          <div className="bg-emerald-50 text-emerald-700 text-xs font-bold p-3 rounded-2xl border border-emerald-300 flex items-center gap-2 animate-fade-in dark:bg-emerald-950/30 dark:text-emerald-200 dark:border-emerald-800">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{allBuyersNotice}</span>
+          </div>
+        )}
 
         {successMsg && (
           <div className="bg-emerald-50 text-emerald-700 text-xs font-bold p-3 rounded-2xl border border-emerald-300 flex items-center gap-2 animate-fade-in">
@@ -201,11 +249,11 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
                   ) : (
                     <img src={ev.coverImage || business.coverImage || business.logo} alt={ev.title} className="w-full h-full object-cover" />
                   )}
-                  <div className="absolute top-3 right-3 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase">
+                  <div className="absolute top-3 right-3 bg-slate-900/80 text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase">
                     {ev.category}
                   </div>
                   {ev.status === 'cancelled' && (
-                    <div className="absolute inset-0 bg-red-900/70 backdrop-blur-xs flex items-center justify-center text-white font-black text-xs uppercase">
+                    <div className="absolute inset-0 bg-red-900/70 flex items-center justify-center text-white font-black text-xs uppercase">
                       {t('eventCancelled')}
                     </div>
                   )}
@@ -219,11 +267,11 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
 
                   <div className="space-y-1.5 text-xs text-slate-600 pt-1 border-t border-slate-100 font-medium">
                     <div className="flex items-center gap-2">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      <Clock className="w-3.5 h-3.5 text-slate-500" />
                       <span>{ev.date} às {ev.time}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                      <MapPin className="w-3.5 h-3.5 text-slate-500" />
                       <span className="truncate">{ev.location}</span>
                     </div>
                     <div className="flex items-center justify-between pt-1">
@@ -250,7 +298,7 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
 
                 <div className="flex items-center gap-3">
                   <button type="button" onClick={() => setSelectedEvent(ev)} className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 hover:text-blue-800">
-                    <Users className="h-3.5 w-3.5" /> Participantes
+                    <Ticket className="h-3.5 w-3.5" /> Centro de controlo
                   </button>
                   {ev.status === 'active' && (
                     <button type="button"
@@ -268,46 +316,19 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
       )}
 
       {selectedEvent && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`Participantes de ${selectedEvent.title}`}>
-          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 p-5 shadow-[var(--shadow-lg)] sm:p-7">
-            <div className="mb-5 flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Gestão de bilhetes</p>
-                <h3 className="mt-1 text-lg font-black text-slate-900">{selectedEvent.title}</h3>
-                <p className="mt-1 text-xs text-slate-500">{selectedEvent.totalTicketsSold || 0} vendidos · {(selectedEvent.totalRevenueXOF || 0).toLocaleString('pt-PT')} XOF de receita</p>
-              </div>
-              <button type="button" onClick={() => setSelectedEvent(null)} className="guigui-close-button" aria-label="Fechar participantes"><X className="h-4 w-4" /></button>
-            </div>
-            {purchaseOrders.filter((order) => order.eventId === selectedEvent.id && order.businessId === business.id).length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 p-8 text-center text-xs text-slate-500">
-                <Ticket className="mx-auto mb-2 h-8 w-8 text-slate-300" />
-                Ainda não existem participantes ou vendas registadas para este evento.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {purchaseOrders.filter((order) => order.eventId === selectedEvent.id && order.businessId === business.id).map((order) => (
-                  <div key={order.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 p-3">
-                    <div>
-                      <div className="text-xs font-black text-slate-900">{order.customerName}</div>
-                      <div className="text-[11px] text-slate-500">{order.customerPhone} · {order.quantity} bilhete(s)</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-mono text-xs font-black text-slate-800">{order.qrToken}</div>
-                      <div className="text-[10px] font-bold uppercase text-slate-500">{order.status === 'redeemed' ? 'Validado' : order.status === 'cancelled' ? 'Cancelado' : 'Pendente'}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        <EventControlCenter
+          eventId={selectedEvent.id}
+          eventTitle={selectedEvent.title}
+          viewerRole="business"
+          onClose={() => setSelectedEvent(null)}
+        />
       )}
 
       {/* CREATE EVENT MODAL */}
       {showCreateModal && (
-        <div className="event-modal-overlay fixed inset-0 z-[200] bg-slate-900/70 backdrop-blur-xs flex items-start justify-center p-3 overflow-y-auto">
+        <div className="event-modal-overlay fixed inset-0 z-[200] bg-slate-900/70 flex items-start justify-center p-3 overflow-y-auto">
           <div ref={createModalRef} className="my-4 w-full max-w-3xl space-y-5 overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 p-4 shadow-[var(--shadow-lg)] sm:my-8 sm:p-7">
-          <div className="sticky top-0 z-10 -mx-4 -mt-4 flex items-start justify-between gap-3 border-b border-slate-100 bg-white/95 px-4 py-4 backdrop-blur sm:-mx-7 sm:-mt-7 sm:px-7">
+          <div className="sticky top-0 z-10 -mx-4 -mt-4 flex items-start justify-between gap-3 border-b border-slate-100 bg-white px-4 py-4 sm:-mx-7 sm:-mt-7 sm:px-7">
               <div className="flex min-w-0 items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
                   <Calendar className="h-5 w-5" />
@@ -340,7 +361,7 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
                   placeholder="Ex: Noite de Kizomba e Marisco na Esplanada"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="mt-1.5 min-h-11 w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="mt-1.5 min-h-11 w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
                 </label>
 
@@ -351,28 +372,28 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
                   placeholder="Atrações musicais, menu incluído, dress code..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="mt-1.5 min-h-28 w-full resize-y px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="mt-1.5 min-h-28 w-full resize-y px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
                 </label>
               </div>
 
-              <div className="event-form-section event-schedule-section space-y-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 sm:p-3.5">
+              <div className="event-form-section event-schedule-section space-y-2 rounded-2xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 sm:p-3.5">
                 <div>
                   <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">2. Data e local</p>
                   <p className="mt-0.5 text-[10px] text-slate-500">Ajude os participantes a planear a presença.</p>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <label className="text-[11px] font-bold text-slate-700">Data
-                    <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="mt-1 w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                    <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="mt-1 w-full px-3 py-2 bg-white dark:bg-slate-900 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </label>
                   <label className="text-[11px] font-bold text-slate-700">Horário
-                    <input type="time" required value={time} onChange={(e) => setTime(e.target.value)} className="mt-1 w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                    <input type="time" required value={time} onChange={(e) => setTime(e.target.value)} className="mt-1 w-full px-3 py-2 bg-white dark:bg-slate-900 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </label>
                   <label className="text-[11px] font-bold text-slate-700 sm:col-span-2">Local
-                    <input type="text" required value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ex: Restaurante Coqueiros, Bissau Velho" className="mt-1 w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                    <input type="text" required value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ex: Restaurante Coqueiros, Bissau Velho" className="mt-1 w-full px-3 py-2 bg-white dark:bg-slate-900 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </label>
                   <label className="text-[11px] font-bold text-slate-700">Categoria
-                    <select value={category} onChange={(e) => setCategory(e.target.value as typeof category)} className="mt-1 w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <select value={category} onChange={(e) => setCategory(e.target.value as typeof category)} className="mt-1 w-full px-3 py-2 bg-white dark:bg-slate-900 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
                       <option value="todos">Todos</option>
                       <option value="gastronomia">Gastronomia</option>
                       <option value="musica">Música</option>
@@ -383,20 +404,20 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
                 </div>
               </div>
 
-              <div className="event-form-section space-y-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 sm:p-3.5">
+              <div className="event-form-section space-y-2.5 rounded-2xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 sm:p-3.5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">3. Divulgação</p>
                     <label className="text-xs font-black text-slate-800">Imagem ou vídeo do evento</label>
                     <p className="mt-0.5 text-[10px] text-slate-500">Escolha um ficheiro ou cole um URL para destacar o evento.</p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1">
+                  <div className="flex shrink-0 items-center gap-1 rounded-xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-white dark:bg-slate-900 p-1">
                     <button type="button" onClick={() => { setMediaType('image'); setMediaError(''); }} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold ${mediaType === 'image' ? 'bg-blue-600 text-white' : 'text-slate-600'}`}><ImageIcon className="mr-1 inline h-3 w-3" />{t('business.Imagem')}</button>
                     <button type="button" onClick={() => { setMediaType('video'); setMediaError(''); }} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold ${mediaType === 'video' ? 'bg-violet-600 text-white' : 'text-slate-600'}`}><Video className="mr-1 inline h-3 w-3" />{t('video')}</button>
                   </div>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                  <input type="url" value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); setMediaError(''); }} placeholder={mediaType === 'image' ? 'URL da imagem (opcional)' : 'URL do vídeo (opcional)'} className="min-h-11 w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900" />
+                  <input type="url" value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); setMediaError(''); }} placeholder={mediaType === 'image' ? 'URL da imagem (opcional)' : 'URL do vídeo (opcional)'} className="min-h-11 w-full rounded-xl border border-[var(--color-border-default)] dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900" />
                   <input type="file" accept={mediaType === 'image' ? 'image/*' : 'video/*'} onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
@@ -415,10 +436,10 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
                     } catch (error) {
                       setMediaError(error instanceof Error ? error.message : 'Não foi possível carregar este ficheiro.');
                     }
-                  }} className="min-h-11 w-full min-w-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-2 text-xs text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-xs file:font-bold file:text-white" />
+                  }} className="min-h-11 w-full min-w-0 rounded-xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-2 text-xs text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-xs file:font-bold file:text-white" />
                 </div>
                 {mediaError && <p className="text-xs font-semibold text-rose-600">{mediaError}</p>}
-                {imageUrl && <div className="h-36 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">{mediaType === 'video' ? <video src={imageUrl} controls muted className="h-full w-full object-cover" /> : <img src={imageUrl} alt="Pré-visualização do evento" className="h-full w-full object-cover" />}</div>}
+                {imageUrl && <div className="h-36 overflow-hidden rounded-xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-white dark:bg-slate-900">{mediaType === 'video' ? <video src={imageUrl} controls muted className="h-full w-full object-cover" /> : <img src={imageUrl} alt="Pré-visualização do evento" className="h-full w-full object-cover" />}</div>}
               </div>
 
               <div className="event-form-section space-y-2.5 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3 sm:p-3.5">
@@ -433,7 +454,7 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
                     required
                     value={priceXOF}
                     onChange={(e) => setPriceXOF(Number(e.target.value))}
-                    className="mt-1.5 min-h-11 w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="mt-1.5 min-h-11 w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-xs font-bold font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                   </label>
 
@@ -442,7 +463,7 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
                     type="number"
                     value={vipPriceXOF}
                     onChange={(e) => setVipPriceXOF(Number(e.target.value))}
-                    className="mt-1.5 min-h-11 w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="mt-1.5 min-h-11 w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-xs font-bold font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                   </label>
                   <label className="text-xs font-bold text-slate-700">Lotação máxima
@@ -451,7 +472,7 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
                     required
                     value={capacity}
                     onChange={(e) => setCapacity(Number(e.target.value))}
-                    className="mt-1.5 min-h-11 w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="mt-1.5 min-h-11 w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                   </label>
                 </div>

@@ -1,4 +1,4 @@
-import { expect, request as apiRequest, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, request as apiRequest, test, type APIRequestContext, type Page } from './fixtures';
 
 /**
  * JORNADA COMPLETA DO UTILIZADOR — óptica de quem usa a plataforma.

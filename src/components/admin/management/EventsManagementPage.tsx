@@ -1,7 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { Ticket } from 'lucide-react';
 import type { EventItem } from '../../../types';
 import { formatManagementDate } from './managementState';
 import { RecordsManagementPage } from './RecordsManagementPage';
+import { EventControlCenter } from '../../events/EventControlCenter';
 
 const STATUS_LABELS: Record<EventItem['status'], string> = {
   active: 'Ativo',
@@ -16,6 +18,7 @@ interface EventsManagementPageProps {
 }
 
 export const EventsManagementPage: React.FC<EventsManagementPageProps> = ({ events, onBack }) => {
+  const [controlEvent, setControlEvent] = useState<EventItem | null>(null);
   const categories = useMemo(
     () => [...new Set(events.map((event) => event.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt')),
     [events],
@@ -30,6 +33,7 @@ export const EventsManagementPage: React.FC<EventsManagementPageProps> = ({ even
   }), [events]);
 
   return (
+    <>
     <RecordsManagementPage<EventItem>
       title="Gestão de eventos"
       description="Pesquise e filtre todos os eventos, consulte ocupação e receita e abra a ficha detalhada de cada registo."
@@ -71,7 +75,7 @@ export const EventsManagementPage: React.FC<EventsManagementPageProps> = ({ even
           sortable: true,
           render: (event) => (
             <div className="flex min-w-[220px] items-center gap-2">
-              {event.coverImage ? <img src={event.coverImage} alt="" className="h-9 w-9 rounded-lg border border-slate-200 object-cover" /> : null}
+              {event.coverImage ? <img src={event.coverImage} alt="" className="h-9 w-9 rounded-lg border border-[var(--color-border-default)] object-cover" /> : null}
               <div className="min-w-0">
                 <div className="truncate font-black text-slate-900">{event.title}</div>
                 <div className="truncate text-[9.5px] text-slate-500">{event.organizerName} · {event.location}</div>
@@ -87,14 +91,14 @@ export const EventsManagementPage: React.FC<EventsManagementPageProps> = ({ even
           sortable: true,
           render: (event) => (
             <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${
-              event.status === 'active' ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                : event.status === 'draft' ? 'border-amber-200 bg-amber-50 text-amber-800'
+              event.status === 'active' ? 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)]'
+                : event.status === 'draft' ? 'border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)]'
                   : 'border-slate-300 bg-slate-100 text-slate-700'
             }`}>{STATUS_LABELS[event.status] || event.status}</span>
           ),
         },
         { key: 'sold', label: 'Bilhetes', sortable: true, render: (event) => <span className="tabular-nums">{(event.totalTicketsSold || 0).toLocaleString('pt-PT')}</span> },
-        { key: 'revenue', label: 'Receita', sortable: true, render: (event) => <span className="whitespace-nowrap font-black tabular-nums text-emerald-800">{(event.totalRevenueXOF || 0).toLocaleString('pt-PT')} XOF</span> },
+        { key: 'revenue', label: 'Receita', sortable: true, render: (event) => <span className="whitespace-nowrap font-black tabular-nums text-[var(--tone-success-text)]">{(event.totalRevenueXOF || 0).toLocaleString('pt-PT')} XOF</span> },
       ]}
       kpis={[
         { label: 'Total de eventos', value: events.length, tone: 'info' },
@@ -116,6 +120,15 @@ export const EventsManagementPage: React.FC<EventsManagementPageProps> = ({ even
           { label: 'Bilhetes', value: String(totals.tickets) },
         ],
       }}
+      rowActions={(event) => (
+        <button
+          type="button"
+          onClick={() => setControlEvent(event)}
+          className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-border-subtle)] px-2 py-1 text-[10px] font-black uppercase tracking-wide text-slate-600 transition hover:border-[var(--color-green-700)] dark:border-slate-700 dark:text-slate-300"
+        >
+          <Ticket className="h-3 w-3" /> Centro de controlo
+        </button>
+      )}
       detailLabel={(event) => event.title}
       detail={(event) => (
         <div className="space-y-3 text-[11px]">
@@ -143,7 +156,7 @@ export const EventsManagementPage: React.FC<EventsManagementPageProps> = ({ even
               <thead><tr className="bg-slate-50 text-[9px] uppercase text-slate-500"><th className="p-2">Tipo</th><th className="p-2">Preço</th><th className="p-2">Vendidos</th><th className="p-2">Disponíveis</th></tr></thead>
               <tbody>
                 {(event.ticketTypes || []).map((type) => (
-                  <tr key={type.id} className="border-b border-slate-100">
+                  <tr key={type.id} className="border-b border-[var(--color-border-subtle)]">
                     <td className="p-2 font-bold">{type.name}</td>
                     <td className="p-2">{type.priceXOF.toLocaleString('pt-PT')} XOF</td>
                     <td className="p-2">{type.soldQuantity}</td>
@@ -157,5 +170,14 @@ export const EventsManagementPage: React.FC<EventsManagementPageProps> = ({ even
         </div>
       )}
     />
+    {controlEvent ? (
+      <EventControlCenter
+        eventId={controlEvent.id}
+        eventTitle={controlEvent.title}
+        viewerRole="admin"
+        onClose={() => setControlEvent(null)}
+      />
+    ) : null}
+    </>
   );
 };

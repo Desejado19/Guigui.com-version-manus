@@ -23,7 +23,6 @@ describe('simulated communication adapters', () => {
     vi.stubGlobal('fetch', fetchSpy);
     const createTransportSpy = vi.spyOn(nodemailer, 'createTransport');
 
-    await import('../../server/emailService');
     const email = createSimulatedEmailAdapter();
     const sms = createSimulatedSmsAdapter();
     const ticketDelivery = await email.sendTicketPurchase({

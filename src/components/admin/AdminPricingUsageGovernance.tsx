@@ -108,24 +108,24 @@ export const AdminPricingUsageGovernance: React.FC<AdminPricingUsageGovernancePr
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge variant="info" className="bg-indigo-100 text-indigo-800 border-0 px-3 py-1 text-[10px] font-black">v2 — Pricing & Usage</Badge>
+          <Badge variant="info" className="bg-[var(--tone-info-bg)] text-[var(--tone-info-text)] border-0 px-3 py-1 text-[10px] font-black">v2 — Pricing & Usage</Badge>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => setSubTab('configuracao')} className={`rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-wider transition ${subTab === 'configuracao' ? 'border-indigo-600 bg-indigo-600/10 text-indigo-800' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:border-slate-300'}`}>
+        <button type="button" onClick={() => setSubTab('configuracao')} className={`rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-wider transition ${subTab === 'configuracao' ? 'border-indigo-600 bg-indigo-600/10 text-[var(--tone-info-text)]' : 'border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:border-slate-300'}`}>
           <ArrowUpRight className="inline h-3.5 w-3.5" />
           Configuração dinâmica
         </button>
-        <button type="button" onClick={() => setSubTab('alertas')} className={`rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-wider transition ${subTab === 'alertas' ? 'border-indigo-600 bg-indigo-600/10 text-indigo-800' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:border-slate-300'}`}>
+        <button type="button" onClick={() => setSubTab('alertas')} className={`rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-wider transition ${subTab === 'alertas' ? 'border-indigo-600 bg-indigo-600/10 text-[var(--tone-info-text)]' : 'border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:border-slate-300'}`}>
           <AlertTriangle className="inline h-3.5 w-3.5" />
           Alertas de uso
         </button>
-        <button type="button" onClick={() => setSubTab('versionamento')} className={`rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-wider transition ${subTab === 'versionamento' ? 'border-indigo-600 bg-indigo-600/10 text-indigo-800' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:border-slate-300'}`}>
+        <button type="button" onClick={() => setSubTab('versionamento')} className={`rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-wider transition ${subTab === 'versionamento' ? 'border-indigo-600 bg-indigo-600/10 text-[var(--tone-info-text)]' : 'border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:border-slate-300'}`}>
           <History className="inline h-3.5 w-3.5" />
           Versionamento
         </button>
-        <button type="button" onClick={() => setSubTab('catalogo')} className={`rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-wider transition ${subTab === 'catalogo' ? 'border-indigo-600 bg-indigo-600/10 text-indigo-800' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:border-slate-300'}`}>
+        <button type="button" onClick={() => setSubTab('catalogo')} className={`rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-wider transition ${subTab === 'catalogo' ? 'border-indigo-600 bg-indigo-600/10 text-[var(--tone-info-text)]' : 'border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:border-slate-300'}`}>
           <RefreshCw className="inline h-3.5 w-3.5" />
           Catálogo
         </button>
@@ -141,7 +141,7 @@ export const AdminPricingUsageGovernance: React.FC<AdminPricingUsageGovernancePr
             <div className="flex items-center gap-2 text-[11px] text-slate-500">
               <span className="font-bold">{activePlans.length} planos</span>
               <span className="text-slate-300">·</span>
-              <span className="font-bold text-indigo-700">{activeFeaturesCount} funcionalidades</span>
+              <span className="font-bold text-[var(--tone-info-text)]">{activeFeaturesCount} funcionalidades</span>
             </div>
           </div>
 
@@ -151,18 +151,18 @@ export const AdminPricingUsageGovernance: React.FC<AdminPricingUsageGovernancePr
               const featureCount = featuresForPlan(resolved, allFeatures).length;
               return (
                 <Card key={plan.id} className="p-4">
-                  <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-3 mb-3">
+                  <div className="flex items-start justify-between gap-2 border-b border-[var(--color-border-subtle)] pb-3 mb-3">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-slate-900">{plan.name}</span>
                         <Badge variant={plan.isActive ? 'success' : 'warning'} className="bg-slate-100 dark:bg-slate-800 text-slate-700 border-0 px-2 py-0.5 text-[9px] uppercase tracking-wider">v{plan.version}</Badge>
-                        {plan.isActive && <Badge variant="success" className="bg-emerald-100 text-emerald-800 border-0 px-2 py-0.5 text-[9px]">ativo</Badge>}
+                        {plan.isActive && <Badge variant="success" className="bg-[var(--tone-success-bg)] text-[var(--tone-success-text)] border-0 px-2 py-0.5 text-[9px]">ativo</Badge>}
                       </div>
                       <div className="mt-1 text-[11px] text-slate-500 line-clamp-2">{plan.description}</div>
                     </div>
                     <div className="text-right flex-shrink-0">
                       <div className="text-[11px] text-slate-500">preço base</div>
-                      <div className="font-mono font-black text-indigo-700">{plan.price > 0 ? `${plan.price.toLocaleString('pt-PT')} ${plan.currency}` : 'negociado'}</div>
+                      <div className="font-mono font-black text-[var(--tone-info-text)]">{plan.price > 0 ? `${plan.price.toLocaleString('pt-PT')} ${plan.currency}` : 'negociado'}</div>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-[11px]">
@@ -173,7 +173,7 @@ export const AdminPricingUsageGovernance: React.FC<AdminPricingUsageGovernancePr
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1">
                     {featuresForPlan(resolved, allFeatures).slice(0, 4).map((feature) => (
-                      <span key={feature.id} className="rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[9px] font-bold text-indigo-700">{feature.name}</span>
+                      <span key={feature.id} className="rounded-full border border-[var(--tone-info-border)] bg-[var(--tone-info-bg)] px-2 py-0.5 text-[9px] font-bold text-[var(--tone-info-text)]">{feature.name}</span>
                     ))}
                     {featureCount > 4 && <span className="text-[9px] text-slate-500 font-bold">+{featureCount - 4}</span>}
                   </div>
@@ -182,12 +182,12 @@ export const AdminPricingUsageGovernance: React.FC<AdminPricingUsageGovernancePr
             })}
           </div>
 
-          <div className="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-4 text-[11px] text-slate-700 flex flex-wrap items-start justify-between gap-3 shadow-sm">
+          <div className="rounded-2xl border border-[var(--tone-info-border)] bg-[var(--tone-info-bg)]/40 p-4 text-[11px] text-slate-700 flex flex-wrap items-start justify-between gap-3 shadow-sm">
             <div>
-              <span className="font-black text-indigo-800">Política dinâmica: </span>
+              <span className="font-black text-[var(--tone-info-text)]">Política dinâmica: </span>
               O catálogo de funcionalidades, os limites e as flags são editáveis pelo painel. O sistema aplica esses valores em concessão, consumo e alertas.
             </div>
-            <Badge variant="info" className="bg-indigo-100 text-indigo-800 border-0 px-3 py-1 text-[10px] font-black">v2 — Configuração</Badge>
+            <Badge variant="info" className="bg-[var(--tone-info-bg)] text-[var(--tone-info-text)] border-0 px-3 py-1 text-[10px] font-black">v2 — Configuração</Badge>
           </div>
         </div>
       )}
@@ -208,7 +208,7 @@ export const AdminPricingUsageGovernance: React.FC<AdminPricingUsageGovernancePr
                 <span className="inline-block h-2 w-2 rounded-full bg-amber-600" />
                 aviso {severityCounts.warning}
               </div>
-              <div className="flex items-center gap-1.5 text-[11px] font-bold text-red-700">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--tone-danger-text)]">
                 <span className="inline-block h-2 w-2 rounded-full bg-red-600" />
                 crítico {severityCounts.critical}
               </div>
@@ -220,24 +220,24 @@ export const AdminPricingUsageGovernance: React.FC<AdminPricingUsageGovernancePr
               Todos
             </Button>
             {(['info', 'warning', 'critical'] as const).map((sev) => (
-              <Button key={sev} type="button" size="sm" variant={usageFilter.severity === sev ? 'primary' : 'secondary'} onClick={() => setUsageFilter((prev) => ({ ...prev, severity: sev }))} className={sev === 'critical' ? 'rounded-xl bg-red-100 hover:bg-red-200 text-red-800' : 'rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700'}>
+              <Button key={sev} type="button" size="sm" variant={usageFilter.severity === sev ? 'primary' : 'secondary'} onClick={() => setUsageFilter((prev) => ({ ...prev, severity: sev }))} className={sev === 'critical' ? 'rounded-xl bg-[var(--tone-danger-bg)] hover:bg-red-200 text-[var(--tone-danger-text)]' : 'rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700'}>
                 {sev}
               </Button>
             ))}
           </div>
 
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm">
+          <div className="rounded-2xl border border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm">
             {filteredAlerts.length === 0 ? (
               <div className="p-4 text-center text-[11px] text-slate-500">
                 {paginatedBusinesses.length === 0 ? 'Nenhuma empresa nesta página.' : 'Nenhum alerta relevante nesta página com os filtros seleccionados.'}
               </div>
             ) : (
-              <div className="divide-y divide-slate-100 text-xs">
+              <div className="divide-y divide-[var(--color-border-subtle)] text-xs">
                 {filteredAlerts.map((alert) => (
                   <div key={alert.id} className="flex flex-wrap items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${alert.severity === 'critical' ? 'bg-red-100 text-red-800' : alert.severity === 'warning' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}`}>
+                        <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${alert.severity === 'critical' ? 'bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)]' : alert.severity === 'warning' ? 'bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)]' : 'bg-[var(--tone-info-bg)] text-[var(--tone-info-text)]'}`}>
                           {alert.severity}
                         </span>
                         <span className="font-bold text-slate-900">{alert.businessName}</span>
@@ -261,7 +261,7 @@ export const AdminPricingUsageGovernance: React.FC<AdminPricingUsageGovernancePr
                       <Badge variant={alert.tier === 'enterprise' ? 'success' : alert.tier === 'premium' ? 'info' : alert.tier === 'professional' ? 'neutral' : 'warning'} className="bg-slate-100 dark:bg-slate-800 text-slate-700 border-0 px-2 py-0.5 text-[9px] uppercase tracking-wider">
                         {alert.tier}
                       </Badge>
-                      {alert.acknowledged ? <span className="text-[9px] text-slate-400">lido</span> : <span className="text-[9px] text-red-700 font-bold">pendente</span>}
+                      {alert.acknowledged ? <span className="text-[9px] text-slate-400">lido</span> : <span className="text-[9px] text-[var(--tone-danger-text)] font-bold">pendente</span>}
                     </div>
                   </div>
                 ))}
@@ -286,15 +286,15 @@ export const AdminPricingUsageGovernance: React.FC<AdminPricingUsageGovernancePr
             <div className="flex items-center gap-2 text-[11px] text-slate-500">
               <span className="font-bold">{activeVersions.length} versão(ões)</span>
               <span className="text-slate-300">·</span>
-              <span className="font-bold text-indigo-700">{activePlans.length} planos</span>
+              <span className="font-bold text-[var(--tone-info-text)]">{activePlans.length} planos</span>
             </div>
           </div>
 
           {activeVersions.length === 0 ? (
             <EmptyState title="Sem histórico de versões" description="As versões aparecem quando um plano ou a configuração dinâmica é alterada." icon={<History className="h-6 w-6" />} />
           ) : (
-            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm">
-              <div className="divide-y divide-slate-100 text-xs">
+            <div className="rounded-2xl border border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm">
+              <div className="divide-y divide-[var(--color-border-subtle)] text-xs">
                 {versionPagination.pageItems.map((version) => {
                   const plan = activePlans.find((p) => p.id === version.planId);
                   return (
@@ -303,7 +303,7 @@ export const AdminPricingUsageGovernance: React.FC<AdminPricingUsageGovernancePr
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-black text-slate-900">{plan?.name ?? version.planId}</span>
                           <Badge variant={plan?.isActive ? 'success' : 'warning'} className="bg-slate-100 dark:bg-slate-800 text-slate-700 border-0 px-2 py-0.5 text-[9px] uppercase tracking-wider">v{version.version}</Badge>
-                          {plan?.isActive && <Badge variant="success" className="bg-emerald-100 text-emerald-800 border-0 px-2 py-0.5 text-[9px]">ativo</Badge>}
+                          {plan?.isActive && <Badge variant="success" className="bg-[var(--tone-success-bg)] text-[var(--tone-success-text)] border-0 px-2 py-0.5 text-[9px]">ativo</Badge>}
                         </div>
                         <div className="mt-1 text-[11px] text-slate-500">
                           {version.changedBy} · {new Date(version.changedAt).toLocaleString('pt-PT')} · política {version.changePolicy}
@@ -311,7 +311,7 @@ export const AdminPricingUsageGovernance: React.FC<AdminPricingUsageGovernancePr
                         {version.changes.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1">
                             {version.changes.slice(0, 6).map((change) => (
-                              <span key={change.field} className="rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 text-[9px] font-bold text-slate-700">
+                              <span key={change.field} className="rounded-full border border-[var(--color-border-default)] dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 text-[9px] font-bold text-slate-700">
                                 {change.field}: {JSON.stringify(change.oldValue).slice(0, 18)} → {JSON.stringify(change.newValue).slice(0, 18)}
                               </span>
                             ))}
@@ -321,7 +321,7 @@ export const AdminPricingUsageGovernance: React.FC<AdminPricingUsageGovernancePr
                       </div>
                       <div className="text-right flex-shrink-0">
                         <div className="text-[11px] text-slate-500">preço base</div>
-                        <div className="font-mono font-black text-indigo-700">
+                        <div className="font-mono font-black text-[var(--tone-info-text)]">
                           {plan && plan.price > 0 ? `${plan.price.toLocaleString('pt-PT')} ${plan.currency}` : 'negociado'}
                         </div>
                       </div>
@@ -333,12 +333,12 @@ export const AdminPricingUsageGovernance: React.FC<AdminPricingUsageGovernancePr
             </div>
           )}
 
-          <div className="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-4 text-[11px] text-slate-700 flex flex-wrap items-start justify-between gap-3 shadow-sm">
+          <div className="rounded-2xl border border-[var(--tone-info-border)] bg-[var(--tone-info-bg)]/40 p-4 text-[11px] text-slate-700 flex flex-wrap items-start justify-between gap-3 shadow-sm">
             <div>
-              <span className="font-black text-indigo-800">Versão contratual: </span>
+              <span className="font-black text-[var(--tone-info-text)]">Versão contratual: </span>
               Upgrade e downgrade são versionados. Assinaturas ativas não são reescritas automaticamente; a política aplica-se conforme configurado por plano.
             </div>
-            <Badge variant="info" className="bg-indigo-100 text-indigo-800 border-0 px-3 py-1 text-[10px] font-black">v2 — Versionamento</Badge>
+            <Badge variant="info" className="bg-[var(--tone-info-bg)] text-[var(--tone-info-text)] border-0 px-3 py-1 text-[10px] font-black">v2 — Versionamento</Badge>
           </div>
         </div>
       )}
@@ -347,12 +347,12 @@ export const AdminPricingUsageGovernance: React.FC<AdminPricingUsageGovernancePr
         <AdminFeatureCatalog currentLang={currentLang} />
       )}
 
-      <div className="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-4 text-[11px] text-slate-700 flex flex-wrap items-start justify-between gap-3 shadow-sm">
+      <div className="rounded-2xl border border-[var(--tone-info-border)] bg-[var(--tone-info-bg)]/40 p-4 text-[11px] text-slate-700 flex flex-wrap items-start justify-between gap-3 shadow-sm">
         <div>
-          <span className="font-black text-indigo-800">Governança de preços e uso: </span>
+          <span className="font-black text-[var(--tone-info-text)]">Governança de preços e uso: </span>
           A configuração dinâmica, os alertas, o versionamento e o catálogo formam um ciclo fechado. O sistema consome os valores definidos pelo painel e nunca os substitui por valores fixos.
         </div>
-        <Badge variant="info" className="bg-indigo-100 text-indigo-800 border-0 px-3 py-1 text-[10px] font-black">v2 — Pricing & Usage</Badge>
+        <Badge variant="info" className="bg-[var(--tone-info-bg)] text-[var(--tone-info-text)] border-0 px-3 py-1 text-[10px] font-black">v2 — Pricing & Usage</Badge>
       </div>
     </section>
   );

@@ -80,79 +80,77 @@ export const BusinessCard: React.FC<BusinessCardProps> = ({
     <Card interactive className="guigui-business-card group flex flex-col justify-between">
       {/* Cover Image & Badges */}
       <div className="relative w-full cursor-pointer" onClick={() => onSelect(business)}>
-        <div className="guigui-business-cover relative w-full h-[160px] overflow-hidden">
-        {hasCoverImage ? (
-          <img
-            src={business.coverImage}
-            alt={`Capa de ${business.name}`}
-            onError={() => setFailedCoverSource(business.coverImage)}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
-          <div
-            role="img"
-            aria-label={`Capa de ${business.name}`}
-            className="flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-950 via-emerald-800 to-teal-600 text-4xl font-black tracking-widest text-white/90"
-          >
-            {initials}
-          </div>
-        )}
-          <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-green-950)]/70 via-transparent to-transparent" />
-
-          {/* Tier / Highlight Badge — topo esquerdo */}
-          {(isEnterprise || isPremium) && (
-            <Badge variant={isEnterprise ? 'verified' : 'premium'} className="absolute top-4 left-4 shadow-lg uppercase tracking-wider">
-              <Sparkles className="w-3 h-3 text-gold-300" />
-              <span>{isEnterprise ? t('featured') : t('tierPremium')}</span>
-            </Badge>
-          )}
-
-          {/* Open/Closed Badge — topo direito */}
-          <Badge variant={business.isOpenNow ? 'success' : 'neutral'} className="absolute top-4 right-4 shadow-lg backdrop-blur-md">
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                business.isOpenNow ? 'bg-[var(--color-state-success)] animate-pulse' : 'bg-[var(--color-text-muted)]'
-              }`}
-            />
-            <span>{business.isOpenNow ? t('openNow') : t('closedNow')}</span>
-          </Badge>
-
-          {/* Active Promo Tag — canto inferior direito da capa */}
-          {hasActivePromo && (
-            <Badge variant="premium" className="absolute bottom-4 right-4 shadow-lg">
-              {t('activeOffer')}
-            </Badge>
-          )}
-
-          {/* Comparison Checkbox — canto inferior esquerdo da capa */}
-          {onToggleCompare && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleCompare(business);
-              }}
-              disabled={compareDisabled && !isCompared}
-              className={`absolute bottom-4 left-4 z-10 text-[11px] font-extrabold px-2.5 py-1 rounded-xl shadow-lg backdrop-blur-md flex items-center gap-1.5 transition ${
-                isCompared
-                  ? 'bg-[var(--color-blue-600)] text-white ring-2 ring-[var(--color-blue-400)]'
-                  : compareDisabled
-                  ? 'bg-[rgba(13,41,36,0.6)] text-[var(--color-text-muted)] cursor-not-allowed'
-                  : 'bg-[rgba(13,41,36,0.8)] text-white hover:bg-[var(--color-green-900)]'
-              }`}
-              title={isCompared ? t('removeFromComparison') : t('compareBusinesses')}
-              aria-label={isCompared ? t('removeFromComparison') : t('compareBusinesses')}
-            >
-              {isCompared ? (
-                <CheckSquare className="w-3.5 h-3.5 text-blue-300" />
-              ) : (
-                <Square className="w-3.5 h-3.5 text-slate-300" />
+        <div className="guigui-business-cover">
+          {/* Badges alinhados com a moldura, numa barra própria — nunca sobre a foto */}
+          <div className="guigui-business-cover-toolbar">
+            <div className="guigui-business-cover-tags">
+              {(isEnterprise || isPremium) && (
+                <Badge variant={isEnterprise ? 'verified' : 'premium'} className="gap-1.5 uppercase tracking-wider">
+                  <Sparkles className="w-3 h-3 text-gold-300" />
+                  <span>{isEnterprise ? t('featured') : t('tierPremium')}</span>
+                </Badge>
               )}
-              <span>{isCompared ? t('comparing') : t('compare')}</span>
-            </button>
+              {hasActivePromo && <Badge variant="premium">{t('activeOffer')}</Badge>}
+            </div>
+            <Badge variant={business.isOpenNow ? 'success' : 'neutral'} className="shrink-0 gap-1.5">
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  business.isOpenNow ? 'bg-[var(--color-state-success)] animate-pulse' : 'bg-[var(--color-text-muted)]'
+                }`}
+              />
+              <span>{business.isOpenNow ? t('openNow') : t('closedNow')}</span>
+            </Badge>
+          </div>
+
+          {/* Moldura da fotografia: a imagem cabe sempre inteira, sem cortes */}
+          <div className="guigui-business-cover-frame">
+            {hasCoverImage ? (
+              <img
+                src={business.coverImage}
+                alt={`Capa de ${business.name}`}
+                onError={() => setFailedCoverSource(business.coverImage)}
+              />
+            ) : (
+              <div
+                role="img"
+                aria-label={`Capa de ${business.name}`}
+                className="flex h-full w-full items-center justify-center rounded-xl bg-gradient-to-br from-emerald-950 via-emerald-800 to-teal-600 text-4xl font-black tracking-widest text-white/90"
+              >
+                {initials}
+              </div>
+            )}
+          </div>
+
+          {/* Comparison Checkbox — abaixo da moldura, alinhado com ela */}
+          {onToggleCompare && (
+            <div className="guigui-business-cover-footer">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleCompare(business);
+                }}
+                disabled={compareDisabled && !isCompared}
+                className={`text-[11px] font-extrabold px-2.5 py-1 rounded-xl flex items-center gap-1.5 transition ${
+                  isCompared
+                    ? 'bg-[var(--color-blue-600)] text-white ring-2 ring-[var(--color-blue-400)]'
+                    : compareDisabled
+                    ? 'bg-[var(--color-bg-strong)] text-[var(--color-text-muted)] cursor-not-allowed'
+                    : 'bg-[var(--color-bg-surface)] text-[var(--color-text-default)] border border-[var(--color-border-strong)] hover:bg-[var(--color-green-50)] hover:text-[var(--color-green-700)]'
+                }`}
+                title={isCompared ? t('removeFromComparison') : t('compareBusinesses')}
+                aria-label={isCompared ? t('removeFromComparison') : t('compareBusinesses')}
+              >
+                {isCompared ? (
+                  <CheckSquare className="w-3.5 h-3.5 text-white" />
+                ) : (
+                  <Square className="w-3.5 h-3.5 text-[var(--color-green-700)]" />
+                )}
+                <span>{isCompared ? t('comparing') : t('compare')}</span>
+              </button>
+            </div>
           )}
         </div>
-
       </div>
 
       {/* Card Content */}

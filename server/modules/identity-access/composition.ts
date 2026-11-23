@@ -103,6 +103,8 @@ export interface IdentityAccess {
   inspectTeamInvitation(token: string): ReturnType<typeof inspectTeamInvitation>;
   acceptTeamInvitation(input: AcceptTeamInvitationInput): Promise<AcceptTeamInvitationResult>;
   findById(userId: string): Promise<PublicIdentity | null>;
+  /** Necessário para distinguir destinatários internos de emails externos. */
+  findByEmail(email: string): Promise<PublicIdentity | null>;
 }
 
 function asPublicIdentity(account: IdentityAccount | null): PublicIdentity | null {
@@ -115,12 +117,21 @@ function asPublicIdentity(account: IdentityAccount | null): PublicIdentity | nul
   const sessions = createSessionRepository();
   const mfa = createMfaRepository();
   const jsonCredentials = createJsonCredentialRepository();
+  // Contas de demonstração não vivem na base de dados: a validação da
+  // palavra-passe atual precisa da palavra-passe com que a conta entra hoje.
+  const changeDemoPassword = (email: string, currentPassword: string, newPassword: string) => {
+    const demo = options.demoUsers.find((user) => user.email.toLowerCase() === email.trim().toLowerCase());
+    return jsonCredentials.changeDemoPassword
+      ? jsonCredentials.changeDemoPassword(email, currentPassword, newPassword, demo?.password)
+      : Promise.resolve(false);
+  };
   const credentials: IdentityCredentialRepository = options.databaseConfigured
     ? {
+      changeDemoPassword,
       createPasswordReset: jsonCredentials.createPasswordReset,
       resetPassword: jsonCredentials.resetPassword,
     }
-    : jsonCredentials;
+    : { ...jsonCredentials, changeDemoPassword };
   const invitations = createJsonTeamInvitationRepository();
   const invitationAccounts: IdentityAccountRepository = jsonAccounts;
 
@@ -194,5 +205,6 @@ function asPublicIdentity(account: IdentityAccount | null): PublicIdentity | nul
     inspectTeamInvitation: (token) => inspectTeamInvitation(token, invitationDependencies),
     acceptTeamInvitation: (input) => acceptTeamInvitation(input, invitationDependencies),
     findById: async (userId) => asPublicIdentity(await accounts.findById(userId)),
+    findByEmail: async (email) => asPublicIdentity(await accounts.findByEmail(email)),
   };
 }

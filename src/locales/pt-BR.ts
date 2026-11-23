@@ -629,6 +629,10 @@ const ptBR = {
   'business.VideoComercial': 'Vídeo Comercial',
   'business.periodoRelatorio': 'Período do relatório',
   'business.UltimosDias90': 'Últimos 90 dias',
+
+  'business.PeriodoEsteMes': 'Este mês',
+
+  'business.PeriodoEsteAno': 'Este ano',
   'business.AnoCorrente': 'Ano corrente',
   'business.TodoHistorico': 'Todo o histórico',
   'business.IntervaloPersonalizado': 'Intervalo personalizado',

@@ -49,6 +49,8 @@ function invitationDependencies(overrides: {
   const accounts: IdentityAccountRepository = {
     findByEmail: vi.fn(async () => overrides.existingAccount ?? null),
     findById: async () => null,
+    findByGoogleSubject: async () => null,
+    linkGoogleSubject: async () => true,
     create: vi.fn(async () => overrides.createdAccount ?? account),
     changePassword: async () => false,
     deactivate: async () => false,

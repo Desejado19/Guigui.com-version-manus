@@ -7,6 +7,16 @@ export default defineConfig(() => {
   const isProduction = process.env.NODE_ENV === 'production';
   return {
     plugins: [react(), tailwindcss()],
+    // O esbuild 0.28.2 marca o destructuring como não suportado no target
+    // `safari14` (na realidade o Safari suporta destructuring desde o 7.1) e
+    // aborta o `vite build` ao tentar transpilá-lo, algo que ainda não
+    // implementa. Declaramos o suporte real para evitar essa transformação
+    // impossível, sem alterar os targets de browser nem a versão do esbuild.
+    esbuild: {
+      supported: {
+        destructuring: true,
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
@@ -18,7 +28,13 @@ export default defineConfig(() => {
     server: {
       // Allowlist de hosts para desenvolvimento local autorizado.
       // Em produção o Vite não é utilizado (build servido pelo Express).
-      allowedHosts: (process.env.VITE_ALLOWED_HOSTS || 'localhost,127.0.0.1,::1')
+      // Inclui o domínio do túnel ngrok usado para aceder ao dev server fora da
+      // rede local. `allowedHosts: true` fica de fora de propósito: aceitar
+      // qualquer hostname anularia a proteção contra DNS rebinding.
+      allowedHosts: (
+        process.env.VITE_ALLOWED_HOSTS
+        || 'localhost,127.0.0.1,::1,nephew-monotype-surreal.ngrok-free.dev'
+      )
         .split(',')
         .map((host) => host.trim())
         .filter(Boolean),

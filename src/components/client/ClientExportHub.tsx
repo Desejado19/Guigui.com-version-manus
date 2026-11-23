@@ -10,6 +10,7 @@ import {
   FileSpreadsheet,
   FileText,
   Headphones,
+  History,
   Image as ImageIcon,
   Megaphone,
   MessageCircle,
@@ -21,6 +22,7 @@ import {
   Ticket,
   Users,
   Wallet,
+  X,
 } from 'lucide-react';
 import { usePostEngagementContext } from '../PostEngagementProvider';
 import type {
@@ -41,7 +43,14 @@ import type {
   UserProfile,
 } from '../../types';
 import { storyApi, type StoryApi } from '../../services/storyApi';
-import { downloadCSV, downloadExcel, downloadExcelWorkbook, downloadPDFReport } from '../../utils/exportHelpers';
+import {
+  downloadCSV,
+  downloadCSVWorkbook,
+  downloadExcel,
+  downloadExcelWorkbook,
+  downloadPDFReport,
+  triggerPrintReport,
+} from '../../utils/exportHelpers';
 import { readExportHistory, recordExportHistory, type ExportHistoryEntry } from '../../utils/exportHistory';
 import { getTranslation } from '../../utils/i18n';
 
@@ -254,10 +263,70 @@ function timestamp(value: string | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function withinPeriod(value: string | null | undefined, cutoff: number): boolean {
-  if (!cutoff) return true;
+export interface PeriodRange {
+  from: number;
+  to: number;
+}
+
+type PeriodPreset = '7days' | '30days' | '90days' | 'month' | 'year' | 'custom' | 'all';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// As etiquetas vêm das traduções: o painel da empresa é validado nos 4 idiomas
+// e nenhum literal português pode escapar para en/fr/es.
+const PERIOD_LABEL_KEYS: Record<PeriodPreset, string> = {
+  '7days': 'business.UltimosDias',
+  '30days': 'business.UltimosDias2',
+  '90days': 'business.UltimosDias90',
+  month: 'business.PeriodoEsteMes',
+  year: 'business.PeriodoEsteAno',
+  custom: 'business.IntervaloPersonalizado',
+  all: 'business.TodoHistorico',
+};
+
+function startOfDay(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+/** Traduz o período escolhido no intervalo usado por todos os conjuntos. */
+function buildPeriodRange(
+  preset: PeriodPreset,
+  customFrom: string,
+  customTo: string,
+  now: Date = new Date(),
+): PeriodRange | null {
+  const todayStart = startOfDay(now);
+  const todayEnd = todayStart + DAY_MS - 1;
+  switch (preset) {
+    case '7days':
+      return { from: todayEnd - 6 * DAY_MS, to: todayEnd };
+    case '30days':
+      return { from: todayEnd - 29 * DAY_MS, to: todayEnd };
+    case '90days':
+      return { from: todayEnd - 89 * DAY_MS, to: todayEnd };
+    case 'month':
+      return { from: new Date(now.getFullYear(), now.getMonth(), 1).getTime(), to: todayEnd };
+    case 'year':
+      return { from: new Date(now.getFullYear(), 0, 1).getTime(), to: todayEnd };
+    case 'custom': {
+      const fromMs = customFrom ? new Date(`${customFrom}T00:00:00`).getTime() : Number.NaN;
+      const toMs = customTo ? new Date(`${customTo}T23:59:59.999`).getTime() : Number.NaN;
+      if (!Number.isFinite(fromMs) && !Number.isFinite(toMs)) return null;
+      return {
+        from: Number.isFinite(fromMs) ? fromMs : 0,
+        to: Number.isFinite(toMs) ? toMs : todayEnd,
+      };
+    }
+    default:
+      return null;
+  }
+}
+
+function withinPeriod(value: string | null | undefined, range: PeriodRange | null): boolean {
+  if (!range) return true;
   const parsed = timestamp(value);
-  return parsed === 0 || parsed >= cutoff;
+  // Registos sem data legível continuam incluídos, como antes da reorganização.
+  return parsed === 0 || (parsed >= range.from && parsed <= range.to);
 }
 
 function formatDateValue(value: string | null | undefined): string {
@@ -295,7 +364,14 @@ export const ClientExportHub: React.FC<ClientExportHubProps> = ({
 }) => {
   const t = (key: string, variables?: Record<string, string | number>) =>
     getTranslation(currentLang, key, variables);
-  const [exportTimeframe, setExportTimeframe] = useState<'30days' | '90days' | 'year' | 'all'>('30days');
+  const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('30days');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [selectedArea, setSelectedArea] = useState<string>(DATASET_GROUPS[0].id);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [exportFormat, setExportFormat] = useState<ExportFormat>('excel');
+  const [lastExport, setLastExport] = useState<{ fileName: string; format: ExportFormat; records: number } | null>(null);
   const [query, setQuery] = useState('');
   const [orderStatus, setOrderStatus] = useState('all');
   const [orderType, setOrderType] = useState('all');
@@ -329,20 +405,13 @@ export const ClientExportHub: React.FC<ClientExportHubProps> = ({
     return () => { active = false; };
   }, [business.id]);
 
-  const now = new Date();
-  const yearStart = new Date(now.getFullYear(), 0, 1).getTime();
-  const exportCutoff = exportTimeframe === 'all'
-    ? 0
-    : exportTimeframe === 'year'
-      ? yearStart
-      : Date.now() - (exportTimeframe === '30days' ? 30 : 90) * 24 * 60 * 60 * 1000;
-  const timeframeLabel = exportTimeframe === '30days'
-    ? t('business.UltimosDias2')
-    : exportTimeframe === '90days'
-      ? t('business.UltimosDias90')
-      : exportTimeframe === 'year'
-        ? t('business.AnoCorrente')
-        : t('business.TodoHistorico');
+  const periodLabel = (preset: PeriodPreset) => t(PERIOD_LABEL_KEYS[preset]);
+  const periodRange = buildPeriodRange(periodPreset, customFrom, customTo);
+  const timeframeLabel = periodPreset === 'custom'
+    ? `Período personalizado (${customFrom || '—'} a ${customTo || '—'})`
+    : periodLabel(periodPreset);
+  const customPeriodInvalid = periodPreset === 'custom'
+    && (!customFrom || !customTo || new Date(customFrom).getTime() > new Date(customTo).getTime());
   const queryTerm = normalizeText(query);
 
   const myOrders = purchaseOrders.filter((order) => order.businessId === business.id);
@@ -350,7 +419,7 @@ export const ClientExportHub: React.FC<ClientExportHubProps> = ({
   const products = business.products || [];
 
   const filteredOrders = myOrders.filter((order) => (
-    withinPeriod(order.purchasedAt, exportCutoff)
+    withinPeriod(order.purchasedAt, periodRange)
     && (orderStatus === 'all' || order.status === orderStatus)
     && (orderType === 'all' || order.itemType === orderType)
     && matchesQuery(queryTerm, order.orderCode, order.id, order.customerName, order.customerPhone, order.itemTitle, order.holderName)
@@ -362,23 +431,23 @@ export const ClientExportHub: React.FC<ClientExportHubProps> = ({
   ));
   const postEngagement = usePostEngagementContext();
   const filteredPosts = business.posts.filter((post) => (
-    withinPeriod(post.publishedAt || post.createdAt, exportCutoff)
+    withinPeriod(post.publishedAt || post.createdAt, periodRange)
     && (postStatus === 'all' || post.status === postStatus)
     && matchesQuery(queryTerm, post.title, post.content, post.status)
   ));
   const filteredPromotions = business.promotions.filter((promotion) => (
-    withinPeriod(promotion.validUntil, exportCutoff)
+    withinPeriod(promotion.validUntil, periodRange)
     && (promotionStatus === 'all'
       || (promotionStatus === 'active' ? promotion.isActive : !promotion.isActive))
     && matchesQuery(queryTerm, promotion.title, promotion.description, promotion.code, promotion.discountBadge)
   ));
   const filteredReviews = business.reviews.filter((review) => (
-    withinPeriod(review.createdAt, exportCutoff)
+    withinPeriod(review.createdAt, periodRange)
     && (reviewStatus === 'all' || review.status === reviewStatus)
     && matchesQuery(queryTerm, review.authorName, review.comment, review.ownerReply)
   ));
   const filteredEvents = myEvents.filter((event) => (
-    withinPeriod(event.date, exportCutoff)
+    withinPeriod(event.date, periodRange)
     && (eventStatus === 'all' || event.status === eventStatus)
     && matchesQuery(queryTerm, event.title, event.location, event.neighborhood, event.category)
   ));
@@ -400,54 +469,54 @@ export const ClientExportHub: React.FC<ClientExportHubProps> = ({
   const myNotifications = notifications;
 
   const filteredConversations = myConversations.filter((conversation) => (
-    withinPeriod(conversation.updatedAt || conversation.createdAt, exportCutoff)
+    withinPeriod(conversation.updatedAt || conversation.createdAt, periodRange)
     && (conversationState !== 'unread' || conversation.unreadForBusiness)
     && (conversationState !== 'pinned' || conversation.pinned)
     && matchesQuery(queryTerm, conversation.subject, conversation.userName, conversation.lastMessage)
   ));
   const filteredMessages = myMessages.filter((message) => {
     const conversation = conversationById.get(message.conversationId);
-    return withinPeriod(message.createdAt, exportCutoff)
+    return withinPeriod(message.createdAt, periodRange)
       && (conversationState === 'all' || filteredConversations.some((item) => item.id === message.conversationId))
       && matchesQuery(queryTerm, message.text, message.senderName, conversation?.subject, message.attachmentName);
   });
   const filteredSupport = mySupportRequests.filter((request) => (
-    withinPeriod(request.updatedAt || request.createdAt, exportCutoff)
+    withinPeriod(request.updatedAt || request.createdAt, periodRange)
     && (supportStatus === 'all' || request.status === supportStatus)
     && (supportCategory === 'all' || (request.category || 'other') === supportCategory)
     && matchesQuery(queryTerm, request.subject, request.description, request.lastReply, request.category, request.status)
   ));
   const filteredCampaigns = myCampaigns.filter((campaign) => (
-    withinPeriod(campaign.startsAt || campaign.createdAt, exportCutoff)
+    withinPeriod(campaign.startsAt || campaign.createdAt, periodRange)
     && (campaignStatus === 'all' || campaign.status === campaignStatus)
     && matchesQuery(queryTerm, campaign.name, campaign.description, campaign.objective, campaign.channels.join(' '))
   ));
   const filteredSegments = mySegments.filter((segment) => (
-    withinPeriod(segment.createdAt, exportCutoff)
+    withinPeriod(segment.createdAt, periodRange)
     && matchesQuery(queryTerm, segment.name, segment.location, segment.interests.join(' '))
   ));
   const filteredAssets = myAssets.filter((asset) => (
-    withinPeriod(asset.createdAt, exportCutoff)
+    withinPeriod(asset.createdAt, periodRange)
     && (assetType === 'all' || asset.type === assetType)
     && matchesQuery(queryTerm, asset.name, asset.type, asset.url, asset.sourceId)
   ));
   const filteredScheduled = myScheduledItems.filter((item) => (
-    withinPeriod(item.scheduledAt || item.createdAt, exportCutoff)
+    withinPeriod(item.scheduledAt || item.createdAt, periodRange)
     && (scheduledStatus === 'all' || item.status === scheduledStatus)
     && matchesQuery(queryTerm, item.itemType, item.label, item.description, item.status, item.errorMessage)
   ));
   const filteredStories = myStories.filter((story) => (
-    withinPeriod(story.createdAt, exportCutoff)
+    withinPeriod(story.createdAt, periodRange)
     && (storyStatus === 'all' || story.status === storyStatus)
     && matchesQuery(queryTerm, story.caption, story.storyType, story.status, story.moderationStatus)
   ));
   const filteredAudit = teamAudit.filter((entry) => (
     entry.businessId === business.id
-    && withinPeriod(entry.createdAt, exportCutoff)
+    && withinPeriod(entry.createdAt, periodRange)
     && matchesQuery(queryTerm, entry.memberName, entry.action)
   ));
   const filteredNotifications = myNotifications.filter((notification) => (
-    withinPeriod(notification.createdAt, exportCutoff)
+    withinPeriod(notification.createdAt, periodRange)
     && (notificationRead === 'all' || (notificationRead === 'unread' ? !notification.read : notification.read))
     && matchesQuery(queryTerm, notification.title, notification.message, notification.category, notification.eventType)
   ));
@@ -892,7 +961,7 @@ export const ClientExportHub: React.FC<ClientExportHubProps> = ({
   };
 
   const subscriptionPaymentDate = business.subscriptionStartedAt || business.subscriptionRenewDate;
-  const includeSubscriptionPayment = Boolean(business.subscriptionPaymentId) && withinPeriod(subscriptionPaymentDate, exportCutoff);
+  const includeSubscriptionPayment = Boolean(business.subscriptionPaymentId) && withinPeriod(subscriptionPaymentDate, periodRange);
   const subscriptionPaymentAmount = subscriptionPlan?.price || 0;
   const paymentRows: ExportRow[] = [
     ...(includeSubscriptionPayment ? [[
@@ -1293,7 +1362,13 @@ export const ClientExportHub: React.FC<ClientExportHubProps> = ({
     return () => window.removeEventListener('guigui:export-history', refresh);
   }, [business.id]);
 
-  const logExport = (fileName: string, category: string, format: ExportFormat, records: number) => {
+  const logExport = (
+    fileName: string,
+    category: string,
+    format: ExportFormat,
+    records: number,
+    detail: string,
+  ) => {
     recordExportHistory(business.id, {
       fileName,
       category,
@@ -1301,41 +1376,148 @@ export const ClientExportHub: React.FC<ClientExportHubProps> = ({
       records,
       actor: currentUser?.name || currentUser?.email || business.name,
       status: 'completed',
-      detail: `${timeframeLabel} · ${category}`,
+      detail,
     });
   };
 
-  const exportDataset = (dataset: ExportDataset, format: ExportFormat) => {
-    logExport(`${dataset.filename}.${format === 'excel' ? 'xlsx' : format}`, dataset.group, format, dataset.rows.length);
-    if (format === 'pdf') {
+  const datasetByKey = new Map(datasets.map((entry) => [entry.dataset.key, entry]));
+  const selectedDatasets = selectedKeys
+    .map((key) => datasetByKey.get(key))
+    .filter((entry): entry is { dataset: ExportDataset; icon: React.ReactNode; accent: string } => Boolean(entry));
+  const previewRecords = selectedDatasets.reduce((sum, entry) => sum + entry.dataset.rows.length, 0);
+  const previewAreaLabels = DATASET_GROUPS
+    .filter((group) => selectedDatasets.some((entry) => entry.dataset.group === group.id))
+    .map((group) => group.label);
+
+  const filterDefinitions: FilterDefinition[] = [
+    { id: 'orderStatus', label: t('business.exportOrderStatusFilter'), value: orderStatus, onChange: setOrderStatus, options: ORDER_STATUS_OPTIONS },
+    { id: 'orderType', label: t('business.exportOrderTypeFilter'), value: orderType, onChange: setOrderType, options: ORDER_TYPE_OPTIONS },
+    { id: 'postStatus', label: t('business.exportPostStatusFilter'), value: postStatus, onChange: setPostStatus, options: POST_STATUS_OPTIONS },
+    { id: 'promotionStatus', label: t('business.exportPromotionStatusFilter'), value: promotionStatus, onChange: setPromotionStatus, options: [{ value: 'active', label: 'Ativas' }, { value: 'inactive', label: 'Inativas' }] },
+    { id: 'reviewStatus', label: t('business.exportReviewStatusFilter'), value: reviewStatus, onChange: setReviewStatus, options: REVIEW_STATUS_OPTIONS },
+    { id: 'eventStatus', label: t('business.exportEventStatusFilter'), value: eventStatus, onChange: setEventStatus, options: EVENT_STATUS_OPTIONS },
+    { id: 'teamStatus', label: t('business.exportTeamStatusFilter'), value: teamStatus, onChange: setTeamStatus, options: TEAM_STATUS_OPTIONS },
+    { id: 'catalogAvailability', label: t('business.exportCatalogAvailabilityFilter'), value: catalogAvailability, onChange: setCatalogAvailability, options: [{ value: 'available', label: t('business.exportCatalogAvailable') }, { value: 'unavailable', label: t('business.exportCatalogSoldOut') }] },
+    { id: 'customerType', label: 'Tipo de cliente', value: customerType, onChange: setCustomerType, options: CUSTOMER_TYPE_OPTIONS },
+    { id: 'ticketCredentialStatus', label: 'Estado do bilhete', value: ticketCredentialStatus, onChange: setTicketCredentialStatus, options: TICKET_CREDENTIAL_STATUS_OPTIONS },
+    { id: 'campaignStatus', label: 'Estado da campanha', value: campaignStatus, onChange: setCampaignStatus, options: CAMPAIGN_STATUS_OPTIONS },
+    { id: 'assetType', label: 'Tipo de ficheiro', value: assetType, onChange: setAssetType, options: ASSET_TYPE_OPTIONS },
+    { id: 'scheduledStatus', label: 'Estado do agendamento', value: scheduledStatus, onChange: setScheduledStatus, options: SCHEDULED_STATUS_OPTIONS },
+    { id: 'storyStatus', label: 'Estado da story', value: storyStatus, onChange: setStoryStatus, options: STORY_STATUS_OPTIONS },
+    { id: 'conversationState', label: 'Estado da conversa', value: conversationState, onChange: setConversationState, options: CONVERSATION_STATE_OPTIONS },
+    { id: 'supportStatus', label: 'Estado do suporte', value: supportStatus, onChange: setSupportStatus, options: SUPPORT_STATUS_OPTIONS },
+    { id: 'supportCategory', label: 'Categoria do suporte', value: supportCategory, onChange: setSupportCategory, options: SUPPORT_CATEGORY_OPTIONS },
+    { id: 'notificationRead', label: 'Estado da notificação', value: notificationRead, onChange: setNotificationRead, options: NOTIFICATION_READ_OPTIONS },
+  ];
+
+  const relevantFilterIds = new Set(selectedDatasets.flatMap((entry) => FILTERS_BY_DATASET[entry.dataset.key] || []));
+  const relevantFilters = filterDefinitions.filter((definition) => relevantFilterIds.has(definition.id));
+  const activeFilterLabels = [
+    ...filterDefinitions
+      .filter((definition) => definition.value !== 'all')
+      .map((definition) => {
+        const option = definition.options.find((candidate) => candidate.value === definition.value);
+        return `${definition.label}: ${option?.label || definition.value}`;
+      }),
+    ...(query.trim() ? [`Pesquisa: ${query.trim()}`] : []),
+  ];
+
+  const areaReports = datasets.filter((entry) => entry.dataset.group === selectedArea);
+  const selectedInArea = areaReports.filter((entry) => selectedKeys.includes(entry.dataset.key)).length;
+  const toggleDataset = (key: string) => {
+    setLastExport(null);
+    setSelectedKeys((current) => (
+      current.includes(key) ? current.filter((item) => item !== key) : [...current, key]
+    ));
+  };
+  const toggleAreaReports = () => {
+    const keys = areaReports.map((entry) => entry.dataset.key);
+    const allSelected = keys.every((key) => selectedKeys.includes(key));
+    setSelectedKeys((current) => (
+      allSelected
+        ? current.filter((key) => !keys.includes(key))
+        : Array.from(new Set([...current, ...keys]))
+    ));
+  };
+  const startWizard = () => {
+    setWizardOpen(true);
+    setLastExport(null);
+  };
+  const openHistory = () => {
+    document.getElementById('export-history')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const canFinish = selectedKeys.length > 0 && !customPeriodInvalid;
+
+  const generateExport = () => {
+    if (selectedDatasets.length === 0) return;
+    const fileBase = selectedDatasets.length === 1
+      ? selectedDatasets[0].dataset.filename
+      : `Guigui_Exportacao_${businessSlug}_${dateStamp}`;
+    const extension = exportFormat === 'excel' ? 'xlsx' : exportFormat;
+    const fileName = `${fileBase}.${extension}`;
+    const category = selectedDatasets.length === 1
+      ? selectedDatasets[0].dataset.title
+      : `${selectedDatasets.length} relatórios · ${previewAreaLabels.join(', ')}`;
+    const sheets = selectedDatasets.map((entry) => ({
+      title: entry.dataset.sheet,
+      headers: entry.dataset.headers,
+      rows: entry.dataset.rows,
+    }));
+
+    logExport(
+      fileName,
+      category,
+      exportFormat,
+      previewRecords,
+      [timeframeLabel, ...activeFilterLabels].join(' · '),
+    );
+
+    if (exportFormat === 'excel') {
+      if (selectedDatasets.length === 1) {
+        const dataset = selectedDatasets[0].dataset;
+        downloadExcel(dataset.filename, dataset.sheet, dataset.headers, dataset.rows);
+      } else {
+        downloadExcelWorkbook(fileBase, sheets);
+      }
+    } else if (exportFormat === 'csv') {
+      if (selectedDatasets.length === 1) {
+        const dataset = selectedDatasets[0].dataset;
+        downloadCSV(dataset.filename, dataset.headers, dataset.rows);
+      } else {
+        downloadCSVWorkbook(fileBase, sheets);
+      }
+    } else if (selectedDatasets.length === 1) {
+      const dataset = selectedDatasets[0].dataset;
       downloadPDFReport(
         dataset.title,
-        `${business.name} · ${dataset.description}`,
+        [
+          `${business.name} · ${dataset.description}`,
+          `Período: ${timeframeLabel}`,
+          `Filtros: ${activeFilterLabels.length > 0 ? activeFilterLabels.join(' · ') : 'Sem filtros adicionais'}`,
+          `Registos: ${dataset.rows.length}`,
+        ].join(' · '),
         dataset.kpis,
         dataset.headers,
         dataset.rows,
       );
-    } else if (format === 'excel') {
-      downloadExcel(dataset.filename, dataset.sheet, dataset.headers, dataset.rows);
     } else {
-      downloadCSV(dataset.filename, dataset.headers, dataset.rows);
+      triggerPrintReport(
+        `${business.name} · ${category}`,
+        buildMultiReportHtml({
+          businessName: business.name,
+          periodLabel: timeframeLabel,
+          filters: activeFilterLabels,
+          records: previewRecords,
+          sheets,
+        }),
+      );
     }
-  };
 
-  const downloadAll = () => {
-    logExport(`Guigui_Dados_Empresa_${businessSlug}_${dateStamp}.xlsx`, 'Todos os conjuntos', 'excel', totalRecords);
-    downloadExcelWorkbook(
-      `Guigui_Dados_Empresa_${businessSlug}_${dateStamp}`,
-      datasets.map(({ dataset }) => ({
-        title: dataset.sheet,
-        headers: dataset.headers,
-        rows: dataset.rows,
-      })),
-    );
+    setLastExport({ fileName, format: exportFormat, records: previewRecords });
+    setWizardOpen(false);
   };
 
   const resetFilters = () => {
-    setExportTimeframe('30days');
     setQuery('');
     setOrderStatus('all');
     setOrderType('all');
@@ -1357,12 +1539,9 @@ export const ClientExportHub: React.FC<ClientExportHubProps> = ({
     setNotificationRead('all');
   };
 
-  const filteredMarketplaceOrders = myOrders.filter((order) => order.itemType === 'product' || order.itemType === 'service');
-  const filteredTicketOrders = myOrders.filter((order) => order.itemType === 'ticket' || order.itemType === 'promotion');
-
   return (
     <div className="space-y-4">
-      <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel dark:bg-slate-800 shadow-[var(--shadow-xs)] space-y-2 p-3.5 sm:p-4">
+      <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel dark:bg-slate-800 shadow-[var(--shadow-xs)] space-y-3 p-3.5 sm:p-4">
         <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
           <Download className="h-3.5 w-3.5" />
           <span>{t('businessDataExport')}</span>
@@ -1371,173 +1550,393 @@ export const ClientExportHub: React.FC<ClientExportHubProps> = ({
         <p className="max-w-3xl text-xs leading-relaxed text-slate-600 dark:text-slate-300">
           {t('business.exportHubIntroBefore')} <strong>{business.name}</strong>{t('business.exportHubIntroAfter')}
         </p>
-      </div>
 
-      <section className="space-y-3 rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel p-4 shadow-[var(--shadow-xs)] dark:bg-slate-800 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <h4 className="text-sm font-black text-slate-900 dark:text-white">{t('business.exportFiltersTitle')}</h4>
-            <p className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">{t('business.exportFiltersHint')}</p>
+        <div className="grid gap-2.5 sm:grid-cols-3">
+          <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-white p-3 dark:border-slate-700 dark:bg-slate-900" data-testid="export-total-reports">
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Relatórios disponíveis</p>
+            <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white">{datasets.length}</p>
           </div>
-          <button
-            type="button"
-            onClick={resetFilters}
-            className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[10px] font-black text-slate-700 transition hover:border-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
-          >
-            {t('business.exportResetFilters')}
-          </button>
+          <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-white p-3 dark:border-slate-700 dark:bg-slate-900" data-testid="export-total-records">
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Registos disponíveis</p>
+            <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white">{totalRecords}</p>
+            <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400">{timeframeLabel}</p>
+          </div>
+          <div className="flex flex-col justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 dark:border-emerald-900 dark:bg-emerald-950/30">
+            <button
+              type="button"
+              onClick={startWizard}
+              data-testid="prepare-export"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white transition hover:bg-emerald-800"
+            >
+              <Download className="h-4 w-4" />
+              Preparar exportação
+            </button>
+            <button
+              type="button"
+              onClick={openHistory}
+              data-testid="open-export-history"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-3 py-1.5 text-[10px] font-black text-emerald-800 transition hover:border-emerald-500 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-200"
+            >
+              <History className="h-3.5 w-3.5" />
+              Histórico de exportações
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-          <label>
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('business.periodoRelatorio')}</span>
-            <select value={exportTimeframe} onChange={(event) => setExportTimeframe(event.target.value as typeof exportTimeframe)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-black text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white">
-              <option value="30days">{t('business.UltimosDias2')}</option>
-              <option value="90days">{t('business.UltimosDias90')}</option>
-              <option value="year">{t('business.AnoCorrente')}</option>
-              <option value="all">{t('business.TodoHistorico')}</option>
-            </select>
-          </label>
-          <label className="sm:col-span-2">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('business.exportSearchLabel')}</span>
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={t('business.exportSearchPlaceholder')}
-              className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-bold text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-            />
-          </label>
-          <div className="flex items-end">
-            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[9px] font-black text-emerald-800">
-              {timeframeLabel}
+        {lastExport && (
+          <div
+            className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100"
+            data-testid="export-confirmation"
+          >
+            <span>
+              Exportação concluída: <strong>{lastExport.fileName}</strong> · {lastExport.records} registo(s) · {lastExport.format.toUpperCase()}
             </span>
+            <button type="button" onClick={() => setLastExport(null)} className="text-emerald-700 dark:text-emerald-300" aria-label="Fechar confirmação">
+              <X className="h-4 w-4" />
+            </button>
           </div>
-          <FilterSelect label={t('business.exportOrderStatusFilter')} value={orderStatus} onChange={setOrderStatus} options={ORDER_STATUS_OPTIONS} allLabel={t('business.Todos')} />
-          <FilterSelect label={t('business.exportOrderTypeFilter')} value={orderType} onChange={setOrderType} options={ORDER_TYPE_OPTIONS} allLabel={t('business.Todos')} />
-          <FilterSelect label={t('business.exportPostStatusFilter')} value={postStatus} onChange={setPostStatus} options={POST_STATUS_OPTIONS} allLabel={t('business.Todos')} />
-          <FilterSelect label={t('business.exportPromotionStatusFilter')} value={promotionStatus} onChange={setPromotionStatus} options={[{ value: 'active', label: 'Ativas' }, { value: 'inactive', label: 'Inativas' }]} allLabel={t('business.Todos')} />
-          <FilterSelect label={t('business.exportReviewStatusFilter')} value={reviewStatus} onChange={setReviewStatus} options={REVIEW_STATUS_OPTIONS} allLabel={t('business.Todos')} />
-          <FilterSelect label={t('business.exportEventStatusFilter')} value={eventStatus} onChange={setEventStatus} options={EVENT_STATUS_OPTIONS} allLabel={t('business.Todos')} />
-          <FilterSelect label={t('business.exportTeamStatusFilter')} value={teamStatus} onChange={setTeamStatus} options={TEAM_STATUS_OPTIONS} allLabel={t('business.Todos')} />
-          <FilterSelect label={t('business.exportCatalogAvailabilityFilter')} value={catalogAvailability} onChange={setCatalogAvailability} options={[{ value: 'available', label: t('business.exportCatalogAvailable') }, { value: 'unavailable', label: t('business.exportCatalogSoldOut') }]} allLabel={t('business.Todos')} />
-          <FilterSelect label="Tipo de cliente" value={customerType} onChange={setCustomerType} options={CUSTOMER_TYPE_OPTIONS} allLabel={t('business.Todos')} />
-          <FilterSelect label="Estado do bilhete" value={ticketCredentialStatus} onChange={setTicketCredentialStatus} options={TICKET_CREDENTIAL_STATUS_OPTIONS} allLabel={t('business.Todos')} />
-          <FilterSelect label="Estado da campanha" value={campaignStatus} onChange={setCampaignStatus} options={CAMPAIGN_STATUS_OPTIONS} allLabel={t('business.Todos')} />
-          <FilterSelect label="Tipo de ficheiro" value={assetType} onChange={setAssetType} options={ASSET_TYPE_OPTIONS} allLabel={t('business.Todos')} />
-          <FilterSelect label="Estado do agendamento" value={scheduledStatus} onChange={setScheduledStatus} options={SCHEDULED_STATUS_OPTIONS} allLabel={t('business.Todos')} />
-          <FilterSelect label="Estado da story" value={storyStatus} onChange={setStoryStatus} options={STORY_STATUS_OPTIONS} allLabel={t('business.Todos')} />
-          <FilterSelect label="Estado da conversa" value={conversationState} onChange={setConversationState} options={CONVERSATION_STATE_OPTIONS} allLabel={t('business.Todos')} />
-          <FilterSelect label="Estado do suporte" value={supportStatus} onChange={setSupportStatus} options={SUPPORT_STATUS_OPTIONS} allLabel={t('business.Todos')} />
-          <FilterSelect label="Categoria do suporte" value={supportCategory} onChange={setSupportCategory} options={SUPPORT_CATEGORY_OPTIONS} allLabel={t('business.Todos')} />
-          <FilterSelect label="Estado da notificação" value={notificationRead} onChange={setNotificationRead} options={NOTIFICATION_READ_OPTIONS} allLabel={t('business.Todos')} />
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2">
-          <p className="text-[10px] font-bold text-emerald-900">
-            {t('business.exportRecords', { count: totalRecords })}
-          </p>
-          <button
-            type="button"
-            onClick={downloadAll}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2 text-[10px] font-black text-white transition hover:bg-emerald-800"
-          >
-            <FileSpreadsheet className="h-3.5 w-3.5" />
-            {t('business.exportFullWorkbook')}
-          </button>
-        </div>
-        <p className="text-[9px] text-slate-500 dark:text-slate-400">{t('business.exportFullWorkbookHint')}</p>
-      </section>
-
-      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-900 p-4 text-white shadow-sm sm:grid-cols-4 sm:p-5 dark:border-slate-700">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-wider text-blue-300">{t('business.PedidosNoAmbito')}</p>
-          <p className="mt-1 text-sm font-black">{filteredOrders.length}</p>
-        </div>
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-wider text-amber-300">{t('business.VolumeNoAmbito')}</p>
-          <p className="mt-1 text-sm font-black">{filteredOrders.reduce((total, order) => total + order.totalPriceXOF, 0).toLocaleString('pt-PT')} XOF</p>
-        </div>
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-wider text-emerald-300">Registos no âmbito</p>
-          <p className="mt-1 text-sm font-black">{totalRecords} registos · {datasets.filter(({ dataset }) => dataset.rows.length > 0).length}/{datasets.length} relatórios</p>
-        </div>
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-wider text-slate-300">{t('business.exportCompanyLabel')}</p>
-          <p className="mt-1 truncate text-sm font-black">{business.name}</p>
-        </div>
+        )}
       </div>
 
-      <div className="space-y-5">
-        {DATASET_GROUPS.map((group) => {
-          const groupDatasets = datasets.filter(({ dataset }) => dataset.group === group.id);
-          if (groupDatasets.length === 0) return null;
-          const groupRecords = groupDatasets.reduce((sum, { dataset }) => sum + dataset.rows.length, 0);
-          return (
-            <section key={group.id} className="space-y-2.5">
-              <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-[var(--color-border-subtle)] pb-2">
-                <div>
-                  <h4 className="text-sm font-black text-[var(--color-text-strong)]">{group.label}</h4>
-                  <p className="mt-0.5 text-[10px] text-[var(--color-text-muted)]">{group.hint}</p>
+      {wizardOpen && (
+        <section
+          className="space-y-3 rounded-[var(--radius-xl)] border-2 border-emerald-200 bg-[var(--color-bg-surface)] p-4 shadow-[var(--shadow-sm)] dark:border-emerald-800 dark:bg-slate-800 sm:p-5"
+          data-testid="export-wizard"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h4 className="text-sm font-black text-slate-900 dark:text-white">Preparar exportação</h4>
+              <p className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
+                Escolhe os dados, o período e o formato e gera o ficheiro — tudo no mesmo ecrã.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setWizardOpen(false)}
+              className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-border-default)] px-2 py-1 text-[10px] font-black text-slate-600 transition hover:border-slate-500 dark:border-slate-600 dark:text-slate-300"
+            >
+              <X className="h-3.5 w-3.5" /> Cancelar
+            </button>
+          </div>
+
+          {(
+            <div className="space-y-3" data-testid="wizard-step-1">
+              <p className="text-[10px] font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300">1. Dados a exportar</p>
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                <label>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Área</span>
+                  <select
+                    value={selectedArea}
+                    onChange={(event) => setSelectedArea(event.target.value)}
+                    data-testid="wizard-area"
+                    className="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-white px-2.5 py-2 text-xs font-black text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  >
+                    {DATASET_GROUPS.map((group) => (
+                      <option key={group.id} value={group.id}>{group.label}</option>
+                    ))}
+                  </select>
+                  <span className="mt-1 block text-[9px] text-slate-500 dark:text-slate-400">
+                    {DATASET_GROUPS.find((group) => group.id === selectedArea)?.hint}
+                  </span>
+                </label>
+                <div className="flex items-end justify-between gap-2 rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                  <p className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                    {selectedKeys.length} relatório(s) selecionado(s)
+                  </p>
+                  <button
+                    type="button"
+                    onClick={toggleAreaReports}
+                    data-testid="wizard-select-area"
+                    className="rounded-lg border border-[var(--color-border-default)] px-2 py-1 text-[9px] font-black text-slate-700 dark:border-slate-600 dark:text-slate-200"
+                  >
+                    {selectedInArea === areaReports.length ? 'Desmarcar área' : 'Selecionar área'}
+                  </button>
                 </div>
-                <span className="rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] px-2.5 py-1 text-[9px] font-black text-[var(--color-text-muted)]">
-                  {groupDatasets.length} relatório(s) · {groupRecords} registo(s)
-                </span>
               </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {groupDatasets.map(({ dataset, icon, accent }) => (
-                  <section key={dataset.key} className="flex flex-col justify-between gap-4 rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 shadow-[var(--shadow-xs)] transition hover:border-[var(--color-border-strong)] dark:bg-slate-800">
-                    <div className="space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl font-bold ${accent}`}>{icon}</div>
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9px] font-black text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                          {dataset.rows.length} registo(s)
+
+              <div className="grid gap-2 md:grid-cols-2">
+                {areaReports.map(({ dataset, icon, accent }) => {
+                  const checked = selectedKeys.includes(dataset.key);
+                  return (
+                    <label
+                      key={dataset.key}
+                      className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-2.5 transition ${
+                        checked
+                          ? 'border-emerald-500 bg-emerald-50/70 dark:border-emerald-700 dark:bg-emerald-950/30'
+                          : 'border-[var(--color-border-subtle)] bg-white hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleDataset(dataset.key)}
+                        data-testid={`wizard-report-${dataset.key}`}
+                        className="mt-0.5 h-4 w-4 accent-emerald-700"
+                      />
+                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${accent}`}>{icon}</span>
+                      <span className="min-w-0">
+                        <span className="block text-xs font-black text-slate-900 dark:text-white">{dataset.title}</span>
+                        <span className="mt-0.5 block text-[9px] font-bold text-slate-500 dark:text-slate-400">
+                          {dataset.rows.length} registo(s) · {timeframeLabel}
                         </span>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">{dataset.title}</h4>
-                        <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-300">{dataset.description}</p>
-                      </div>
-                      {dataset.rows.length === 0 && (
-                        <p className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[9px] font-bold text-amber-800">
-                          {t('business.exportEmpty')}
-                        </p>
-                      )}
-                    </div>
-                    <div className="space-y-2 border-t border-slate-100 pt-2 dark:border-slate-700">
-                      <div className="grid grid-cols-3 gap-1.5">
-                        <ExportButton format="pdf" disabled={dataset.rows.length === 0} onClick={() => exportDataset(dataset, 'pdf')} label="PDF" />
-                        <ExportButton format="excel" disabled={dataset.rows.length === 0} onClick={() => exportDataset(dataset, 'excel')} label="Excel" />
-                        <ExportButton format="csv" disabled={dataset.rows.length === 0} onClick={() => exportDataset(dataset, 'csv')} label="CSV" />
-                      </div>
-                    </div>
-                  </section>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {(
+            <div className="space-y-3" data-testid="wizard-step-2">
+              <p className="text-[10px] font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300">2. Período</p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {(Object.keys(PERIOD_LABEL_KEYS) as PeriodPreset[]).map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setPeriodPreset(preset)}
+                    data-testid={`wizard-period-${preset}`}
+                    className={`rounded-xl border px-2.5 py-2 text-[10px] font-black transition ${
+                      periodPreset === preset
+                        ? 'border-emerald-600 bg-emerald-700 text-white'
+                        : 'border-[var(--color-border-subtle)] bg-white text-slate-700 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200'
+                    }`}
+                  >
+                    {periodLabel(preset)}
+                  </button>
                 ))}
               </div>
-            </section>
-          );
-        })}
-      </div>
+              {periodPreset === 'custom' && (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Data inicial</span>
+                    <input
+                      type="date"
+                      value={customFrom}
+                      onChange={(event) => setCustomFrom(event.target.value)}
+                      data-testid="wizard-date-from"
+                      className="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-white px-2.5 py-2 text-xs font-bold text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                    />
+                  </label>
+                  <label>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Data final</span>
+                    <input
+                      type="date"
+                      value={customTo}
+                      onChange={(event) => setCustomTo(event.target.value)}
+                      data-testid="wizard-date-to"
+                      className="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-white px-2.5 py-2 text-xs font-bold text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                    />
+                  </label>
+                  {customPeriodInvalid && (
+                    <p className="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[10px] font-bold text-amber-800" data-testid="wizard-period-error">
+                      Indique a data inicial e a data final, com a data inicial anterior à final.
+                    </p>
+                  )}
+                </div>
+              )}
+              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400" data-testid="wizard-period-summary">
+                {timeframeLabel}
+              </p>
+            </div>
+          )}
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-white p-3 text-[10px] text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-          <strong className="font-black text-slate-900 dark:text-white">Pedidos de catálogo:</strong> {filteredMarketplaceOrders.length} pedido(s) de produtos ou serviços no período filtrado.
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-3 text-[10px] text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-          <strong className="font-black text-slate-900 dark:text-white">Bilhetes e promoções:</strong> {filteredTicketOrders.length} pedido(s) de bilhetes ou promoções no período filtrado.
-        </div>
-      </div>
+          {(
+            <div className="space-y-3" data-testid="wizard-step-3">
+              <p className="text-[10px] font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300">3. Pesquisa e filtros <span className="font-bold normal-case tracking-normal text-slate-500 dark:text-slate-400">(opcional)</span></p>
+              <label className="block">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('business.exportSearchLabel')}</span>
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={t('business.exportSearchPlaceholder')}
+                  data-testid="wizard-query"
+                  className="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-white px-2.5 py-2 text-xs font-bold text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                />
+              </label>
 
-      <section className="space-y-3 rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 shadow-[var(--shadow-xs)] dark:border-slate-700 dark:bg-slate-800 sm:p-5">
+              {relevantFilters.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-[var(--color-border-default)] bg-slate-50 p-3 text-[10px] font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+                  Os relatórios escolhidos não têm filtros próprios. Pode usar a pesquisa textual.
+                </p>
+              ) : (
+                <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                  {relevantFilters.map((definition) => (
+                    <FilterSelect
+                      key={definition.id}
+                      label={definition.label}
+                      value={definition.value}
+                      onChange={definition.onChange}
+                      options={definition.options}
+                      allLabel={t('business.Todos')}
+                      testId={`wizard-filter-${definition.id}`}
+                    />
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                <p className="text-[10px] font-bold text-slate-600 dark:text-slate-300" data-testid="wizard-filter-summary">
+                  {activeFilterLabels.length > 0 ? activeFilterLabels.join(' · ') : 'Sem filtros adicionais'}
+                </p>
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="rounded-lg border border-[var(--color-border-default)] px-2 py-1 text-[9px] font-black text-slate-700 dark:border-slate-600 dark:text-slate-200"
+                >
+                  {t('business.exportResetFilters')}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {(
+            <div className="space-y-2" data-testid="wizard-step-4">
+              <p className="text-[10px] font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300">4. Formato do ficheiro</p>
+              <div className="grid gap-2 sm:grid-cols-3">
+              {([
+                { format: 'pdf' as ExportFormat, title: 'PDF', hint: 'Documento pronto a imprimir ou arquivar.', icon: <Download className="h-4 w-4" /> },
+                { format: 'excel' as ExportFormat, title: 'Excel', hint: 'Livro com uma folha por relatório.', icon: <FileSpreadsheet className="h-4 w-4" /> },
+                { format: 'csv' as ExportFormat, title: 'CSV', hint: 'Texto separado por ponto e vírgula.', icon: <FileText className="h-4 w-4" /> },
+              ]).map((option) => (
+                <button
+                  key={option.format}
+                  type="button"
+                  onClick={() => setExportFormat(option.format)}
+                  data-testid={`wizard-format-${option.format}`}
+                  className={`flex items-start gap-2 rounded-xl border p-3 text-left transition ${
+                    exportFormat === option.format
+                      ? 'border-emerald-600 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950/30'
+                      : 'border-[var(--color-border-subtle)] bg-white hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900'
+                  }`}
+                >
+                  <span className={`mt-0.5 ${exportFormat === option.format ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-500 dark:text-slate-400'}`}>{option.icon}</span>
+                  <span>
+                    <span className="block text-xs font-black text-slate-900 dark:text-white">{option.title}</span>
+                    <span className="mt-0.5 block text-[9px] font-bold text-slate-500 dark:text-slate-400">{option.hint}</span>
+                  </span>
+                </button>
+              ))}
+              </div>
+            </div>
+          )}
+
+          {(
+            <div className="space-y-3" data-testid="wizard-step-5">
+              <p className="text-[10px] font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300">5. Revisão</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="rounded-xl border border-[var(--color-border-subtle)] bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Empresa</p>
+                  <p className="mt-0.5 text-xs font-black text-slate-900 dark:text-white" data-testid="preview-company">{business.name}</p>
+                </div>
+                <div className="rounded-xl border border-[var(--color-border-subtle)] bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Área e relatório</p>
+                  <p className="mt-0.5 text-xs font-black text-slate-900 dark:text-white" data-testid="preview-reports">
+                    {previewAreaLabels.join(', ')} · {selectedDatasets.map((entry) => entry.dataset.title).join(', ')}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-[var(--color-border-subtle)] bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Período</p>
+                  <p className="mt-0.5 text-xs font-black text-slate-900 dark:text-white" data-testid="preview-period">{timeframeLabel}</p>
+                </div>
+                <div className="rounded-xl border border-[var(--color-border-subtle)] bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Filtros</p>
+                  <p className="mt-0.5 text-xs font-black text-slate-900 dark:text-white" data-testid="preview-filters">
+                    {activeFilterLabels.length > 0 ? activeFilterLabels.join(' · ') : 'Sem filtros adicionais'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-[var(--color-border-subtle)] bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Quantidade de registos</p>
+                  <p className="mt-0.5 text-xs font-black text-slate-900 dark:text-white" data-testid="preview-records">
+                    {previewRecords} registo(s) em {selectedDatasets.length} relatório(s)
+                  </p>
+                </div>
+                <div className="rounded-xl border border-[var(--color-border-subtle)] bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Formato</p>
+                  <p className="mt-0.5 text-xs font-black text-slate-900 dark:text-white" data-testid="preview-format">
+                    {exportFormat === 'excel' ? 'Excel (.xlsx)' : exportFormat === 'csv' ? 'CSV (.csv)' : 'PDF'}
+                    {exportFormat === 'excel' && selectedDatasets.length > 1 ? ` · ${selectedDatasets.length} folhas` : ''}
+                  </p>
+                </div>
+              </div>
+              {selectedDatasets.some((entry) => entry.dataset.rows.length === 0) && (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[10px] font-bold text-amber-800">
+                  Um ou mais relatórios não têm registos neste âmbito; serão exportados apenas com cabeçalho.
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-border-subtle)] pt-3 dark:border-slate-700">
+            <p className="text-[10px] font-bold text-slate-600 dark:text-slate-300" data-testid="wizard-summary">
+              {selectedDatasets.length} relatório(s) · {previewRecords} registo(s) · {timeframeLabel} · {exportFormat === 'excel' ? 'Excel' : exportFormat === 'csv' ? 'CSV' : 'PDF'}
+              {customPeriodInvalid ? ' · período incompleto' : ''}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setWizardOpen(false)}
+                className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-border-default)] px-2.5 py-1.5 text-[10px] font-black text-slate-700 dark:border-slate-600 dark:text-slate-200"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={generateExport}
+                disabled={!canFinish}
+                data-testid="generate-export"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-1.5 text-[10px] font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Download className="h-3.5 w-3.5" /> Gerar exportação
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      <section className="space-y-2 rounded-2xl border border-[var(--color-border-subtle)] bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800" data-testid="report-overview">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h4 className="text-sm font-black text-slate-900 dark:text-white">Relatórios disponíveis</h4>
+          <span className="rounded-full border border-[var(--color-border-subtle)] bg-slate-50 px-2.5 py-1 text-[9px] font-black text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+            {datasets.length} relatórios · {totalRecords} registos
+          </span>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2">
+          {DATASET_GROUPS.map((group) => {
+            const groupDatasets = datasets.filter((entry) => entry.dataset.group === group.id);
+            if (groupDatasets.length === 0) return null;
+            return (
+              <div key={group.id} className="rounded-xl border border-slate-100 p-2.5 dark:border-slate-700">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">{group.label}</p>
+                <ul className="mt-1 space-y-0.5">
+                  {groupDatasets.map(({ dataset }) => (
+                    <li key={dataset.key} className="flex items-baseline justify-between gap-2 text-[10px] font-bold text-slate-700 dark:text-slate-200">
+                      <span className="truncate">{dataset.title}</span>
+                      <span className="shrink-0 text-slate-500">{dataset.rows.length}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-[9px] text-slate-500 dark:text-slate-400">
+          Os totais reflectem o período e os filtros actualmente aplicados. Cada exportação parte de «Preparar exportação».
+        </p>
+      </section>
+
+      <section id="export-history" className="space-y-3 rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 shadow-[var(--shadow-xs)] dark:border-slate-700 dark:bg-slate-800 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h4 className="text-sm font-black text-slate-900 dark:text-white">Histórico de exportações</h4>
             <p className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">Últimas operações desta empresa neste dispositivo. O acesso fica limitado à conta autenticada.</p>
           </div>
-          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9px] font-black text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">{history.length} registo(s)</span>
+          <span className="rounded-full border border-[var(--color-border-subtle)] bg-slate-50 px-2.5 py-1 text-[9px] font-black text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">{history.length} registo(s)</span>
         </div>
         {history.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-[11px] font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">Ainda não foram gerados ficheiros. Escolha um conjunto de dados e um formato para registar a primeira exportação.</p>
+          <p className="rounded-2xl border border-dashed border-[var(--color-border-default)] bg-slate-50 p-4 text-center text-[11px] font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">Ainda não foram gerados ficheiros. Escolha um conjunto de dados e um formato para registar a primeira exportação.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-[11px]" data-testid="export-history-table">
@@ -1577,42 +1976,84 @@ export const ClientExportHub: React.FC<ClientExportHubProps> = ({
   );
 };
 
+interface FilterDefinition {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+}
+
+/** Filtros que fazem sentido para cada um dos 24 conjuntos de dados. */
+const FILTERS_BY_DATASET: Record<string, string[]> = {
+  profile: [],
+  subscription: [],
+  metrics: [],
+  payments: [],
+  orders: ['orderStatus', 'orderType'],
+  customers: ['customerType'],
+  'issued-tickets': ['ticketCredentialStatus', 'eventStatus'],
+  catalog: ['catalogAvailability'],
+  posts: ['postStatus'],
+  promotions: ['promotionStatus'],
+  reviews: ['reviewStatus'],
+  events: ['eventStatus'],
+  'ticket-types': ['eventStatus'],
+  campaigns: ['campaignStatus'],
+  audiences: [],
+  assets: ['assetType'],
+  scheduled: ['scheduledStatus'],
+  stories: ['storyStatus'],
+  conversations: ['conversationState'],
+  messages: ['conversationState'],
+  support: ['supportCategory', 'supportStatus'],
+  team: ['teamStatus'],
+  'team-audit': [],
+  notifications: ['notificationRead'],
+};
+
+function buildMultiReportHtml(options: {
+  businessName: string;
+  periodLabel: string;
+  filters: string[];
+  records: number;
+  sheets: Array<{ title: string; headers: string[]; rows: Array<string | number>[] }>;
+}): string {
+  const summary = [
+    `<h1>${options.businessName}</h1>`,
+    `<p><strong>Período:</strong> ${options.periodLabel}</p>`,
+    `<p><strong>Filtros:</strong> ${options.filters.length > 0 ? options.filters.join(' · ') : 'Sem filtros adicionais'}</p>`,
+    `<p><strong>Total:</strong> ${options.records} registo(s) em ${options.sheets.length} relatório(s)</p>`,
+  ].join('');
+  const sections = options.sheets.map((sheet) => `
+    <h2>${sheet.title}</h2>
+    <p style="font-size: 11px; color: #5B6B67;">${sheet.rows.length} registo(s)</p>
+    <table>
+      <thead><tr>${sheet.headers.map((header) => `<th>${header}</th>`).join('')}</tr></thead>
+      <tbody>${sheet.rows.map((row) => `<tr>${row.map((cell) => `<td>${String(cell ?? '')}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table>
+  `).join('');
+  return `${summary}${sections}`;
+}
+
 const FilterSelect: React.FC<{
   label: string;
   value: string;
   onChange: (value: string) => void;
   options: Array<{ value: string; label: string }>;
   allLabel: string;
-}> = ({ label, value, onChange, options, allLabel }) => (
+  testId?: string;
+}> = ({ label, value, onChange, options, allLabel, testId }) => (
   <label>
     <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</span>
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-black text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+      data-testid={testId}
+      className="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-white px-2.5 py-2 text-xs font-black text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
     >
       <option value="all">{allLabel}</option>
       {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select>
   </label>
 );
-
-const ExportButton: React.FC<{
-  format: ExportFormat;
-  label: string;
-  disabled: boolean;
-  onClick: () => void;
-}> = ({ format, label, disabled, onClick }) => {
-  const Icon = format === 'pdf' ? Download : format === 'excel' ? FileSpreadsheet : FileText;
-  const tone = format === 'pdf'
-    ? 'bg-slate-900 text-white hover:bg-slate-800'
-    : format === 'excel'
-      ? 'bg-emerald-700 text-white hover:bg-emerald-800'
-      : 'border border-slate-300 bg-slate-50 text-slate-800 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100';
-  return (
-    <button type="button" disabled={disabled} onClick={onClick} className={`inline-flex items-center justify-center gap-1 rounded-lg px-1.5 py-2 text-[10px] font-black transition disabled:cursor-not-allowed disabled:opacity-40 ${tone}`}>
-      <Icon className="h-3 w-3" />
-      {label}
-    </button>
-  );
-};

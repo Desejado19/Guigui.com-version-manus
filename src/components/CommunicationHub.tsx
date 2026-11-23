@@ -1,5 +1,5 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
-import { LifeBuoy, MessageCircle, ShieldCheck, UserRound } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { LifeBuoy, Mail, MessageCircle, ShieldCheck, UserRound } from "lucide-react";
 import type {
   Business,
   Conversation,
@@ -26,6 +26,7 @@ import {
   NewSupportForm,
   SupportThread,
 } from "./communication/CommunicationPanels";
+import { ExternalEmailComposer } from "./communication/ExternalEmailComposer";
 
 export type CommunicationMode = "user" | "business";
 export type { ConversationFilter };
@@ -128,6 +129,7 @@ export const CommunicationHub: React.FC<CommunicationHubProps> = ({
   const [conversationInfoOpen, setConversationInfoOpen] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [mobilePane, setMobilePane] = useState<"list" | "thread">("list");
+  const [externalEmailOpen, setExternalEmailOpen] = useState(false);
   const threadEndRef = React.useRef<HTMLDivElement>(null);
 
   const scopedConversations = useMemo(
@@ -501,13 +503,25 @@ export const CommunicationHub: React.FC<CommunicationHubProps> = ({
               : t("messagesAndSupport")}
           </h2>
         </div>
-        <div className="guigui-communication-account">
-          <span className="guigui-communication-account-avatar" aria-hidden="true">
-            {accountInitials}
-          </span>
-          <span className="guigui-communication-account-name">
-            {currentUser.name}
-          </span>
+        <div className="guigui-communication-topbar-actions">
+          <button
+            type="button"
+            className="guigui-communication-external-email"
+            onClick={() => setExternalEmailOpen(true)}
+            aria-label="Escrever email externo"
+            title="Escrever email externo"
+          >
+            <Mail className="h-4 w-4" aria-hidden="true" />
+            <span>Email externo</span>
+          </button>
+          <div className="guigui-communication-account">
+            <span className="guigui-communication-account-avatar" aria-hidden="true">
+              {accountInitials}
+            </span>
+            <span className="guigui-communication-account-name">
+              {currentUser.name}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -680,6 +694,15 @@ export const CommunicationHub: React.FC<CommunicationHubProps> = ({
         supportInfoOpen={supportInfoOpen}
         setSupportInfoOpen={setSupportInfoOpen}
       />
+
+      {externalEmailOpen && (
+        <ExternalEmailComposer
+          variant="dialog"
+          senderEmail={currentUser.email}
+          roleLabel={mode === "business" ? "empresa" : "cidadão"}
+          onClose={() => setExternalEmailOpen(false)}
+        />
+      )}
     </section>
   );
 };

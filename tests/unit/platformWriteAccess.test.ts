@@ -79,6 +79,7 @@ describe('escrita de estado da plataforma', () => {
       'guigui_conversations',
       'guigui_conversation_messages',
       'guigui_support_requests',
+      'guigui_about_content',
     ];
     for (const key of PLATFORM_STATE_KEYS) {
       if (forbiddenForBusiness.includes(key)) {

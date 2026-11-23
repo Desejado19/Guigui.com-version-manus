@@ -93,8 +93,8 @@ export const TicketsManagementPage: React.FC<TicketsManagementPageProps> = ({ ev
         { key: 'typeName', label: 'Tipo de bilhete', render: (row) => <span className="font-bold text-slate-800">{row.typeName}</span> },
         { key: 'price', label: 'Preço', sortable: true, render: (row) => <span className="whitespace-nowrap tabular-nums">{row.priceXOF.toLocaleString('pt-PT')} XOF</span> },
         { key: 'sold', label: 'Vendidos', sortable: true, render: (row) => <span className="tabular-nums">{row.sold.toLocaleString('pt-PT')}</span> },
-        { key: 'available', label: 'Disponíveis', sortable: true, render: (row) => <span className={`tabular-nums font-bold ${row.available <= 0 ? 'text-rose-700' : 'text-slate-700'}`}>{row.available.toLocaleString('pt-PT')}</span> },
-        { key: 'revenue', label: 'Receita', sortable: true, render: (row) => <span className="whitespace-nowrap font-black tabular-nums text-emerald-800">{row.revenueXOF.toLocaleString('pt-PT')} XOF</span> },
+        { key: 'available', label: 'Disponíveis', sortable: true, render: (row) => <span className={`tabular-nums font-bold ${row.available <= 0 ? 'text-[var(--tone-danger-text)]' : 'text-slate-700'}`}>{row.available.toLocaleString('pt-PT')}</span> },
+        { key: 'revenue', label: 'Receita', sortable: true, render: (row) => <span className="whitespace-nowrap font-black tabular-nums text-[var(--tone-success-text)]">{row.revenueXOF.toLocaleString('pt-PT')} XOF</span> },
       ]}
       kpis={[
         { label: 'Tipos de bilhete', value: rows.length, tone: 'info' },

@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { databasePool } from './db';
 import { hashPassword } from './modules/identity-access';
+import { normaliseEmailForAccount } from '../shared/emailAddress';
 import {
   accessFromLegacyPermissions,
   legacyPermissionsFromAccess,
@@ -144,9 +145,10 @@ export type CreateCompanyMemberResult =
 
 export async function createCompanyMember(input: CreateCompanyMemberInput): Promise<CreateCompanyMemberResult> {
   const pool = requirePool();
-  const email = input.email.trim().toLowerCase();
+  const emailCheck = normaliseEmailForAccount(input.email);
+  const email = emailCheck.email ?? '';
   const name = input.name.trim();
-  if (!name || !email.includes('@')) return { kind: 'invalid', reason: 'Indique nome e e-mail válidos.' };
+  if (!name || !emailCheck.ok) return { kind: 'invalid', reason: 'Indique nome e e-mail válidos.' };
   if (input.password.length < 8) return { kind: 'invalid', reason: 'A palavra-passe inicial precisa de pelo menos 8 caracteres.' };
 
   const existing = await pool.query('SELECT id FROM users WHERE LOWER(email)=LOWER($1) LIMIT 1', [email]);
@@ -281,6 +283,32 @@ export async function listAccessActivity(companyId: string, limit = 50): Promise
   }));
 }
 
+/** Histórico das alterações de acesso da equipa administrativa. */
+export async function listAdminAccessActivity(limit = 50): Promise<AccessActivityEntry[]> {
+  const pool = requirePool();
+  const result = await pool.query(
+    `SELECT c.id, c.action, c.actor_user_id, c.target_user_id, c.created_at, c.scope,
+            actor.name AS actor_name, target.name AS target_name
+       FROM access_changes c
+       LEFT JOIN users actor ON actor.id = c.actor_user_id
+       LEFT JOIN users target ON target.id = c.target_user_id
+      WHERE c.scope = 'admin'
+      ORDER BY c.created_at DESC
+      LIMIT $1`,
+    [Math.min(Math.max(limit, 1), 200)],
+  );
+  return result.rows.map((row) => ({
+    id: String(row.id),
+    action: String(row.action),
+    actorUserId: row.actor_user_id ? String(row.actor_user_id) : null,
+    actorName: row.actor_name ? String(row.actor_name) : null,
+    targetUserId: row.target_user_id ? String(row.target_user_id) : null,
+    targetName: row.target_name ? String(row.target_name) : null,
+    createdAt: new Date(row.created_at).toISOString(),
+    scope: String(row.scope),
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // Equipa administrativa da plataforma
 // ---------------------------------------------------------------------------
@@ -334,8 +362,9 @@ export interface CreateAdminStaffInput {
 
 export async function createAdminStaff(input: CreateAdminStaffInput): Promise<CreateCompanyMemberResult & { staff?: AdminStaffView }> {
   const pool = requirePool();
-  const email = input.email.trim().toLowerCase();
-  if (!input.name.trim() || !email.includes('@')) return { kind: 'invalid', reason: 'Indique nome e e-mail válidos.' };
+  const emailCheck = normaliseEmailForAccount(input.email);
+  const email = emailCheck.email ?? '';
+  if (!input.name.trim() || !emailCheck.ok) return { kind: 'invalid', reason: 'Indique nome e e-mail válidos.' };
   if (input.password.length < 8) return { kind: 'invalid', reason: 'A palavra-passe inicial precisa de pelo menos 8 caracteres.' };
   const existing = await pool.query('SELECT id FROM users WHERE LOWER(email)=LOWER($1) LIMIT 1', [email]);
   if (existing.rowCount) return { kind: 'duplicate' };

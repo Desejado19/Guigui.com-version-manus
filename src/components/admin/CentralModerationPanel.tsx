@@ -55,14 +55,14 @@ const STATUS_LABELS: Record<SubmissionStatus, string> = {
 };
 
 const STATUS_STYLES: Record<SubmissionStatus, string> = {
-  draft: 'bg-slate-100 text-slate-700 border-slate-200',
-  pending: 'bg-amber-100 text-amber-800 border-amber-200',
-  in_review: 'bg-blue-100 text-blue-800 border-blue-200',
-  changes_requested: 'bg-orange-100 text-orange-800 border-orange-200',
-  resubmitted: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-  approved: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  rejected: 'bg-red-100 text-red-800 border-red-200',
-  cancelled: 'bg-slate-100 text-slate-600 border-slate-200',
+  draft: 'bg-slate-100 text-slate-700 border-[var(--color-border-default)]',
+  pending: 'bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)] border-[var(--tone-warning-border)]',
+  in_review: 'bg-[var(--tone-info-bg)] text-[var(--tone-info-text)] border-[var(--tone-info-border)]',
+  changes_requested: 'bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)] border-[var(--tone-warning-border)]',
+  resubmitted: 'bg-[var(--tone-info-bg)] text-[var(--tone-info-text)] border-[var(--tone-info-border)]',
+  approved: 'bg-[var(--tone-success-bg)] text-[var(--tone-success-text)] border-[var(--tone-success-border)]',
+  rejected: 'bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)] border-[var(--tone-danger-border)]',
+  cancelled: 'bg-slate-100 text-slate-600 border-[var(--color-border-default)]',
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -180,8 +180,8 @@ export const CentralModerationPanel: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3 dark:border-slate-800">
+      <div className="rounded-2xl border border-[var(--color-border-default)] bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border-subtle)] pb-3 dark:border-slate-800">
           <div>
             <span className="rounded bg-indigo-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
               Moderação centralizada
@@ -195,7 +195,7 @@ export const CentralModerationPanel: React.FC = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-bold text-amber-800">
+            <span className="rounded-xl border border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] px-3 py-1.5 text-[11px] font-bold text-[var(--tone-warning-text)]">
               {pendingTotal} a aguardar decisão
             </span>
             <button
@@ -280,17 +280,17 @@ export const CentralModerationPanel: React.FC = () => {
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-[11px] font-bold text-red-700">
+        <div className="flex items-center gap-2 rounded-2xl border border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] px-4 py-3 text-[11px] font-bold text-[var(--tone-danger-text)]">
           <AlertTriangle className="h-4 w-4" /> {error}
         </div>
       )}
       {notice && (
-        <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[11px] font-bold text-emerald-700">
+        <div className="flex items-center gap-2 rounded-2xl border border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] px-4 py-3 text-[11px] font-bold text-[var(--tone-success-text)]">
           <CheckCircle2 className="h-4 w-4" /> {notice}
         </div>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="overflow-hidden rounded-2xl border border-[var(--color-border-default)] bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {loading ? (
           <div className="flex items-center justify-center gap-2 p-8 text-xs font-bold text-slate-500">
             <Loader2 className="h-4 w-4 animate-spin" /> A carregar submissões…
@@ -302,14 +302,14 @@ export const CentralModerationPanel: React.FC = () => {
             <p>As submissões de eventos, empresas e conteúdos aparecem aqui automaticamente.</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          <div className="divide-y divide-[var(--color-border-subtle)] dark:divide-slate-800">
             {items.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => void openDetail(item)}
                 className={`flex w-full flex-wrap items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800 ${
-                  selected?.id === item.id ? 'bg-indigo-50 dark:bg-indigo-950/40' : ''
+                  selected?.id === item.id ? 'bg-[var(--tone-info-bg)] dark:bg-indigo-950/40' : ''
                 }`}
               >
                 <div className="min-w-0 flex-1">
@@ -321,7 +321,7 @@ export const CentralModerationPanel: React.FC = () => {
                       {TYPE_LABELS[item.type] || item.type}
                     </span>
                     {item.priority !== 'normal' && (
-                      <span className="rounded bg-red-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-red-700">
+                      <span className="rounded bg-[var(--tone-danger-bg)] px-1.5 py-0.5 text-[9px] font-black uppercase text-[var(--tone-danger-text)]">
                         {PRIORITY_LABELS[item.priority] || item.priority}
                       </span>
                     )}
@@ -339,8 +339,8 @@ export const CentralModerationPanel: React.FC = () => {
       </div>
 
       {selected && (
-        <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm dark:border-indigo-800 dark:bg-slate-900">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3 dark:border-slate-800">
+        <div className="rounded-2xl border border-[var(--tone-info-border)] bg-white p-5 shadow-sm dark:border-indigo-800 dark:bg-slate-900">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--color-border-subtle)] pb-3 dark:border-slate-800">
             <div>
               <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black ${STATUS_STYLES[selected.status]}`}>
                 {STATUS_LABELS[selected.status] || selected.status}
@@ -369,7 +369,7 @@ export const CentralModerationPanel: React.FC = () => {
               <p><strong>Última atualização:</strong> {formatDate(selected.updatedAt)}</p>
               {selected.decidedAt && <p><strong>Decidido em:</strong> {formatDate(selected.decidedAt)}</p>}
               {selected.decisionReason && (
-                <p className="rounded-xl border border-amber-200 bg-amber-50 p-2 text-amber-900">
+                <p className="rounded-xl border border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] p-2 text-[var(--tone-warning-text)]">
                   <strong>Motivo/observações:</strong> {selected.decisionReason}
                 </p>
               )}
@@ -388,7 +388,7 @@ export const CentralModerationPanel: React.FC = () => {
             <p className="mb-1 flex items-center gap-1 text-[10px] font-black uppercase tracking-wide text-slate-500">
               <Clock className="h-3 w-3" /> Histórico ({selected.history?.length ?? 0})
             </p>
-            <div className="max-h-44 space-y-1.5 overflow-auto rounded-xl border border-slate-200 p-2 dark:border-slate-700">
+            <div className="max-h-44 space-y-1.5 overflow-auto rounded-xl border border-[var(--color-border-default)] p-2 dark:border-slate-700">
               {(selected.history ?? []).map((entry) => (
                 <div key={entry.id} className="rounded-lg bg-slate-50 px-2 py-1.5 text-[10px] dark:bg-slate-800">
                   <p className="font-bold text-slate-800 dark:text-slate-100">
@@ -430,7 +430,7 @@ export const CentralModerationPanel: React.FC = () => {
                     type="button"
                     disabled={acting !== null}
                     onClick={() => void decide('in_review')}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-[11px] font-bold text-blue-800 disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--tone-info-border)] bg-[var(--tone-info-bg)] px-3 py-2 text-[11px] font-bold text-[var(--tone-info-text)] disabled:opacity-50"
                   >
                     {acting === 'in_review' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clock className="h-3.5 w-3.5" />}
                     Iniciar análise

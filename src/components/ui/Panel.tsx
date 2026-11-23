@@ -11,7 +11,7 @@ interface PanelProps extends React.HTMLAttributes<HTMLDivElement> {
  */
 export const Panel: React.FC<PanelProps> = ({ padding = 'compact', className = '', children, ...props }) => (
   <div
-    className={`rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 shadow-[var(--shadow-xs)] ${padding === 'compact' ? 'p-4 sm:p-5' : 'p-5 sm:p-6'} ${className}`}
+    className={`rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] shadow-[var(--shadow-xs)] ${padding === 'compact' ? 'p-4 sm:p-5' : 'p-5 sm:p-6'} ${className}`}
     {...props}
   >
     {children}

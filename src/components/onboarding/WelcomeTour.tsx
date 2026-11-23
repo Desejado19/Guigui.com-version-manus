@@ -20,7 +20,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react';
-import type { Language, UserRole } from '../../types';
+import type { BusinessTeamRole, Language, TeamModuleAccess, UserRole } from '../../types';
 import { getTranslation } from '../../utils/i18n';
 import {
   getTourSteps,
@@ -48,41 +48,58 @@ const ICONS: Record<TourIconKey, React.ComponentType<{ className?: string }>> = 
   settings: Settings,
 };
 
+const KICKER_KEYS = {
+  citizen: 'onboardingCitizenKicker',
+  business: 'onboardingBusinessKicker',
+  team: 'onboardingTeamKicker',
+  admin: 'onboardingAdminKicker',
+} as const;
+
 interface WelcomeTourProps {
   role: UserRole;
   userId: string | null | undefined;
   currentLang: Language;
+  /** Colaborador: o guia segue os módulos que lhe foram atribuídos. */
+  teamRole?: BusinessTeamRole | null;
+  teamAccess?: TeamModuleAccess | null;
 }
 
 /**
- * Guia de boas-vindas.
- *
- * Abre automaticamente na primeira utilização de cada conta, com um percurso
- * diferente para cidadãos e empresas. O progresso fica guardado por utilizador,
- * pelo que concluir ou saltar o guia impede que ele volte a aparecer sozinho —
- * mas o botão flutuante permite consultá-lo outra vez a qualquer momento.
+ * Guia de boas-vindas: um percurso por perfil (cidadão, empresa, colaborador ou
+ * administração), aberto uma vez por conta. O progresso fica em localStorage;
+ * o botão flutuante permite reabri-lo.
  */
-export const WelcomeTour: React.FC<WelcomeTourProps> = ({ role, userId, currentLang }) => {
+export const WelcomeTour: React.FC<WelcomeTourProps> = ({ role, userId, currentLang, teamRole, teamAccess }) => {
   const t = (key: string) => getTranslation(currentLang, key);
-  const steps = useMemo(() => getTourSteps(role), [role]);
+  const audience: 'citizen' | 'business' | 'team' | 'admin' = role === 'admin'
+    ? 'admin'
+    : role === 'business'
+      ? (teamRole ? 'team' : 'business')
+      : 'citizen';
+  const steps = useMemo(
+    () => getTourSteps(role, { teamRole, teamAccess }),
+    [role, teamRole, teamAccess],
+  );
+  // O progresso é por perfil: concluir o guia de cidadão não esconde o de empresa.
+  const stateId = userId ? `${userId}:${audience}` : null;
   const [open, setOpen] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
 
   // Estado inicial: só abre sozinho se a conta ainda não concluiu nem saltou.
   useEffect(() => {
-    if (!userId) {
+    if (!stateId) {
       setOpen(false);
       return;
     }
-    const stored = readTourState(userId);
+    const stored = readTourState(stateId);
     setStepIndex(stored?.step && stored.step < steps.length ? stored.step : 0);
-    setOpen(shouldAutoOpenTour(userId));
-  }, [userId, steps.length, role]);
+    setOpen(shouldAutoOpenTour(stateId));
+  }, [stateId, steps.length]);
 
   const persist = useCallback((status: 'in_progress' | 'completed' | 'skipped', index: number) => {
-    if (!userId) return;
-    writeTourState(userId, { status, step: index });
-  }, [userId]);
+    if (!stateId) return;
+    writeTourState(stateId, { status, step: index });
+  }, [stateId]);
 
   const goTo = useCallback((index: number) => {
     const clamped = Math.max(0, Math.min(steps.length - 1, index));
@@ -96,10 +113,10 @@ export const WelcomeTour: React.FC<WelcomeTourProps> = ({ role, userId, currentL
   }, [persist, stepIndex, steps.length]);
 
   const replay = useCallback(() => {
-    if (userId) resetTourState(userId);
+    if (stateId) resetTourState(stateId);
     setStepIndex(0);
     setOpen(true);
-  }, [userId]);
+  }, [stateId]);
 
   useEffect(() => {
     if (!open) return;
@@ -112,7 +129,7 @@ export const WelcomeTour: React.FC<WelcomeTourProps> = ({ role, userId, currentL
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [open, close, goTo, stepIndex]);
 
-  if (!userId || role === 'admin') return null;
+  if (!userId) return null;
 
   const step = steps[stepIndex];
   const Icon = ICONS[step.icon] ?? Sparkles;
@@ -136,7 +153,7 @@ export const WelcomeTour: React.FC<WelcomeTourProps> = ({ role, userId, currentL
 
       {open && (
         <div
-          className="fixed inset-0 z-[70] flex items-end justify-center bg-[var(--color-bg-canvas)]/55 p-3 backdrop-blur-sm sm:items-center sm:p-6"
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-[var(--color-bg-canvas)]/55 p-3 sm:items-center sm:p-6"
           role="dialog"
           aria-modal="true"
           aria-labelledby="welcome-tour-title"
@@ -151,7 +168,7 @@ export const WelcomeTour: React.FC<WelcomeTourProps> = ({ role, userId, currentL
             <div className="flex items-start justify-between gap-3 border-b border-[var(--color-border-subtle)] px-5 py-4">
               <div className="min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-green-700)]">
-                  {role === 'business' ? t('onboardingBusinessKicker') : t('onboardingCitizenKicker')}
+                  {t(KICKER_KEYS[audience])}
                 </p>
                 <p className="mt-1 text-[11px] font-bold text-[var(--color-text-muted)]">
                   {t('onboardingStepOf')

@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page } from './fixtures';
 
 /**
  * Feed + localizações + interações: 11 cenários exigidos.
@@ -10,7 +10,7 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 
 const CITIZEN = { email: 'cidadao.teste@guigui.com', password: 'Guigui@2026!' };
 const BUSINESS = { email: 'empresa.teste@guigui.com', password: 'Guigui@2026!' };
-const BASE_URL = `http://127.0.0.1:${process.env.PW_PORT?.trim() || '3000'}`;
+const BASE_URL = `http://localhost:${process.env.PW_PORT?.trim() || '3000'}`;
 
 async function login(request: APIRequestContext, account: { email: string; password: string }) {
   const response = await request.post('/api/auth/login', { data: account });
@@ -45,7 +45,10 @@ test.describe('Feed, localizações e interações', () => {
     expect(catalog.locations.length).toBeGreaterThanOrEqual(50);
     await page.goto('/');
     const dialog = await openFilter(page);
-    expect(await dialog.getByRole('option').count()).toBe(catalog.locations.length);
+    // A lista é preenchida a partir do catálogo já carregado; esperar pela
+    // primeira opção evita ler a contagem antes do render.
+    await expect(dialog.getByRole('option').first()).toBeVisible();
+    await expect.poll(async () => dialog.getByRole('option').count()).toBe(catalog.locations.length);
     await dialog.getByPlaceholder('Pesquisar bairro ou localidade...').fill('bandim');
     await expect(dialog.getByRole('option', { name: /Bandim/ })).toBeVisible();
     await dialog.getByPlaceholder('Pesquisar bairro ou localidade...').fill('Praca dos Herois');
@@ -176,7 +179,7 @@ test.describe('Feed, localizações e interações', () => {
 
     const foreign = await businessRequest.get('/api/businesses/seed-co-18/post-metrics');
     expect(foreign.status()).toBe(403);
-    expect((await foreign.json()).code).toBe('FORBIDDEN');
+    expect((await foreign.json()).code).toBe('BUSINESS_SCOPE_REQUIRED');
 
     const citizenRequest = await playwright.request.newContext({ baseURL: BASE_URL });
     await login(citizenRequest, CITIZEN);

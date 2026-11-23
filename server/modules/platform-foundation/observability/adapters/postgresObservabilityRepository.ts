@@ -16,7 +16,10 @@ export function createPostgresObservabilityRepository(
   return {
     async persistRequestMetric(route, statusCode, durationMs) {
       if (!queryPort) return;
-      await queryPort.query(
+      // Telemetria de plataforma (trilha de sistema, como a auditoria): o upsert
+      // exige visibilidade da linha em conflito, por isso corre como sistema.
+      const { withDbIdentity } = await import('../../../../db');
+      await withDbIdentity({ userId: '', role: 'anon', system: true }, () => queryPort.query(
         `INSERT INTO request_metrics (metric_date,route,request_count,error_count,total_duration_ms)
          VALUES (CURRENT_DATE,$1,1,$2,$3)
          ON CONFLICT (metric_date,route) DO UPDATE SET request_count=request_metrics.request_count+1,
@@ -28,7 +31,7 @@ export function createPostgresObservabilityRepository(
           statusCode >= 400 ? 1 : 0,
           Math.round(durationMs),
         ],
-      );
+      ));
     },
     async getDatabaseObservability() {
       if (!queryPort) return null;

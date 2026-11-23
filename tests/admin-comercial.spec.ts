@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 import dotenv from 'dotenv';
 import { Pool } from 'pg';
 
@@ -531,8 +531,8 @@ test('auditoria mostra alterações, versões e responsáveis', async ({ page })
 
 test('permissões: empresa não acede ao módulo comercial', async ({ page }) => {
   await signIn(page, BUSINESS_EMAIL);
-  const overview = await page.request.get(`${process.env.PW_PORT ? `http://127.0.0.1:${process.env.PW_PORT}` : 'http://127.0.0.1:3000'}/api/admin/commercial/overview`);
+  const overview = await page.request.get(`${process.env.PW_PORT ? `http://localhost:${process.env.PW_PORT}` : 'http://localhost:3000'}/api/admin/commercial/overview`);
   expect(overview.status()).toBe(403);
-  const mutation = await page.request.post(`${process.env.PW_PORT ? `http://127.0.0.1:${process.env.PW_PORT}` : 'http://127.0.0.1:3000'}/api/admin/commercial/plans`, { data: { name: 'Negado', code: 'negado' } });
+  const mutation = await page.request.post(`${process.env.PW_PORT ? `http://localhost:${process.env.PW_PORT}` : 'http://localhost:3000'}/api/admin/commercial/plans`, { data: { name: 'Negado', code: 'negado' } });
   expect(mutation.status()).toBe(403);
 });

@@ -124,7 +124,7 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({
       </div>
 
       {selectedStoryIndex !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
           <div className="relative w-full max-w-lg rounded-[28px] bg-white p-2 shadow-2xl dark:bg-slate-900">
             <button
               type="button"

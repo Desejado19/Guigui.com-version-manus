@@ -121,9 +121,9 @@ export const TransactionsManagementPage: React.FC<TransactionsManagementPageProp
         { key: 'amount', label: 'Montante', sortable: true, render: (transaction) => <span className="whitespace-nowrap font-black tabular-nums">{(transaction.amountXOF || 0).toLocaleString('pt-PT')} XOF</span> },
         { key: 'status', label: 'Estado', sortable: true, render: (transaction) => (
           <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-black ${
-            CONFIRMED_STATUSES.has(transaction.status) ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-              : String(transaction.status).startsWith('pending') ? 'border-amber-200 bg-amber-50 text-amber-800'
-                : 'border-rose-200 bg-rose-50 text-rose-800'
+            CONFIRMED_STATUSES.has(transaction.status) ? 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)]'
+              : String(transaction.status).startsWith('pending') ? 'border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)]'
+                : 'border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)]'
           }`}>{paymentStatusLabel(transaction)}</span>
         ) },
         { key: 'createdAt', label: 'Data', sortable: true, render: (transaction) => <span className="whitespace-nowrap">{formatManagementDate(transaction.createdAt)}</span> },

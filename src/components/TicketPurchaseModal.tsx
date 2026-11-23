@@ -176,7 +176,7 @@ export const TicketPurchaseModal: React.FC<TicketPurchaseModalProps> = ({
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60"
         onClick={onClose}
       />
 
@@ -238,7 +238,7 @@ export const TicketPurchaseModal: React.FC<TicketPurchaseModalProps> = ({
                 {event?.description || 'Descrição a confirmar com o organizador.'}
               </p>
 
-              <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3.5">
+              <div className="rounded-xl border border-[var(--color-border-subtle)] dark:border-slate-700 p-3.5">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-green-800 text-white flex items-center justify-center text-sm font-extrabold">
                     {event?.organizerName && String(event.organizerName).toUpperCase().slice(0, 2) || 'OE'}
@@ -250,7 +250,7 @@ export const TicketPurchaseModal: React.FC<TicketPurchaseModalProps> = ({
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3.5">
+              <div className="rounded-xl border border-[var(--color-border-subtle)] dark:border-slate-700 p-3.5">
                 <p className="text-sm font-extrabold text-slate-900 dark:text-white">Localização</p>
                 <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">{event?.location} ({event?.neighborhood || 'Todos'})</p>
                 <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event?.location || 'Espaço Manogai, Bissau')}`}
@@ -263,7 +263,7 @@ export const TicketPurchaseModal: React.FC<TicketPurchaseModalProps> = ({
             </div>
 
             {/* Coluna direita: bilhetes */}
-            <div className="lg:col-span-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+            <div className="lg:col-span-2 rounded-xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">Bilhetes</h2>
@@ -290,7 +290,7 @@ export const TicketPurchaseModal: React.FC<TicketPurchaseModalProps> = ({
                     type="button"
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
                     disabled={quantity <= 1}
-                    className="w-8 h-8 rounded-full border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 flex items-center justify-center text-sm font-bold hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-8 h-8 rounded-full border border-[var(--color-border-default)] dark:border-slate-600 text-slate-600 dark:text-slate-300 flex items-center justify-center text-sm font-bold hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label="Diminuir quantidade"
                   >
                     −
@@ -300,7 +300,7 @@ export const TicketPurchaseModal: React.FC<TicketPurchaseModalProps> = ({
                     type="button"
                     onClick={() => setQuantity(Math.min(maxQuantity, quantity + 1))}
                     disabled={quantity >= maxQuantity}
-                    className="w-8 h-8 rounded-full border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 flex items-center justify-center text-sm font-bold hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-8 h-8 rounded-full border border-[var(--color-border-default)] dark:border-slate-600 text-slate-600 dark:text-slate-300 flex items-center justify-center text-sm font-bold hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label="Aumentar quantidade"
                   >
                     +
@@ -308,7 +308,7 @@ export const TicketPurchaseModal: React.FC<TicketPurchaseModalProps> = ({
                 </div>
               </div>
 
-              <div className="mt-2 pt-3 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <div className="mt-2 pt-3 border-t border-[var(--color-border-subtle)] dark:border-slate-700 flex items-center justify-between">
                 <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Total</span>
                 <span className="text-sm font-extrabold text-slate-900 dark:text-white">—</span>
               </div>
@@ -328,7 +328,7 @@ export const TicketPurchaseModal: React.FC<TicketPurchaseModalProps> = ({
           </div>
 
           {/* Formulário de compra completo (compra efetiva, sessão pré-autenticada) */}
-          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4 space-y-3">
+          <div className="rounded-xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4 space-y-3">
             <p className="text-sm font-bold text-slate-900 dark:text-white">Dados do comprador</p>
             <p className="text-xs text-slate-600 dark:text-slate-300">Preenche os dados para confirmar a compra.</p>
             <div className="mt-2 grid grid-cols-2 gap-3">

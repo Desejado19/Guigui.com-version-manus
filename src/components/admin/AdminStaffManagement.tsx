@@ -301,28 +301,28 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
         );
       case 'moderator':
         return (
-          <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200 inline-flex items-center gap-1">
+          <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)] border border-[var(--tone-warning-border)] inline-flex items-center gap-1">
             <Shield className="w-3 h-3 text-amber-500" />
             Moderador IA
           </span>
         );
       case 'finance_manager':
         return (
-          <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+          <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-[var(--tone-success-bg)] text-[var(--tone-success-text)] border border-[var(--tone-success-border)] inline-flex items-center gap-1">
             <Shield className="w-3 h-3 text-emerald-600" />
             Gestor Financeiro
           </span>
         );
       case 'support_agent':
         return (
-          <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-1">
+          <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-[var(--tone-info-bg)] text-[var(--tone-info-text)] border border-[var(--tone-info-border)] inline-flex items-center gap-1">
             <Users className="w-3 h-3 text-blue-600" />
             Suporte Bissau
           </span>
         );
       case 'events_coordinator':
         return (
-          <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-purple-50 text-purple-700 border border-purple-200 inline-flex items-center gap-1">
+          <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-[var(--tone-info-bg)] text-[var(--tone-info-text)] border border-[var(--tone-info-border)] inline-flex items-center gap-1">
             <UserCheck className="w-3 h-3 text-purple-600" />
             Coord. Eventos
           </span>
@@ -334,21 +334,21 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
     switch (status) {
       case 'active':
         return (
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[var(--tone-success-bg)] text-[var(--tone-success-text)] flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             Ativo
           </span>
         );
       case 'suspended':
         return (
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 flex items-center gap-1">
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)] flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
             Suspenso
           </span>
         );
       case 'revoked':
         return (
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-red-800 flex items-center gap-1">
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)] flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
             Revogado
           </span>
@@ -438,7 +438,7 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={`${t('search')}...`}
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-700 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
         </div>
 
@@ -447,7 +447,7 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
           <select
             value={selectedDept}
             onChange={(e) => setSelectedDept(e.target.value)}
-            className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 focus:outline-none"
+            className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 focus:outline-none"
           >
 
             <option value="Diretoria Executiva">Diretoria Executiva</option>
@@ -460,7 +460,7 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 focus:outline-none"
+            className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 focus:outline-none"
           >
 
             <option value="active">Apenas Ativos</option>
@@ -475,7 +475,7 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 dark:border-slate-700 text-slate-500 font-extrabold uppercase text-[10px]">
+              <tr className="bg-slate-50/80 border-b border-[var(--color-border-default)] dark:border-slate-700 text-slate-500 font-extrabold uppercase text-[10px]">
                 <th className="py-3.5 px-4">Administrador / Funcionário</th>
                 <th className="py-3.5 px-4">Departamento</th>
                 <th className="py-3.5 px-4">Nível de Acesso</th>
@@ -486,7 +486,7 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
                 <th className="py-3.5 px-4 text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
+            <tbody className="divide-y divide-[var(--color-border-subtle)] font-medium text-slate-800">
               {filteredStaff.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-8 text-center text-slate-400">
@@ -501,7 +501,7 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
                         <img
                           src={staff.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
                           alt={staff.name}
-                          className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                          className="w-9 h-9 rounded-full object-cover border border-[var(--color-border-default)] dark:border-slate-700 shrink-0"
                         />
                         <div>
                           <div className="font-extrabold text-slate-900 flex items-center gap-1.5">
@@ -544,22 +544,22 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
                           </span>
                         )}
                         {staff.permissions.contentModeration && (
-                          <span className="text-[9px] bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded font-bold">
+                          <span className="text-[9px] bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)] px-1.5 py-0.5 rounded font-bold">
                             Moderação IA
                           </span>
                         )}
                         {staff.permissions.financialAudit && (
-                          <span className="text-[9px] bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
+                          <span className="text-[9px] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)] px-1.5 py-0.5 rounded font-bold">
                             Finanças
                           </span>
                         )}
                         {staff.permissions.viewAuditLogs && (
-                          <span className="text-[9px] bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded font-bold">
+                          <span className="text-[9px] bg-[var(--tone-info-bg)] text-[var(--tone-info-text)] px-1.5 py-0.5 rounded font-bold">
                             {t('admin.auditLogs')}
                           </span>
                         )}
                         {staff.permissions.manageAdmins && (
-                          <span className="text-[9px] bg-purple-50 text-purple-800 px-1.5 py-0.5 rounded font-bold">
+                          <span className="text-[9px] bg-[var(--tone-info-bg)] text-[var(--tone-info-text)] px-1.5 py-0.5 rounded font-bold">
                             Gestão Admins
                           </span>
                         )}
@@ -568,12 +568,12 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
 
                     <td className="py-3.5 px-4">
                       {staff.twoFactorEnabled ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-[var(--tone-success-bg)] px-2 py-0.5 rounded-full border border-[var(--tone-success-border)]">
                           <CheckCircle2 className="w-3 h-3" />
                           Ativo (SMS/App)
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-[var(--tone-warning-bg)] px-2 py-0.5 rounded-full border border-[var(--tone-warning-border)]">
                           <AlertTriangle className="w-3 h-3" />
                           Pendente
                         </span>
@@ -603,8 +603,8 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
                           onClick={() => handleToggleStatus(staff)}
                           className={`p-1.5 rounded-lg transition ${
                             staff.status === 'active'
-                              ? 'hover:bg-amber-50 text-slate-600 hover:text-amber-700'
-                              : 'hover:bg-emerald-50 text-slate-600 hover:text-emerald-700'
+                              ? 'hover:bg-[var(--tone-warning-bg)] text-slate-600 hover:text-[var(--tone-warning-text)]'
+                              : 'hover:bg-[var(--tone-success-bg)] text-slate-600 hover:text-[var(--tone-success-text)]'
                           }`}
                           title={staff.status === 'active' ? 'Suspender Acesso' : 'Reativar Acesso'}
                         >
@@ -618,7 +618,7 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
                         {staff.accessLevel !== 'super_admin' && (
                           <button type="button"
                             onClick={() => setRevokeModalStaff(staff)}
-                            className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition"
+                            className="p-1.5 hover:bg-[var(--tone-danger-bg)] text-slate-400 hover:text-red-600 rounded-lg transition"
                             title="Revogar Acesso Definitivamente"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -645,9 +645,9 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
 
       {/* Modal: Criar / Editar Administrador */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/70 z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center justify-between border-b border-[var(--color-border-subtle)] pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black">
                   <UserPlus className="w-5 h-5" />
@@ -692,8 +692,8 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
                       onClick={() => handleAccessLevelPreset(preset.id as AdminAccessLevel)}
                       className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition ${
                         formAccessLevel === preset.id
-                          ? 'border-emerald-600 bg-emerald-50 text-emerald-800 font-extrabold shadow-xs'
-                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 hover:bg-slate-50'
+                          ? 'border-emerald-600 bg-[var(--tone-success-bg)] text-[var(--tone-success-text)] font-extrabold shadow-xs'
+                          : 'border-[var(--color-border-default)] dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 hover:bg-slate-50'
                       }`}
                     >
                       <preset.icon className="w-3.5 h-3.5 shrink-0" />
@@ -713,7 +713,7 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
                     placeholder={t('name')}
-                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>
 
@@ -725,7 +725,7 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
                     value={formEmail}
                     onChange={(e) => setFormEmail(e.target.value)}
                     placeholder={t('email')}
-                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>
 
@@ -737,7 +737,7 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
                     value={formPhone}
                     onChange={(e) => setFormPhone(e.target.value)}
                     placeholder={t('phone')}
-                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>
 
@@ -746,7 +746,7 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
                   <select
                     value={formDepartment}
                     onChange={(e) => setFormDepartment(e.target.value as AdminDepartment)}
-                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-bold"
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-bold"
                   >
                     <option value="Diretoria Executiva">Diretoria Executiva</option>
                     <option value="Moderação & Conteúdo">Moderação & Conteúdo</option>
@@ -759,7 +759,7 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
               </div>
 
               {/* Matriz de Permissões Granulares */}
-              <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2">
+              <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-[var(--color-border-default)] dark:border-slate-700 space-y-2">
                 <div className="font-extrabold text-slate-900 uppercase text-[10px] tracking-wider mb-2">
                   Permissões Granulares de Acesso:
                 </div>
@@ -776,7 +776,7 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
                   ].map((perm) => (
                     <label
                       key={perm.key}
-                      className="flex items-center gap-2 p-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 cursor-pointer hover:bg-slate-100/60"
+                      className="flex items-center gap-2 p-2 bg-white dark:bg-slate-900 rounded-xl border border-[var(--color-border-default)]/80 cursor-pointer hover:bg-slate-100/60"
                     >
                       <input
                         type="checkbox"
@@ -795,7 +795,7 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--color-border-subtle)]">
                 <button
                   type="button"
                   onClick={() => {
@@ -821,9 +821,9 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
 
       {/* Modal: Revogar Acesso com Confirmação */}
       {revokeModalStaff && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/70 z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
-            <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+            <div className="w-12 h-12 rounded-2xl bg-[var(--tone-danger-bg)] text-red-600 flex items-center justify-center mx-auto">
               <ShieldAlert className="w-6 h-6" />
             </div>
 
@@ -844,7 +844,7 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
                 value={revokeReason}
                 onChange={(e) => setRevokeReason(e.target.value)}
                 rows={2}
-                className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500"
+                className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-700 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500"
               />
             </div>
 

@@ -7,7 +7,7 @@ import { defineConfig, devices } from '@playwright/test';
  * falhavam por causa do sítio errado, não do código.
  */
 const webPort = process.env.PW_PORT?.trim() || '3000';
-const baseURL = `http://127.0.0.1:${webPort}`;
+const baseURL = `http://localhost:${webPort}`;
 
 export default defineConfig({
   testDir: './tests',

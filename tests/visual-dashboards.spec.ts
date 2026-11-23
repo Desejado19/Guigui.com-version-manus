@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 type Language = 'pt' | 'en' | 'fr' | 'es';
 type Role = 'user' | 'business' | 'admin';

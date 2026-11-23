@@ -57,7 +57,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
           <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
             {this.props.area ? t('errorScreenWithArea').replace('{area}', this.props.area) : t('errorScreenBody')}
           </p>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500">
+          <p className="text-[11px] text-slate-500 dark:text-slate-500">
             {t('errorScreenCode')}: {error.name}
           </p>
         </div>
@@ -72,7 +72,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
           <button
             type="button"
             onClick={() => window.location.assign('/')}
-            className="inline-flex min-h-11 items-center rounded-xl border border-slate-300 dark:border-slate-600 bg-white px-4 text-sm font-black text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            className="inline-flex min-h-11 items-center rounded-xl border border-[var(--color-border-default)] dark:border-slate-600 bg-white px-4 text-sm font-black text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
           >
             {t('backHome')}
           </button>

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const deliveryMocks = vi.hoisted(() => ({
-  legacyEmailSend: vi.fn(),
   legacySmsSend: vi.fn(),
   emailSendTicketPurchase: vi.fn(),
   emailSendTeamInvitation: vi.fn(),
@@ -9,10 +8,6 @@ const deliveryMocks = vi.hoisted(() => ({
   persistPostgresNotification: vi.fn(),
 }));
 
-vi.mock('../../server/emailService', () => ({
-  EmailServiceNotConfiguredError: class EmailServiceNotConfiguredError extends Error {},
-  sendTicketPurchaseEmail: deliveryMocks.legacyEmailSend,
-}));
 vi.mock('../../server/smsGatewayService', () => ({
   sendSms: deliveryMocks.legacySmsSend,
   normaliseMsisdn: (phone: string) => `+245${phone.replace(/\D/g, '').slice(-9)}`,
@@ -67,7 +62,6 @@ describe('confirmed ticket purchase delivery', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.resetAllMocks();
-    deliveryMocks.legacyEmailSend.mockResolvedValue(undefined);
     deliveryMocks.legacySmsSend.mockResolvedValue({ state: 'accepted', mode: 'sandbox' });
     deliveryMocks.persistPostgresNotification.mockResolvedValue(undefined);
   });
@@ -107,7 +101,6 @@ describe('confirmed ticket purchase delivery', () => {
       text: expect.stringContaining('GUI-3'),
     }));
     expect(deliveryMocks.smsSend.mock.calls[1][0].text).toContain('1234');
-    expect(deliveryMocks.legacyEmailSend).not.toHaveBeenCalled();
     expect(deliveryMocks.legacySmsSend).not.toHaveBeenCalled();
     expect(result).toEqual({
       email: { state: 'simulated', reference: 'SIM-EMAIL-TICKET-txn-1' },

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 const openFilter = async (page: import('@playwright/test').Page) => {
   await page.getByRole('button', { name: /filtrar por localização/i }).first().click();
@@ -25,8 +25,9 @@ test.describe('Catálogo e filtro de localidades de Bissau', () => {
     const catalog = await (await request.get('/api/locations')).json();
     await page.goto('/');
     const dialog = await openFilter(page);
-    const rendered = await dialog.getByRole('option').count();
-    expect(rendered).toBe(catalog.locations.length);
+    // O catálogo chega de forma assíncrona: esperar pela primeira opção.
+    await expect(dialog.getByRole('option').first()).toBeVisible();
+    await expect.poll(async () => dialog.getByRole('option').count()).toBe(catalog.locations.length);
     await expect(dialog.getByText(catalog.groups[0].sector, { exact: true })).toBeVisible();
   });
 

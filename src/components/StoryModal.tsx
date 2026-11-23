@@ -439,7 +439,7 @@ export const StoryModal: React.FC<StoryModalProps> = ({
               const counts = pollCounts[element.id] || element.pollCounts || [];
               const total = counts.reduce((sum, value) => sum + value, 0);
               return (
-                <div key={element.id} style={positionStyle(element)} className={`${className} w-[78%] bg-slate-950/85 p-3 backdrop-blur`}>
+                <div key={element.id} style={positionStyle(element)} className={`${className} w-[78%] bg-slate-950/85 p-3`}>
                   <p className="mb-2 text-center text-xs font-black">{String(content.question || '')}</p>
                   <div className="space-y-1.5">
                     {options.map((option, index) => {
@@ -458,7 +458,7 @@ export const StoryModal: React.FC<StoryModalProps> = ({
             }
             if (element.type === 'question') {
               return (
-                <form key={element.id} style={positionStyle(element)} className={`${className} w-[78%] bg-slate-950/85 p-3 backdrop-blur`} onSubmit={(event) => { event.preventDefault(); void answerQuestion(element.id); }}>
+                <form key={element.id} style={positionStyle(element)} className={`${className} w-[78%] bg-slate-950/85 p-3`} onSubmit={(event) => { event.preventDefault(); void answerQuestion(element.id); }}>
                   <p className="mb-2 text-center text-xs font-black">{String(content.question || 'Pergunta')}</p>
                   {questionSent[element.id] ? <p className="text-center text-[11px] font-bold text-emerald-300">Resposta enviada <Check className="inline h-3 w-3" /></p> : (
                     <div className="flex gap-1.5">
@@ -505,7 +505,7 @@ export const StoryModal: React.FC<StoryModalProps> = ({
         {/* Legenda */}
         {story.caption && (
           <div className="absolute bottom-24 left-4 right-4 z-30 text-center">
-            <p className="inline-block rounded-xl bg-black/40 px-3 py-1.5 text-xs font-semibold leading-snug text-white backdrop-blur">{story.caption}</p>
+            <p className="inline-block rounded-xl bg-black/40 px-3 py-1.5 text-xs font-semibold leading-snug text-white">{story.caption}</p>
           </div>
         )}
 
@@ -513,7 +513,7 @@ export const StoryModal: React.FC<StoryModalProps> = ({
         <div className="absolute bottom-3 left-3 right-3 z-40 space-y-2">
           {notice && <div className="rounded-xl bg-black/70 px-3 py-2 text-center text-[10px] font-bold text-white">{notice}</div>}
           <div className="flex items-center gap-2">
-            <div className="flex min-w-0 flex-1 items-center rounded-full border border-white/30 bg-black/35 backdrop-blur">
+            <div className="flex min-w-0 flex-1 items-center rounded-full border border-white/30 bg-black/35">
               <input
                 value={replyText}
                 onChange={(event) => setReplyText(event.target.value)}
@@ -526,14 +526,14 @@ export const StoryModal: React.FC<StoryModalProps> = ({
               />
               <button type="button" onClick={() => void sendReply()} className="mr-1 flex h-8 w-8 items-center justify-center rounded-full text-white hover:bg-white/10" aria-label="Enviar resposta"><Send className="h-4 w-4" /></button>
             </div>
-            <button type="button" onClick={() => void toggleLike()} className={`flex h-10 w-10 items-center justify-center rounded-full border backdrop-blur ${liked ? 'border-rose-400 bg-rose-500/30 text-rose-300' : 'border-white/30 bg-black/35 text-white'}`} aria-label={liked ? 'Remover gosto' : 'Gostar'} aria-pressed={liked}>
+            <button type="button" onClick={() => void toggleLike()} className={`flex h-10 w-10 items-center justify-center rounded-full border ${liked ? 'border-rose-400 bg-rose-500/30 text-rose-300' : 'border-white/30 bg-black/35 text-white'}`} aria-label={liked ? 'Remover gosto' : 'Gostar'} aria-pressed={liked}>
               <Heart className={`h-5 w-5 ${liked ? 'fill-current' : ''}`} />
             </button>
-            <button type="button" onClick={() => setShowReactions((value) => !value)} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/35 text-lg backdrop-blur" aria-label="Reagir com emoji">{reaction || '😊'}</button>
-            <button type="button" onClick={() => void share()} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/35 text-white backdrop-blur" aria-label="Partilhar story"><Share2 className="h-4 w-4" /></button>
+            <button type="button" onClick={() => setShowReactions((value) => !value)} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/35 text-lg" aria-label="Reagir com emoji">{reaction || '😊'}</button>
+            <button type="button" onClick={() => void share()} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/35 text-white" aria-label="Partilhar story"><Share2 className="h-4 w-4" /></button>
           </div>
           {showReactions && (
-            <div className="flex items-center justify-center gap-1 rounded-full bg-black/75 p-1.5 backdrop-blur">
+            <div className="flex items-center justify-center gap-1 rounded-full bg-black/75 p-1.5">
               {REACTIONS.map((emoji) => <button key={emoji} type="button" onClick={() => void sendReaction(emoji)} className="rounded-full px-2 py-1 text-lg transition hover:scale-125">{emoji}</button>)}
             </div>
           )}
@@ -544,7 +544,7 @@ export const StoryModal: React.FC<StoryModalProps> = ({
         </div>
 
         {menuOpen && (
-          <div className="absolute right-3 top-20 z-50 w-56 overflow-hidden rounded-2xl border border-white/15 bg-slate-950/95 py-1 text-xs text-white shadow-2xl backdrop-blur">
+          <div className="absolute right-3 top-20 z-50 w-56 overflow-hidden rounded-2xl border border-white/15 bg-slate-950/95 py-1 text-xs text-white shadow-2xl">
             <button type="button" onClick={() => void share()} className="flex w-full items-center gap-2 px-3 py-2.5 text-left hover:bg-white/10"><Link2 className="h-4 w-4" /> Copiar ligação</button>
             {isOwner && <button type="button" onClick={() => { setMenuOpen(false); void openStats(); }} className="flex w-full items-center gap-2 px-3 py-2.5 text-left hover:bg-white/10"><BarChart3 className="h-4 w-4" /> Estatísticas {loadingStats ? '...' : ''}</button>}
             {currentUser && !isOwner && (

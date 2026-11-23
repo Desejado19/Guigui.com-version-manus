@@ -79,8 +79,8 @@ export const CommercialTicketFeesPage: React.FC<{ onBack: () => void }> = ({ onB
       {notice && <CommercialMessage tone="success">{notice}</CommercialMessage>}
       {loading ? <CommercialLoading /> : (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-          <section className="rounded-2xl border border-[#e6dac8] bg-white p-4 shadow-sm lg:col-span-2">
-            <div className="flex items-center gap-2"><Ticket className="h-4 w-4 text-[#123e3b]" /><h3 className="text-[13px] font-black text-slate-900">Parâmetros atuais</h3></div>
+          <section className="rounded-2xl border border-[var(--color-border-default)] bg-white p-4 shadow-sm lg:col-span-2">
+            <div className="flex items-center gap-2"><Ticket className="h-4 w-4 text-[var(--color-green-800)]" /><h3 className="text-[13px] font-black text-slate-900">Parâmetros atuais</h3></div>
             <p className="mt-1 text-[10px] text-slate-500">Os valores existentes de 10% e 200 XOF são mantidos como configuração inicial e só mudam quando guardados aqui.</p>
             <form onSubmit={(event) => void save(event)} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <CommercialField label="Comissão percentual (%)"><input type="number" min={0} max={100} step={0.5} className={commercialInputClass} value={form.commissionPercentage} onChange={(event) => setForm({ ...form, commissionPercentage: Math.min(100, Math.max(0, Number(event.target.value) || 0)) })} /></CommercialField>
@@ -93,13 +93,13 @@ export const CommercialTicketFeesPage: React.FC<{ onBack: () => void }> = ({ onB
               <CommercialField label="Motivo da alteração" className="sm:col-span-2"><input className={commercialInputClass} value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} placeholder="Registado na auditoria" /></CommercialField>
               <div className="sm:col-span-2 flex justify-end"><ManagementActionButton type="submit" tone="primary" disabled={busy}>{busy ? 'A guardar…' : 'Guardar taxas'}</ManagementActionButton></div>
             </form>
-            <div className="mt-4 rounded-xl border border-[#cfe2df] bg-[#f3faf8] p-3 text-[10px] leading-relaxed text-[#123e3b]">
+            <div className="mt-4 rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] p-3 text-[10px] leading-relaxed text-[var(--color-green-800)]">
               Exemplo: um bilhete de 2 500 XOF gera {formatCommercialXOF(Math.round(2500 * form.commissionPercentage / 100) + form.fixedFeeXOF)} de taxa com os valores acima. A receita das subscrições é contabilizada noutro módulo.
             </div>
           </section>
-          <section className="rounded-2xl border border-[#e6dac8] bg-white p-4 shadow-sm">
+          <section className="rounded-2xl border border-[var(--color-border-default)] bg-white p-4 shadow-sm">
             <div className="flex items-center gap-2"><History className="h-4 w-4 text-slate-600" /><h3 className="text-[13px] font-black text-slate-900">Histórico de taxas</h3></div>
-            <div className="mt-2 max-h-[420px] divide-y divide-slate-100 overflow-y-auto">
+            <div className="mt-2 max-h-[420px] divide-y divide-[var(--color-border-subtle)] overflow-y-auto">
               {ticket?.history.map((entry) => <div key={entry.id} className="py-2 text-[10px]"><div className="flex items-center justify-between gap-2"><strong>v{entry.version}</strong><span className="text-slate-500">{formatCommercialDate(entry.createdAt, true)}</span></div><div className="text-slate-600">{entry.reason || 'Alteração das taxas'}</div><div className="text-[9px] text-slate-500">{entry.changedBy}</div></div>)}
               {(!ticket?.history || ticket.history.length === 0) && <p className="py-6 text-center text-[10.5px] text-slate-500">Sem histórico registado.</p>}
             </div>

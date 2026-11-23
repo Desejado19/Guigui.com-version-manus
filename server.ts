@@ -31,6 +31,9 @@ import {
   type PublicIdentity,
 } from './server/modules/identity-access';
 import { createGoogleIdTokenVerifier } from './server/modules/identity-access/infrastructure/googleIdTokenVerifier';
+import { createGoogleOAuthRouter } from './server/googleOAuthRoutes';
+import { normaliseAndValidateEmail, normaliseEmailForAccount } from './shared/emailAddress';
+import { evaluatePassword } from './shared/passwordPolicy';
 import { loadJson, saveJson } from './server/runtimeStore';
 import { createPaymentAdapters } from './server/paymentService';
 import { localizeApiPayload, resolveRequestLanguage } from './server/i18n';
@@ -48,6 +51,7 @@ import {
   createCompanyMember,
   findCompanyMember,
   listAccessActivity,
+  listAdminAccessActivity,
   listAdminStaff,
   listCompanyMembers,
   recordAccessChange,
@@ -56,6 +60,17 @@ import {
   updateAdminStaff,
   updateCompanyMember,
 } from './server/teamAccessService';
+import {
+  acceptTeamInvitation,
+  createTeamInvitationRecord,
+  inspectTeamInvitation,
+  invitationModuleSummary,
+  invitationRoleLabel,
+  listTeamInvitations,
+  markInvitationSent,
+  resendTeamInvitation,
+  revokeTeamInvitation,
+} from './server/teamInvitationService';
 import { addSubscriptionPeriod } from './src/utils/subscriptions';
 import { checkDatabaseConnection, databaseConfigured, databasePool } from './server/db';
 import {
@@ -108,12 +123,15 @@ import {
 } from './server/commercialAdminService';
 import { createCategoryRouter } from './server/categoryRoutes';
 import { createStoryRouter } from './server/storyRoutes';
+import { readFile } from 'node:fs/promises';
+import { injectInstitutionalMeta, registerInstitutionalRoutes } from './server/institutional/routes';
+import { createInstitutionalRepository } from './server/institutional/repository';
 import { createHealthHandler } from './server/modules/platform-foundation/http/healthHandler';
 import { createHttpCompressionMiddleware } from './server/httpCompression';
 import { loadPlatformRuntimeConfig } from './server/modules/platform-foundation/config/platformRuntimeConfig';
 import { BUSINESS_ROLE_PERMISSIONS } from './src/utils/businessPermissions';
 import { activatePostgresTicketReservations, findPostgresTicket, listPostgresTicketsForUser, markPostgresTicketUsed, persistPostgresTickets, releaseExpiredPostgresTicketReservations } from './server/postgresTicketService';
-import { cancelPostgresTicket, findPostgresTicketForLifecycle, listPostgresTicketsForCompany } from './server/postgresTicketLifecycleService';
+import { cancelPostgresTicket, exportPostgresTicketsByBuyer, findPostgresEventTitleForCompany, findPostgresTicketForLifecycle, listPostgresTicketsForCompany } from './server/postgresTicketLifecycleService';
 import { buildOfflineManifest, syncOfflineValidations, type OfflineValidationRecord } from './server/offlineScannerService';
 import { listPostgresPayments, persistPostgresPayment, recordPostgresPaymentEvent } from './server/postgresPaymentService';
 import { persistPostgresAudit } from './server/postgresAuditService';
@@ -157,8 +175,20 @@ import { deliverConfirmedTicketPurchase } from './server/ticketPurchaseDeliveryS
 import { getTicketOffer } from './server/ticketCatalogService';
 import { ticketInventory } from './server/ticketInventoryService';
 import { quoteTicketPurchase, ticketFeeSnapshotForUnit } from './server/ticketPurchaseDomain';
+import {
+  EXPORT_SECTIONS,
+  buildEventCsv,
+  buildEventPdf,
+  buildEventXlsx,
+  filterEventData,
+  loadEventControlCenter,
+  normaliseSections,
+  type EventViewer,
+} from './server/eventControlCenter';
 import { executeTicketPurchase, type TicketPurchaseResult } from './server/ticketPurchaseUseCase';
-import { createSimulatedEmailAdapter, createSimulatedSmsAdapter } from './server/integrations/simulatedAdapters';
+import { createEmailDeliveryAdapter } from './server/integrations/emailDeliveryAdapter';
+import { createExternalEmailSender, EmailConfigurationError, ExternalEmailValidationError } from './server/email';
+import { createSimulatedSmsAdapter } from './server/integrations/simulatedAdapters';
 import { createScheduledItem, ensureDemoScheduledItems, listScheduledItems, processDueScheduledItems, updateScheduledItem, SCHEDULING_TIMEZONE } from './server/schedulingService';
 import type { ScheduledItem } from './src/types';
 import type { MonetizationCatalog, MonetizationLedgerEntry, MonetizationWallet } from './src/types';
@@ -168,7 +198,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const emailDelivery = createSimulatedEmailAdapter();
+const emailDelivery = createEmailDeliveryAdapter();
+const externalEmail = createExternalEmailSender();
 const smsDelivery = createSimulatedSmsAdapter();
 type CommunicationSubscriber = {
   userId: string;
@@ -305,7 +336,8 @@ app.use((req, res, next) => {
       // O botão "Continuar com Google" carrega o script e o iframe oficiais.
       "script-src 'self' 'unsafe-inline' https://accounts.google.com",
       "frame-src https://accounts.google.com",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      // O GSI injeta a folha de estilos do botão a partir de accounts.google.com.
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
       "img-src 'self' data: https:",
       "font-src 'self' data: https: https://fonts.gstatic.com",
       "connect-src 'self' https:",
@@ -661,6 +693,16 @@ const ADMIN_API_RULES: RouteRule[] = [
   { pattern: /^\/api\/admin\/locations(\/|$)/, module: 'categories', action: { GET: 'view', POST: 'create', PATCH: 'edit', PUT: 'edit', DELETE: 'delete' } },
   { pattern: /^\/api\/monetization\/catalog$/, module: 'pricing', action: { GET: 'view', PUT: 'manage' } },
   { pattern: /^\/api\/admin\/team(\/|$)/, module: 'admin_staff', action: { GET: 'view', POST: 'create', PATCH: 'edit', DELETE: 'delete' } },
+  // Operações financeiras, comerciais e de comunicação também respeitam os
+  // módulos: um colaborador de moderação não pode abrir Financeiro por URL.
+  { pattern: /^\/api\/admin\/finance(\/|$)/, module: 'financials', action: { GET: 'view', POST: 'approve', PATCH: 'approve', PUT: 'approve', DELETE: 'reject' } },
+  { pattern: /^\/api\/admin\/commercial(\/|$)/, module: 'pricing', action: { GET: 'view', POST: 'manage', PATCH: 'manage', PUT: 'manage', DELETE: 'manage' } },
+  { pattern: /^\/api\/admin\/notifications(\/|$)/, module: 'notifications', action: { GET: 'view', POST: 'create', PATCH: 'edit', DELETE: 'delete' } },
+  { pattern: /^\/api\/admin\/conversations(\/|$)/, module: 'support', action: { GET: 'view', POST: 'edit', PATCH: 'edit', DELETE: 'delete' } },
+  { pattern: /^\/api\/admin\/institutional\/publish$/, module: 'sobre_nos', action: { POST: 'publish' } },
+  { pattern: /^\/api\/admin\/institutional\/releases\/[^/]+\/restore$/, module: 'sobre_nos', action: { POST: 'manage' } },
+  { pattern: /^\/api\/admin\/institutional(\/|$)/, module: 'sobre_nos', action: { GET: 'view', POST: 'create', PUT: 'edit', DELETE: 'delete' } },
+  { pattern: /^\/api\/admin\/quality-audit(\/|$)/, module: 'quality_audit', action: { GET: 'view', POST: 'edit', PUT: 'edit' } },
 ];
 
 /** Acesso efectivo de um colaborador empresarial; `null` significa acesso total (titular). */
@@ -870,15 +912,6 @@ app.post('/api/marketing/campaigns', requireRole('business'), async (req, res) =
   }
   if (databasePool) {
     await databasePool.query(`
-      CREATE TABLE IF NOT EXISTS marketing_campaigns (
-        id TEXT PRIMARY KEY,
-        business_id TEXT NOT NULL,
-        payload JSONB NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL,
-        updated_at TIMESTAMPTZ NOT NULL
-      )
-    `);
-    await databasePool.query(`
       INSERT INTO marketing_campaigns (id, business_id, payload, created_at, updated_at)
       VALUES ($1, $2, $3::jsonb, $4, $5)
       ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload, updated_at=EXCLUDED.updated_at
@@ -922,15 +955,6 @@ app.post('/api/marketing/promotions', requireRole('business'), async (req, res) 
     return res.status(400).json({ error: 'A data de fim deve ser posterior à data de início.' });
   }
   if (databasePool) {
-    await databasePool.query(`
-      CREATE TABLE IF NOT EXISTS marketing_promotions (
-        id TEXT PRIMARY KEY,
-        business_id TEXT NOT NULL,
-        payload JSONB NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL,
-        updated_at TIMESTAMPTZ NOT NULL
-      )
-    `);
     await databasePool.query(`
       INSERT INTO marketing_promotions (id, business_id, payload, created_at, updated_at)
       VALUES ($1, $2, $3::jsonb, $4, $5)
@@ -1362,207 +1386,67 @@ app.put('/api/admin/businesses/featured', requireRole('admin'), async (req, res)
   }
 });
 
-/* ------------------------------------------------------------------ *
- * Sobre Nós (página institucional do Guigui.com)
- * Um único registo (slug fixo) com rascunho + versão publicada + histórico.
- * ------------------------------------------------------------------ */
-const SOBRE_NOS_SLUG = 'guigui-com';
-
-let sobreNosSchemaReady: Promise<void> | null = null;
-function ensureSobreNosSchema(): Promise<void> {
-  if (!databasePool) return Promise.reject(new Error('DATABASE_REQUIRED'));
-  if (!sobreNosSchemaReady) {
-    sobreNosSchemaReady = (async () => {
-      await databasePool.query(`
-        CREATE TABLE IF NOT EXISTS sobre_nos (
-          id BIGSERIAL PRIMARY KEY,
-          slug TEXT NOT NULL UNIQUE,
-          payload JSONB NOT NULL DEFAULT '{}'::jsonb,
-          published_payload JSONB,
-          is_draft BOOLEAN NOT NULL DEFAULT TRUE,
-          published_at TIMESTAMPTZ,
-          created_by TEXT,
-          updated_by TEXT,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-        )
-      `);
-      await databasePool.query(`
-        CREATE TABLE IF NOT EXISTS sobre_nos_history (
-          id BIGSERIAL PRIMARY KEY,
-          slug TEXT NOT NULL,
-          payload JSONB NOT NULL,
-          action TEXT NOT NULL,
-          changed_by TEXT,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-        )
-      `);
-    })().catch((error) => {
-      sobreNosSchemaReady = null;
-      throw error;
-    });
-  }
-  return sobreNosSchemaReady;
-}
-
-async function readSobreNosRow() {
-  const result = await databasePool!.query(
-    `SELECT slug, payload, published_payload, is_draft, published_at, updated_at, updated_by
-       FROM sobre_nos WHERE slug = $1`,
-    [SOBRE_NOS_SLUG]
-  );
-  return result.rows[0] || null;
-}
-
-async function recordSobreNosHistory(action: string, payload: unknown, changedBy: string | null) {
-  await databasePool!.query(
-    `INSERT INTO sobre_nos_history (slug, payload, action, changed_by) VALUES ($1, $2::jsonb, $3, $4)`,
-    [SOBRE_NOS_SLUG, JSON.stringify(payload ?? {}), action, changedBy]
-  );
-}
-
-async function saveSobreNosPayload(payload: unknown, options: { publish?: boolean; changedBy: string | null }) {
-  const now = new Date().toISOString();
-  const publish = options.publish === true;
-  const result = await databasePool!.query(
-    `INSERT INTO sobre_nos (slug, payload, published_payload, is_draft, published_at, created_by, updated_by, created_at, updated_at)
-     VALUES ($1, $2::jsonb, $3::jsonb, $4, $5, $6, $6, $7, $7)
-     ON CONFLICT (slug) DO UPDATE SET
-       payload = EXCLUDED.payload,
-       published_payload = CASE WHEN $8 THEN EXCLUDED.payload ELSE sobre_nos.published_payload END,
-       is_draft = EXCLUDED.is_draft,
-       published_at = CASE WHEN $8 THEN EXCLUDED.published_at ELSE sobre_nos.published_at END,
-       updated_by = EXCLUDED.updated_by,
-       updated_at = EXCLUDED.updated_at
-     RETURNING slug, payload, published_payload, is_draft, published_at, updated_at, updated_by`,
-    [
-      SOBRE_NOS_SLUG,
-      JSON.stringify(payload ?? {}),
-      publish ? JSON.stringify(payload ?? {}) : null,
-      !publish,
-      publish ? now : null,
-      options.changedBy,
-      now,
-      publish,
-    ]
-  );
-  return result.rows[0];
-}
-
-app.get('/api/admin/sobre-nos', requireRole('admin'), async (_req, res) => {
-  if (!databaseConfigured) return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária para o módulo Sobre Nós.', code: 'DATABASE_REQUIRED' });
-  try {
-    await ensureSobreNosSchema();
-    const row = await readSobreNosRow();
-    const history = (await databasePool!.query(
-      `SELECT id, action, changed_by, created_at, payload FROM sobre_nos_history WHERE slug = $1 ORDER BY id DESC LIMIT 20`,
-      [SOBRE_NOS_SLUG]
-    )).rows;
-    return res.json({
-      data: row?.payload || {},
-      published: row?.published_payload || null,
-      isDraft: row ? row.is_draft !== false : true,
-      publishedAt: row?.published_at || null,
-      updatedAt: row?.updated_at || null,
-      updatedBy: row?.updated_by || null,
-      history,
-    });
-  } catch (error) {
-    console.error('[Guigui.com] sobre-nos load failed:', error);
-    return res.status(500).json({ error: 'Não foi possível carregar o Sobre Nós.', code: 'SOBRE_NOS_LOAD_FAILED' });
-  }
+// Módulo institucional (Sobre Nós) — conteúdo normalizado, rascunho de trabalho
+// e publicações imutáveis. O cliente público lê apenas a última release.
+// ---------------------------------------------------------------------------
+registerInstitutionalRoutes(app, {
+  getPool: () => databasePool,
+  requireAdmin: requireRole('admin'),
+  userIdFrom: async (req) => (await sessionContext(req))?.userId ?? null,
 });
 
-app.put('/api/admin/sobre-nos', requireRole('admin'), async (req, res) => {
-  if (!databaseConfigured) return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária para o módulo Sobre Nós.', code: 'DATABASE_REQUIRED' });
-  const payload = req.body?.data;
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    return res.status(400).json({ error: 'Os dados do Sobre Nós são inválidos.', code: 'INVALID_SOBRE_NOS_PAYLOAD' });
-  }
-  try {
-    await ensureSobreNosSchema();
-    const changedBy = (await sessionContext(req))?.userId || null;
-    const row = await saveSobreNosPayload(payload, { publish: false, changedBy });
-    await recordSobreNosHistory('save', payload, changedBy);
-    return res.json({ success: true, isDraft: row.is_draft, updatedAt: row.updated_at });
-  } catch (error) {
-    console.error('[Guigui.com] sobre-nos save failed:', error);
-    return res.status(500).json({ error: 'Não foi possível guardar o Sobre Nós.', code: 'SOBRE_NOS_SAVE_FAILED' });
-  }
-});
-
-app.post('/api/admin/sobre-nos/publish', requireRole('admin'), async (req, res) => {
-  if (!databaseConfigured) return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária para o módulo Sobre Nós.', code: 'DATABASE_REQUIRED' });
-  const payload = req.body?.data;
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    return res.status(400).json({ error: 'Os dados do Sobre Nós são inválidos.', code: 'INVALID_SOBRE_NOS_PAYLOAD' });
-  }
-  try {
-    await ensureSobreNosSchema();
-    const changedBy = (await sessionContext(req))?.userId || null;
-    const row = await saveSobreNosPayload(payload, { publish: true, changedBy });
-    await recordSobreNosHistory('publish', payload, changedBy);
-    return res.json({ success: true, publishedAt: row.published_at, updatedAt: row.updated_at });
-  } catch (error) {
-    console.error('[Guigui.com] sobre-nos publish failed:', error);
-    return res.status(500).json({ error: 'Não foi possível publicar o Sobre Nós.', code: 'SOBRE_NOS_PUBLISH_FAILED' });
-  }
-});
-
-app.post('/api/admin/sobre-nos/draft', requireRole('admin'), async (req, res) => {
-  if (!databaseConfigured) return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária para o módulo Sobre Nós.', code: 'DATABASE_REQUIRED' });
-  try {
-    await ensureSobreNosSchema();
-    const current = await readSobreNosRow();
-    const payload = req.body?.data ?? current?.payload ?? {};
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-      return res.status(400).json({ error: 'Os dados do Sobre Nós são inválidos.', code: 'INVALID_SOBRE_NOS_PAYLOAD' });
+// A página pública tem endereço próprio: a SPA é servida aqui com os metadados
+// da última publicação injetados no HTML (motores de busca e partilha leem-nos
+// sem executar JavaScript). Sem publicação, mantém-se o shell por omissão.
+async function readInstitutionalShell(): Promise<string> {
+  const candidates = runtimeConfig.isProduction && !runtimeConfig.isVercel
+    ? [path.join(process.cwd(), 'dist', 'index.html'), path.join(process.cwd(), 'index.html')]
+    : [path.join(process.cwd(), 'index.html'), path.join(process.cwd(), 'dist', 'index.html')];
+  for (const candidate of candidates) {
+    try {
+      return await readFile(candidate, 'utf8');
+    } catch {
+      // tenta a localização seguinte
     }
-    const changedBy = (await sessionContext(req))?.userId || null;
-    const row = await saveSobreNosPayload(payload, { publish: false, changedBy });
-    await recordSobreNosHistory('draft', payload, changedBy);
-    return res.json({ success: true, isDraft: true, updatedAt: row.updated_at });
+  }
+  throw new Error('index.html não encontrado');
+}
+
+app.get('/sobre-nos', async (req, res) => {
+  try {
+    const html = await readInstitutionalShell();
+    const release = databasePool
+      ? await createInstitutionalRepository(databasePool).latestRelease()
+      : null;
+    const origin = (process.env.APP_URL?.trim() || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+    res
+      .type('html')
+      .setHeader('Cache-Control', 'no-cache')
+      .send(injectInstitutionalMeta(html, release?.snapshot ?? null, origin));
   } catch (error) {
-    console.error('[Guigui.com] sobre-nos draft failed:', error);
-    return res.status(500).json({ error: 'Não foi possível guardar o rascunho do Sobre Nós.', code: 'SOBRE_NOS_DRAFT_FAILED' });
+    console.error('[Guigui.com] institutional shell failed:', error);
+    res.status(500).type('text').send('Página institucional indisponível.');
   }
 });
 
-app.post('/api/admin/sobre-nos/restore/:historyId', requireRole('admin'), async (req, res) => {
-  if (!databaseConfigured) return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária para o módulo Sobre Nós.', code: 'DATABASE_REQUIRED' });
-  const historyId = Number(req.params.historyId);
-  if (!Number.isInteger(historyId) || historyId <= 0) {
-    return res.status(400).json({ error: 'Versão inválida.', code: 'INVALID_SOBRE_NOS_VERSION' });
-  }
+app.get('/sitemap.xml', async (req, res) => {
+  const origin = (process.env.APP_URL?.trim() || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+  const entries: string[] = ['/', '/sobre-nos'];
   try {
-    await ensureSobreNosSchema();
-    const version = (await databasePool!.query(
-      `SELECT payload FROM sobre_nos_history WHERE id = $1 AND slug = $2`,
-      [historyId, SOBRE_NOS_SLUG]
-    )).rows[0];
-    if (!version) {
-      return res.status(404).json({ error: 'Versão não encontrada.', code: 'SOBRE_NOS_VERSION_NOT_FOUND' });
+    if (databasePool) {
+      const release = await createInstitutionalRepository(databasePool).latestRelease();
+      if (release?.snapshot?.seo?.no_index === true) entries.splice(entries.indexOf('/sobre-nos'), 1);
     }
-    const changedBy = (await sessionContext(req))?.userId || null;
-    const row = await saveSobreNosPayload(version.payload, { publish: false, changedBy });
-    await recordSobreNosHistory('restore', version.payload, changedBy);
-    return res.json({ success: true, data: row.payload, isDraft: true, updatedAt: row.updated_at });
+    const urls = entries
+      .map((entry) => `  <url><loc>${origin}${entry}</loc></url>`)
+      .join('\n');
+    res
+      .type('application/xml')
+      .setHeader('Cache-Control', 'public, max-age=3600')
+      .send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
   } catch (error) {
-    console.error('[Guigui.com] sobre-nos restore failed:', error);
-    return res.status(500).json({ error: 'Não foi possível restaurar a versão.', code: 'SOBRE_NOS_RESTORE_FAILED' });
-  }
-});
-
-app.get('/api/sobre-nos', async (_req, res) => {
-  if (!databaseConfigured) return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária.', code: 'DATABASE_REQUIRED' });
-  try {
-    await ensureSobreNosSchema();
-    const row = await readSobreNosRow();
-    if (!row?.published_payload) return res.status(404).json({ error: 'Sobre Nós ainda não publicado.', code: 'SOBRE_NOS_NOT_PUBLISHED' });
-    return res.json({ data: row.published_payload, publishedAt: row.published_at });
-  } catch (error) {
-    console.error('[Guigui.com] public sobre-nos failed:', error);
-    return res.status(500).json({ error: 'Não foi possível carregar o Sobre Nós.', code: 'SOBRE_NOS_PUBLIC_LOAD_FAILED' });
+    console.error('[Guigui.com] sitemap failed:', error);
+    res.status(500).type('text').send('Sitemap indisponível.');
   }
 });
 
@@ -1698,13 +1582,19 @@ app.post('/api/admin/categories', requireRole('admin'), async (req, res) => {
       return sendCategoryError(res, categoryInputError(400, 'Selecione um grupo de actividade válido.', 'CATEGORY_GROUP_INVALID'), 'Grupo inválido.');
     }
     const subcategories = categoryNames(req.body?.subcategories).filter((entry) => entry.length <= 80);
+    // Toda a categoria do catálogo público precisa de metadata.iconName; sem ele
+    // o leitor rejeita a árvore inteira. O painel não envia ícone, por isso
+    // gravamos um ícone neutro por omissão.
+    const iconName = typeof req.body?.iconName === 'string' && req.body.iconName.trim()
+      ? req.body.iconName.trim().slice(0, 60)
+      : 'Tag';
     const id = `cat-${categorySlug(name)}-${randomUUID().slice(0, 6)}`;
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
       await client.query(
-        `INSERT INTO categories (id, parent_id, name, is_active) VALUES ($1, $2, $3, TRUE)`,
-        [id, groupId, name],
+        `INSERT INTO categories (id, parent_id, name, is_active, metadata) VALUES ($1, $2, $3, TRUE, $4::jsonb)`,
+        [id, groupId, name, JSON.stringify({ iconName })],
       );
       for (const [position, subcategory] of subcategories.entries()) {
         await client.query(
@@ -1749,7 +1639,20 @@ app.patch('/api/admin/categories/:categoryId', requireRole('admin'), async (req,
       return res.status(400).json({ error: 'O nome da categoria deve ter entre 2 e 80 caracteres.', code: 'CATEGORY_NAME_INVALID' });
     }
     const nextActive = typeof req.body?.isActive === 'boolean' ? req.body.isActive : Boolean(existing.rows[0].is_active);
-    await pool.query('UPDATE categories SET name = $2, is_active = $3 WHERE id = $1', [categoryId, nextName, nextActive]);
+    const nextIconName = typeof req.body?.iconName === 'string' ? req.body.iconName.trim().slice(0, 60) : '';
+    await pool.query(
+      `UPDATE categories
+          SET name = $2,
+              is_active = $3,
+              metadata = CASE WHEN $4 = '' THEN metadata ELSE metadata || jsonb_build_object('iconName', $4) END
+        WHERE id = $1`,
+      [categoryId, nextName, nextActive, nextIconName],
+    );
+    // Arquivar uma categoria principal tem de arquivar as subcategorias: o
+    // catálogo público rejeita subcategorias ativas cujo pai está inativo.
+    if (!nextActive) {
+      await pool.query('UPDATE categories SET is_active = FALSE WHERE parent_id = $1 AND is_active', [categoryId]);
+    }
 
     if (req.body?.subcategories !== undefined) {
       const wanted = categoryNames(req.body.subcategories).filter((entry) => entry.length <= 80);
@@ -2087,7 +1990,9 @@ app.get('/api/admin/finance/reconciliations', requireRole('admin'), async (_req,
 app.post('/api/admin/finance/reconciliations', requireRole('admin'), async (req, res) => {
   try {
     const context = await sessionContext(req);
-    res.status(201).json(await createReconciliation(req.body || {}, context?.userId || 'system'));
+    const reconciliation = await createReconciliation(req.body || {}, context?.userId || 'system');
+    recordAudit({ action: 'payment_reconciliation_created', resource: 'payment_reconciliation', resourceId: String(reconciliation.transactionId || req.body?.transactionId || ''), actorRole: 'admin', actorId: context?.userId, requestId: requestIdFrom(req), success: true });
+    res.status(201).json(reconciliation);
   } catch (error) {
     sendFinanceError(res, error, 'POST /api/admin/finance/reconciliations');
   }
@@ -2096,7 +2001,9 @@ app.post('/api/admin/finance/reconciliations', requireRole('admin'), async (req,
 app.patch('/api/admin/finance/reconciliations/:id', requireRole('admin'), async (req, res) => {
   try {
     const context = await sessionContext(req);
-    res.json(await updateReconciliation(req.params.id, req.body || {}, context?.userId || 'system'));
+    const reconciliation = await updateReconciliation(req.params.id, req.body || {}, context?.userId || 'system');
+    recordAudit({ action: 'payment_reconciliation_updated', resource: 'payment_reconciliation', resourceId: String(reconciliation.transactionId || req.params.id), actorRole: 'admin', actorId: context?.userId, requestId: requestIdFrom(req), success: true });
+    res.json(reconciliation);
   } catch (error) {
     sendFinanceError(res, error, 'PATCH /api/admin/finance/reconciliations/:id');
   }
@@ -2113,7 +2020,9 @@ app.get('/api/admin/finance/operators', requireRole('admin'), async (_req, res) 
 app.patch('/api/admin/finance/operators/:provider', requireRole('admin'), async (req, res) => {
   try {
     const context = await sessionContext(req);
-    res.json(await updateOperatorConfig(req.params.provider, req.body || {}, context?.userId || 'system'));
+    const result = await updateOperatorConfig(req.params.provider, req.body || {}, context?.userId || 'system');
+    recordAudit({ action: 'payment_operator_config_updated', resource: 'payment_operator', resourceId: req.params.provider, actorRole: 'admin', actorId: context?.userId, requestId: requestIdFrom(req), success: true });
+    res.json(result);
   } catch (error) {
     sendFinanceError(res, error, 'PATCH /api/admin/finance/operators/:provider');
   }
@@ -2134,7 +2043,10 @@ app.post('/api/admin/finance/pending/:transactionId/:action', requireRole('admin
   }
   try {
     const context = await sessionContext(req);
-    res.json(await recordPendingAction(req.params.transactionId, action as 'confirm' | 'reject' | 'request_proof', req.body || {}, context?.userId || 'system'));
+    const result = await recordPendingAction(req.params.transactionId, action as 'confirm' | 'reject' | 'request_proof', req.body || {}, context?.userId || 'system');
+    const auditAction = action === 'confirm' ? 'payment_confirm' : action === 'reject' ? 'payment_reject' : 'payment_proof_requested';
+    recordAudit({ action: auditAction, resource: 'payment', resourceId: req.params.transactionId, actorRole: 'admin', actorId: context?.userId, requestId: requestIdFrom(req), success: true });
+    res.json(result);
   } catch (error) {
     sendFinanceError(res, error, 'POST /api/admin/finance/pending/:id/:action');
   }
@@ -2151,7 +2063,9 @@ app.get('/api/admin/finance/refunds', requireRole('admin'), async (_req, res) =>
 app.post('/api/admin/finance/refunds', requireRole('admin'), async (req, res) => {
   try {
     const context = await sessionContext(req);
-    res.status(201).json(await createRefund(req.body || {}, context?.userId || 'system'));
+    const refund = await createRefund(req.body || {}, context?.userId || 'system');
+    recordAudit({ action: 'refund_requested', resource: 'refund', resourceId: String(refund.id || ''), actorRole: 'admin', actorId: context?.userId, requestId: requestIdFrom(req), success: true });
+    res.status(201).json(refund);
   } catch (error) {
     sendFinanceError(res, error, 'POST /api/admin/finance/refunds');
   }
@@ -2163,7 +2077,10 @@ app.post('/api/admin/finance/refunds/:id/:mode', requireRole('admin'), async (re
   if (!handler) return res.status(400).json({ error: 'Ação de reembolso inválida.', code: 'INVALID_REFUND_ACTION' });
   try {
     const context = await sessionContext(req);
-    res.json(await handler(req.params.id, req.body || {}, context?.userId || 'system'));
+    const result = await handler(req.params.id, req.body || {}, context?.userId || 'system');
+    const auditAction = req.params.mode === 'authorize' ? 'refund_authorized' : req.params.mode === 'process' ? 'refund_processed' : 'refund_rejected';
+    recordAudit({ action: auditAction, resource: 'refund', resourceId: req.params.id, actorRole: 'admin', actorId: context?.userId, requestId: requestIdFrom(req), success: true });
+    res.json(result);
   } catch (error) {
     sendFinanceError(res, error, 'POST /api/admin/finance/refunds/:id/:mode');
   }
@@ -3135,12 +3052,170 @@ app.post('/api/events', requireSession, async (req, res) => {
     await persistPostgresEvent(storedEvent);
     eventSnapshots.set(storedEvent.id, storedEvent);
     persistEventSnapshots();
+    // Histórico do evento: cada gravação fica registada para o centro de controlo.
+    recordAudit({
+      action: previousEvent ? 'event_updated' : 'event_created',
+      resource: 'event',
+      resourceId: storedEvent.id,
+      actorRole: context.role === 'user' ? 'citizen' : context.role,
+      actorId: context.userId,
+      requestId,
+      success: true,
+      metadata: previousEvent
+        ? {
+            statusChanged: previousEvent.status !== storedEvent.status,
+            dateChanged: previousEvent.date !== storedEvent.date,
+            timeChanged: previousEvent.time !== storedEvent.time,
+            locationChanged: previousEvent.location !== storedEvent.location,
+          }
+        : { created: true },
+    });
     res.json({ success: true, event: storedEvent });
   } catch (error) {
     res.status(500).json({ error: 'Erro ao persistir evento no banco.' });
   }
 });
 
+
+/* ------------------------------------------------------------------ *
+ * Centro de controlo individual do evento
+ * Empresa organizadora (só os seus eventos) e Super Admin. Reaproveita os
+ * dados operacionais existentes; não há cálculo financeiro paralelo.
+ * ------------------------------------------------------------------ */
+
+async function resolveEventViewer(req: express.Request): Promise<{ viewer: EventViewer | null; status?: number; code?: string; error?: string }> {
+  const context = await sessionContext(req);
+  if (!context) {
+    return { viewer: null, status: 401, code: 'AUTHENTICATION_REQUIRED', error: 'Sessão autenticada necessária.' };
+  }
+  if (context.role !== 'business' && context.role !== 'admin') {
+    return { viewer: null, status: 403, code: 'EVENT_CONTROL_FORBIDDEN', error: 'Apenas a empresa organizadora ou a administração podem abrir o evento.' };
+  }
+  if (context.role === 'admin') {
+    return { viewer: { role: 'admin', userId: context.userId, companyId: null } };
+  }
+  const stored = await identityAccess.findById(context.userId);
+  if (!stored?.businessId) {
+    return { viewer: null, status: 403, code: 'BUSINESS_ACCOUNT_REQUIRED', error: 'A sua conta não está associada a uma empresa.' };
+  }
+  return { viewer: { role: 'business', userId: context.userId, companyId: stored.businessId } };
+}
+
+app.get('/api/events/:eventId/control-center', requireRole('business', 'admin'), async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const resolved = await resolveEventViewer(req);
+  if (!resolved.viewer) {
+    return res.status(resolved.status || 403).json({ error: resolved.error, code: resolved.code });
+  }
+  if (!databasePool) {
+    return res.status(503).json({ error: 'O centro de controlo exige base de dados configurada.', code: 'DATABASE_REQUIRED' });
+  }
+  const eventId = String(req.params.eventId || '').trim();
+  if (!eventId) return res.status(400).json({ error: 'Evento inválido.', code: 'EVENT_REQUIRED' });
+  try {
+    const data = await loadEventControlCenter(databasePool, eventId, resolved.viewer);
+    if (!data) return res.status(404).json({ error: 'Evento não encontrado.', code: 'EVENT_NOT_FOUND' });
+    res.json({ data });
+  } catch (error) {
+    if ((error as { code?: string }).code === 'EVENT_FORBIDDEN') {
+      recordAudit({
+        action: 'event_control_denied',
+        resource: 'event',
+        resourceId: eventId,
+        actorRole: resolved.viewer.role,
+        actorId: resolved.viewer.userId,
+        requestId: requestIdFrom(req),
+        success: false,
+        metadata: { reason: 'company_scope' },
+      });
+      return res.status(403).json({ error: 'Não tem acesso a este evento.', code: 'EVENT_FORBIDDEN' });
+    }
+    console.error('[Guigui.com] event control center failed:', error);
+    res.status(500).json({ error: 'Não foi possível carregar o centro de controlo do evento.', code: 'EVENT_CONTROL_FAILED' });
+  }
+});
+
+app.get('/api/events/:eventId/control-center/export', requireRole('business', 'admin'), async (req, res) => {
+  const resolved = await resolveEventViewer(req);
+  if (!resolved.viewer) {
+    return res.status(resolved.status || 403).json({ error: resolved.error, code: resolved.code });
+  }
+  if (!databasePool) {
+    return res.status(503).json({ error: 'A exportação exige base de dados configurada.', code: 'DATABASE_REQUIRED' });
+  }
+  const eventId = String(req.params.eventId || '').trim();
+  if (!eventId) return res.status(400).json({ error: 'Evento inválido.', code: 'EVENT_REQUIRED' });
+  const format = String(req.query.format || 'csv').toLowerCase();
+  if (format !== 'csv' && format !== 'xlsx' && format !== 'pdf') {
+    return res.status(400).json({ error: 'Formato de exportação inválido.', code: 'INVALID_EXPORT_FORMAT', formats: ['csv', 'xlsx', 'pdf'] });
+  }
+  const sections = normaliseSections(req.query.sections ?? EXPORT_SECTIONS);
+  try {
+    // A exportação carrega o evento com um limite alto para não truncar dados.
+    const loaded = await loadEventControlCenter(databasePool, eventId, resolved.viewer, { ticketLimit: 50000 });
+    if (!loaded) return res.status(404).json({ error: 'Evento não encontrado.', code: 'EVENT_NOT_FOUND' });
+    // A exportação respeita os filtros aplicados no centro de controlo.
+    const data = filterEventData(loaded, {
+      query: typeof req.query.q === 'string' ? req.query.q : undefined,
+      ticketStatus: typeof req.query.ticketStatus === 'string' ? req.query.ticketStatus : undefined,
+      orderStatus: typeof req.query.orderStatus === 'string' ? req.query.orderStatus : undefined,
+      validationResult: typeof req.query.validationResult === 'string' ? req.query.validationResult : undefined,
+    });
+    const slug = (data.event.title || 'evento')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase()
+      .slice(0, 60) || 'evento';
+    const filename = `evento-${slug}-${new Date().toISOString().slice(0, 10)}`;
+    if (format === 'csv') {
+      const csv = buildEventCsv(data, sections);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
+      res.setHeader('Cache-Control', 'no-store');
+      res.send(csv);
+    } else if (format === 'xlsx') {
+      const buffer = await buildEventXlsx(data, sections);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}.xlsx"`);
+      res.setHeader('Cache-Control', 'no-store');
+      res.send(buffer);
+    } else {
+      const buffer = await buildEventPdf(data, sections);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}.pdf"`);
+      res.setHeader('Cache-Control', 'no-store');
+      res.send(buffer);
+    }
+    recordAudit({
+      action: 'event_report_exported',
+      resource: 'event',
+      resourceId: eventId,
+      actorRole: resolved.viewer.role,
+      actorId: resolved.viewer.userId,
+      requestId: requestIdFrom(req),
+      success: true,
+      metadata: { format, sections },
+    });
+  } catch (error) {
+    if ((error as { code?: string }).code === 'EVENT_FORBIDDEN') {
+      recordAudit({
+        action: 'event_report_export_denied',
+        resource: 'event',
+        resourceId: eventId,
+        actorRole: resolved.viewer.role,
+        actorId: resolved.viewer.userId,
+        requestId: requestIdFrom(req),
+        success: false,
+        metadata: { reason: 'company_scope', format },
+      });
+      return res.status(403).json({ error: 'Não tem acesso a este evento.', code: 'EVENT_FORBIDDEN' });
+    }
+    console.error('[Guigui.com] event report export failed:', error);
+    res.status(500).json({ error: 'Não foi possível gerar a exportação do evento.', code: 'EVENT_EXPORT_FAILED' });
+  }
+});
 
 app.post('/api/product-events', async (req, res) => {
     const eventName = typeof req.body?.eventName === 'string' ? req.body.eventName.trim() : '';
@@ -3352,6 +3427,13 @@ app.post('/api/auth/login', async (req, res) => {
   res.json({ success: true, user: result.user });
 });
 
+// Login com Google por redireccionamento (OAuth 2.0 authorization code).
+// O router vive em server/googleOAuthRoutes.ts para poder ser testado sem levantar
+// o servidor completo nem contactar a Google.
+app.use('/api/auth/google', createGoogleOAuthRouter({
+  authenticate: (input) => identityAccess.authenticate(input),
+}));
+
 app.post('/api/auth/mfa/setup', requireRole('admin'), async (req, res) => {
   const context = await sessionContext(req);
   if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
@@ -3438,7 +3520,20 @@ app.get('/api/security/events', requireSession, async (req, res) => {
 
 app.get('/api/auth/session', async (req, res) => {
   const session = await identityAccess.getSession(sessionTokenFromRequest(req));
-  res.json({ authenticated: Boolean(session && session.role), ...(session && session.role ? { userId: session.userId, role: session.role, expiresAt: session.expiresAt } : {}) });
+  if (!session || !session.role) {
+    res.json({ authenticated: false });
+    return;
+  }
+  // Devolve a mesma projecção do login para que um browser sem
+  // `guigui_current_user` restaure a conta completa e o guia/painel certos.
+  const account = await identityAccess.findById(session.userId) || findDemoUserById(session.userId);
+  res.json({
+    authenticated: true,
+    userId: session.userId,
+    role: session.role,
+    expiresAt: session.expiresAt,
+    ...(account ? { user: account } : {}),
+  });
 });
 
 app.post('/api/business/team/invitations', requireRole('business'), async (req, res) => {
@@ -3457,9 +3552,10 @@ app.post('/api/business/team/invitations', requireRole('business'), async (req, 
       });
     }
   }
+  const invitationEmailCheck = normaliseEmailForAccount(recipientEmail);
   if (
     typeof recipientEmail !== 'string'
-    || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())
+    || !invitationEmailCheck.ok
     || typeof recipientName !== 'string'
     || typeof businessName !== 'string'
     || typeof businessId !== 'string'
@@ -3474,7 +3570,7 @@ app.post('/api/business/team/invitations', requireRole('business'), async (req, 
   try {
     const invitationResult = await identityAccess.createTeamInvitation({
       inviterUserId: context.userId,
-      email: recipientEmail,
+      email: invitationEmailCheck.ok ? invitationEmailCheck.email : '',
       name: recipientName,
       businessId,
       businessName,
@@ -3496,11 +3592,14 @@ app.post('/api/business/team/invitations', requireRole('business'), async (req, 
       roleLabel: roleLabel.trim(),
       invitationUrl: `${runtimeConfig.appUrl?.trim() || 'http://localhost:3000'}/?team_invite=${encodeURIComponent(token.trim())}`,
     });
+    const accepted = delivery.state === 'accepted';
     return res.status(201).json({
       success: true,
       simulated: delivery.mode === 'simulated',
       delivery: { state: delivery.state, mode: delivery.mode, reference: delivery.reference },
-      message: 'Convite registado. O envio por e-mail está simulado e não foi realizado.',
+      message: accepted
+        ? 'Convite registado. O e-mail foi aceite pelo fornecedor de envio.'
+        : 'Convite registado. O envio por e-mail está simulado e não foi realizado.',
     });
   } catch (error) {
     console.error('team-invitation-simulation-failed', {
@@ -3691,6 +3790,13 @@ async function adminCanManageTeam(req: Parameters<typeof sessionContext>[0]): Pr
   return access === null || canPerformAction(access, 'admin_staff', 'manage') || canPerformAction(access, 'admin_staff', 'create');
 }
 
+app.get('/api/admin/team/activity', requireRole('admin'), async (req, res) => {
+  if (!await adminCanManageTeam(req)) return res.status(403).json({ error: 'Não tem permissão para consultar a equipa administrativa.', code: 'TEAM_MANAGE_FORBIDDEN' });
+  if (!databaseConfigured) return res.json({ entries: [] });
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ entries: await listAdminAccessActivity(Number(req.query.limit) || 50) });
+});
+
 app.get('/api/admin/team/members', requireRole('admin'), async (_req, res) => {
   if (!databaseConfigured) return res.status(503).json({ error: 'A gestão da equipa exige a base de dados PostgreSQL.', code: 'TEAM_ACCESS_REQUIRES_DATABASE' });
   res.setHeader('Cache-Control', 'no-store');
@@ -3763,16 +3869,288 @@ app.delete('/api/admin/team/members/:userId', requireRole('admin'), async (req, 
   res.json({ success: true });
 });
 
-app.post('/api/auth/change-password', async (req, res) => {
-  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+// ---------------------------------------------------------------------------
+// Convites de colaboradores (Administração e Empresas)
+// ---------------------------------------------------------------------------
+//
+// O responsável cria o convite com os módulos já escolhidos; o colaborador
+// recebe um link individual e define a própria palavra-passe. Nenhum módulo é
+// aceite a partir do cliente na ativação: só os gravados no convite contam.
+
+async function invitationScopeFor(req: Parameters<typeof sessionContext>[0]): Promise<{
+  context: NonNullable<Awaited<ReturnType<typeof sessionContext>>>;
+  scope: 'admin' | 'business';
+  companyId: string | null;
+  canManage: boolean;
+} | null> {
+  const context = await sessionContext(req);
+  if (!context) return null;
+  if (context.role === 'admin') {
+    const access = await effectiveAdminAccess(context.userId);
+    const canManage = access === null
+      || canPerformAction(access, 'admin_staff', 'manage')
+      || canPerformAction(access, 'admin_staff', 'create');
+    return { context, scope: 'admin', companyId: null, canManage };
+  }
+  if (context.role === 'business') {
+    const stored = await identityAccess.findById(context.userId);
+    const businessId = stored?.businessId || '';
+    if (!businessId) return null;
+    const effective = await effectiveBusinessAccess(context.userId);
+    const canManage = effective.access === null
+      || canPerformAction(effective.access, 'team', 'manage')
+      || canPerformAction(effective.access, 'team', 'create');
+    return { context, scope: 'business', companyId: businessId, canManage };
+  }
+  return null;
+}
+
+function invitationActivationUrl(token: string): string {
+  const base = (runtimeConfig.appUrl?.trim() || 'http://localhost:3000').replace(/\/$/, '');
+  return `${base}/ativar-convite?token=${encodeURIComponent(token)}`;
+}
+
+async function companyNameFor(companyId: string): Promise<string> {
+  if (!databasePool) return 'Guigui.com';
+  const result = await databasePool.query('SELECT name FROM companies WHERE id = $1 LIMIT 1', [companyId]);
+  return result.rowCount ? String(result.rows[0].name) : 'Guigui.com';
+}
+
+async function deliverInvitationEmail(input: {
+  token: string;
+  scope: 'admin' | 'business';
+  invitation: { id: string; email: string; name: string; jobTitle?: string; role: string; access: TeamModuleAccess };
+  companyId: string | null;
+}): Promise<{ mode: 'sent' | 'simulated'; activationUrl: string }> {
+  const activationUrl = invitationActivationUrl(input.token);
+  const organizationName = input.scope === 'admin'
+    ? 'Administração Guigui.com'
+    : await companyNameFor(input.companyId || '');
+  try {
+    const delivery = await emailDelivery.sendTeamInvitation({
+      invitationId: input.invitation.id,
+      recipientEmail: input.invitation.email,
+      recipientName: input.invitation.name,
+      businessName: organizationName,
+      organizationName,
+      roleLabel: invitationRoleLabel(input.invitation.jobTitle, input.invitation.role),
+      modules: invitationModuleSummary(input.scope, input.invitation.access).map((module) => module.label),
+      invitationUrl: activationUrl,
+      isAdminScope: input.scope === 'admin',
+    });
+    if (delivery.state === 'accepted') {
+      await markInvitationSent(input.invitation.id);
+      return { mode: 'sent', activationUrl };
+    }
+    if (delivery.state !== 'simulated') {
+      console.error('[team-invitation] Entrega de e-mail não confirmada:', delivery.state);
+    }
+    return { mode: 'simulated', activationUrl };
+  } catch (error) {
+    console.error('[team-invitation] Falha no envio do e-mail:', error instanceof Error ? error.message : String(error));
+    return { mode: 'simulated', activationUrl };
+  }
+}
+
+app.get('/api/team/invitations', async (req, res) => {
+  const scope = await invitationScopeFor(req);
+  if (!scope) return res.status(403).json({ error: 'A conta não tem acesso à gestão de colaboradores.', code: 'TEAM_SCOPE_REQUIRED' });
+  if (!scope.canManage) return res.status(403).json({ error: 'Não tem permissão para gerir convites.', code: 'TEAM_MANAGE_FORBIDDEN' });
+  if (!databaseConfigured) return res.status(503).json({ error: 'A gestão de convites exige a base de dados PostgreSQL.', code: 'TEAM_ACCESS_REQUIRES_DATABASE' });
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ invitations: await listTeamInvitations(scope.scope, scope.companyId) });
+});
+
+app.post('/api/team/invitations', async (req, res) => {
+  const requestId = requestIdFrom(req);
+  const scope = await invitationScopeFor(req);
+  if (!scope) return res.status(403).json({ error: 'A conta não tem acesso à gestão de colaboradores.', code: 'TEAM_SCOPE_REQUIRED' });
+  if (!scope.canManage) return res.status(403).json({ error: 'Não tem permissão para convidar colaboradores.', code: 'TEAM_MANAGE_FORBIDDEN' });
+  if (!databaseConfigured) return res.status(503).json({ error: 'A gestão de convites exige a base de dados PostgreSQL.', code: 'TEAM_ACCESS_REQUIRES_DATABASE' });
+  const body = req.body || {};
+  const result = await createTeamInvitationRecord({
+    scope: scope.scope,
+    companyId: scope.companyId,
+    name: typeof body.name === 'string' ? body.name : '',
+    email: typeof body.email === 'string' ? body.email : '',
+    jobTitle: typeof body.jobTitle === 'string' ? body.jobTitle : undefined,
+    role: typeof body.role === 'string' ? body.role : 'custom',
+    access: body.access ?? {},
+    invitedByUserId: scope.context.userId,
+  }).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message === 'TEAM_ACCESS_REQUIRES_DATABASE') return null;
+    console.error('[team-invitation] Falha ao criar convite:', message);
+    return null;
+  });
+  if (!result) return res.status(500).json({ error: 'Não foi possível criar o convite.', code: 'TEAM_INVITATION_FAILED' });
+  if (result.kind === 'invalid') return res.status(400).json({ error: result.reason, code: 'TEAM_INVITATION_INVALID' });
+  if (result.kind === 'account_exists') {
+    return res.status(409).json({
+      error: 'Já existe uma conta com este e-mail. Associe-a pela gestão de equipa em vez de criar um novo convite.',
+      code: 'TEAM_MEMBER_DUPLICATE',
+    });
+  }
+  const delivery = await deliverInvitationEmail({ token: result.token, scope: scope.scope, invitation: result.invitation, companyId: scope.companyId });
+  await recordAccessChange({
+    scope: scope.scope,
+    companyId: scope.companyId || undefined,
+    actorUserId: scope.context.userId,
+    targetUserId: '',
+    action: result.renewed ? 'invitation_renewed' : 'invitation_created',
+    after: { email: result.invitation.email, role: result.invitation.role, modules: Object.keys(result.invitation.access) },
+  });
+  recordAudit({
+    action: 'team_invitation_created',
+    resource: 'team_invitation',
+    resourceId: result.invitation.id,
+    actorRole: scope.scope === 'admin' ? 'admin' : 'business',
+    actorId: scope.context.userId,
+    success: true,
+    requestId,
+    metadata: { scope: scope.scope, modules: Object.keys(result.invitation.access), delivery: delivery.mode },
+  });
+  res.status(201).json({ invitation: result.invitation, delivery });
+});
+
+app.post('/api/team/invitations/:id/resend', async (req, res) => {
+  const requestId = requestIdFrom(req);
+  const scope = await invitationScopeFor(req);
+  if (!scope) return res.status(403).json({ error: 'A conta não tem acesso à gestão de colaboradores.', code: 'TEAM_SCOPE_REQUIRED' });
+  if (!scope.canManage) return res.status(403).json({ error: 'Não tem permissão para gerir convites.', code: 'TEAM_MANAGE_FORBIDDEN' });
+  const resent = await resendTeamInvitation(String(req.params.id || ''), scope.scope, scope.companyId);
+  if (!resent) return res.status(404).json({ error: 'Convite não encontrado ou já utilizado.', code: 'TEAM_INVITATION_NOT_FOUND' });
+  const delivery = await deliverInvitationEmail({ token: resent.token, scope: scope.scope, invitation: resent.invitation, companyId: scope.companyId });
+  await recordAccessChange({
+    scope: scope.scope,
+    companyId: scope.companyId || undefined,
+    actorUserId: scope.context.userId,
+    targetUserId: '',
+    action: 'invitation_resent',
+    after: { email: resent.invitation.email },
+  });
+  recordAudit({ action: 'team_invitation_resent', resource: 'team_invitation', resourceId: resent.invitation.id, actorRole: scope.scope === 'admin' ? 'admin' : 'business', actorId: scope.context.userId, success: true, requestId });
+  res.json({ invitation: resent.invitation, delivery });
+});
+
+app.delete('/api/team/invitations/:id', async (req, res) => {
+  const requestId = requestIdFrom(req);
+  const scope = await invitationScopeFor(req);
+  if (!scope) return res.status(403).json({ error: 'A conta não tem acesso à gestão de colaboradores.', code: 'TEAM_SCOPE_REQUIRED' });
+  if (!scope.canManage) return res.status(403).json({ error: 'Não tem permissão para gerir convites.', code: 'TEAM_MANAGE_FORBIDDEN' });
+  const revoked = await revokeTeamInvitation(String(req.params.id || ''), scope.scope, scope.companyId);
+  if (!revoked) return res.status(404).json({ error: 'Convite não encontrado ou já fechado.', code: 'TEAM_INVITATION_NOT_FOUND' });
+  await recordAccessChange({
+    scope: scope.scope,
+    companyId: scope.companyId || undefined,
+    actorUserId: scope.context.userId,
+    targetUserId: '',
+    action: 'invitation_revoked',
+  });
+  recordAudit({ action: 'team_invitation_revoked', resource: 'team_invitation', resourceId: String(req.params.id || ''), actorRole: scope.scope === 'admin' ? 'admin' : 'business', actorId: scope.context.userId, success: true, requestId });
+  res.json({ success: true });
+});
+
+app.get('/api/team/invitations/token/:token', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const invitation = await inspectTeamInvitation(String(req.params.token || '')).catch(() => null);
+  if (!invitation) return res.status(404).json({ error: 'Convite inválido, expirado ou já utilizado.', code: 'INVALID_TEAM_INVITATION' });
+  res.json({ invitation });
+});
+
+app.post('/api/team/invitations/token/:token/accept', async (req, res) => {
+  const requestId = requestIdFrom(req);
+  const body = req.body || {};
+  const password = typeof body.password === 'string' ? body.password : '';
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'A palavra-passe precisa de pelo menos 8 caracteres.', code: 'INVALID_TEAM_ACCEPTANCE' });
+  }
+  const result = await acceptTeamInvitation({
+    token: String(req.params.token || ''),
+    password,
+    phone: typeof body.phone === 'string' ? body.phone : '',
+    neighborhood: typeof body.neighborhood === 'string' ? body.neighborhood : 'Bissau',
+  }).catch((error: unknown) => {
+    console.error('[team-invitation] Falha na ativação:', error instanceof Error ? error.message : String(error));
+    return { kind: 'unavailable' as const };
+  });
+  if (result.kind === 'invalid') return res.status(400).json({ error: result.reason, code: 'INVALID_TEAM_ACCEPTANCE' });
+  if (result.kind === 'account_exists') {
+    return res.status(409).json({
+      error: 'Já existe uma conta com este e-mail. Inicie sessão ou recupere a palavra-passe.',
+      code: 'TEAM_ACCOUNT_EXISTS',
+    });
+  }
+  if (result.kind === 'unavailable') {
+    return res.status(410).json({ error: 'Este convite já não está disponível. Peça um novo convite ao responsável.', code: 'TEAM_INVITATION_UNAVAILABLE' });
+  }
+  await recordAccessChange({
+    scope: result.scope,
+    companyId: result.companyId || undefined,
+    actorUserId: result.userId,
+    targetUserId: result.userId,
+    action: 'invitation_accepted',
+    after: { email: result.email },
+  });
+  recordAudit({ action: 'team_invitation_accepted', resource: 'team_invitation', resourceId: result.userId, actorRole: result.scope === 'admin' ? 'admin' : 'business', actorId: result.userId, success: true, requestId });
+  res.json({ success: true, user: { id: result.userId, email: result.email, name: result.name, scope: result.scope } });
+});
+
+// Alteração da própria palavra-passe. A conta vem sempre da sessão — o e-mail
+// no corpo, quando enviado, só serve para recusar tentativas de mudar
+// credenciais de outra pessoa. Serve cidadão, empresa e administração.
+app.post('/api/auth/change-password', requireSession, async (req, res) => {
+  const requestId = requestIdFrom(req);
+  const context = await sessionContext(req);
+  if (!context) {
+    return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  }
   const currentPassword = typeof req.body?.currentPassword === 'string' ? req.body.currentPassword : '';
   const newPassword = typeof req.body?.newPassword === 'string' ? req.body.newPassword : '';
-  if (!email || currentPassword.length < 6 || newPassword.length < 6) {
-    return res.status(400).json({ error: 'Indique a conta e passwords com pelo menos 6 carateres.' });
+  const account = await identityAccess.findById(context.userId) || findDemoUserById(context.userId);
+  const accountEmail = account?.email ? String(account.email) : '';
+  if (!accountEmail) {
+    return res.status(404).json({ error: 'Conta não encontrada para alterar a palavra-passe.', code: 'ACCOUNT_NOT_FOUND' });
   }
-  const updated = await identityAccess.changePassword({ email, currentPassword, newPassword });
-  if (!updated) return res.status(401).json({ error: 'A palavra-passe actual não corresponde à conta.' });
-  res.json({ success: true, message: 'Palavra-passe actualizada com sucesso.' });
+  const requestedEmail = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  if (requestedEmail && requestedEmail !== accountEmail.toLowerCase()) {
+    return res.status(403).json({
+      error: 'A palavra-passe só pode ser alterada na conta autenticada.',
+      code: 'ACCOUNT_IDENTITY_MISMATCH',
+    });
+  }
+  if (!currentPassword) {
+    return res.status(400).json({ error: 'Confirme a palavra-passe atual.', code: 'CURRENT_PASSWORD_REQUIRED' });
+  }
+  const policy = evaluatePassword({
+    password: newPassword,
+    currentPassword,
+    email: accountEmail,
+    name: account?.name,
+  });
+  if (!policy.ok) {
+    return res.status(400).json({
+      error: policy.issues[0] || 'A nova palavra-passe não cumpre os requisitos de segurança.',
+      issues: policy.issues,
+      code: 'PASSWORD_POLICY',
+    });
+  }
+
+  const updated = await identityAccess.changePassword({ email: accountEmail, currentPassword, newPassword });
+  recordAudit({
+    action: 'password_changed',
+    resource: 'auth',
+    resourceId: accountEmail,
+    actorId: context.userId,
+    actorRole: context.role === 'user' ? 'citizen' : context.role,
+    success: updated,
+    requestId,
+    metadata: { strength: policy.label },
+  });
+  if (!updated) {
+    return res.status(401).json({ error: 'A palavra-passe atual não corresponde à conta.', code: 'INVALID_CURRENT_PASSWORD' });
+  }
+  res.json({ success: true, message: 'Palavra-passe atualizada com sucesso.' });
 });
 
 app.post('/api/account/deactivate', requireSession, async (req, res) => {
@@ -3883,6 +4261,126 @@ app.get('/api/conversations', requireSession, async (req, res) => {
     : null;
   const result = await listPostgresConversations(context.userId, context.role, stored?.businessId);
   res.json(result);
+});
+
+const EXTERNAL_EMAIL_WINDOW_MS = 60 * 60 * 1000;
+const EXTERNAL_EMAIL_MAX_PER_WINDOW = 20;
+
+/**
+ * Email escrito pelo próprio utilizador para fora da plataforma.
+ *
+ * O remetente visível é a plataforma (SPF/DKIM/DMARC) e as respostas vão para
+ * o email da conta. Não existe modo simulado: sem fornecedor configurado a
+ * rota responde 503, para que ninguém receba "enviado" sem ter saído.
+ */
+app.post('/api/emails/external', requireSession, async (req, res) => {
+  const context = await sessionContext(req);
+  if (!context) {
+    return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  }
+  const stored = await identityAccess.findById(context.userId);
+  // Colaboradores administrativos com acesso granular precisam do módulo
+  // `external_email`. Cidadãos, contas empresariais e administradores com
+  // acesso total não têm adminAccess e não são afectados.
+  if (
+    context.role === 'admin' &&
+    stored?.adminAccess &&
+    !canPerformAction(stored.adminAccess, 'external_email', 'create')
+  ) {
+    recordAudit({
+      action: 'authorization_denied',
+      resource: 'external_email',
+      resourceId: '/api/emails/external',
+      actorRole: 'admin',
+      actorId: context.userId,
+      success: false,
+      requestId: requestIdFrom(req),
+      metadata: { requiredModule: 'external_email', method: 'POST' },
+    });
+    return res.status(403).json({
+      error: 'A sua conta não tem acesso ao email externo. Contacte o responsável da equipa.',
+      code: 'MODULE_FORBIDDEN',
+      module: 'external_email',
+    });
+  }
+  if (!stored?.email) {
+    return res.status(409).json({ error: 'A conta não tem um email associado.', code: 'ACCOUNT_EMAIL_REQUIRED' });
+  }
+
+  const to = typeof req.body?.to === 'string' ? req.body.to.trim() : '';
+  const subject = typeof req.body?.subject === 'string' ? req.body.subject : '';
+  const message = typeof req.body?.message === 'string' ? req.body.message : '';
+  if (!to || !subject.trim() || !message.trim()) {
+    return res.status(400).json({
+      error: 'Destinatário, assunto e mensagem são obrigatórios.',
+      code: 'EXTERNAL_EMAIL_INVALID',
+    });
+  }
+
+  // Dentro da plataforma há mensagens internas; este canal é só para fora.
+  const recipientAccount = await identityAccess.findByEmail(to);
+  if (recipientAccount) {
+    return res.status(409).json({
+      error: 'Este destinatário tem conta no Guigui.com. Use as mensagens internas da plataforma.',
+      code: 'RECIPIENT_IS_PLATFORM_MEMBER',
+    });
+  }
+
+  const allowed = await consumeDistributedRateLimit(
+    `email:external:${context.userId}`,
+    EXTERNAL_EMAIL_WINDOW_MS,
+    EXTERNAL_EMAIL_MAX_PER_WINDOW,
+  );
+  if (allowed === false) {
+    return res.status(429).json({
+      error: 'Limite de emails externos atingido. Tente novamente mais tarde.',
+      code: 'EXTERNAL_EMAIL_RATE_LIMITED',
+    });
+  }
+
+  const idempotencyKey = typeof req.body?.requestId === 'string' ? req.body.requestId.trim() : undefined;
+  try {
+    const outcome = await externalEmail.send({
+      sender: { userId: context.userId, name: stored.name || stored.email, email: stored.email },
+      to,
+      subject,
+      message,
+      requestId: idempotencyKey,
+    });
+    recordAudit({
+      action: 'external_email_sent',
+      resource: 'email_delivery',
+      resourceId: outcome.deliveryId,
+      actorRole: context.role === 'user' ? 'citizen' : context.role,
+      actorId: context.userId,
+      success: outcome.state === 'accepted',
+      requestId: requestIdFrom(req),
+      metadata: { state: outcome.state, deduplicated: outcome.deduplicated },
+    });
+    if (outcome.state === 'accepted') {
+      return res.status(202).json({ state: outcome.state, reference: outcome.deliveryId });
+    }
+    return res.status(502).json({
+      error: 'O fornecedor de email não aceitou a mensagem.',
+      code: 'EXTERNAL_EMAIL_FAILED',
+      state: outcome.state,
+    });
+  } catch (error) {
+    if (error instanceof ExternalEmailValidationError) {
+      return res.status(400).json({ error: error.message, code: error.code.toUpperCase() });
+    }
+    if (error instanceof EmailConfigurationError) {
+      return res.status(503).json({
+        error: 'O envio de email não está configurado.',
+        code: 'EMAIL_NOT_CONFIGURED',
+      });
+    }
+    console.error('external-email-failed', {
+      userId: context.userId,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    return res.status(500).json({ error: 'Não foi possível enviar o email.', code: 'EXTERNAL_EMAIL_FAILED' });
+  }
 });
 
 app.post('/api/conversations', requireSession, async (req, res) => {
@@ -4332,8 +4830,12 @@ app.post('/api/auth/register', async (req, res) => {
     businessNeighborhood,
     publicEmail,
   } = req.body || {};
-  if (typeof name !== 'string' || name.trim().length < 2 || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || typeof password !== 'string' || password.length < 6) {
-    return res.status(400).json({ error: 'Indique um nome, e-mail válido e palavra-passe com pelo menos 6 carateres.' });
+  const emailCheck = normaliseEmailForAccount(email);
+  if (typeof name !== 'string' || name.trim().length < 2 || !emailCheck.ok || typeof password !== 'string' || password.length < 6) {
+    return res.status(400).json({
+      error: 'Indique um nome, e-mail válido e palavra-passe com pelo menos 6 carateres.',
+      ...(emailCheck.ok ? {} : { code: emailCheck.code }),
+    });
   }
   if (role !== 'user' && role !== 'business') return res.status(400).json({ error: 'Tipo de conta inválido.' });
 
@@ -4344,7 +4846,10 @@ app.post('/api/auth/register', async (req, res) => {
   const normalizedGroupGroupId = typeof groupGroupId === 'string' ? groupGroupId.trim() : normalizedCategoryId;
   const normalizedSubcategoryId = typeof subcategoryId === 'string' ? subcategoryId.trim() : '';
   const normalizedDescription = typeof description === 'string' ? description.trim() : '';
-  const normalizedPublicEmail = typeof publicEmail === 'string' ? publicEmail.trim() : '';
+  const publicEmailCheck = typeof publicEmail === 'string' && publicEmail.trim()
+    ? normaliseAndValidateEmail(publicEmail)
+    : null;
+  const normalizedPublicEmail = publicEmailCheck?.ok ? publicEmailCheck.email : '';
   if (role === 'business') {
     const completion = getBusinessProfileCompletion({
       name: normalizedBusinessName,
@@ -4364,12 +4869,12 @@ app.post('/api/auth/register', async (req, res) => {
     if (publicEmail !== undefined && typeof publicEmail !== 'string') {
       return res.status(400).json({ error: 'O e-mail público é inválido.', code: 'BUSINESS_PUBLIC_EMAIL_INVALID' });
     }
-    if (normalizedPublicEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedPublicEmail)) {
-      return res.status(400).json({ error: 'O e-mail público é inválido.', code: 'BUSINESS_PUBLIC_EMAIL_INVALID' });
+    if (publicEmailCheck && !publicEmailCheck.ok) {
+      return res.status(400).json({ error: publicEmailCheck.message, code: 'BUSINESS_PUBLIC_EMAIL_INVALID' });
     }
   }
 
-  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedEmail = emailCheck.email ?? '';
   const businessProfile = role === 'business' ? {
     name: normalizedBusinessName,
     categoryId: normalizedCategoryId,
@@ -5394,7 +5899,14 @@ app.get('/api/tickets/sold', requireRole('business', 'admin'), async (req, res) 
     return res.status(403).json({ error: 'A sua conta não está associada a uma empresa.', code: 'BUSINESS_ACCOUNT_REQUIRED' });
   }
   const eventId = typeof req.query.eventId === 'string' && req.query.eventId.trim() ? req.query.eventId.trim() : undefined;
-  const tickets = companyId && databaseConfigured ? await listPostgresTicketsForCompany(companyId, eventId) : [];
+  // A vista é paginada por natureza: pede-se um registo a mais do que o limite
+  // para conseguir sinalizar truncagem (nunca devolver dados parciais sem aviso).
+  const TICKET_LIST_LIMIT = 500;
+  const fetched = companyId && databaseConfigured
+    ? await listPostgresTicketsForCompany(companyId, eventId, TICKET_LIST_LIMIT + 1)
+    : [];
+  const truncated = fetched.length > TICKET_LIST_LIMIT;
+  const tickets = truncated ? fetched.slice(0, TICKET_LIST_LIMIT) : fetched;
   const totals = tickets.reduce((acc, ticket) => {
     acc.total += 1;
     if (ticket.status === 'valid') acc.valid += 1;
@@ -5407,8 +5919,110 @@ app.get('/api/tickets/sold', requireRole('business', 'admin'), async (req, res) 
     acc.revenueXOF += ticket.status === 'valid' || ticket.status === 'used' ? ticket.priceXOF : 0;
     return acc;
   }, { total: 0, valid: 0, used: 0, cancelled: 0, pending: 0, refunded: 0, revenueXOF: 0 });
-  res.json({ tickets, totals });
+  res.json({ tickets, totals, limit: TICKET_LIST_LIMIT, truncated });
 });
+// Exportação CSV da lista de compradores de um evento. A agregação (quantidade,
+// tipos e total por comprador) é feita na base de dados, sem o limite de 500 da
+// vista paginada, e o browser só descarrega o ficheiro pronto.
+app.get('/api/tickets/sold/export', requireRole('business', 'admin'), async (req, res) => {
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  const stored = context.role === 'business'
+    ? (await identityAccess.findById(context.userId) || undefined)
+    : null;
+  const companyId = context.role === 'admin'
+    ? (typeof req.query.companyId === 'string' ? req.query.companyId : undefined)
+    : stored?.businessId;
+  if (context.role === 'business' && !companyId) {
+    return res.status(403).json({ error: 'A sua conta não está associada a uma empresa.', code: 'BUSINESS_ACCOUNT_REQUIRED' });
+  }
+  if (!companyId) {
+    return res.status(400).json({ error: 'Indique a empresa (companyId) a exportar.', code: 'COMPANY_REQUIRED' });
+  }
+  const eventId = typeof req.query.eventId === 'string' && req.query.eventId.trim() ? req.query.eventId.trim() : undefined;
+
+  const aggregated = databaseConfigured ? await exportPostgresTicketsByBuyer(companyId, eventId) : [];
+  // Sem `eventId` a exportação cobre todos os eventos da empresa: cada linha é
+  // por comprador E por evento, com uma coluna extra com o nome do evento.
+  const includeEventColumn = !eventId;
+  type BuyerLine = {
+    name: string;
+    phone: string;
+    eventId: string;
+    eventTitle: string;
+    quantity: number;
+    types: Map<string, number>;
+    totalXOF: number;
+    paid: boolean;
+    pending: boolean;
+    cancelled: boolean;
+  };
+  const buyers = new Map<string, BuyerLine>();
+  for (const row of aggregated) {
+    const key = `${row.eventId}|${row.buyerName.toLowerCase()}|${row.buyerPhone}`;
+    const line = buyers.get(key) || {
+      name: row.buyerName,
+      phone: row.buyerPhone,
+      eventId: row.eventId,
+      eventTitle: row.eventTitle,
+      quantity: 0,
+      types: new Map<string, number>(),
+      totalXOF: 0,
+      paid: false,
+      pending: false,
+      cancelled: false,
+    };
+    line.quantity += row.quantity;
+    line.totalXOF += row.totalXOF;
+    line.paid = line.paid || row.paid;
+    line.pending = line.pending || row.pending;
+    line.cancelled = line.cancelled || row.cancelled;
+    line.types.set(row.ticketTypeName, (line.types.get(row.ticketTypeName) || 0) + row.quantity);
+    buyers.set(key, line);
+  }
+
+  const statusLabel = (line: BuyerLine) => {
+    const parts: string[] = [];
+    if (line.paid) parts.push('Pago');
+    if (line.pending) parts.push('Pendente');
+    if (line.cancelled) parts.push('Cancelado');
+    return parts.join(' + ') || '—';
+  };
+  const cell = (value: string | number) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const lines = Array.from(buyers.values())
+    .sort((left, right) => left.name.localeCompare(right.name, 'pt') || left.eventTitle.localeCompare(right.eventTitle, 'pt'))
+    .map((line) => [
+      line.name,
+      line.phone || '—',
+      ...(includeEventColumn ? [line.eventTitle] : []),
+      line.quantity,
+      Array.from(line.types.entries()).map(([type, count]) => `${type} x${count}`).join(' + '),
+      line.totalXOF,
+      statusLabel(line),
+    ].map(cell).join(';'));
+  const header = includeEventColumn
+    ? '"Comprador";"Telefone";"Evento";"Bilhetes";"Tipos de bilhete";"Total pago (XOF)";"Estado"'
+    : '"Comprador";"Telefone";"Bilhetes";"Tipos de bilhete";"Total pago (XOF)";"Estado"';
+  const csv = [header, ...lines].join('\r\n');
+
+  const eventTitle = eventId && databaseConfigured
+    ? await findPostgresEventTitleForCompany(companyId, eventId)
+    : null;
+  const slug = (eventTitle || (includeEventColumn ? 'todos-os-eventos' : 'compradores'))
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+    .slice(0, 60) || 'compradores';
+  const filename = `compradores-${slug}-${new Date().toISOString().slice(0, 10)}.csv`;
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.setHeader('Cache-Control', 'no-store');
+  res.send(`\uFEFF${csv}`);
+});
+
 // Cancelamento operacional pela empresa organizadora (ou administração).
 // A empresa vem da sessão; o id do bilhete no corpo só é lido depois de
 // confirmada a associação da conta a uma empresa.

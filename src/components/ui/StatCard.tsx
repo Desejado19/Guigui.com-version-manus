@@ -42,7 +42,7 @@ const deltaArrow: Record<'up' | 'down' | 'flat', string> = {
 export const StatCard: React.FC<StatCardProps> = ({ value, label, icon: Icon, tone = 'primary', delta, hint, action, onClick, active = false, className = '', ...rest }) => {
   const interactive = Boolean(onClick);
   const accent = accentVar[tone];
-  const shell = `group relative flex w-full flex-col overflow-hidden rounded-[14px] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_30px_-26px_rgba(15,23,42,0.35)] transition-[transform,box-shadow,border-color] duration-[var(--duration-normal)] ease-[var(--ease-standard)] ${interactive ? 'hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-[0_2px_4px_rgba(15,23,42,0.05),0_18px_40px_-28px_rgba(15,23,42,0.4)]' : ''} ${active ? 'shadow-[var(--shadow-md)]' : ''} ${className}`;
+  const shell = `group relative flex w-full flex-col overflow-hidden rounded-[14px] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_30px_-26px_rgba(15,23,42,0.35)] transition-[transform,box-shadow,border-color] duration-[var(--duration-normal)] ease-[var(--ease-standard)] ${interactive ? 'hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-[0_2px_4px_rgba(15,23,42,0.05),0_18px_40px_-28px_rgba(15,23,42,0.4)]' : ''} ${active ? 'shadow-[var(--shadow-md)]' : ''} ${className}`;
   const borderStyle = active
     ? { borderColor: accent, boxShadow: `0 0 0 1px ${accent}` }
     : undefined;

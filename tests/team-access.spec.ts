@@ -1,4 +1,4 @@
-import { expect, request as playwrightRequest, test, type Page } from '@playwright/test';
+import { expect, request as playwrightRequest, test, type Page } from './fixtures';
 
 const DEMO_PASSWORD = 'Guigui@2026!';
 const BUSINESS_EMAIL = 'empresa.teste@guigui.com';
@@ -117,10 +117,25 @@ test.describe('Gestão de utilizadores, acessos e permissões', () => {
     await page.getByLabel('Nome completo').fill('Colaborador Interface');
     await page.getByLabel('E-mail de acesso').fill(email);
     await page.getByLabel('Cargo / função').fill('Marketing');
-    await page.getByLabel('Palavra-passe inicial').fill(MEMBER_PASSWORD);
     await page.getByLabel('Função predefinida (modelo de permissões)').selectOption('marketing');
-    await page.getByRole('button', { name: 'Criar conta' }).click();
+    await page.getByRole('button', { name: 'Enviar convite' }).click();
 
+    // O colaborador passou a ser criado por convite: fica pendente até ativar a
+    // conta pelo link recebido por e-mail (sem SMTP, o link volta à interface).
+    const inviteLinkInput = page.getByTestId('business-invite-link').locator('input');
+    await expect(inviteLinkInput).toBeVisible({ timeout: 20_000 });
+    const activationUrl = await inviteLinkInput.inputValue();
+    const token = new URL(activationUrl).searchParams.get('token');
+    expect(token).toBeTruthy();
+    await expect(page.getByTestId('business-team-invitations')).toContainText('Colaborador Interface');
+    await expect(page.getByTestId('business-team-invitations')).toContainText('Pendente');
+
+    const accepted = await page.request.post(`/api/team/invitations/token/${encodeURIComponent(token!)}/accept`, {
+      data: { password: MEMBER_PASSWORD },
+    });
+    expect(accepted.ok(), await accepted.text()).toBeTruthy();
+
+    await page.getByRole('button', { name: 'Actualizar' }).click();
     await expect(page.getByText('Colaborador Interface').first()).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText(email).first()).toBeVisible();
 
@@ -134,10 +149,12 @@ test.describe('Gestão de utilizadores, acessos e permissões', () => {
     // Pesquisa e filtro por estado funcionam sobre dados reais.
     await page.getByPlaceholder('Pesquisar nome, e-mail ou cargo').fill('Colaborador Interface');
     await expect(page.getByText('Colaborador Interface').first()).toBeVisible();
-    await page.getByPlaceholder('Pesquisar nome, e-mail ou cargo').fill('');
+    // Combina a pesquisa com o estado: este colaborador é o único com este nome
+    // e está activo, por isso o filtro "suspensos" fica vazio para ele.
     await page.getByLabel('Filtrar por estado').selectOption('suspended');
     await expect(page.getByText('Sem colaboradores para os filtros actuais')).toBeVisible();
     await page.getByLabel('Filtrar por estado').selectOption('all');
+    await page.getByPlaceholder('Pesquisar nome, e-mail ou cargo').fill('');
 
     await page.request.delete(`/api/business/team/members/${member.userId}`);
     await page.request.post('/api/auth/login', { data: { email: BUSINESS_EMAIL, password: DEMO_PASSWORD } });

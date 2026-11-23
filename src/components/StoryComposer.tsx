@@ -263,14 +263,14 @@ export const StoryComposer: React.FC<StoryComposerProps> = ({
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/80 p-2 sm:p-4" role="dialog" aria-modal="true" aria-label="Editor de Story">
       <div className="flex h-full max-h-[96vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
-        <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+        <header className="flex items-center justify-between border-b border-[var(--color-border-subtle)] px-4 py-3 dark:border-slate-700">
           <div>
             <h2 className="text-sm font-black text-slate-900 dark:text-white">{draft ? 'Editar story' : 'Criar story'}</h2>
             <p className="text-[10px] font-semibold text-slate-500">Publica como {currentUser.businessName || currentUser.name} · visível 24 h</p>
           </div>
           <div className="flex items-center gap-1.5">
-            <button type="button" onClick={undo} disabled={!history.length} className="rounded-lg border border-slate-200 p-2 text-slate-600 disabled:opacity-30 dark:border-slate-700 dark:text-slate-300" aria-label="Desfazer"><Undo2 className="h-4 w-4" /></button>
-            <button type="button" onClick={redo} disabled={!future.length} className="rounded-lg border border-slate-200 p-2 text-slate-600 disabled:opacity-30 dark:border-slate-700 dark:text-slate-300" aria-label="Refazer"><Redo2 className="h-4 w-4" /></button>
+            <button type="button" onClick={undo} disabled={!history.length} className="rounded-lg border border-[var(--color-border-subtle)] p-2 text-slate-600 disabled:opacity-30 dark:border-slate-700 dark:text-slate-300" aria-label="Desfazer"><Undo2 className="h-4 w-4" /></button>
+            <button type="button" onClick={redo} disabled={!future.length} className="rounded-lg border border-[var(--color-border-subtle)] p-2 text-slate-600 disabled:opacity-30 dark:border-slate-700 dark:text-slate-300" aria-label="Refazer"><Redo2 className="h-4 w-4" /></button>
             <button type="button" onClick={onClose} className="rounded-lg bg-slate-100 p-2 text-slate-600 dark:bg-slate-800 dark:text-slate-300" aria-label="Fechar editor"><X className="h-4 w-4" /></button>
           </div>
         </header>
@@ -318,20 +318,20 @@ export const StoryComposer: React.FC<StoryComposerProps> = ({
 
             <label className="block">
               <span className="font-black text-slate-700 dark:text-slate-200">Legenda</span>
-              <textarea value={caption} onChange={(event) => setCaption(event.target.value)} rows={2} maxLength={2200} placeholder="Escreve uma legenda..." className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+              <textarea value={caption} onChange={(event) => setCaption(event.target.value)} rows={2} maxLength={2200} placeholder="Escreve uma legenda..." className="mt-1 w-full rounded-xl border border-[var(--color-border-subtle)] bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
             </label>
 
             <div className="grid grid-cols-2 gap-2">
               <label className="block">
                 <span className="font-black text-slate-700 dark:text-slate-200">Audiência</span>
-                <select value={visibility} onChange={(event) => setVisibility(event.target.value as 'public' | 'limited')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+                <select value={visibility} onChange={(event) => setVisibility(event.target.value as 'public' | 'limited')} className="mt-1 w-full rounded-xl border border-[var(--color-border-subtle)] bg-white px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800 dark:text-white">
                   <option value="public">Todos os cidadãos</option>
                   <option value="limited">Audiência autenticada</option>
                 </select>
               </label>
               <label className="block">
                 <span className="font-black text-slate-700 dark:text-slate-200">Localização</span>
-                <select value={locationName} onChange={(event) => { setLocationName(event.target.value); setLocationId(locations.find((entry) => entry.name === event.target.value)?.id || ''); }} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+                <select value={locationName} onChange={(event) => { setLocationName(event.target.value); setLocationId(locations.find((entry) => entry.name === event.target.value)?.id || ''); }} className="mt-1 w-full rounded-xl border border-[var(--color-border-subtle)] bg-white px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800 dark:text-white">
                   <option value="">Sem localização</option>
                   {locations.map((entry) => <option key={entry.id} value={entry.name}>{entry.name}</option>)}
                 </select>
@@ -351,14 +351,14 @@ export const StoryComposer: React.FC<StoryComposerProps> = ({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+            <div className="rounded-2xl border border-[var(--color-border-subtle)] p-3 dark:border-slate-700">
               <div className="flex items-center justify-between">
                 <span className="font-black text-slate-700 dark:text-slate-200">Elementos e stickers</span>
                 <button type="button" onClick={() => setBuilderOpen((value) => !value)} className="flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[10px] font-black text-white"><Plus className="h-3 w-3" /> Adicionar</button>
               </div>
               {builderOpen && (
-                <div className="mt-2 space-y-2 rounded-xl bg-slate-50 p-2.5 dark:bg-slate-800/70">
-                  <select aria-label="Tipo de elemento" value={builderType} onChange={(event) => setBuilderType(event.target.value as StoryElementType)} className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800">
+                <div className="mt-2 space-y-2 rounded-xl bg-slate-50 p-2.5 dark:bg-slate-800">
+                  <select aria-label="Tipo de elemento" value={builderType} onChange={(event) => setBuilderType(event.target.value as StoryElementType)} className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800">
                     <option value="text">Texto</option><option value="emoji">Emoji</option><option value="sticker">Sticker</option>
                     <option value="poll">Sondagem</option><option value="question">Caixa de perguntas</option><option value="quiz">Teste de escolha múltipla</option>
                     <option value="countdown">Contagem decrescente</option><option value="link">Link</option><option value="cta">Chamada para ação</option>
@@ -367,18 +367,18 @@ export const StoryComposer: React.FC<StoryComposerProps> = ({
                   {['text', 'sticker', 'emoji'].includes(builderType) && <>
                     {builderType === 'emoji' && <div className="flex flex-wrap gap-1">{EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => setBuilderText(emoji)} className="rounded p-1 text-lg">{emoji}</button>)}</div>}
                     {builderType === 'sticker' && <div className="flex flex-wrap gap-1">{STICKERS.map((sticker) => <button key={sticker} type="button" onClick={() => setBuilderText(sticker)} className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-900">{sticker}</button>)}</div>}
-                    <input value={builderText} onChange={(event) => setBuilderText(event.target.value)} placeholder="Texto do elemento" className="w-full rounded-lg border border-slate-200 px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800" />
+                    <input value={builderText} onChange={(event) => setBuilderText(event.target.value)} placeholder="Texto do elemento" className="w-full rounded-lg border border-[var(--color-border-subtle)] px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800" />
                   </>}
-                  {(builderType === 'poll' || builderType === 'question' || builderType === 'quiz') && <input value={builderQuestion} onChange={(event) => setBuilderQuestion(event.target.value)} placeholder="Pergunta" className="w-full rounded-lg border border-slate-200 px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800" />}
-                  {(builderType === 'poll' || builderType === 'quiz') && <textarea value={builderOptions} onChange={(event) => setBuilderOptions(event.target.value)} rows={3} placeholder="Uma opção por linha" className="w-full rounded-lg border border-slate-200 px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800" />}
+                  {(builderType === 'poll' || builderType === 'question' || builderType === 'quiz') && <input value={builderQuestion} onChange={(event) => setBuilderQuestion(event.target.value)} placeholder="Pergunta" className="w-full rounded-lg border border-[var(--color-border-subtle)] px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800" />}
+                  {(builderType === 'poll' || builderType === 'quiz') && <textarea value={builderOptions} onChange={(event) => setBuilderOptions(event.target.value)} rows={3} placeholder="Uma opção por linha" className="w-full rounded-lg border border-[var(--color-border-subtle)] px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800" />}
                   {(builderType === 'link' || builderType === 'cta') && <>
-                    <input value={builderLabel} onChange={(event) => setBuilderLabel(event.target.value)} placeholder="Texto do botão" className="w-full rounded-lg border border-slate-200 px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800" />
-                    <input value={builderUrl} onChange={(event) => setBuilderUrl(event.target.value)} placeholder="https://..." className="w-full rounded-lg border border-slate-200 px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800" />
+                    <input value={builderLabel} onChange={(event) => setBuilderLabel(event.target.value)} placeholder="Texto do botão" className="w-full rounded-lg border border-[var(--color-border-subtle)] px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800" />
+                    <input value={builderUrl} onChange={(event) => setBuilderUrl(event.target.value)} placeholder="https://..." className="w-full rounded-lg border border-[var(--color-border-subtle)] px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800" />
                   </>}
-                  {builderType === 'countdown' && <><input value={builderLabel} onChange={(event) => setBuilderLabel(event.target.value)} placeholder="Título" className="w-full rounded-lg border border-slate-200 px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800" /><input type="datetime-local" value={builderDate} onChange={(event) => setBuilderDate(event.target.value)} className="w-full rounded-lg border border-slate-200 px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800" /></>}
-                  {builderType === 'location' && <select value={locationName} onChange={(event) => setLocationName(event.target.value)} className="w-full rounded-lg border border-slate-200 px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800"><option value="">Escolhe o bairro</option>{locations.map((entry) => <option key={entry.id} value={entry.name}>{entry.name}</option>)}</select>}
-                  {['mention', 'hashtag', 'music'].includes(builderType) && <input value={builderValue} onChange={(event) => setBuilderValue(event.target.value)} placeholder={builderType === 'mention' ? 'Nome da empresa' : builderType === 'hashtag' ? 'hashtag' : 'Título da música'} className="w-full rounded-lg border border-slate-200 px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800" />}
-                  {builderType === 'music' && <input value={builderLabel} onChange={(event) => setBuilderLabel(event.target.value)} placeholder="Artista" className="w-full rounded-lg border border-slate-200 px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800" />}
+                  {builderType === 'countdown' && <><input value={builderLabel} onChange={(event) => setBuilderLabel(event.target.value)} placeholder="Título" className="w-full rounded-lg border border-[var(--color-border-subtle)] px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800" /><input type="datetime-local" value={builderDate} onChange={(event) => setBuilderDate(event.target.value)} className="w-full rounded-lg border border-[var(--color-border-subtle)] px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800" /></>}
+                  {builderType === 'location' && <select value={locationName} onChange={(event) => setLocationName(event.target.value)} className="w-full rounded-lg border border-[var(--color-border-subtle)] px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800"><option value="">Escolhe o bairro</option>{locations.map((entry) => <option key={entry.id} value={entry.name}>{entry.name}</option>)}</select>}
+                  {['mention', 'hashtag', 'music'].includes(builderType) && <input value={builderValue} onChange={(event) => setBuilderValue(event.target.value)} placeholder={builderType === 'mention' ? 'Nome da empresa' : builderType === 'hashtag' ? 'hashtag' : 'Título da música'} className="w-full rounded-lg border border-[var(--color-border-subtle)] px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800" />}
+                  {builderType === 'music' && <input value={builderLabel} onChange={(event) => setBuilderLabel(event.target.value)} placeholder="Artista" className="w-full rounded-lg border border-[var(--color-border-subtle)] px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800" />}
                   <button type="button" onClick={addElement} className="w-full rounded-lg bg-emerald-600 px-2 py-1.5 font-black text-white">Inserir elemento</button>
                 </div>
               )}
@@ -396,16 +396,16 @@ export const StoryComposer: React.FC<StoryComposerProps> = ({
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              <label className="block"><span className="font-black text-slate-700 dark:text-slate-200">Botão de ação</span><input value={actionLabel} onChange={(event) => setActionLabel(event.target.value)} placeholder="Ver oferta" className="mt-1 w-full rounded-xl border border-slate-200 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800" /></label>
-              <label className="block"><span className="font-black text-slate-700 dark:text-slate-200">Link do botão</span><input value={actionUrl} onChange={(event) => setActionUrl(event.target.value)} placeholder="https://..." className="mt-1 w-full rounded-xl border border-slate-200 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800" /></label>
+              <label className="block"><span className="font-black text-slate-700 dark:text-slate-200">Botão de ação</span><input value={actionLabel} onChange={(event) => setActionLabel(event.target.value)} placeholder="Ver oferta" className="mt-1 w-full rounded-xl border border-[var(--color-border-subtle)] px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800" /></label>
+              <label className="block"><span className="font-black text-slate-700 dark:text-slate-200">Link do botão</span><input value={actionUrl} onChange={(event) => setActionUrl(event.target.value)} placeholder="https://..." className="mt-1 w-full rounded-xl border border-[var(--color-border-subtle)] px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800" /></label>
             </div>
           </div>
         </div>
 
-        <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-4 py-3 dark:border-slate-700">
+        <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-border-subtle)] px-4 py-3 dark:border-slate-700">
           <button type="button" onClick={() => setPreview((value) => !value)} className="flex items-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 font-black text-slate-700 dark:bg-slate-800 dark:text-slate-200"><Sparkles className="h-3.5 w-3.5" /> {preview ? 'Editar' : 'Pré-visualizar'}</button>
           <div className="flex gap-2">
-            <button type="button" onClick={() => void save(false)} disabled={saving || uploading} className="rounded-xl border border-slate-300 px-3 py-2 font-black text-slate-700 disabled:opacity-40 dark:border-slate-600 dark:text-slate-200">Guardar rascunho</button>
+            <button type="button" onClick={() => void save(false)} disabled={saving || uploading} className="rounded-xl border border-[var(--color-border-default)] px-3 py-2 font-black text-slate-700 disabled:opacity-40 dark:border-slate-600 dark:text-slate-200">Guardar rascunho</button>
             <button type="button" onClick={() => void save(true)} disabled={saving || uploading} className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 font-black text-white disabled:opacity-40"><Send className="h-3.5 w-3.5" /> {saving ? 'A publicar...' : 'Publicar story'}</button>
           </div>
         </footer>

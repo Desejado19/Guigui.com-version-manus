@@ -59,7 +59,7 @@ export const ModuleSubnav: React.FC<ModuleSubnavProps> = ({
               className={`rounded-2xl border px-3 py-1.5 text-[11px] font-bold transition ${
                 isActive
                   ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
-                  : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:text-emerald-700'
+                  : 'border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] text-slate-700 hover:border-emerald-300 hover:text-emerald-700'
               }`}
             >
               {item.label}

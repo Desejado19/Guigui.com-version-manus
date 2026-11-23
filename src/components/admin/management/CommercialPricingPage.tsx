@@ -130,17 +130,17 @@ export const CommercialPricingPage: React.FC<{ onBack: () => void }> = ({ onBack
       {notice && <CommercialMessage tone="success">{notice}</CommercialMessage>}
       {loading ? <CommercialLoading /> : (
         <>
-          <div className="overflow-x-auto rounded-2xl border border-[#e6dac8] bg-white shadow-sm">
+          <div className="overflow-x-auto rounded-2xl border border-[var(--color-border-default)] bg-white shadow-sm">
             <table className="w-full min-w-[1080px] border-collapse text-left text-[10.5px]">
-              <thead><tr className="bg-[#f7f2ec] text-[9px] uppercase tracking-[0.12em] text-slate-500"><th className="border-b border-[#e6dac8] p-3">Grupo de categoria</th>{plans.map((plan) => <th key={plan.id} className="border-b border-[#e6dac8] p-3 text-center">{plan.name}<div className="text-[8px] font-medium normal-case text-slate-400">referência {formatCommercialXOF(plan.priceXOF)}</div></th>)}</tr></thead>
+              <thead><tr className="bg-[var(--color-bg-subtle)] text-[9px] uppercase tracking-[0.12em] text-slate-500"><th className="border-b border-[var(--color-border-default)] p-3">Grupo de categoria</th>{plans.map((plan) => <th key={plan.id} className="border-b border-[var(--color-border-default)] p-3 text-center">{plan.name}<div className="text-[8px] font-medium normal-case text-slate-400">referência {formatCommercialXOF(plan.priceXOF)}</div></th>)}</tr></thead>
               <tbody>
-                {groups.map((group) => <tr key={group.id} className="border-b border-slate-100 align-top last:border-0"><td className="p-3"><div className="font-black text-slate-900">{group.name}</div><div className="mt-0.5 max-w-[260px] text-[9px] text-slate-500">{group.description || 'Sem descrição'}</div></td>{plans.map((plan) => {
+                {groups.map((group) => <tr key={group.id} className="border-b border-[var(--color-border-subtle)] align-top last:border-0"><td className="p-3"><div className="font-black text-slate-900">{group.name}</div><div className="mt-0.5 max-w-[260px] text-[9px] text-slate-500">{group.description || 'Sem descrição'}</div></td>{plans.map((plan) => {
                   const cell = cellFor(group.id, plan.id);
                   return <td key={plan.id} className="p-2 text-center">
-                    {cell ? <button type="button" aria-label={`Editar preço ${group.name} ${plan.name}`} onClick={() => { setDraft({ groupId: group.id, groupName: group.name, planId: plan.id, planName: plan.name, monthlyXOF: cell.monthlyXOF, discountPercent: cell.discountPercent, isActive: cell.isActive }); setReason(''); }} className={`group w-full rounded-xl border p-2.5 text-left transition hover:border-[#123e3b] ${cell.isActive ? 'border-[#e6dac8] bg-white' : 'border-slate-200 bg-slate-50 opacity-70'}`}>
-                      <div className="font-black text-slate-900">{formatCommercialXOF(cell.monthlyXOF)} <Edit2 className="inline h-3 w-3 text-slate-300 group-hover:text-[#123e3b]" /></div>
+                    {cell ? <button type="button" aria-label={`Editar preço ${group.name} ${plan.name}`} onClick={() => { setDraft({ groupId: group.id, groupName: group.name, planId: plan.id, planName: plan.name, monthlyXOF: cell.monthlyXOF, discountPercent: cell.discountPercent, isActive: cell.isActive }); setReason(''); }} className={`group w-full rounded-xl border p-2.5 text-left transition hover:border-[var(--color-green-700)] ${cell.isActive ? 'border-[var(--color-border-default)] bg-white' : 'border-[var(--color-border-default)] bg-slate-50 opacity-70'}`}>
+                      <div className="font-black text-slate-900">{formatCommercialXOF(cell.monthlyXOF)} <Edit2 className="inline h-3 w-3 text-slate-300 group-hover:text-[var(--color-green-800)]" /></div>
                       <div className="mt-0.5 text-[9px] text-slate-500">Anual {formatCommercialXOF(cell.annualXOF)}</div>
-                      <div className="mt-1 flex items-center justify-between text-[8.5px]"><span className="rounded-full bg-emerald-50 px-1.5 py-0.5 font-black text-emerald-800">{cell.discountPercent}% desc.</span><span className={`font-black ${cell.isActive ? 'text-emerald-700' : 'text-slate-500'}`}>{cell.isActive ? 'Ativa' : 'Inativa'}</span></div>
+                      <div className="mt-1 flex items-center justify-between text-[8.5px]"><span className="rounded-full bg-[var(--tone-success-bg)] px-1.5 py-0.5 font-black text-[var(--tone-success-text)]">{cell.discountPercent}% desc.</span><span className={`font-black ${cell.isActive ? 'text-[var(--tone-success-text)]' : 'text-slate-500'}`}>{cell.isActive ? 'Ativa' : 'Inativa'}</span></div>
                     </button> : <span className="text-slate-400">Sem preço</span>}
                   </td>;
                 })}</tr>)}
@@ -149,17 +149,17 @@ export const CommercialPricingPage: React.FC<{ onBack: () => void }> = ({ onBack
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <section className="rounded-2xl border border-[#cfe2df] bg-[#f3faf8] p-4 shadow-sm">
-              <h3 className="flex items-center gap-2 text-[12px] font-black text-[#123e3b]"><Calculator className="h-4 w-4" /> Simulador de preço</h3>
+            <section className="rounded-2xl border border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] p-4 shadow-sm">
+              <h3 className="flex items-center gap-2 text-[12px] font-black text-[var(--color-green-800)]"><Calculator className="h-4 w-4" /> Simulador de preço</h3>
               <p className="mt-1 text-[10px] text-slate-600">Calculado exclusivamente no backend a partir da matriz ativa.</p>
               <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <ManagementFilter label="Categoria" value={simGroup} onChange={setSimGroup} options={groups.map((group) => ({ value: group.id, label: group.name }))} />
                 <ManagementFilter label="Plano" value={simPlan} onChange={setSimPlan} options={plans.map((plan) => ({ value: plan.id, label: plan.name }))} />
                 <ManagementFilter label="Período" value={simPeriod} onChange={setSimPeriod} options={[{ value: 'monthly', label: 'Mensal' }, { value: 'annual', label: 'Anual' }]} />
               </div>
-              <div className="mt-3 rounded-xl border border-white bg-white/80 p-3"><div className="text-[9px] font-black uppercase text-slate-500">Preço calculado</div><div className="mt-1 text-xl font-black text-[#123e3b]">{simulated ? formatCommercialXOF(simulated.value) : 'Sem combinação ativa'}</div>{simulated && <div className="text-[9.5px] text-slate-500">Mensal {formatCommercialXOF(simulated.monthlyXOF)} · anual {formatCommercialXOF(simulated.annualXOF)} · {simulated.discountPercent}%</div>}</div>
+              <div className="mt-3 rounded-xl border border-white bg-white/80 p-3"><div className="text-[9px] font-black uppercase text-slate-500">Preço calculado</div><div className="mt-1 text-xl font-black text-[var(--color-green-800)]">{simulated ? formatCommercialXOF(simulated.value) : 'Sem combinação ativa'}</div>{simulated && <div className="text-[9.5px] text-slate-500">Mensal {formatCommercialXOF(simulated.monthlyXOF)} · anual {formatCommercialXOF(simulated.annualXOF)} · {simulated.discountPercent}%</div>}</div>
             </section>
-            <section className="rounded-2xl border border-[#e6dac8] bg-white p-4 shadow-sm">
+            <section className="rounded-2xl border border-[var(--color-border-default)] bg-white p-4 shadow-sm">
               <h3 className="flex items-center gap-2 text-[12px] font-black text-slate-900"><BadgePercent className="h-4 w-4" /> Regras de aplicação</h3>
               <ul className="mt-2 space-y-1.5 text-[10px] leading-relaxed text-slate-600">
                 <li>• A matriz prevalece sobre o preço de referência do catálogo quando existe uma combinação ativa.</li>
@@ -167,7 +167,7 @@ export const CommercialPricingPage: React.FC<{ onBack: () => void }> = ({ onBack
                 <li>• O desconto anual configurado é {overview?.rules?.annualDiscountPercent ?? 15}%; cada célula pode ter o seu próprio desconto.</li>
                 <li>• O histórico guarda valor anterior, novo valor, responsável, motivo e versão.</li>
               </ul>
-              {overview?.recentAudit.some((item) => item.entityType === 'price_matrix') && <div className="mt-3 border-t border-slate-100 pt-2 text-[9.5px] text-slate-500">Última alteração: {formatCommercialDate(overview.recentAudit.find((item) => item.entityType === 'price_matrix')?.createdAt || null, true)}</div>}
+              {overview?.recentAudit.some((item) => item.entityType === 'price_matrix') && <div className="mt-3 border-t border-[var(--color-border-subtle)] pt-2 text-[9.5px] text-slate-500">Última alteração: {formatCommercialDate(overview.recentAudit.find((item) => item.entityType === 'price_matrix')?.createdAt || null, true)}</div>}
             </section>
           </div>
         </>
@@ -182,7 +182,7 @@ export const CommercialPricingPage: React.FC<{ onBack: () => void }> = ({ onBack
           <CommercialField label="Preço anual calculado (XOF)" hint="12 mensalidades com o desconto indicado."><input readOnly className={commercialInputClass} value={annualFromForm} /></CommercialField>
           <CommercialField label="Estado"><select className={commercialInputClass} value={draft.isActive ? 'active' : 'inactive'} onChange={(event) => setDraft({ ...draft, isActive: event.target.value === 'active' })}><option value="active">Ativa</option><option value="inactive">Inativa</option></select></CommercialField>
           <CommercialField label="Motivo" className="sm:col-span-2"><input className={commercialInputClass} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Obrigatório para o histórico? Opcional, mas recomendado." /></CommercialField>
-          <div className="sm:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-[9.5px] text-amber-900">As assinaturas atuais preservam o preço contratado. A nova matriz só entra em vigor em novas adesões ou renovações.</div>
+          <div className="sm:col-span-2 rounded-xl border border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] p-2.5 text-[9.5px] text-[var(--tone-warning-text)]">As assinaturas atuais preservam o preço contratado. A nova matriz só entra em vigor em novas adesões ou renovações.</div>
         </div>}
       </CommercialModal>
 

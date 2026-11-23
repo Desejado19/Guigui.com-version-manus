@@ -1,4 +1,4 @@
-import { expect, request as playwrightRequest, test, type Page } from '@playwright/test';
+import { expect, request as playwrightRequest, test, type Page } from './fixtures';
 
 const DEMO_PASSWORD = 'Guigui@2026!';
 const BUSINESS_EMAIL = 'empresa.teste@guigui.com';
@@ -132,8 +132,20 @@ test.describe('Segurança, Relatórios e Exportação', () => {
     await expect(historyTable).toBeVisible({ timeout: 20_000 });
     await expect(historyTable.getByText('Relatórios · Comercial')).toBeVisible();
 
+    // A exportação individual passou a ser feita pelo formulário guiado.
+    await page.getByTestId('prepare-export').click();
+    await page.getByTestId('wizard-area').selectOption('sales');
+    await page.getByTestId('wizard-report-orders').check();
+    await page.getByTestId('wizard-next').click();
+    await page.getByTestId('wizard-period-all').click();
+    await page.getByTestId('wizard-next').click();
+    await page.getByTestId('wizard-next').click();
+    await page.getByTestId('wizard-format-csv').click();
+    await page.getByTestId('wizard-next').click();
+    await expect(page.getByTestId('preview-records')).toContainText('registo(s)');
+
     const downloadDataset = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'CSV' }).first().click();
+    await page.getByTestId('generate-export').click();
     const datasetFile = await downloadDataset;
     expect(datasetFile.suggestedFilename()).toMatch(/\.csv$/);
     await expect(historyTable.getByText(/\.csv/).first()).toBeVisible();
@@ -146,7 +158,7 @@ test.describe('Segurança, Relatórios e Exportação', () => {
     await openNav(page, 'Relatórios');
     await expect(page.getByRole('button', { name: 'Abrir Exportação' })).toBeVisible();
     await page.getByRole('button', { name: 'Abrir Exportação' }).click();
-    await expect(page.getByText('Histórico de exportações')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Histórico de exportações' })).toBeVisible();
 
     await openNav(page, 'Segurança');
     await expect(page.getByRole('heading', { name: 'Alterar palavra-passe' })).toBeVisible();

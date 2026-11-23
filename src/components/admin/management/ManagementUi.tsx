@@ -11,11 +11,11 @@ export interface ManagementKpi {
 }
 
 const KPI_TONES: Record<NonNullable<ManagementKpi['tone']>, string> = {
-  neutral: 'border-slate-200 bg-white text-slate-900',
-  success: 'border-emerald-200 bg-emerald-50 text-emerald-900',
-  warning: 'border-amber-200 bg-amber-50 text-amber-900',
-  danger: 'border-rose-200 bg-rose-50 text-rose-900',
-  info: 'border-sky-200 bg-sky-50 text-sky-900',
+  neutral: 'border-[var(--color-border-default)] bg-white text-slate-900',
+  success: 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)]',
+  warning: 'border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)]',
+  danger: 'border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)]',
+  info: 'border-[var(--tone-info-border)] bg-[var(--tone-info-bg)] text-[var(--tone-info-text)]',
 };
 
 export const ManagementKpiGrid: React.FC<{ items: ManagementKpi[]; className?: string }> = ({ items, className = '' }) => (
@@ -53,16 +53,16 @@ export const ModuleNav: React.FC<{
         key={item.key}
         type="button"
         onClick={() => onSelect(item.key)}
-        className="group flex min-h-[46px] items-center gap-2.5 rounded-xl border border-[#e6dac8] bg-white px-3 py-2.5 text-left transition hover:border-[#123e3b] hover:bg-[#fbfaf7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#123e3b]/20"
+        className="group flex min-h-[46px] items-center gap-2.5 rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2.5 text-left transition hover:border-[var(--color-green-700)] hover:bg-[var(--color-bg-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#123e3b]/20"
       >
         {item.icon && (
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#f4f1ea] text-[#123e3b]">{item.icon}</span>
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--color-bg-subtle)] text-[var(--color-green-800)]">{item.icon}</span>
         )}
         <span className="min-w-0 flex-1 truncate text-[11.5px] font-black text-slate-800">{item.label}</span>
         {item.count !== undefined && item.count !== null && (
           <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[9.5px] font-black tabular-nums text-slate-600">{item.count}</span>
         )}
-        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#123e3b]" />
+        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[var(--color-green-800)]" />
       </button>
     ))}
   </nav>
@@ -95,7 +95,7 @@ export const ManagementPage: React.FC<ManagementPageProps> = ({
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-1 rounded-full border border-[#dccfb7] bg-white px-2.5 py-1.5 text-[10px] font-black text-[#123e3b] transition hover:border-[#123e3b]"
+          className="inline-flex items-center gap-1 rounded-full border border-[var(--color-border-default)] bg-white px-2.5 py-1.5 text-[10px] font-black text-[var(--color-green-800)] transition hover:border-[var(--color-green-700)]"
         >
           <ChevronLeft className="h-3.5 w-3.5" />
           Voltar ao módulo
@@ -108,7 +108,7 @@ export const ManagementPage: React.FC<ManagementPageProps> = ({
       <span className="text-slate-900">{breadcrumbTail}</span>
     </div>
 
-    <div className="flex flex-col gap-3 rounded-2xl border border-[#e6dac8] bg-white p-4 shadow-sm sm:flex-row sm:items-start sm:justify-between">
+    <div className="flex flex-col gap-3 rounded-2xl border border-[var(--color-border-default)] bg-white p-4 shadow-sm sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
         <h2 className="text-lg font-black text-slate-900">{title}</h2>
         <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-slate-600">{description}</p>
@@ -139,7 +139,7 @@ export const ManagementToolbar: React.FC<ManagementToolbarProps> = ({
   children,
   onReset,
 }) => (
-  <div className="space-y-2.5 rounded-2xl border border-[#e6dac8] bg-white p-3.5 shadow-sm">
+  <div className="space-y-2.5 rounded-2xl border border-[var(--color-border-default)] bg-white p-3.5 shadow-sm">
     <div className="flex flex-wrap items-center gap-2">
       <div className="relative min-w-[200px] flex-1">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
@@ -149,14 +149,14 @@ export const ManagementToolbar: React.FC<ManagementToolbarProps> = ({
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder={placeholder}
           aria-label={placeholder}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-8 pr-3 text-[11px] font-medium text-slate-700 outline-none transition focus:border-[#123e3b] focus:bg-white focus:ring-2 focus:ring-[#123e3b]/10"
+          className="w-full rounded-xl border border-[var(--color-border-default)] bg-slate-50 py-2 pl-8 pr-3 text-[11px] font-medium text-slate-700 outline-none transition focus:border-[var(--color-focus-ring)] focus:bg-white focus:ring-2 focus:ring-[var(--color-focus-ring)]/25"
         />
       </div>
       {onReset && (
         <button
           type="button"
           onClick={onReset}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-slate-600 transition hover:border-[#123e3b] hover:text-[#123e3b]"
+          className="rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-slate-600 transition hover:border-[var(--color-green-700)] hover:text-[var(--color-green-800)]"
         >
           Limpar
         </button>
@@ -179,7 +179,7 @@ export const ManagementFilter: React.FC<{
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] font-bold text-slate-800 outline-none transition focus:border-[#123e3b] focus:bg-white"
+      className="rounded-xl border border-[var(--color-border-default)] bg-slate-50 px-2.5 py-2 text-[11px] font-bold text-slate-800 outline-none transition focus:border-[var(--color-focus-ring)] focus:bg-white"
     >
       {options.map((option) => (
         <option key={option.value} value={option.value}>
@@ -220,20 +220,20 @@ export function ManagementTable<T>({
   rowClassName,
 }: ManagementTableProps<T>) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#e6dac8] bg-white shadow-sm">
+    <div className="overflow-hidden rounded-2xl border border-[var(--color-border-default)] bg-white shadow-sm">
       <div className="max-h-[calc(100vh-330px)] overflow-auto">
         <table className="w-full min-w-[860px] border-collapse text-left text-[11px]">
-          <thead className="sticky top-0 z-10 bg-[#f7f2ec]">
+          <thead className="sticky top-0 z-10 bg-[var(--color-bg-subtle)]">
             <tr>
               {columns.map((column) => {
                 const isSorted = sortKey === column.key;
                 return (
-                  <th key={column.key} scope="col" className={`border-b border-[#e6dac8] px-3 py-2.5 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500 ${column.className || ''}`}>
+                  <th key={column.key} scope="col" className={`border-b border-[var(--color-border-default)] px-3 py-2.5 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500 ${column.className || ''}`}>
                     {column.sortable && onSort ? (
                       <button
                         type="button"
                         onClick={() => onSort(column.key)}
-                        className="inline-flex items-center gap-1 text-inherit transition hover:text-[#123e3b]"
+                        className="inline-flex items-center gap-1 text-inherit transition hover:text-[var(--color-green-800)]"
                         title={`Ordenar por ${column.label}`}
                       >
                         {column.label}
@@ -260,7 +260,7 @@ export function ManagementTable<T>({
               </tr>
             ) : (
               rows.map((row) => (
-                <tr key={rowKey(row)} className={`border-b border-slate-100 last:border-0 hover:bg-[#faf7f2] ${rowClassName?.(row) || ''}`}>
+                <tr key={rowKey(row)} className={`border-b border-[var(--color-border-subtle)] last:border-0 hover:bg-[var(--color-bg-subtle)] ${rowClassName?.(row) || ''}`}>
                   {columns.map((column) => (
                     <td key={column.key} className={`px-3 py-2.5 align-middle text-slate-700 ${column.className || ''}`}>
                       {column.render(row)}
@@ -301,11 +301,11 @@ export const ManagementActionButton: React.FC<
   React.ButtonHTMLAttributes<HTMLButtonElement> & { tone?: 'neutral' | 'primary' | 'success' | 'danger' | 'warning' }
 > = ({ tone = 'neutral', className = '', children, ...rest }) => {
   const tones: Record<string, string> = {
-    neutral: 'border-slate-200 bg-white text-slate-700 hover:border-slate-400',
-    primary: 'border-[#123e3b] bg-[#123e3b] text-white hover:bg-[#0c2f2c]',
-    success: 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100',
-    danger: 'border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100',
-    warning: 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100',
+    neutral: 'border-[var(--color-border-default)] bg-white text-slate-700 hover:border-[var(--color-green-700)]',
+    primary: 'border-[var(--color-green-700)] bg-[var(--color-green-800)] text-white hover:bg-[#0c2f2c]',
+    success: 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)] hover:bg-[var(--tone-success-bg)]',
+    danger: 'border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)] hover:bg-[var(--tone-danger-bg)]',
+    warning: 'border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)] hover:bg-[var(--tone-warning-bg)]',
   };
   return (
     <button
@@ -324,7 +324,7 @@ export const ManagementCard: React.FC<{ title?: string; description?: string; ch
   children,
   className = '',
 }) => (
-  <section className={`space-y-3 rounded-2xl border border-[#e6dac8] bg-white p-4 shadow-sm ${className}`}>
+  <section className={`space-y-3 rounded-2xl border border-[var(--color-border-default)] bg-white p-4 shadow-sm ${className}`}>
     {title && (
       <div>
         <h3 className="text-[13px] font-black text-slate-900">{title}</h3>

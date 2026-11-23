@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 const DEMO_PASSWORD = 'Guigui@2026!';
 const DEMO_EMAILS = {

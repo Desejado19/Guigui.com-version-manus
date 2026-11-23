@@ -46,7 +46,7 @@ export const SmsSimulatorToast: React.FC<{ currentLang?: Language }> = ({ curren
 
   return (
     <div className="fixed top-4 right-3 sm:right-6 z-[9999] max-w-md w-[calc(100vw-24px)] sm:w-full animate-in slide-in-from-top-4 duration-300">
-      <div className="bg-slate-900/95 text-white border-2 border-emerald-500/80 rounded-3xl shadow-2xl backdrop-blur-md p-4 sm:p-5 space-y-3">
+      <div className="bg-slate-900 text-white border-2 border-emerald-500/80 rounded-3xl shadow-2xl p-4 sm:p-5 space-y-3">
         {/* Top Header Bar */}
         <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
           <div className="flex items-center gap-2">
@@ -62,7 +62,7 @@ export const SmsSimulatorToast: React.FC<{ currentLang?: Language }> = ({ curren
                   {t('smsReceived')}
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 font-mono">
+              <p className="text-[10px] text-slate-500 font-mono">
                 Para: {currentSms.recipientPhone} ⬢ Agora mesmo
               </p>
             </div>
@@ -70,7 +70,7 @@ export const SmsSimulatorToast: React.FC<{ currentLang?: Language }> = ({ curren
 
           <button type="button"
             onClick={() => setCurrentSms(null)}
-            className="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition"
+            className="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition"
             title={`${t('close')} notificação SMS`}
           >
             <X className="w-4 h-4" />
@@ -78,7 +78,7 @@ export const SmsSimulatorToast: React.FC<{ currentLang?: Language }> = ({ curren
         </div>
 
         {/* Message Bubble Body */}
-        <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3.5 space-y-2">
+        <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 space-y-2">
           <p className="text-xs text-slate-200 leading-relaxed font-sans select-text">
             {currentSms.messageText}
           </p>
@@ -87,10 +87,10 @@ export const SmsSimulatorToast: React.FC<{ currentLang?: Language }> = ({ curren
           {isTicket && currentSms.metadata?.ticketCode && (
             <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
               <div className="text-[11px] font-mono">
-                <span className="text-slate-400">{t('code')}: </span>
+                <span className="text-slate-500">{t('code')}: </span>
                 <span className="font-extrabold text-emerald-400">{currentSms.metadata.ticketCode}</span>
                 {currentSms.metadata.pinCode && (
-                  <span className="ml-2 text-slate-400">
+                  <span className="ml-2 text-slate-500">
                     PIN: <strong className="text-amber-400">{currentSms.metadata.pinCode}</strong>
                   </span>
                 )}
@@ -108,7 +108,7 @@ export const SmsSimulatorToast: React.FC<{ currentLang?: Language }> = ({ curren
         </div>
 
         {/* Bottom Helper */}
-        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5 px-1">
+        <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5 px-1">
           <span className="flex items-center gap-1 text-emerald-400/90 font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
             {t('smsGatewaySimulation')}

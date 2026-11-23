@@ -34,6 +34,7 @@ import {
   Sliders,
   History,
   MessageSquare,
+  Mail,
   HelpCircle,
   RefreshCw,
   FileText,
@@ -87,7 +88,7 @@ import type { CommercialSection } from './admin/management/commercialApi';
 import { BusinessesModule } from './admin/management/BusinessesModule';
 import { BusinessesManagementPage } from './admin/management/BusinessesManagementPage';
 import { FeaturedBusinessesManagementPage } from './admin/management/FeaturedBusinessesManagementPage';
-import { SobreNosManagementPage } from './admin/management/SobreNosManagementPage';
+import { InstitutionalManagementPage } from './admin/institutional/InstitutionalManagementPage';
 import { EventsManagementPage } from './admin/management/EventsManagementPage';
 import { TicketsManagementPage } from './admin/management/TicketsManagementPage';
 import { TransactionsManagementPage } from './admin/management/TransactionsManagementPage';
@@ -100,6 +101,7 @@ import { FinanceRefundsPage } from './admin/management/FinanceRefundsPage';
 import { FinanceStatementsPage } from './admin/management/FinanceStatementsPage';
 import { PromotionsManagementPage } from './admin/management/PromotionsManagementPage';
 import { SupportManagementPage } from './admin/management/SupportManagementPage';
+import { ExternalEmailComposer } from './communication/ExternalEmailComposer';
 import { CitizensManagementPage } from './admin/management/CitizensManagementPage';
 import { UsersModule } from './admin/management/UsersModule';
 import { UsersActivityPage } from './admin/management/UsersActivityPage';
@@ -174,7 +176,7 @@ interface AdminDashboardProps {
   onReplySupport?: (requestId: string, text: string) => void;
   onUpdateSupportStatus?: (requestId: string, status: SupportRequest['status']) => void;
   focusSupportId?: string | null;
-  initialTab?: 'capabilities' | 'profile' | 'overview' | 'businesses' | 'moderation' | 'pricing' | 'categories' | 'roles' | 'admin_staff' | 'audit_logs' | 'events' | 'financials' | 'architecture' | 'reports' | 'notifications' | 'support' | 'sobre-nos';
+  initialTab?: 'capabilities' | 'profile' | 'overview' | 'businesses' | 'moderation' | 'pricing' | 'categories' | 'roles' | 'admin_staff' | 'audit_logs' | 'events' | 'financials' | 'architecture' | 'reports' | 'notifications' | 'support' | 'external_email' | 'sobre-nos';
   currentUser?: UserProfile | null;
   onLogout?: () => void;
   sidebarCollapsed?: boolean;
@@ -326,6 +328,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       heading: t('admin.support'),
       items: [
         { label: t('admin.support'), tab: 'support', icon: MessageSquare, help: t('admin.supportHelp'), count: pendingAdminSupport },
+        { label: 'Email externo', tab: 'external_email', icon: Mail, help: 'Enviar mensagens para destinatários fora da plataforma.' },
         { label: t('adminNavNotifications'), tab: 'notifications', icon: Bell, help: t('adminNavNotificationsHelp') },
       ],
     },
@@ -337,7 +340,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         { label: t('adminNavCategories'), tab: 'categories', icon: Tag, help: t('adminNavCategoriesHelp') },
         { label: t('adminNavSystem'), tab: 'architecture', icon: Server, help: t('adminNavSystemHelp') },
         { label: t('adminNavGlobal'), tab: 'capabilities', icon: SlidersHorizontal, help: t('adminNavGlobalHelp') },
-        { label: 'Sobre Nós', tab: 'sobre-nos', icon: Building2, help: 'Identidade visual e informações institucionais do Guigui.com.' },
+        { label: 'Identidade Institucional', tab: 'sobre-nos', icon: Building2, help: '21 submódulos: visão geral, identidade, conteúdo, serviços, contactos, media, políticas, comunicação, publicação e auditoria.' },
       ],
     },
     {
@@ -355,7 +358,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const allAdminItems = adminNavigationGroups.flatMap((group) => group.items);
   const configuredAdminNavigation = ADMIN_NAVIGATION;
-  const [activeTab, setActiveTab] = useState<'capabilities' | 'profile' | 'overview' | 'businesses' | 'moderation' | 'pricing' | 'categories' | 'users' | 'roles' | 'admin_staff' | 'audit_logs' | 'events' | 'financials' | 'architecture' | 'reports' | 'notifications' | 'support' | 'sobre-nos'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'capabilities' | 'profile' | 'overview' | 'businesses' | 'moderation' | 'pricing' | 'categories' | 'users' | 'roles' | 'admin_staff' | 'audit_logs' | 'events' | 'financials' | 'architecture' | 'reports' | 'notifications' | 'support' | 'external_email' | 'sobre-nos'>(initialTab);
   const [commercialView, setCommercialView] = useState<'summary' | CommercialSection>('summary');
   // Submódulos que antes apareciam empilhados na mesma página.
   const [moderationSection, setModerationSection] = useState<'stories' | 'pipeline' | 'queue'>('pipeline');
@@ -1785,9 +1788,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           { id: 'support', label: 'Suporte', icon: HelpCircle },
         ]}
       />
-      <div className="guigui-profile-dashboard guigui-light-dashboard w-full min-h-[calc(100vh-72px)] bg-[#f3efe9]">
-        <div className="flex min-h-[calc(100vh-72px)] w-full bg-[#f3efe9]">
-          <div className={`${mobileSidebarOpen ? 'block' : 'hidden'} fixed inset-0 z-40 bg-slate-950/35 backdrop-blur-[1px] md:hidden`} onClick={() => setMobileSidebarOpen(false)} />
+      <div className="guigui-profile-dashboard guigui-light-dashboard w-full min-h-[calc(100vh-72px)] bg-[var(--color-bg-dashboard-canvas)]">
+        <div className="flex min-h-[calc(100vh-72px)] w-full bg-[var(--color-bg-dashboard-canvas)]">
+          <div className={`${mobileSidebarOpen ? 'block' : 'hidden'} fixed inset-0 z-40 bg-slate-950/35 md:hidden`} onClick={() => setMobileSidebarOpen(false)} />
 
           <aside
             style={{ width: sidebarCollapsed ? 72 : 260 }}
@@ -1803,7 +1806,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   {!sidebarCollapsed && (
                     <div className="min-w-0">
                       <div className="text-lg font-black leading-none text-white">Guigui<span className="text-[#e8a23a]">.com</span></div>
-                      <div className="mt-1.5 text-[8.5px] font-black uppercase tracking-[0.2em] text-[#8fb3ac]">Painel Administrativo</div>
+                      <div className="mt-1.5 text-[8.5px] font-black uppercase tracking-[0.2em] text-[var(--color-text-muted-dark)]">Painel Administrativo</div>
                     </div>
                   )}
                 </div>
@@ -1813,7 +1816,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     label={t('collapseMenu')}
                     variant="secondary"
                     size="sm"
-                    className="h-8 w-8 rounded-full border-0 bg-transparent text-[#8fb3ac] shadow-none hover:bg-white/10 hover:text-white"
+                    className="h-8 w-8 rounded-full border-0 bg-transparent text-[var(--color-text-muted-dark)] shadow-none hover:bg-[var(--color-green-800)] hover:text-white"
                     onClick={() => setSidebarCollapsed(true)}
                     title={t('collapseMenu')}
                   >
@@ -1825,7 +1828,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     label={t('expandMenu')}
                     variant="secondary"
                     size="sm"
-                    className="absolute right-1 top-3 h-6 w-6 rounded-full border-0 bg-transparent text-[#8fb3ac] shadow-none hover:bg-white/10 hover:text-white"
+                    className="absolute right-1 top-3 h-6 w-6 rounded-full border-0 bg-transparent text-[var(--color-text-muted-dark)] shadow-none hover:bg-[var(--color-green-800)] hover:text-white"
                     onClick={() => setSidebarCollapsed(false)}
                     title={t('expandMenu')}
                   >
@@ -1839,27 +1842,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <button
                     type="button"
                     onClick={() => setActiveTab('profile')}
-                    className="mb-2 flex w-full items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.045] p-2.5 text-left transition hover:bg-white/[0.08]"
+                    className="mb-2 flex w-full items-center gap-3 rounded-2xl border border-[#1b4a43] bg-[#0d3a34] p-2.5 text-left transition hover:bg-[var(--color-green-800)]"
                   >
                     {adminAvatarUrl ? (
-                      <img src={adminAvatarUrl} alt={adminDisplayName} className="h-10 w-10 shrink-0 rounded-full border border-white/10 object-cover" />
+                      <img src={adminAvatarUrl} alt={adminDisplayName} className="h-10 w-10 shrink-0 rounded-full border border-[var(--color-green-800)] object-cover" />
                     ) : (
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#155048] text-xs font-black text-[#d8e6e2]">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-green-800)] text-xs font-black text-[var(--color-green-100)]">
                         {adminInitials}
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[12px] font-black text-white">{adminDisplayName}</div>
-                      <div className="mt-0.5 text-[10px] font-semibold text-[#8fb3ac]">Administrador</div>
+                      <div className="mt-0.5 text-[10px] font-semibold text-[var(--color-text-muted-dark)]">Administrador</div>
                     </div>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-[#6f8f89]" />
+                    <ChevronRight className="h-4 w-4 shrink-0 text-[var(--color-text-muted-dark)]" />
                   </button>
                 )}
 
                 {filteredNavigationGroups.map((group) => (
                   <div key={group.heading} className={sidebarCollapsed ? 'mb-2 space-y-1.5' : 'mb-3 space-y-1'}>
                     {!sidebarCollapsed && group.heading !== t('adminNavDashboard') && (
-                      <div className="px-3 pb-1 pt-1.5 text-[8px] font-black uppercase tracking-[0.22em] text-[#6f8f89]">
+                      <div className="px-3 pb-1 pt-1.5 text-[8px] font-black uppercase tracking-[0.22em] text-[var(--color-text-muted-dark)]">
                         {group.heading}
                       </div>
                     )}
@@ -1881,31 +1884,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             aria-label={item.countLabel ? `${item.label}: ${item.countLabel}` : item.label}
                             aria-current={isActive ? 'page' : undefined}
                             title={item.countLabel ? `${item.label}: ${item.countLabel}` : item.label}
-                            className={`group relative flex w-full items-center rounded-full text-left transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[#3fae80]/50 ${
+                            className={`group relative flex w-full items-center rounded-full text-left transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[var(--color-green-700)]/50 ${
                               sidebarCollapsed
                                 ? 'justify-center p-2.5'
                                 : 'gap-3 px-3 py-2'
                             } ${
                               isActive
-                                ? 'bg-[#3fae80] text-white shadow-[0_16px_28px_-16px_rgba(63,174,128,0.9)]'
-                                : 'text-[#d8e6e2] hover:bg-white/[0.05]'
+                                ? 'bg-[var(--color-green-700)] text-white shadow-[0_16px_28px_-16px_rgba(23,97,88,0.9)]'
+                                : 'text-[var(--color-green-100)] hover:bg-[var(--color-green-800)]'
                             }`}
                           >
-                            <div className={`flex shrink-0 items-center justify-center rounded-full ${sidebarCollapsed ? 'h-8 w-8' : 'h-9 w-9'} ${isActive ? 'bg-black/10 text-white' : 'bg-white/[0.06] text-[#a9c4be] group-hover:bg-white/[0.1] group-hover:text-white'}`}>
+                            <div className={`flex shrink-0 items-center justify-center rounded-full ${sidebarCollapsed ? 'h-8 w-8' : 'h-9 w-9'} ${isActive ? 'bg-black/10 text-white' : 'bg-[#124039] text-[#a9c4be] group-hover:bg-[var(--color-green-800)] group-hover:text-white'}`}>
                               <Icon className="h-4 w-4" />
                             </div>
 
                             {!sidebarCollapsed && (
                               <div className="min-w-0 flex-1">
                                 <div className={`truncate text-[11.5px] font-black leading-snug ${isActive ? 'text-white' : 'text-[#eef6f4]'}`}>{item.label}</div>
-                                <div className={`mt-0.5 truncate text-[9.5px] font-medium leading-relaxed ${isActive ? 'text-white/75' : 'text-[#8fb3ac]'}`}>
+                                <div className={`mt-0.5 truncate text-[9.5px] font-medium leading-relaxed ${isActive ? 'text-white/75' : 'text-[var(--color-text-muted-dark)]'}`}>
                                   {item.help}
                                 </div>
                               </div>
                             )}
 
                             {!sidebarCollapsed && item.count !== undefined && item.count > 0 && (
-                              <span className={`flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-black ${isActive ? 'bg-white/25 text-white' : 'bg-[#f7bcbc] text-[#8a1f1f]'}`}>
+                              <span className={`flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-black ${isActive ? 'bg-emerald-950/70 text-white' : 'bg-[#f7bcbc] text-[#8a1f1f]'}`}>
                                 {item.count}
                               </span>
                             )}
@@ -1916,25 +1919,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                 ))}
                 {adminSearchQuery && filteredNavigationGroups.length === 0 && (
-                  <div className="mt-2 rounded-2xl border border-dashed border-white/15 bg-white/[0.04] p-3 text-[11px] font-medium text-[#a9c4be]">
+                  <div className="mt-2 rounded-2xl border border-dashed border-[#2a5a50] bg-[#0e3a34] p-3 text-[11px] font-medium text-[#a9c4be]">
                     Nenhum módulo encontrado para “{adminSearchQuery}”.
                   </div>
                 )}
               </div>
 
-              <div className="mt-auto border-t border-white/10 px-2 py-2.5">
+              <div className="mt-auto border-t border-[var(--color-green-800)] px-2 py-2.5">
                 {!sidebarCollapsed && (
                   <div className="flex items-center gap-3 rounded-2xl px-1 py-1.5">
                     {adminAvatarUrl ? (
-                      <img src={adminAvatarUrl} alt={adminDisplayName} className="h-9 w-9 shrink-0 rounded-full border border-white/10 object-cover" />
+                      <img src={adminAvatarUrl} alt={adminDisplayName} className="h-9 w-9 shrink-0 rounded-full border border-[var(--color-green-800)] object-cover" />
                     ) : (
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#155048] text-[10px] font-black text-[#d8e6e2]">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-green-800)] text-[10px] font-black text-[var(--color-green-100)]">
                         {adminInitials}
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[11.5px] font-black text-white">{adminDisplayName}</div>
-                      <div className="text-[9.5px] font-semibold text-[#8fb3ac]">Administrador</div>
+                      <div className="text-[9.5px] font-semibold text-[var(--color-text-muted-dark)]">Administrador</div>
                     </div>
                   </div>
                 )}
@@ -1942,7 +1945,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   type="button"
                   onClick={onLogout}
                   title="Terminar sessão"
-                  className={`mt-1 flex w-full items-center rounded-2xl py-2.5 text-left text-[#d8e6e2] transition hover:bg-white/[0.07] hover:text-white ${sidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-2'}`}
+                  className={`mt-1 flex w-full items-center rounded-2xl py-2.5 text-left text-[var(--color-green-100)] transition hover:bg-[var(--color-green-800)] hover:text-white ${sidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-2'}`}
                 >
                   <LogOut className="h-5 w-5 shrink-0 text-[#a9c4be]" />
                   {!sidebarCollapsed && <span className="text-[12px] font-black">Terminar sessão</span>}
@@ -1952,9 +1955,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </aside>
           <main
             style={{ '--admin-sidebar-width': `${sidebarCollapsed ? 72 : 260}px` } as React.CSSProperties}
-            className="min-w-0 flex-1 bg-[#f7f2ec] p-0 pb-[calc(4.75rem+env(safe-area-inset-bottom))] transition-[width,margin] duration-300 ease-out md:ml-[var(--admin-sidebar-width)] lg:pb-0"
+            className="min-w-0 flex-1 bg-[var(--color-bg-dashboard-canvas)] p-0 pb-[calc(4.75rem+env(safe-area-inset-bottom))] transition-[width,margin] duration-300 ease-out md:ml-[var(--admin-sidebar-width)] lg:pb-0"
           >
-            <div className="flex flex-col gap-3 border-b border-[#e6dac8] bg-[#f7f2ec] px-4 py-3.5 sm:px-5 sm:py-4">
+            <div className="flex flex-col gap-3 border-b border-[var(--color-border-default)] bg-[var(--color-bg-dashboard-canvas)] px-4 py-3.5 sm:px-5 sm:py-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-center gap-3">
                   <IconButton
@@ -1973,21 +1976,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 <div className="flex items-center gap-2 self-start lg:self-auto">
                   <div className="relative w-full min-w-0 md:w-auto md:min-w-[220px]">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
                     <input
                       type="text"
                       value={adminSearchQuery}
                       onChange={(event) => setAdminSearchQuery(event.target.value)}
                       placeholder={t('adminSearchPlaceholder')}
-                      className="w-full rounded-full border border-[#dccfb7] bg-white px-8 py-2 text-[11px] font-medium text-slate-700 shadow-[0_8px_18px_-18px_rgba(15,23,42,0.22)] outline-none transition focus:border-[#123e3b] focus:ring-2 focus:ring-[#123e3b]/10"
+                      className="w-full rounded-full border border-[#dccfb7] bg-[var(--color-bg-surface)] px-8 py-2 text-[11px] font-medium text-slate-700 shadow-[0_8px_18px_-18px_rgba(15,23,42,0.22)] outline-none transition focus:border-[var(--color-green-900)] focus:ring-2 focus:ring-[var(--color-green-900)]/10"
                     />
                   </div>
                   <IconButton label={t('notifications')} variant="secondary" className="relative h-9 w-9 rounded-full" onClick={() => setActiveTab('notifications')}>
                     <Bell className="h-4 w-4" />
                     {supportRequests.length > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[8px] font-black text-white">{supportRequests.length > 99 ? '99+' : supportRequests.length}</span>}
                   </IconButton>
-                  <button type="button" onClick={() => setActiveTab('profile')} title={t('admin.profile')} aria-label={t('admin.profile')} className="flex items-center gap-2 rounded-full border border-[#e6dac8] bg-white px-2.5 py-1.5 shadow-sm transition hover:border-[#123e3b]">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#123e3b] text-[10px] font-black text-[#f0d59c]">AD</div>
+                  <button type="button" onClick={() => setActiveTab('profile')} title={t('admin.profile')} aria-label={t('admin.profile')} className="flex items-center gap-2 rounded-full border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-2.5 py-1.5 shadow-sm transition hover:border-[var(--color-green-900)]">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-green-900)] text-[10px] font-black text-[#f0d59c]">AD</div>
                     <div className="hidden text-left sm:block">
                       <div className="text-[10px] font-black text-slate-900">Admin Guigui</div>
                       <div className="text-[8px] uppercase tracking-[0.16em] text-slate-500">{t('activeSession')}</div>
@@ -1997,7 +2000,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               {adminSearchQuery && quickSearchMatches.length > 0 && (
-                <div className="rounded-2xl border border-[#e6dac8] bg-white/75 p-3">
+                <div className="rounded-2xl border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] p-3">
                   <div className="mb-2 text-[9px] font-black uppercase tracking-[0.22em] text-slate-500">{t('quickResults')}</div>
                   <div className="flex flex-wrap gap-2">
                     {quickSearchMatches.map((item) => (
@@ -2010,7 +2013,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           setAdminSearchQuery('');
                           setMobileSidebarOpen(false);
                         }}
-                        className="rounded-full border border-[#d9d2c6] bg-[#f9f7f3] px-2.5 py-1 text-[10px] font-bold text-slate-700 transition hover:border-[#123e3b] hover:text-[#123e3b]"
+                        className="rounded-full border border-[#d9d2c6] bg-[#f9f7f3] px-2.5 py-1 text-[10px] font-bold text-slate-700 transition hover:border-[var(--color-green-900)] hover:text-[var(--color-green-900)]"
                       >
                         {item.label}
                       </button>
@@ -2021,7 +2024,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-bold text-slate-500">
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full border border-slate-200 bg-white px-2 py-1 uppercase tracking-[0.18em] text-slate-600">{t('breadcrumb')}</span>
+                  <span className="rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-2 py-1 uppercase tracking-[0.18em] text-slate-600">{t('breadcrumb')}</span>
                   <span>Guigui.com</span>
                   <span>/</span>
                   <span className="text-slate-800">Administração</span>
@@ -2242,7 +2245,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <span>Pipeline Automático de Segurança & Auditoria Humana</span>
                 </h3>
               </div>
-              <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700">
+              <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
                 <span className="text-[11px] font-bold text-slate-200">
                   {reviewItems.filter((m) => m.status === 'pending_human').length} Itens em Fila de Revisão
@@ -2285,7 +2288,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           {/* Section 9.3 Sensitivity & Policy Settings Controls */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm">
+          <div className="bg-[var(--color-bg-surface)] border border-[var(--color-border-subtle)] rounded-2xl p-5 space-y-4 shadow-sm">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <Sliders className="w-4 h-4 text-blue-600" />
@@ -2293,7 +2296,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   Configuração de Sensibilidade & Regras Especiais (Secção 9.3)
                 </h4>
               </div>
-              <span className="text-[10px] text-slate-400 italic">
+              <span className="text-[10px] text-slate-500 italic">
                 Ajuste direto de parâmetros sem necessidade de alteração de código.
               </span>
             </div>
@@ -2321,7 +2324,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               {/* Sensitivity Level Selector */}
-              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-2xl space-y-2">
+              <div className="bg-slate-50 border border-[var(--color-border-subtle)] p-3.5 rounded-2xl space-y-2">
                 <label className="font-extrabold text-slate-800 text-xs block">
                   Nível de Sensibilidade da IA
                 </label>
@@ -2333,7 +2336,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       sensitivityLevel: e.target.value as 'strict' | 'standard' | 'relaxed',
                     }))
                   }
-                  className="w-full bg-white border border-slate-300 rounded-xl p-2 font-bold text-slate-900 text-xs"
+                  className="w-full bg-[var(--color-bg-surface)] border border-[var(--color-border-default)] rounded-xl p-2 font-bold text-slate-900 text-xs"
                 >
                   <option value="strict">Rigorosa (Máxima proteção anti-spam)</option>
                   <option value="standard">Padrão (Recomendado)</option>
@@ -2345,7 +2348,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               {/* Threshold Sliders */}
-              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-2xl space-y-2">
+              <div className="bg-slate-50 border border-[var(--color-border-subtle)] p-3.5 rounded-2xl space-y-2">
                 <div className="flex justify-between text-xs font-bold text-slate-800">
                   <span>Limiar Aprovação Verde</span>
                   <span className="text-emerald-700 font-mono">{modSettings.autoApproveGreenThreshold}%</span>
@@ -2360,7 +2363,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   }
                   className="w-full accent-emerald-600 cursor-pointer"
                 />
-                <span className="text-[10px] text-slate-400 block">
+                <span className="text-[10px] text-slate-500 block">
                   Confiança mínima exigida para publicação direta sem revisão.
                 </span>
               </div>
@@ -2370,7 +2373,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {moderationSection === 'queue' && (<>
           {/* Pipeline Filters */}
-          <Card className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <Card className="bg-[var(--color-bg-surface)] p-4 rounded-2xl border border-[var(--color-border-subtle)] shadow-sm space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-blue-600" />
@@ -2394,14 +2397,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
               <label className="text-[10px] font-black uppercase tracking-wide text-slate-500 lg:col-span-2">
                 Pesquisar conteúdo, autor ou empresa
-                <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-2.5 py-2">
-                  <Search className="h-3.5 w-3.5 text-slate-400" />
+                <div className="mt-1 flex items-center gap-2 rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-2.5 py-2">
+                  <Search className="h-3.5 w-3.5 text-slate-500" />
                   <input value={modSearchQuery} onChange={(event) => setModSearchQuery(event.target.value)} placeholder="Ex.: promoção, Mamadu, Coqueiros" className="w-full bg-transparent text-xs font-semibold text-slate-900 outline-none" />
                 </div>
               </label>
               <label className="text-[10px] font-black uppercase tracking-wide text-slate-500">
                 Tipo
-                <select value={modTypeFilter} onChange={(event) => setModTypeFilter(event.target.value as typeof modTypeFilter)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-bold text-slate-900">
+                <select value={modTypeFilter} onChange={(event) => setModTypeFilter(event.target.value as typeof modTypeFilter)} className="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-2.5 py-2 text-xs font-bold text-slate-900">
                   <option value="all">Todos os tipos</option>
                   <option value="promotion">Promoções</option>
                   <option value="event">Eventos</option>
@@ -2410,18 +2413,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </label>
               <label className="text-[10px] font-black uppercase tracking-wide text-slate-500">
                 Empresa
-                <select value={modBusinessFilter} onChange={(event) => setModBusinessFilter(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-bold text-slate-900">
+                <select value={modBusinessFilter} onChange={(event) => setModBusinessFilter(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-2.5 py-2 text-xs font-bold text-slate-900">
                   <option value="">Selecione uma empresa</option>
                   {moderationBusinessOptions.map((businessName) => <option value={businessName} key={businessName}>{businessName}</option>)}
                 </select>
               </label>
-              <Button type="button" variant="secondary" size="sm" onClick={() => { setModFilter('all'); setModTypeFilter('all'); setModBusinessFilter('all'); setModSearchQuery(''); setModDateFrom(''); setModDateTo(''); }} className="self-end rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-100">
+              <Button type="button" variant="secondary" size="sm" onClick={() => { setModFilter('all'); setModTypeFilter('all'); setModBusinessFilter('all'); setModSearchQuery(''); setModDateFrom(''); setModDateTo(''); }} className="self-end rounded-xl border border-[var(--color-border-default)] bg-slate-50 px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-100">
                 Limpar filtros
               </Button>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <label className="text-[10px] font-black uppercase tracking-wide text-slate-500">Data inicial<input type="date" value={modDateFrom} onChange={(event) => setModDateFrom(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-bold text-slate-900" /></label>
-              <label className="text-[10px] font-black uppercase tracking-wide text-slate-500">Data final<input type="date" value={modDateTo} onChange={(event) => setModDateTo(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-bold text-slate-900" /></label>
+              <label className="text-[10px] font-black uppercase tracking-wide text-slate-500">Data inicial<input type="date" value={modDateFrom} onChange={(event) => setModDateFrom(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-2.5 py-2 text-xs font-bold text-slate-900" /></label>
+              <label className="text-[10px] font-black uppercase tracking-wide text-slate-500">Data final<input type="date" value={modDateTo} onChange={(event) => setModDateTo(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-2.5 py-2 text-xs font-bold text-slate-900" /></label>
             </div>
           </Card>
 
@@ -2447,20 +2450,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     ? 'border-red-200 bg-red-50 text-red-800'
                     : 'border-amber-300 bg-amber-50 text-amber-900';
                 return (
-                  <Card key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4 text-xs shadow-sm">
+                  <Card key={item.id} className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 text-xs shadow-sm">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                       <div className="flex min-w-0 flex-1 items-center gap-3">
                         {item.imageUrl ? (
-                          <img src={item.imageUrl} alt="" className="h-12 w-12 shrink-0 rounded-xl border border-slate-200 object-cover" />
+                          <img src={item.imageUrl} alt="" className="h-12 w-12 shrink-0 rounded-xl border border-[var(--color-border-subtle)] object-cover" />
                         ) : (
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
-                            <Calendar className="h-5 w-5 text-slate-400" />
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border-subtle)] bg-slate-50">
+                            <Calendar className="h-5 w-5 text-slate-500" />
                           </div>
                         )}
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className="font-black text-slate-900">{item.businessName || 'Sem empresa'}</span>
-                            <span className="rounded-lg border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-700">
+                            <span className="rounded-lg border border-[var(--color-border-subtle)] bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-700">
                               {moderationTypeLabel(item.type)}
                             </span>
                             <span className={"rounded-full border px-2 py-0.5 text-[10px] font-black " + statusClass}>
@@ -2476,7 +2479,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <div className="flex shrink-0 flex-wrap items-center gap-1.5">
                         <Button type="button" variant="secondary" size="sm"
                           onClick={() => setSelectedModerationDetailId(item.id)}
-                          className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
+                          className="flex items-center gap-1.5 rounded-xl border border-[var(--color-border-default)] bg-slate-50 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
                         >
                           <Eye className="h-4 w-4" />
                           <span>Detalhe</span>
@@ -2512,8 +2515,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             if (!item) return null;
             const event = item.eventId ? events.find((entry) => entry.id === item.eventId) : undefined;
             return (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-                <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 text-xs shadow-2xl">
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+                <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[var(--color-bg-surface)] p-5 text-xs shadow-2xl">
                   <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
                     <div>
                       <h3 className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
@@ -2539,8 +2542,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       ['Tipo', moderationTypeLabel(item.type)],
                       ['Data', item.createdAt],
                     ].map(([label, value]) => (
-                      <div key={label} className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
-                        <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">{label}</div>
+                      <div key={label} className="rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 p-2.5">
+                        <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">{label}</div>
                         <div className="mt-0.5 font-bold text-slate-800">{value}</div>
                       </div>
                     ))}
@@ -2548,7 +2551,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                   {event ? (
                     <div className="mt-3 space-y-3">
-                      {event.coverImage && <img src={event.coverImage} alt="" className="h-40 w-full rounded-xl border border-slate-200 object-cover" />}
+                      {event.coverImage && <img src={event.coverImage} alt="" className="h-40 w-full rounded-xl border border-[var(--color-border-subtle)] object-cover" />}
                       <div>
                         <h4 className="text-base font-black text-slate-900">{event.title}</h4>
                         <p className="mt-1 whitespace-pre-line leading-relaxed text-slate-700">{event.description || 'Sem descrição registada.'}</p>
@@ -2561,7 +2564,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           ['Organizador', event.organizerName || item.businessName || '—'],
                         ].map(([label, value]) => (
                           <div key={label}>
-                            <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">{label}</div>
+                            <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">{label}</div>
                             <div className="mt-0.5 font-medium text-slate-700">{value}</div>
                           </div>
                         ))}
@@ -2586,7 +2589,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </div>
                   ) : (
                     <div className="mt-3 space-y-2">
-                      <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 font-medium leading-relaxed text-slate-900">
+                      <p className="rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 p-3 font-medium leading-relaxed text-slate-900">
                         "{item.contentSnippet}"
                       </p>
                       <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-900">
@@ -2603,7 +2606,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="space-y-1.5">
                       {item.auditTrail.map((log, index) => (
                         <div key={index} className="flex items-start gap-2 rounded-lg bg-slate-50 p-2 text-[10.5px]">
-                          <span className="min-w-[100px] text-slate-400">{log.timestamp}</span>
+                          <span className="min-w-[100px] text-slate-500">{log.timestamp}</span>
                           <span className="rounded bg-slate-200 px-1.5 py-0.5 font-bold text-slate-700">{log.actor}</span>
                           <span className="flex-1 text-slate-600">{log.notes}</span>
                         </div>
@@ -2656,7 +2659,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* TAB: Sobre Nós */}
       {activeTab === 'sobre-nos' && (
-        <SobreNosManagementPage onBack={() => setActiveTab('capabilities')} />
+        <InstitutionalManagementPage onBack={() => setActiveTab('capabilities')} />
       )}
 
       {/* TAB: Categories Structure Management (Section 5) */}
@@ -2667,7 +2670,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="bg-purple-400 text-purple-950 px-2.5 py-0.5 rounded font-black text-[10px] uppercase tracking-wider">
+                  <span className="bg-purple-200 text-purple-950 px-2.5 py-0.5 rounded font-black text-[10px] uppercase tracking-wider">
                     Secção 5 - Guigui.com
                   </span>
                   <h3 className="font-extrabold text-sm sm:text-base text-white flex items-center gap-2">
@@ -2683,7 +2686,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <button type="button"
                 onClick={() => setShowAddCategoryModal(true)}
                 disabled={categoriesBusy}
-                className="bg-purple-500 hover:bg-purple-600 text-white font-extrabold px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 shadow-sm min-h-[40px] disabled:opacity-60"
+                className="bg-purple-700 hover:bg-purple-800 text-white font-extrabold px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 shadow-sm min-h-[40px] disabled:opacity-60"
               >
                 <Plus className="w-4 h-4" />
                 <span>Nova Categoria Principal</span>
@@ -2719,12 +2722,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <LocationCatalogAdmin />
 
           {/* Cultural Events Special Differentiated Handling Banner (#14) */}
-          <div className="bg-amber-50 border border-amber-300 rounded-2xl p-5 space-y-2 shadow-sm text-amber-950">
-            <div className="flex items-center gap-2 font-extrabold text-xs uppercase tracking-wider text-amber-900">
+          <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl p-5 space-y-2 shadow-sm text-amber-950 dark:text-amber-100">
+            <div className="flex items-center gap-2 font-extrabold text-xs uppercase tracking-wider text-amber-900 dark:text-amber-200">
               <Ticket className="w-4 h-4 text-amber-600" />
               <span>Diferenciação Técnica - Categoria 14: Eventos Culturais & Bilhética</span>
             </div>
-            <p className="text-[11px] leading-relaxed text-amber-900">
+            <p className="text-[11px] leading-relaxed text-amber-900 dark:text-amber-200">
               A categoria <strong>"Eventos Culturais"</strong> possui tratamento técnico diferenciado em relação às outras 15 categorias de negócio: cada evento é um <strong>registo temporário</strong> associado a datas de realização (início e fim) e bilheteira digital, e não uma ficha permanente de empresa. Ao expirar a data do evento, o registo passa automaticamente para o arquivo histórico da agenda cultural.
             </p>
           </div>
@@ -2732,7 +2735,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* Categories Grid (16 Primary Categories) */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {categoriesList.length === 0 && !categoriesBusy && !categoriesError && (
-              <p className="md:col-span-2 lg:col-span-3 rounded-2xl border border-slate-200 bg-white p-6 text-center text-xs font-semibold text-slate-500">
+              <p className="md:col-span-2 lg:col-span-3 rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-6 text-center text-xs font-semibold text-slate-500">
                 Ainda não existem categorias principais. Crie a primeira com o botão acima.
               </p>
             )}
@@ -2743,14 +2746,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               return (
                 <div
                   key={cat.id}
-                  className={`bg-white border rounded-2xl p-5 space-y-4 shadow-sm flex flex-col justify-between transition hover:border-purple-300 ${
-                    isCulturalEventCat ? 'border-amber-300 ring-2 ring-amber-400/30' : 'border-slate-200'
+                  className={`bg-[var(--color-bg-surface)] border rounded-2xl p-5 space-y-4 shadow-sm flex flex-col justify-between transition hover:border-purple-300 ${
+                    isCulturalEventCat ? 'border-amber-300 ring-2 ring-amber-400/30' : 'border-[var(--color-border-subtle)]'
                   }`}
                 >
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-2 border-b pb-3 border-slate-100">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 rounded-2xl bg-purple-50 text-purple-700 font-black text-xs flex items-center justify-center border border-purple-200">
+                        <div className="w-9 h-9 rounded-2xl bg-purple-50 dark:bg-slate-800 text-purple-700 dark:text-blue-300 font-black text-xs flex items-center justify-center border border-purple-200 dark:border-slate-700">
                           #{index + 1}
                         </div>
                         <div>
@@ -2769,7 +2772,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <button type="button"
                         onClick={() => handleArchiveCategory(cat.id)}
                         title="Arquivar categoria"
-                        className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg transition hover:bg-red-50"
+                        className="p-1.5 text-slate-500 hover:text-red-600 rounded-lg transition hover:bg-red-50"
                       >
                         <Archive className="w-4 h-4" />
                       </button>
@@ -2785,12 +2788,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         {cat.subcategories.map((sub) => (
                           <span
                             key={sub}
-                            className="bg-slate-100 text-slate-800 text-[10px] font-semibold px-2.5 py-1 rounded-xl border border-slate-200 flex items-center gap-1 group/sub"
+                            className="bg-slate-100 text-slate-800 text-[10px] font-semibold px-2.5 py-1 rounded-xl border border-[var(--color-border-subtle)] flex items-center gap-1 group/sub"
                           >
                             <span>{sub}</span>
                             <button type="button"
                               onClick={() => handleRemoveSubcategory(cat.id, sub)}
-                              className="text-slate-400 hover:text-red-600 font-bold text-[9px] opacity-0 group-hover/sub:opacity-100 transition"
+                              className="text-slate-500 hover:text-red-600 font-bold text-[9px] opacity-0 group-hover/sub:opacity-100 transition"
                               title="Remover subcategoria"
                             >
                               ✕
@@ -2810,7 +2813,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           placeholder="Nome da subcategoria..."
                           value={newSubcatName}
                           onChange={(e) => setNewSubcatName(e.target.value)}
-                          className="w-full bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-900"
+                          className="w-full bg-[var(--color-bg-surface)] border border-[var(--color-border-default)] rounded-xl px-2.5 py-1.5 text-xs text-slate-900"
                         />
                         <div className="flex gap-2 justify-end">
                           <button type="button"
@@ -2830,7 +2833,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     ) : (
                       <button type="button"
                         onClick={() => setSelectedCatForSub(cat.id)}
-                        className="w-full py-1.5 bg-slate-50 hover:bg-purple-50 text-slate-700 hover:text-purple-700 font-bold rounded-xl border border-slate-200 transition text-[11px] flex items-center justify-center gap-1"
+                        className="w-full py-1.5 bg-slate-50 hover:bg-purple-50 text-slate-700 hover:text-purple-700 font-bold rounded-xl border border-[var(--color-border-subtle)] transition text-[11px] flex items-center justify-center gap-1"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Adicionar Subcategoria</span>
@@ -2844,8 +2847,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {/* Modal: New Primary Category */}
           {showAddCategoryModal && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overscroll-contain">
-              <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 overscroll-contain">
+            <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 overscroll-contain">
+              <div className="bg-[var(--color-bg-surface)] rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 overscroll-contain">
                 <div className="flex items-center justify-between border-b pb-3 border-slate-100">
                   <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
                     <FolderTree className="w-5 h-5 text-purple-600" />
@@ -2870,7 +2873,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       placeholder="Ex: Serviços de Energia & Solar"
                       value={newCatName}
                       onChange={(e) => setNewCatName(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-slate-900"
+                      className="w-full bg-slate-50 border border-[var(--color-border-default)] rounded-xl p-3 text-slate-900"
                     />
                   </div>
 
@@ -2879,7 +2882,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <select
                       value={newCatGroupId}
                       onChange={(e) => setNewCatGroupId(e.target.value as any)}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-slate-900 font-medium"
+                      className="w-full bg-slate-50 border border-[var(--color-border-default)] rounded-xl p-3 text-slate-900 font-medium"
                     >
                       <option value="restauracao">Restauração, Cafés e Pequeno Comércio</option>
                       <option value="hotelaria_saude_educacao">Hotelaria, Clínicas, Escolas e Comércio Médio</option>
@@ -2898,7 +2901,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       placeholder="Ex: Painéis Solares, Geradores, Baterias, Manutenção"
                       value={newCatSubcategories}
                       onChange={(e) => setNewCatSubcategories(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-slate-900"
+                      className="w-full bg-slate-50 border border-[var(--color-border-default)] rounded-xl p-3 text-slate-900"
                     />
                   </div>
 
@@ -2935,7 +2938,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* TAB 3: Roles & Permissions Matrix */}
       {activeTab === 'roles' && (
         <>
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm text-xs">
+          <div className="bg-[var(--color-bg-surface)] border border-[var(--color-border-subtle)] rounded-2xl p-6 space-y-4 shadow-sm text-xs">
             <AdminPermissionsMatrix
               currentLang={currentLang}
               staffList={staffList}
@@ -3003,7 +3006,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
                   <span>Comprar Bilhetes de Eventos via SMS com Orange Money ou Telecel</span>
                 </li>
-                <li className="flex items-center gap-1.5 text-slate-400">
+                <li className="flex items-center gap-1.5 text-slate-500">
                   <XCircle className="w-3.5 h-3.5 text-slate-300 flex-shrink-0" />
                   <span className="line-through">Sem acesso a painéis de gestão ou moderação</span>
                 </li>
@@ -3043,7 +3046,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
                   <span>Gerir Quotas de Publicação e Faturação CFA</span>
                 </li>
-                <li className="flex items-center gap-1.5 text-slate-400">
+                <li className="flex items-center gap-1.5 text-slate-500">
                   <XCircle className="w-3.5 h-3.5 text-slate-300 flex-shrink-0" />
                   <span className="line-through">Sem acesso a aprovação global de terceiros</span>
                 </li>
@@ -3167,6 +3170,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         />
       )}
 
+      {activeTab === 'external_email' && (
+        <ManagementPage
+          title="Email externo"
+          description="Mensagens enviadas pela plataforma para destinatários que não têm conta no Guigui.com."
+          moduleLabel="Comunicação"
+          onBack={() => navigateAdminTab('overview')}
+        >
+          <ExternalEmailComposer
+            variant="inline"
+            senderEmail={currentUser?.email}
+            roleLabel="administração"
+          />
+        </ManagementPage>
+      )}
+
       {activeTab === 'reports' && (
         <ManagementPage
           title="Relatórios e documentos"
@@ -3214,7 +3232,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {/* Sub-section 11.1 & 11.2 Overview Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 pt-1">
               {/* Stack Card */}
-              <div className="bg-slate-800/80 border border-slate-700 p-4 rounded-2xl space-y-2">
+              <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl space-y-2">
                 <div className="flex items-center gap-2 font-black text-slate-200 text-sm">
                   <Layers className="w-4 h-4 text-blue-400" />
                   <span>11.1 Stack Recomendada</span>
@@ -3236,19 +3254,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               {/* Hosting Card (11.2) */}
-              <div className="bg-slate-800/80 border border-slate-700 p-4 rounded-2xl space-y-2">
+              <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl space-y-2">
                 <div className="flex items-center gap-2 font-black text-slate-200 text-sm">
                   <Globe2 className="w-4 h-4 text-emerald-400" />
                   <span>11.2 Hospedagem Nuvem vs Local</span>
                 </div>
                 <div className="space-y-1.5 text-[11px] text-slate-300">
-                  <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-700 flex items-center justify-between">
+                  <div className="bg-slate-900 p-2 rounded-xl border border-slate-700 flex items-center justify-between">
                     <span>DigitalOcean Frankfurt (fra1)</span>
                     <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-bold border border-emerald-500/30">
                       Nó Primário Ativo
                     </span>
                   </div>
-                  <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-700 flex items-center justify-between">
+                  <div className="bg-slate-900 p-2 rounded-xl border border-slate-700 flex items-center justify-between">
                     <span>Hetzner Amsterdam (ams3)</span>
                     <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded font-bold border border-blue-500/30">
                       Cópia Fria Replicada
@@ -3261,7 +3279,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               {/* PWA & Gate Scanner Card (11.3) */}
-              <div className="bg-slate-800/80 border border-slate-700 p-4 rounded-2xl space-y-2">
+              <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl space-y-2">
                 <div className="flex items-center gap-2 font-black text-slate-200 text-sm">
                   <Smartphone className="w-4 h-4 text-purple-400" />
                   <span>11.3 PWA & Scanner de Porta</span>
@@ -3292,7 +3310,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* Sub-section 11.4: Segurança, Privacidade (RGPD / Diáspora) & supervisão empresarial */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Ticket security architecture — no operational access */}
-            <div className="bg-white border border-slate-200 p-5 rounded-2xl space-y-4 shadow-sm">
+            <div className="bg-[var(--color-bg-surface)] border border-[var(--color-border-subtle)] p-5 rounded-2xl space-y-4 shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h4 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-blue-600" />
@@ -3316,7 +3334,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             {/* Password Security, 2FA & Consent Terms Log */}
-            <div className="bg-white border border-slate-200 p-5 rounded-2xl space-y-4 shadow-sm">
+            <div className="bg-[var(--color-bg-surface)] border border-[var(--color-border-subtle)] p-5 rounded-2xl space-y-4 shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h4 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-emerald-600" />
@@ -3328,14 +3346,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-[11px]">
-                <div className="bg-slate-50 border border-slate-200 p-3 rounded-2xl space-y-1">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Hash de Passwords</span>
+                <div className="bg-slate-50 border border-[var(--color-border-subtle)] p-3 rounded-2xl space-y-1">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase block">Hash de Passwords</span>
                   <div className="font-bold text-slate-800 font-mono">scrypt + Salt</div>
                   <span className="text-[10px] text-slate-500">Sem armazenamento em plaintext</span>
                 </div>
 
-                <div className="bg-slate-50 border border-slate-200 p-3 rounded-2xl space-y-1">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Autenticação 2FA</span>
+                <div className="bg-slate-50 border border-[var(--color-border-subtle)] p-3 rounded-2xl space-y-1">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase block">Autenticação 2FA</span>
                   <div className="font-bold text-emerald-700">Obrigatório no Super Admin</div>
                   <span className="text-[10px] text-slate-500">Entrega externa ainda simulada na demo</span>
                 </div>
@@ -3351,7 +3369,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div key={log.id} className="border-b border-slate-800 pb-2 last:border-b-0 last:pb-0 flex items-center justify-between">
                       <div>
                         <span className="font-bold text-white">{log.userName}</span> ({log.phone})
-                        <div className="text-slate-400">IP: {log.ipAddress} • {log.acceptedAt}</div>
+                        <div className="text-slate-500">IP: {log.ipAddress} • {log.acceptedAt}</div>
                       </div>
                       <span className="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded text-[9px] font-bold">
                         {log.termsVersion}
@@ -3364,7 +3382,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           {/* Cloud Backups Log Table */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-[var(--color-bg-surface)] border border-[var(--color-border-subtle)] rounded-2xl overflow-hidden shadow-sm">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
               <h4 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
                 <Database className="w-4 h-4 text-indigo-600" />
@@ -3376,7 +3394,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 font-bold uppercase text-[10px] tracking-wider">
+                  <tr className="bg-slate-50 text-slate-500 border-b border-[var(--color-border-subtle)] font-bold uppercase text-[10px] tracking-wider">
                     <th className="py-3 px-4">ID Backup</th>
                     <th className="py-3 px-4">Tipo</th>
                     <th className="py-3 px-4">Região Primária</th>
@@ -3421,26 +3439,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-slate-800/80 border border-slate-700 p-4 rounded-2xl space-y-1">
-                <span className="text-[10px] text-slate-400 uppercase font-bold">Idiomas Suportados</span>
+              <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl space-y-1">
+                <span className="text-[10px] text-slate-500 uppercase font-bold">Idiomas Suportados</span>
                 <div className="text-sm font-black text-emerald-400">Português, Francês, Inglês</div>
                 <p className="text-[10px] text-slate-300">Arquitectura multilingue pronta com fallback PT</p>
               </div>
 
-              <div className="bg-slate-800/80 border border-slate-700 p-4 rounded-2xl space-y-1">
-                <span className="text-[10px] text-slate-400 uppercase font-bold">Otimização de Largura de Banda</span>
+              <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl space-y-1">
+                <span className="text-[10px] text-slate-500 uppercase font-bold">Otimização de Largura de Banda</span>
                 <div className="text-sm font-black text-blue-400">Suporte a Ligações 3G/4G Instáveis</div>
                 <p className="text-[10px] text-slate-300">Compressão de dados e minificação extrema de assets</p>
               </div>
 
-              <div className="bg-slate-800/80 border border-slate-700 p-4 rounded-2xl space-y-1">
-                <span className="text-[10px] text-slate-400 uppercase font-bold">Funcionamento Offline</span>
+              <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl space-y-1">
+                <span className="text-[10px] text-slate-500 uppercase font-bold">Funcionamento Offline</span>
                 <div className="text-sm font-black text-amber-400">Sem Perda de Dados no Scanner</div>
                 <p className="text-[10px] text-slate-300">Validação local bufferizada com sincronização posterior</p>
               </div>
 
-              <div className="bg-slate-800/80 border border-slate-700 p-4 rounded-2xl space-y-1">
-                <span className="text-[10px] text-slate-400 uppercase font-bold">Escalabilidade</span>
+              <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl space-y-1">
+                <span className="text-[10px] text-slate-500 uppercase font-bold">Escalabilidade</span>
                 <div className="text-sm font-black text-purple-400">Dezenas a Milhares de Clientes</div>
                 <p className="text-[10px] text-slate-300">Sem necessidade de reescrita estrutural do MVP</p>
               </div>
@@ -3464,7 +3482,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           />
 
           {notificationSection === 'send' && (
-          <form onSubmit={handleSendAdminAnnouncement} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+          <form onSubmit={handleSendAdminAnnouncement} className="bg-[var(--color-bg-surface)] border border-[var(--color-border-subtle)] rounded-2xl p-6 shadow-sm space-y-4">
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
@@ -3479,7 +3497,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <label className="space-y-1.5">
                 <span className="text-[10px] font-bold uppercase text-slate-500">{t('admin.audience')}</span>
-                <select value={announcementTargetRole} onChange={(e) => setAnnouncementTargetRole(e.target.value as NotificationTargetRole)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800">
+                <select value={announcementTargetRole} onChange={(e) => setAnnouncementTargetRole(e.target.value as NotificationTargetRole)} className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800">
                   <option value="admin">Administradores</option>
                   <option value="user">Cidadão específico</option>
                   <option value="business">Empresa específica</option>
@@ -3489,16 +3507,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {(announcementTargetRole === 'user' || announcementTargetRole === 'business') && (
                 <label className="space-y-1.5">
                   <span className="text-[10px] font-bold uppercase text-slate-500">{t('admin.recipientId')}</span>
-                  <input value={announcementRecipient} onChange={(e) => setAnnouncementRecipient(e.target.value)} placeholder={announcementTargetRole === 'user' ? 'ex.: usr-1' : 'ex.: biz-1'} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-800" required />
+                  <input value={announcementRecipient} onChange={(e) => setAnnouncementRecipient(e.target.value)} placeholder={announcementTargetRole === 'user' ? 'ex.: usr-1' : 'ex.: biz-1'} className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 px-3 py-2 text-xs font-mono text-slate-800" required />
                 </label>
               )}
               <label className="space-y-1.5">
                 <span className="text-[10px] font-bold uppercase text-slate-500">{t('admin.noticeTitle')}</span>
-                <input value={announcementTitle} onChange={(e) => setAnnouncementTitle(e.target.value)} placeholder="Título do aviso" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800" required />
+                <input value={announcementTitle} onChange={(e) => setAnnouncementTitle(e.target.value)} placeholder="Título do aviso" className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 px-3 py-2 text-xs text-slate-800" required />
               </label>
               <label className="space-y-1.5">
                 <span className="text-[10px] font-bold uppercase text-slate-500">{t('admin.priority')}</span>
-                <select value={announcementPriority} onChange={(e) => setAnnouncementPriority(e.target.value as NotificationPriority)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800">
+                <select value={announcementPriority} onChange={(e) => setAnnouncementPriority(e.target.value as NotificationPriority)} className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800">
                   <option value="info">Informação</option>
                   <option value="success">Sucesso</option>
                   <option value="attention">Atenção</option>
@@ -3509,13 +3527,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             <label className="space-y-1.5 block">
               <span className="text-[10px] font-bold uppercase text-slate-500">{t('admin.message')}</span>
-              <textarea value={announcementMessage} onChange={(e) => setAnnouncementMessage(e.target.value)} placeholder="Escreva uma mensagem sem dados privados desnecessários." rows={3} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 resize-y" required />
+              <textarea value={announcementMessage} onChange={(e) => setAnnouncementMessage(e.target.value)} placeholder="Escreva uma mensagem sem dados privados desnecessários." rows={3} className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 px-3 py-2 text-xs text-slate-800 resize-y" required />
             </label>
 
             <div className="flex flex-wrap items-end gap-4">
               <label className="space-y-1.5">
                 <span className="text-[10px] font-bold uppercase text-slate-500">Expira em (opcional)</span>
-                <input type="date" value={announcementExpiresAt} onChange={(e) => setAnnouncementExpiresAt(e.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800" />
+                <input type="date" value={announcementExpiresAt} onChange={(e) => setAnnouncementExpiresAt(e.target.value)} className="rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 px-3 py-2 text-xs text-slate-800" />
               </label>
               <div className="space-y-1.5">
                 <span className="text-[10px] font-bold uppercase text-slate-500 block">{t('admin.additionalChannels')}</span>

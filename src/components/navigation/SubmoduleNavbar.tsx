@@ -93,14 +93,14 @@ export const SubmoduleNavbar: React.FC<SubmoduleNavbarProps> = ({
               className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border px-3 py-1.5 text-[11px] font-black uppercase tracking-wider transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-green-600)] ${
                 isActive
                   ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
-                  : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500 hover:border-indigo-300 hover:text-slate-800'
+                  : 'border-[var(--color-border-subtle)] dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500 hover:border-indigo-300 hover:text-slate-800'
               }`}
             >
               {label}
               {count !== undefined && (
                 <span
                   className={`rounded-full px-1.5 py-0.5 text-[9px] font-black tabular-nums ${
-                    isActive ? 'bg-white/20 text-white' : 'bg-white dark:bg-slate-900 text-slate-600'
+                    isActive ? 'bg-white text-[var(--color-green-800)]' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300'
                   }`}
                 >
                   {count}

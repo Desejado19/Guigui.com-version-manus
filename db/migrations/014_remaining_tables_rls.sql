@@ -516,11 +516,19 @@ DROP POLICY IF EXISTS guigui_schema_migrations_admin ON guigui_schema_migrations
 CREATE POLICY guigui_schema_migrations_admin ON guigui_schema_migrations FOR ALL TO guigui_app
   USING (app_is_admin()) WITH CHECK (app_is_admin());
 
-ALTER TABLE schema_migrations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE schema_migrations FORCE ROW LEVEL SECURITY;
+-- `schema_migrations` é a tabela legada de registo. Numa base criada de
+-- raiz só existe `guigui_schema_migrations` (criada pelo migrador), por isso
+-- o bloco legado só corre quando a tabela antiga está presente.
+DO $$
+BEGIN
+  IF to_regclass('public.schema_migrations') IS NOT NULL THEN
+    ALTER TABLE schema_migrations ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE schema_migrations FORCE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS schema_migrations_admin ON schema_migrations;
-CREATE POLICY schema_migrations_admin ON schema_migrations FOR ALL TO guigui_app
-  USING (app_is_admin()) WITH CHECK (app_is_admin());
+    DROP POLICY IF EXISTS schema_migrations_admin ON schema_migrations;
+    CREATE POLICY schema_migrations_admin ON schema_migrations FOR ALL TO guigui_app
+      USING (app_is_admin()) WITH CHECK (app_is_admin());
+  END IF;
+END $$;
 
 COMMIT;

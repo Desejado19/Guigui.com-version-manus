@@ -73,18 +73,18 @@ export const StoriesModerationPanel: React.FC = () => {
   };
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-700">
+    <section className="rounded-2xl border border-[var(--color-border-default)] bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border-default)] pb-3 dark:border-slate-700">
         <div className="flex items-center gap-2">
-          <span className="rounded-xl bg-amber-100 p-2 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"><ShieldAlert className="h-5 w-5" /></span>
+          <span className="rounded-xl bg-[var(--tone-warning-bg)] p-2 text-[var(--tone-warning-text)] dark:bg-amber-950/40 dark:text-amber-300"><ShieldAlert className="h-5 w-5" /></span>
           <div>
             <h3 className="text-sm font-black text-slate-900 dark:text-white">Moderação de Stories</h3>
             <p className="text-[10px] text-slate-500">Permissão granular: story_moderation. Denúncias, suspensão, remoção e auditoria.</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
-          <button type="button" onClick={() => void load()} className="rounded-lg border border-slate-200 p-2 text-slate-600 dark:border-slate-700 dark:text-slate-300" aria-label="Atualizar"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button>
-          {pendingReports > 0 && <span className="rounded-full bg-rose-100 px-2 py-1 text-[10px] font-black text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">{pendingReports} denúncia(s)</span>}
+          <button type="button" onClick={() => void load()} className="rounded-lg border border-[var(--color-border-default)] p-2 text-slate-600 dark:border-slate-700 dark:text-slate-300" aria-label="Atualizar"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button>
+          {pendingReports > 0 && <span className="rounded-full bg-[var(--tone-danger-bg)] px-2 py-1 text-[10px] font-black text-[var(--tone-danger-text)] dark:bg-rose-950/50 dark:text-rose-300">{pendingReports} denúncia(s)</span>}
         </div>
       </div>
 
@@ -95,28 +95,28 @@ export const StoriesModerationPanel: React.FC = () => {
           ))}
         </div>
         {tab === 'stories' && <>
-          <select value={status} onChange={(event) => setStatus(event.target.value)} className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-bold dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+          <select value={status} onChange={(event) => setStatus(event.target.value)} className="rounded-xl border border-[var(--color-border-default)] bg-white px-2.5 py-1.5 text-[10px] font-bold dark:border-slate-700 dark:bg-slate-800 dark:text-white">
             {STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
-          <form onSubmit={(event) => { event.preventDefault(); void load(); }} className="flex min-w-[180px] flex-1 items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 dark:border-slate-700 dark:bg-slate-800">
+          <form onSubmit={(event) => { event.preventDefault(); void load(); }} className="flex min-w-[180px] flex-1 items-center gap-1 rounded-xl border border-[var(--color-border-default)] bg-white px-2 dark:border-slate-700 dark:bg-slate-800">
             <Search className="h-3.5 w-3.5 text-slate-400" />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Empresa ou legenda" className="min-w-0 flex-1 bg-transparent py-1.5 text-[10px] outline-none dark:text-white" />
           </form>
         </>}
       </div>
 
-      {error && <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-bold text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">{error}</p>}
+      {error && <p className="mt-3 rounded-xl bg-[var(--tone-danger-bg)] px-3 py-2 text-[11px] font-bold text-[var(--tone-danger-text)] dark:bg-rose-950/40 dark:text-rose-300">{error}</p>}
 
       {tab === 'stories' && (
         <div className="mt-3 space-y-2">
           {!loading && stories.length === 0 && <p className="rounded-xl bg-slate-50 p-4 text-center text-[11px] text-slate-500 dark:bg-slate-800">Sem stories para estes filtros.</p>}
           {stories.map((story) => (
-            <div key={story.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+            <div key={story.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--color-border-default)] p-3 dark:border-slate-700">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800">
                 {story.storyType === 'video' ? <Eye className="h-4 w-4 text-slate-500" /> : story.mediaUrl ? <img src={story.mediaUrl} alt="" className="h-full w-full object-cover" /> : <span className="p-1 text-center text-[8px] font-bold">{story.caption?.slice(0, 30) || 'Texto'}</span>}
               </div>
               <div className="min-w-[180px] flex-1">
-                <div className="flex flex-wrap items-center gap-1.5"><span className="text-xs font-black text-slate-900 dark:text-white">{story.businessName}</span><span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-slate-600 dark:bg-slate-800 dark:text-slate-300">{story.status}</span>{story.ownerRole === 'admin' && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-800">Institucional</span>}</div>
+                <div className="flex flex-wrap items-center gap-1.5"><span className="text-xs font-black text-slate-900 dark:text-white">{story.businessName}</span><span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-slate-600 dark:bg-slate-800 dark:text-slate-300">{story.status}</span>{story.ownerRole === 'admin' && <span className="rounded-full bg-[var(--tone-warning-bg)] px-1.5 py-0.5 text-[9px] font-black text-[var(--tone-warning-text)]">Institucional</span>}</div>
                 <p className="line-clamp-1 text-[10px] text-slate-500">{story.caption || 'Sem legenda'} · {story.counts.views} vistas · {story.counts.likes} gostos · {story.counts.replies} respostas</p>
               </div>
               <div className="flex flex-wrap gap-1">
@@ -133,11 +133,11 @@ export const StoriesModerationPanel: React.FC = () => {
         <div className="mt-3 space-y-2">
           {!loading && reports.length === 0 && <p className="rounded-xl bg-slate-50 p-4 text-center text-[11px] text-slate-500 dark:bg-slate-800">Sem denúncias registadas.</p>}
           {reports.map((report) => (
-            <div key={report.id} className="rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+            <div key={report.id} className="rounded-2xl border border-[var(--color-border-default)] p-3 dark:border-slate-700">
               <div className="flex flex-wrap items-center gap-2">
                 <Flag className="h-4 w-4 text-rose-500" />
                 <span className="text-xs font-black text-slate-900 dark:text-white">{report.business_name}</span>
-                <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[9px] font-black text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">{REASON_LABEL[report.reason] || report.reason}</span>
+                <span className="rounded-full bg-[var(--tone-danger-bg)] px-2 py-0.5 text-[9px] font-black text-[var(--tone-danger-text)] dark:bg-rose-950/40 dark:text-rose-300">{REASON_LABEL[report.reason] || report.reason}</span>
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{report.status}</span>
               </div>
               <p className="mt-1 text-[10px] text-slate-500">{report.details || 'Sem detalhes'} · por {report.reporter_name}</p>

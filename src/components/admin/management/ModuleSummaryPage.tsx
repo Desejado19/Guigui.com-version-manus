@@ -37,7 +37,7 @@ export const ModuleSummaryPage: React.FC<ModuleSummaryPageProps> = ({
   >
     {kpis && kpis.length > 0 && <ManagementKpiGrid items={kpis} />}
 
-    <section className="flex flex-col justify-between gap-4 rounded-2xl border border-[#e6dac8] bg-white p-4 shadow-sm sm:flex-row sm:items-center">
+    <section className="flex flex-col justify-between gap-4 rounded-2xl border border-[var(--color-border-default)] bg-white p-4 shadow-sm sm:flex-row sm:items-center">
       <div>
         <h3 className="text-[13px] font-black text-slate-900">Área de gestão dedicada</h3>
         <p className="mt-1 max-w-2xl text-[10.5px] leading-relaxed text-slate-600">
@@ -57,7 +57,7 @@ export const ModuleSummaryPage: React.FC<ModuleSummaryPageProps> = ({
     {children}
 
     {note && (
-      <section className="rounded-2xl border border-[#e6dac8] bg-white p-4 text-[10.5px] leading-relaxed text-slate-600 shadow-sm">
+      <section className="rounded-2xl border border-[var(--color-border-default)] bg-white p-4 text-[10.5px] leading-relaxed text-slate-600 shadow-sm">
         {note}
       </section>
     )}

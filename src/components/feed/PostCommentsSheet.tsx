@@ -162,12 +162,12 @@ export const PostCommentsSheet: React.FC<PostCommentsSheetProps> = ({
       <img
         src={comment.authorAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}
         alt=""
-        className="h-8 w-8 shrink-0 rounded-full border border-slate-200 object-cover"
+        className="h-8 w-8 shrink-0 rounded-full border border-[var(--color-border-subtle)] object-cover"
       />
-      <div className="flex-1 rounded-2xl border border-slate-200 bg-[var(--color-bg-surface)] p-2.5 shadow-2xs dark:bg-[var(--color-bg-surface-dark)]">
+      <div className="flex-1 rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-2.5 shadow-2xs dark:bg-[var(--color-bg-surface-dark)]">
         <div className="text-xs font-extrabold text-slate-900 dark:text-slate-200">{comment.authorName}</div>
         <p className="mt-0.5 whitespace-pre-line break-words text-sm text-slate-700 dark:text-slate-300">{comment.content}</p>
-        <div className="mt-1 flex items-center gap-3 text-[10px] font-bold text-slate-400">
+        <div className="mt-1 flex items-center gap-3 text-[10px] font-bold text-slate-500">
           {depth === 0 && onReply && (
             <button
               type="button"
@@ -196,13 +196,13 @@ export const PostCommentsSheet: React.FC<PostCommentsSheetProps> = ({
         type="button"
         aria-label="Fechar comentários"
         onClick={onClose}
-        className="absolute inset-0 h-full w-full bg-slate-950/45 backdrop-blur-[1px]"
+        className="absolute inset-0 h-full w-full bg-slate-950/45"
       />
       <section
         role="dialog"
         aria-modal="true"
         aria-label={`Comentários de ${title}`}
-        className="absolute inset-x-0 flex flex-col overflow-hidden rounded-t-3xl border border-b-0 border-slate-200 bg-[var(--color-bg-surface)] shadow-[0_-12px_40px_rgba(2,6,23,0.25)] dark:border-slate-800 dark:bg-[var(--color-bg-surface-dark)]"
+        className="absolute inset-x-0 flex flex-col overflow-hidden rounded-t-3xl border border-b-0 border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] shadow-[0_-12px_40px_rgba(2,6,23,0.25)] dark:border-slate-800 dark:bg-[var(--color-bg-surface-dark)]"
         style={{
           bottom: `${keyboardInset}px`,
           maxHeight: `calc(100% - ${Math.max(keyboardInset, 0)}px - 12%)`,
@@ -262,7 +262,7 @@ export const PostCommentsSheet: React.FC<PostCommentsSheetProps> = ({
               <img
                 src={currentUser.avatarUrl}
                 alt=""
-                className="h-8 w-8 shrink-0 rounded-full border border-slate-200 object-cover"
+                className="h-8 w-8 shrink-0 rounded-full border border-[var(--color-border-subtle)] object-cover"
               />
             ) : (
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-xs font-bold text-white">
@@ -278,7 +278,7 @@ export const PostCommentsSheet: React.FC<PostCommentsSheetProps> = ({
               aria-label="Escrever comentário"
               autoComplete="off"
               enterKeyHint="send"
-              className="guigui-mobile-input min-w-0 flex-1 rounded-full border border-slate-200 bg-[var(--color-bg-surface)] px-4 py-2.5 text-slate-900 focus:border-blue-600 focus:outline-none dark:bg-[var(--color-bg-surface-dark)] dark:text-slate-200"
+              className="guigui-mobile-input min-w-0 flex-1 rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-4 py-2.5 text-slate-900 focus:border-blue-600 focus:outline-none dark:bg-[var(--color-bg-surface-dark)] dark:text-slate-200"
             />
             <button
               type="submit"

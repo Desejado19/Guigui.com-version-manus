@@ -39,17 +39,17 @@ export function ProfileSidebar<T extends string>({
     <>
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-slate-950/35 backdrop-blur-[1px] md:hidden"
+          className="fixed inset-0 z-40 bg-slate-950/35 md:hidden"
           onClick={() => onMobileOpenChange?.(false)}
           aria-hidden="true"
         />
       )}
       <aside
-        className={`guigui-panel-sidebar ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} fixed left-0 top-0 z-50 flex h-full max-w-[calc(100vw-16px)] flex-col border-r border-slate-200 bg-white shadow-xl transition-transform duration-300 ease-out md:static md:z-auto md:h-auto md:min-h-full md:translate-x-0 md:shadow-none ${className}`}
+        className={`guigui-panel-sidebar ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} fixed left-0 top-0 z-50 flex h-full max-w-[calc(100vw-16px)] flex-col border-r border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] shadow-xl transition-transform duration-300 ease-out md:static md:z-auto md:h-auto md:min-h-full md:translate-x-0 md:shadow-none ${className}`}
         style={{ width: collapsed ? 72 : 248 }}
         aria-label={title}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-2 py-3">
+        <div className="flex items-center justify-between border-b border-[var(--color-border-subtle)] px-2 py-3">
           {!collapsed && (
             <div className="min-w-0 px-1">
               <div className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">{subtitle}</div>
@@ -95,8 +95,8 @@ export function ProfileSidebar<T extends string>({
                       onMobileOpenChange?.(false);
                     }}
                     className={`group relative flex min-h-11 w-full items-center rounded-xl border text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 ${
-                      collapsed ? 'justify-center border-transparent p-2.5' : 'gap-2 border-slate-200 px-2 py-1.5'
-                    } ${isActive ? 'border-blue-600 bg-blue-600 text-white' : 'text-slate-700 hover:border-slate-300 hover:bg-slate-50'}`}
+                      collapsed ? 'justify-center border-transparent p-2.5' : 'gap-2 border-[var(--color-border-subtle)] px-2 py-1.5'
+                    } ${isActive ? 'border-blue-600 bg-blue-600 text-white' : 'text-slate-700 hover:border-[var(--color-border-default)] hover:bg-slate-50'}`}
                     aria-current={isActive ? 'page' : undefined}
                     title={collapsed ? item.label : undefined}
                   >

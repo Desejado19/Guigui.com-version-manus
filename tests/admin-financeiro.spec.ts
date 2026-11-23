@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 import dotenv from 'dotenv';
 import { Pool } from 'pg';
 
@@ -8,7 +8,7 @@ dotenv.config();
 const ADMIN_EMAIL = 'admin.teste@guigui.com';
 const ADMIN_PASSWORD = 'Guigui@2026!';
 const BUSINESS_EMAIL = 'empresa.teste@guigui.com';
-const BASE = process.env.PW_PORT ? `http://127.0.0.1:${process.env.PW_PORT}` : 'http://127.0.0.1:3000';
+const BASE = process.env.PW_PORT ? `http://localhost:${process.env.PW_PORT}` : 'http://localhost:3000';
 
 let db: Pool;
 const fixtureIds: string[] = [];

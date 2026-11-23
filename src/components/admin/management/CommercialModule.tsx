@@ -50,12 +50,12 @@ export const CommercialModule: React.FC<CommercialModuleProps> = ({ onOpenSectio
 
   const summary = overview?.summary;
   const kpis = [
-    { label: 'Receita registada', value: formatCommercialXOF(summary?.revenueXOF), hint: `${summary?.paymentCount ?? 0} pagamentos confirmados`, tone: 'border-[#cfe2df] bg-[#f3faf8] text-[#123e3b]' },
-    { label: 'Assinaturas ativas', value: String(summary?.activeSubscriptions ?? '—'), hint: 'Contratos válidos', tone: 'border-emerald-200 bg-emerald-50 text-emerald-900' },
-    { label: 'Assinaturas pendentes', value: String(summary?.pendingSubscriptions ?? '—'), hint: 'A aguardar ativação', tone: 'border-amber-200 bg-amber-50 text-amber-900' },
-    { label: 'Assinaturas expiradas', value: String(summary?.expiredSubscriptions ?? '—'), hint: `${summary?.suspendedSubscriptions ?? 0} suspensas`, tone: 'border-rose-200 bg-rose-50 text-rose-900' },
-    { label: 'Planos ativos', value: String(summary?.activePlans ?? '—'), hint: 'Catálogo comercial', tone: 'border-sky-200 bg-sky-50 text-sky-900' },
-    { label: 'Produtos ativos', value: String(summary?.activeProducts ?? '—'), hint: 'Extras e pacotes', tone: 'border-violet-200 bg-violet-50 text-violet-900' },
+    { label: 'Receita registada', value: formatCommercialXOF(summary?.revenueXOF), hint: `${summary?.paymentCount ?? 0} pagamentos confirmados`, tone: 'border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] text-[var(--color-green-800)]' },
+    { label: 'Assinaturas ativas', value: String(summary?.activeSubscriptions ?? '—'), hint: 'Contratos válidos', tone: 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)]' },
+    { label: 'Assinaturas pendentes', value: String(summary?.pendingSubscriptions ?? '—'), hint: 'A aguardar ativação', tone: 'border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)]' },
+    { label: 'Assinaturas expiradas', value: String(summary?.expiredSubscriptions ?? '—'), hint: `${summary?.suspendedSubscriptions ?? 0} suspensas`, tone: 'border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)]' },
+    { label: 'Planos ativos', value: String(summary?.activePlans ?? '—'), hint: 'Catálogo comercial', tone: 'border-[var(--tone-info-border)] bg-[var(--tone-info-bg)] text-[var(--tone-info-text)]' },
+    { label: 'Produtos ativos', value: String(summary?.activeProducts ?? '—'), hint: 'Extras e pacotes', tone: 'border-[var(--tone-info-border)] bg-[var(--tone-info-bg)] text-[var(--tone-info-text)]' },
   ];
 
   return (
@@ -84,7 +84,7 @@ export const CommercialModule: React.FC<CommercialModuleProps> = ({ onOpenSectio
             key={action.key}
             type="button"
             onClick={() => onOpenSection(action.key as CommercialSection)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-[#e6dac8] bg-white px-3 py-1.5 text-[10px] font-black text-[#123e3b] shadow-sm transition hover:bg-[#f7f2ec]"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-1.5 text-[10px] font-black text-[var(--color-green-800)] shadow-sm transition hover:bg-[var(--color-bg-subtle)]"
           >
             {action.icon}
             {action.label}

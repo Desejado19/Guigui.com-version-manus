@@ -282,11 +282,11 @@ export const AdminTeamHub: React.FC<AdminTeamHubProps> = () => {
         </div>
       </div>
 
-      {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">{notice}</p>}
-      {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">{error}</p>}
+      {notice && <p role="status" className="rounded-xl border border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] px-3 py-2 text-xs font-bold text-[var(--tone-success-text)] dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">{notice}</p>}
+      {error && <p role="alert" className="rounded-xl border border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] px-3 py-2 text-xs font-bold text-[var(--tone-danger-text)] dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">{error}</p>}
 
       {formOpen && (
-        <section className="rounded-2xl border border-slate-200 bg-white p-3.5 dark:border-slate-700 dark:bg-slate-900">
+        <section className="rounded-2xl border border-[var(--color-border-default)] bg-white p-3.5 dark:border-slate-700 dark:bg-slate-900">
           <div className="flex items-start justify-between">
             <h3 className="flex items-center gap-2 text-sm font-black text-slate-900 dark:text-white">
               <KeyRound className="h-4 w-4 text-emerald-600" /> {editing ? `Editar acessos de ${editing.name}` : 'Nova conta administrativa'}
@@ -321,7 +321,7 @@ export const AdminTeamHub: React.FC<AdminTeamHubProps> = () => {
                 const actions = access[module.id] || [];
                 const enabled = actions.includes('view');
                 return (
-                  <div key={module.id} className={`rounded-xl border p-2.5 ${enabled ? 'border-emerald-300 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/20' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'}`}>
+                  <div key={module.id} className={`rounded-xl border p-2.5 ${enabled ? 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)]/50 dark:border-emerald-800 dark:bg-emerald-950/20' : 'border-[var(--color-border-default)] bg-white dark:border-slate-700 dark:bg-slate-900'}`}>
                     <label className="flex items-start gap-2">
                       <input type="checkbox" checked={enabled} onChange={(event) => toggleModule(module.id, event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300" />
                       <span className="text-[11px] font-black text-slate-800 dark:text-slate-100">{module.label}</span>
@@ -370,7 +370,7 @@ export const AdminTeamHub: React.FC<AdminTeamHubProps> = () => {
             const modules = grantedModules(accessForMember(member.id));
             const raw = rawMembers.find((item) => item.userId === member.id);
             return (
-              <article key={member.id} className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+              <article key={member.id} className="rounded-2xl border border-[var(--color-border-default)] bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-[200px] flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -378,14 +378,14 @@ export const AdminTeamHub: React.FC<AdminTeamHubProps> = () => {
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black uppercase text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                         {STATUS_LABELS[raw?.status || 'active']}
                       </span>
-                      {modules.length === 0 && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[9px] font-black uppercase text-violet-800 dark:bg-violet-950/40 dark:text-violet-200">Acesso total</span>}
+                      {modules.length === 0 && <span className="rounded-full bg-[var(--tone-info-bg)] px-2 py-0.5 text-[9px] font-black uppercase text-[var(--tone-info-text)] dark:bg-violet-950/40 dark:text-violet-200">Acesso total</span>}
                     </div>
                     <p className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
                       {member.email}{raw?.jobTitle ? ` · ${raw.jobTitle}` : ''}
                     </p>
                     <div className="mt-1.5 flex flex-wrap gap-1">
                       {modules.map((moduleId) => (
-                        <span key={moduleId} className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+                        <span key={moduleId} className="rounded-md bg-[var(--tone-success-bg)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--tone-success-text)] dark:bg-emerald-950/40 dark:text-emerald-200">
                           {ADMIN_ACCESS_MODULES.find((module) => module.id === moduleId)?.label || moduleId}
                         </span>
                       ))}
@@ -396,15 +396,15 @@ export const AdminTeamHub: React.FC<AdminTeamHubProps> = () => {
                       <UserCheck className="h-3 w-3" /> Acessos
                     </button>
                     {raw?.status === 'active' ? (
-                      <button type="button" disabled={busy} onClick={() => void changeStatus(member, 'suspended')} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-amber-300 px-2 py-1 text-[10px] font-black text-amber-800 dark:border-amber-800 dark:text-amber-200">
+                      <button type="button" disabled={busy} onClick={() => void changeStatus(member, 'suspended')} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-[var(--tone-warning-border)] px-2 py-1 text-[10px] font-black text-[var(--tone-warning-text)] dark:border-amber-800 dark:text-amber-200">
                         <Pause className="h-3 w-3" /> Suspender
                       </button>
                     ) : (
-                      <button type="button" disabled={busy} onClick={() => void changeStatus(member, 'active')} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-emerald-300 px-2 py-1 text-[10px] font-black text-emerald-800 dark:border-emerald-800 dark:text-emerald-200">
+                      <button type="button" disabled={busy} onClick={() => void changeStatus(member, 'active')} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-[var(--tone-success-border)] px-2 py-1 text-[10px] font-black text-[var(--tone-success-text)] dark:border-emerald-800 dark:text-emerald-200">
                         <Play className="h-3 w-3" /> Reactivar
                       </button>
                     )}
-                    <button type="button" disabled={busy} onClick={() => void remove(member)} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-rose-300 px-2 py-1 text-[10px] font-black text-rose-700 dark:border-rose-900 dark:text-rose-300">
+                    <button type="button" disabled={busy} onClick={() => void remove(member)} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-[var(--tone-danger-border)] px-2 py-1 text-[10px] font-black text-[var(--tone-danger-text)] dark:border-rose-900 dark:text-rose-300">
                       <Trash2 className="h-3 w-3" /> Revogar
                     </button>
                   </div>

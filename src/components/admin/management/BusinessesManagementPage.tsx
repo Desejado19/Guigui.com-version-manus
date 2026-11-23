@@ -41,9 +41,9 @@ const TIER_LABELS: Record<SubscriptionTier, string> = {
 };
 
 const STATUS_META: Record<Business['status'], { label: string; className: string }> = {
-  active: { label: 'Ativa', className: 'border-emerald-200 bg-emerald-50 text-emerald-800' },
-  pending: { label: 'Pendente', className: 'border-amber-200 bg-amber-50 text-amber-800' },
-  suspended: { label: 'Suspensa', className: 'border-rose-200 bg-rose-50 text-rose-800' },
+  active: { label: 'Ativa', className: 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)]' },
+  pending: { label: 'Pendente', className: 'border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)]' },
+  suspended: { label: 'Suspensa', className: 'border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)]' },
   rejected: { label: 'Rejeitada', className: 'border-slate-300 bg-slate-100 text-slate-700' },
 };
 
@@ -90,7 +90,7 @@ function buildDuplicateIds(businesses: Business[]): Set<string> {
 }
 
 const inputClass =
-  'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium text-slate-800 outline-none transition focus:border-[#123e3b] focus:ring-2 focus:ring-[#123e3b]/10';
+  'w-full rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2 text-[11px] font-medium text-slate-800 outline-none transition focus:border-[var(--color-focus-ring)] focus:ring-2 focus:ring-[var(--color-focus-ring)]/25';
 
 export const BusinessesManagementPage: React.FC<BusinessesManagementPageProps> = ({
   businesses,
@@ -335,15 +335,15 @@ export const BusinessesManagementPage: React.FC<BusinessesManagementPageProps> =
       render: (business) => (
         <div className="flex min-w-[200px] items-center gap-2">
           {business.logo ? (
-            <img src={business.logo} alt="" className="h-8 w-8 rounded-lg border border-slate-200 object-cover" />
+            <img src={business.logo} alt="" className="h-8 w-8 rounded-lg border border-[var(--color-border-default)] object-cover" />
           ) : (
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500"><Store className="h-4 w-4" /></div>
           )}
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="truncate font-black text-slate-900">{business.name}</span>
-              {duplicateIds.has(business.id) && <span className="rounded-full border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[8px] font-black text-violet-700">DUPLICADO?</span>}
-              {testIds.has(business.id) && <span className="rounded-full border border-orange-200 bg-orange-50 px-1.5 py-0.5 text-[8px] font-black text-orange-700">TESTE</span>}
+              {duplicateIds.has(business.id) && <span className="rounded-full border border-[var(--tone-info-border)] bg-[var(--tone-info-bg)] px-1.5 py-0.5 text-[8px] font-black text-[var(--tone-info-text)]">DUPLICADO?</span>}
+              {testIds.has(business.id) && <span className="rounded-full border border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] px-1.5 py-0.5 text-[8px] font-black text-[var(--tone-warning-text)]">TESTE</span>}
             </div>
             <div className="truncate text-[9.5px] font-medium text-slate-400">{business.id}</div>
           </div>
@@ -366,14 +366,14 @@ export const BusinessesManagementPage: React.FC<BusinessesManagementPageProps> =
       key: 'tier',
       label: 'Plano',
       sortable: true,
-      render: (business) => <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-black uppercase text-slate-600">{TIER_LABELS[business.tier] || business.tier}</span>,
+      render: (business) => <span className="rounded-md border border-[var(--color-border-default)] bg-slate-50 px-1.5 py-0.5 text-[9px] font-black uppercase text-slate-600">{TIER_LABELS[business.tier] || business.tier}</span>,
     },
     {
       key: 'status',
       label: 'Estado',
       sortable: true,
       render: (business) => {
-        const meta = STATUS_META[business.status] || { label: business.status, className: 'border-slate-200 bg-slate-50 text-slate-700' };
+        const meta = STATUS_META[business.status] || { label: business.status, className: 'border-[var(--color-border-default)] bg-slate-50 text-slate-700' };
         return <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${meta.className}`}>{meta.label}</span>;
       },
     },
@@ -441,7 +441,7 @@ export const BusinessesManagementPage: React.FC<BusinessesManagementPageProps> =
       }
     >
       {feedback && (
-        <div role="status" className={`rounded-xl border px-3.5 py-2.5 text-[11px] font-bold ${feedback.tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>
+        <div role="status" className={`rounded-xl border px-3.5 py-2.5 text-[11px] font-bold ${feedback.tone === 'success' ? 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)]' : 'border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)]'}`}>
           {feedback.message}
         </div>
       )}
@@ -497,7 +497,7 @@ export const BusinessesManagementPage: React.FC<BusinessesManagementPageProps> =
         sortKey={state.sortKey}
         sortDirection={state.sortDirection}
         onSort={setSort}
-        rowClassName={(business) => (duplicateIds.has(business.id) || testIds.has(business.id) ? 'bg-violet-50/30' : '')}
+        rowClassName={(business) => (duplicateIds.has(business.id) || testIds.has(business.id) ? 'bg-[var(--tone-info-bg)]/30' : '')}
       />
 
       <ManagementPagination
@@ -510,11 +510,11 @@ export const BusinessesManagementPage: React.FC<BusinessesManagementPageProps> =
 
       {detail && (
         <div className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4" role="dialog" aria-modal="true" aria-label={`Ficha de ${detail.name}`}>
-          <div className="my-6 w-full max-w-3xl rounded-2xl border border-[#e6dac8] bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-3 border-b border-slate-100 p-4">
+          <div className="my-6 w-full max-w-3xl rounded-2xl border border-[var(--color-border-default)] bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--color-border-subtle)] p-4">
               <div className="flex items-center gap-3">
                 {detail.logo ? (
-                  <img src={detail.logo} alt="" className="h-12 w-12 rounded-xl border border-slate-200 object-cover" />
+                  <img src={detail.logo} alt="" className="h-12 w-12 rounded-xl border border-[var(--color-border-default)] object-cover" />
                 ) : (
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-500"><Store className="h-5 w-5" /></div>
                 )}
@@ -531,14 +531,14 @@ export const BusinessesManagementPage: React.FC<BusinessesManagementPageProps> =
             <div className="max-h-[70vh] space-y-3 overflow-y-auto p-4 text-[11px]">
               <div className="flex flex-wrap gap-1.5">
                 <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${STATUS_META[detail.status]?.className || ''}`}>{STATUS_META[detail.status]?.label || detail.status}</span>
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9px] font-black text-slate-600">{TIER_LABELS[detail.tier] || detail.tier}</span>
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9px] font-black text-slate-600">Registo: {formatManagementDate(detail.createdAt)}</span>
-                {duplicateIds.has(detail.id) && <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[9px] font-black text-violet-700">Possível duplicação</span>}
-                {testIds.has(detail.id) && <span className="rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[9px] font-black text-orange-700">Possível registo de teste</span>}
+                <span className="rounded-full border border-[var(--color-border-default)] bg-slate-50 px-2 py-0.5 text-[9px] font-black text-slate-600">{TIER_LABELS[detail.tier] || detail.tier}</span>
+                <span className="rounded-full border border-[var(--color-border-default)] bg-slate-50 px-2 py-0.5 text-[9px] font-black text-slate-600">Registo: {formatManagementDate(detail.createdAt)}</span>
+                {duplicateIds.has(detail.id) && <span className="rounded-full border border-[var(--tone-info-border)] bg-[var(--tone-info-bg)] px-2 py-0.5 text-[9px] font-black text-[var(--tone-info-text)]">Possível duplicação</span>}
+                {testIds.has(detail.id) && <span className="rounded-full border border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] px-2 py-0.5 text-[9px] font-black text-[var(--tone-warning-text)]">Possível registo de teste</span>}
               </div>
 
               {feedback && (
-                <div className={`rounded-xl border px-3 py-2 text-[11px] font-bold ${feedback.tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>
+                <div className={`rounded-xl border px-3 py-2 text-[11px] font-bold ${feedback.tone === 'success' ? 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)]' : 'border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)]'}`}>
                   {feedback.message}
                 </div>
               )}
@@ -590,7 +590,7 @@ export const BusinessesManagementPage: React.FC<BusinessesManagementPageProps> =
               )}
             </div>
 
-            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 p-3.5">
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--color-border-subtle)] p-3.5">
               {editing ? (
                 <>
                   <ManagementActionButton onClick={() => setEditing(false)} disabled={saving}>Cancelar</ManagementActionButton>

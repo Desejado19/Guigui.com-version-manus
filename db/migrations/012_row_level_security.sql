@@ -230,21 +230,18 @@ CREATE POLICY tickets_admin ON tickets FOR ALL TO guigui_app
 DROP POLICY IF EXISTS tickets_read ON tickets;
 CREATE POLICY tickets_read ON tickets FOR SELECT TO guigui_app
   USING (
-    buyer_user_id = app_user_id()
-    OR order_id IN (SELECT o.id FROM orders o WHERE o.buyer_user_id = app_user_id())
+    order_id IN (SELECT o.id FROM orders o WHERE o.buyer_user_id = app_user_id())
     OR event_id IN (SELECT e.id FROM events e WHERE e.company_id = app_business_id())
   );
 
 DROP POLICY IF EXISTS tickets_write ON tickets;
 CREATE POLICY tickets_write ON tickets FOR ALL TO guigui_app
   USING (
-    buyer_user_id = app_user_id()
-    OR order_id IN (SELECT o.id FROM orders o WHERE o.buyer_user_id = app_user_id())
+    order_id IN (SELECT o.id FROM orders o WHERE o.buyer_user_id = app_user_id())
     OR event_id IN (SELECT e.id FROM events e WHERE e.company_id = app_business_id())
   )
   WITH CHECK (
-    buyer_user_id = app_user_id()
-    OR order_id IN (SELECT o.id FROM orders o WHERE o.buyer_user_id = app_user_id())
+    order_id IN (SELECT o.id FROM orders o WHERE o.buyer_user_id = app_user_id())
     OR event_id IN (SELECT e.id FROM events e WHERE e.company_id = app_business_id())
   );
 

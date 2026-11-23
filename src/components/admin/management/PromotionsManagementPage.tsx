@@ -130,14 +130,14 @@ export const PromotionsManagementPage: React.FC<PromotionsManagementPageProps> =
             </div>
           ),
         },
-        { key: 'discountBadge', label: 'Oferta', render: (row) => <span className="rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[9px] font-black text-emerald-800">{row.discountBadge || '—'}</span> },
+        { key: 'discountBadge', label: 'Oferta', render: (row) => <span className="rounded-md border border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] px-1.5 py-0.5 text-[9px] font-black text-[var(--tone-success-text)]">{row.discountBadge || '—'}</span> },
         { key: 'code', label: 'Código', render: (row) => <span className="font-mono text-[10px]">{row.code || '—'}</span> },
         { key: 'validUntil', label: 'Válida até', sortable: true, render: (row) => <span className="whitespace-nowrap">{formatManagementDate(row.validUntil)}</span> },
         { key: 'status', label: 'Estado', sortable: true, render: (row) => (
           <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-black ${
-            row.status === 'active' ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-              : row.status === 'pending_moderation' ? 'border-amber-200 bg-amber-50 text-amber-800'
-                : row.status === 'scheduled' ? 'border-sky-200 bg-sky-50 text-sky-800'
+            row.status === 'active' ? 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)]'
+              : row.status === 'pending_moderation' ? 'border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)]'
+                : row.status === 'scheduled' ? 'border-[var(--tone-info-border)] bg-[var(--tone-info-bg)] text-[var(--tone-info-text)]'
                   : 'border-slate-300 bg-slate-100 text-slate-700'
           }`}>{STATUS_LABELS[row.status] || row.status}</span>
         ) },

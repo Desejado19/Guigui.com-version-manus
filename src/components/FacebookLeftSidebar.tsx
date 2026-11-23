@@ -52,7 +52,7 @@ export const FacebookLeftSidebar: React.FC<FacebookLeftSidebarProps> = ({
           else if (currentRole === 'business') onTabChange('client');
           else onTabChange('feed');
         }}
-        className={`border rounded-2xl p-3.5 flex items-center gap-3 shadow-sm transition cursor-pointer ${ currentRole === 'admin' ? 'bg-slate-900 border-slate-800 text-white hover:bg-slate-800' : currentRole === 'business' ? 'bg-blue-50 border-blue-200 text-slate-900 hover:bg-blue-100/60' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white hover:bg-slate-50' }`}
+        className={`border rounded-2xl p-3.5 flex items-center gap-3 shadow-sm transition cursor-pointer ${ currentRole === 'admin' ? 'bg-slate-900 border-slate-800 text-white hover:bg-slate-800' : currentRole === 'business' ? 'bg-blue-50 border-blue-200 text-slate-900 hover:bg-blue-100/60' : 'bg-white dark:bg-slate-900 border-[var(--color-border-subtle)] dark:border-slate-700 text-slate-900 dark:text-white hover:bg-slate-50' }`}
       >
         <div
           className={`w-10 h-10 rounded-full font-bold flex items-center justify-center text-sm shadow-sm flex-shrink-0 ${ currentRole === 'admin' ? 'bg-slate-900 text-white' : currentRole === 'business' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-white' }`}
@@ -135,7 +135,7 @@ export const FacebookLeftSidebar: React.FC<FacebookLeftSidebarProps> = ({
       </div>
 
       {/* Professional Access Shortcuts */}
-      <div className="pt-4 border-t border-slate-200/80 dark:border-slate-700 space-y-1">
+      <div className="pt-4 border-t border-[var(--color-border-subtle)]/80 dark:border-slate-700 space-y-1">
         <div className="px-3 text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
           <span>Modo de Acesso ({currentRole.toUpperCase()})</span>
         </div>
@@ -195,7 +195,7 @@ export const FacebookLeftSidebar: React.FC<FacebookLeftSidebarProps> = ({
       </div>
 
       {/* Neighborhoods Shortcut Filter */}
-      <div className="pt-4 border-t border-slate-200/80 dark:border-slate-700 space-y-2">
+      <div className="pt-4 border-t border-[var(--color-border-subtle)]/80 dark:border-slate-700 space-y-2">
         <div className="px-3 text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center justify-between">
           <span className="flex items-center gap-1">
             <MapPin className="w-3.5 h-3.5 text-red-500" />
@@ -230,7 +230,7 @@ export const FacebookLeftSidebar: React.FC<FacebookLeftSidebarProps> = ({
         </div>
       </div>
 
-      <div className="px-3 pt-4 border-t border-slate-200 dark:border-slate-700 text-[10px] text-slate-400 dark:text-slate-500 space-y-1">
+      <div className="px-3 pt-4 border-t border-[var(--color-border-subtle)] dark:border-slate-700 text-[10px] text-slate-500 dark:text-slate-500 space-y-1">
         <p>© 2026 Guigui.com</p>
         <p>Privacidade • Termos • Publicidade • Guigui.com</p>
       </div>

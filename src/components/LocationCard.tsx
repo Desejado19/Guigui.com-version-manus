@@ -20,7 +20,7 @@ export const LocationCard: React.FC<LocationCardProps> = ({
 }) => {
   return (
     <div
-      className={`guigui-location-card rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden cursor-pointer ${className || ''}`}
+      className={`guigui-location-card rounded-2xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden cursor-pointer ${className || ''}`}
       onClick={() => alert('Location card clicked')}
     >
       <div className="guigui-location-inner">
@@ -33,7 +33,7 @@ export const LocationCard: React.FC<LocationCardProps> = ({
               loading="lazy"
             />
           ) : (
-            <div className="h-full w-full px-4 py-6 flex items-center justify-center text-slate-400 dark:text-slate-500 text-xs font-semibold uppercase tracking-wide">
+            <div className="h-full w-full px-4 py-6 flex items-center justify-center text-slate-500 dark:text-slate-500 text-xs font-semibold uppercase tracking-wide">
               <MapPin className="w-5 h-5 mr-2" />
               {neighborhood}
             </div>

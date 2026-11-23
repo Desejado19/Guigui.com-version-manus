@@ -117,7 +117,7 @@ export const FinancePendingPage: React.FC<Props> = ({ onBack }) => {
           <div className="font-black text-slate-900">{item.id}</div>
           <div className="text-[9.5px] text-slate-500">{formatFinanceDateTime(item.createdAt)}</div>
           {pendingAgeHours(item.createdAt) >= OVERDUE_HOURS && (
-            <span className="mt-0.5 inline-block rounded-full border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[8px] font-black text-rose-800">+48 h</span>
+            <span className="mt-0.5 inline-block rounded-full border border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] px-1.5 py-0.5 text-[8px] font-black text-[var(--tone-danger-text)]">+48 h</span>
           )}
         </div>
       ),
@@ -156,12 +156,12 @@ export const FinancePendingPage: React.FC<Props> = ({ onBack }) => {
         { label: 'Simulados bloqueados', value: items.filter((item) => item.isSimulated).length, tone: 'danger' },
       ]}
     >
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-[10px] leading-relaxed text-amber-900">
+      <div className="rounded-2xl border border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] p-3 text-[10px] leading-relaxed text-[var(--tone-warning-text)]">
         <strong className="font-black">Confirmação responsável:</strong> cada ação fica registada com administrador, data e motivo.
         Pagamentos de sandbox ou simulados nunca são convertidos em pagamentos reais confirmados.
       </div>
       {overdue.length > 0 && (
-        <div role="alert" className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-[10px] leading-relaxed text-rose-900">
+        <div role="alert" className="flex items-start gap-2 rounded-2xl border border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] p-3 text-[10px] leading-relaxed text-[var(--tone-danger-text)]">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
             <strong className="font-black">{overdue.length} pagamento(s) ultrapassaram 48 horas na fila</strong>, num total de {formatXOF(overdue.reduce((sum, item) => sum + item.amountXOF, 0))}.
@@ -171,7 +171,7 @@ export const FinancePendingPage: React.FC<Props> = ({ onBack }) => {
       )}
       {message && <FinanceMessage tone={message.tone}>{message.text}</FinanceMessage>}
 
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#e6dac8] bg-white p-3.5 shadow-sm">
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--color-border-default)] bg-white p-3.5 shadow-sm">
         <div className="relative min-w-[230px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <input type="search" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Pesquisar por transação, cliente, telefone ou referência…" className={`${financeInputClass} pl-8`} />
@@ -203,7 +203,7 @@ export const FinancePendingPage: React.FC<Props> = ({ onBack }) => {
       >
         {target && (
           <div className="space-y-3">
-            <div className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[10px] sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 rounded-xl border border-[var(--color-border-default)] bg-slate-50 p-3 text-[10px] sm:grid-cols-2">
               <div><span className="block font-black text-slate-500">Serviço</span>{target.payment.useCaseLabel}</div>
               <div><span className="block font-black text-slate-500">Origem</span>{financeOriginLabel(target.payment.dataOrigin)}</div>
               <div><span className="block font-black text-slate-500">Referência original</span>{target.payment.providerReference || '—'}</div>
@@ -224,7 +224,7 @@ export const FinancePendingPage: React.FC<Props> = ({ onBack }) => {
               <div>
                 <h4 className="text-[11px] font-black text-slate-900">Ações anteriores</h4>
                 {target.payment.actions.map((action) => (
-                  <div key={action.id} className="mt-1 rounded-lg border border-slate-100 p-2 text-[9.5px]">
+                  <div key={action.id} className="mt-1 rounded-lg border border-[var(--color-border-subtle)] p-2 text-[9.5px]">
                     <strong>{action.action}</strong> · {action.actorName} · {formatFinanceDateTime(action.createdAt)}
                     {action.proofReference && <span className="block">Comprovativo: {action.proofReference}</span>}
                     {action.reason && <span className="block text-slate-500">{action.reason}</span>}

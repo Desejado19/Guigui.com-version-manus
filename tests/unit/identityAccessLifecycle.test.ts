@@ -25,6 +25,8 @@ function lifecycleDependencies(overrides: {
   const accounts: IdentityAccountRepository = {
     findByEmail: async () => null,
     findById: async () => overrides.account === undefined ? account : overrides.account,
+    findByGoogleSubject: async () => null,
+    linkGoogleSubject: async () => false,
     create: async () => null,
     changePassword: async () => false,
     deactivate: vi.fn(async () => {

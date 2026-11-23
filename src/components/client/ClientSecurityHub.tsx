@@ -347,11 +347,11 @@ export const ClientSecurityHub: React.FC<ClientSecurityHubProps> = ({ business, 
             </p>
           </div>
           <div className="flex gap-2">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center dark:border-slate-700 dark:bg-slate-900">
+            <div className="rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 px-3 py-2 text-center dark:border-slate-700 dark:bg-slate-900">
               <div className="text-lg font-black text-slate-900 dark:text-white">{sessions.length}</div>
               <div className="text-[9px] font-black uppercase tracking-wide text-slate-500">Sessões</div>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center dark:border-slate-700 dark:bg-slate-900">
+            <div className="rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 px-3 py-2 text-center dark:border-slate-700 dark:bg-slate-900">
               <div className="text-lg font-black text-slate-900 dark:text-white">{alerts.filter((alert) => alert.tone === 'warning').length}</div>
               <div className="text-[9px] font-black uppercase tracking-wide text-slate-500">Alertas</div>
             </div>
@@ -377,14 +377,14 @@ export const ClientSecurityHub: React.FC<ClientSecurityHubProps> = ({ business, 
             <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">A conta é <strong>{currentUser.email}</strong>. A alteração fica registada no histórico de segurança.</p>
             <form className="mt-3 max-w-xl space-y-3" onSubmit={changePassword}>
               <label className="block text-[11px] font-black text-slate-600 dark:text-slate-300">Palavra-passe actual
-                <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required autoComplete="current-password" className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
+                <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required autoComplete="current-password" className="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2 text-xs font-bold text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
               </label>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block text-[11px] font-black text-slate-600 dark:text-slate-300">Nova palavra-passe
-                  <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required minLength={6} autoComplete="new-password" className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
+                  <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required minLength={6} autoComplete="new-password" className="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2 text-xs font-bold text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
                 </label>
                 <label className="block text-[11px] font-black text-slate-600 dark:text-slate-300">Confirmar nova palavra-passe
-                  <input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required minLength={6} autoComplete="new-password" className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
+                  <input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required minLength={6} autoComplete="new-password" className="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2 text-xs font-bold text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
                 </label>
               </div>
               <button type="submit" disabled={passwordBusy} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-black text-white transition hover:bg-emerald-800 disabled:opacity-60">
@@ -447,7 +447,7 @@ export const ClientSecurityHub: React.FC<ClientSecurityHubProps> = ({ business, 
               <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Cada sessão corresponde a um início de sessão com sessão assinada no servidor.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => void loadSessions()} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-1.5 text-[10px] font-black text-slate-700 dark:border-slate-600 dark:text-slate-200">
+              <button type="button" onClick={() => void loadSessions()} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[var(--color-border-default)] px-3 py-1.5 text-[10px] font-black text-slate-700 dark:border-slate-600 dark:text-slate-200">
                 <RefreshCw className={`h-3.5 w-3.5 ${sessionsLoading ? 'animate-spin' : ''}`} /> Actualizar
               </button>
               <button type="button" onClick={() => void revokeAll()} disabled={busySessionId === 'all' || sessions.length === 0} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-1.5 text-[10px] font-black text-white transition hover:bg-rose-700 disabled:opacity-60">
@@ -467,7 +467,7 @@ export const ClientSecurityHub: React.FC<ClientSecurityHubProps> = ({ business, 
               {sessions.map((session) => {
                 const device = describeDevice(session.userAgent);
                 return (
-                  <li key={session.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                  <li key={session.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--color-border-subtle)] bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                       {device.mobile ? <Smartphone className="h-4 w-4" /> : <Laptop className="h-4 w-4" />}
                     </span>
@@ -507,8 +507,8 @@ export const ClientSecurityHub: React.FC<ClientSecurityHubProps> = ({ business, 
               </p>
             </div>
             <div className="flex gap-2">
-              <input type="search" value={historyQuery} onChange={(event) => setHistoryQuery(event.target.value)} placeholder="Pesquisar acção ou recurso" className="min-h-9 w-56 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
-              <button type="button" onClick={() => void loadEvents()} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-1.5 text-[10px] font-black text-slate-700 dark:border-slate-600 dark:text-slate-200">
+              <input type="search" value={historyQuery} onChange={(event) => setHistoryQuery(event.target.value)} placeholder="Pesquisar acção ou recurso" className="min-h-9 w-56 rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-1.5 text-[11px] font-bold text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
+              <button type="button" onClick={() => void loadEvents()} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[var(--color-border-default)] px-3 py-1.5 text-[10px] font-black text-slate-700 dark:border-slate-600 dark:text-slate-200">
                 <RefreshCw className={`h-3.5 w-3.5 ${eventsLoading ? 'animate-spin' : ''}`} /> Actualizar
               </button>
             </div>
@@ -566,7 +566,7 @@ export const ClientSecurityHub: React.FC<ClientSecurityHubProps> = ({ business, 
       {section === 'alertas' && (
         <div className="grid gap-3 md:grid-cols-2">
           {alerts.map((alert) => (
-            <section key={alert.title} className={`rounded-2xl border p-3.5 shadow-[var(--shadow-xs)] ${alert.tone === 'warning' ? 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'}`}>
+            <section key={alert.title} className={`rounded-2xl border p-3.5 shadow-[var(--shadow-xs)] ${alert.tone === 'warning' ? 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30' : 'border-[var(--color-border-subtle)] bg-white dark:border-slate-700 dark:bg-slate-900'}`}>
               <h4 className="flex items-center gap-2 text-xs font-black text-slate-900 dark:text-white">
                 {alert.tone === 'warning' ? <ShieldAlert className="h-4 w-4 text-amber-600" /> : <ShieldCheck className="h-4 w-4 text-emerald-600" />}
                 {alert.title}
@@ -574,7 +574,7 @@ export const ClientSecurityHub: React.FC<ClientSecurityHubProps> = ({ business, 
               <p className="mt-1 text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">{alert.detail}</p>
             </section>
           ))}
-          <section className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5 dark:border-slate-700 dark:bg-slate-900 md:col-span-2">
+          <section className="rounded-2xl border border-[var(--color-border-subtle)] bg-slate-50 p-3.5 dark:border-slate-700 dark:bg-slate-900 md:col-span-2">
             <h4 className="flex items-center gap-2 text-xs font-black text-slate-800 dark:text-slate-100"><Globe className="h-4 w-4 text-slate-500" /> Recomendações</h4>
             <ul className="mt-1 list-disc pl-5 text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
               <li>Use uma palavra-passe exclusiva para a conta empresarial e altere-a quando alguém da equipa sair.</li>
@@ -585,7 +585,7 @@ export const ClientSecurityHub: React.FC<ClientSecurityHubProps> = ({ business, 
         </div>
       )}
 
-      <p className="text-[10px] text-slate-400 dark:text-slate-500">
+      <p className="text-[10px] text-slate-500 dark:text-slate-500">
         Conta {currentUser.email} · empresa {business.name}. As operações sensíveis são validadas e registadas no servidor.
       </p>
     </div>

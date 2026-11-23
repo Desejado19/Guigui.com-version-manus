@@ -183,7 +183,7 @@ export const CommercialSubscriptionsPage: React.FC<{ onBack: () => void }> = ({ 
       {notice && <CommercialMessage tone="success">{notice}</CommercialMessage>}
       <div className="flex flex-wrap gap-1.5">
         {(['all', 'active', 'pending', 'expired', 'suspended', 'cancelled'] as const).map((value) => (
-          <button key={value} type="button" onClick={() => setStatus(value)} className={`rounded-xl border px-3 py-1.5 text-[10px] font-black ${status === value ? 'border-[#123e3b] bg-[#123e3b] text-white' : 'border-slate-200 bg-white text-slate-600'}`}>
+          <button key={value} type="button" onClick={() => setStatus(value)} className={`rounded-xl border px-3 py-1.5 text-[10px] font-black ${status === value ? 'border-[var(--color-green-700)] bg-[var(--color-green-800)] text-white' : 'border-[var(--color-border-default)] bg-white text-slate-600'}`}>
             {value === 'all' ? 'Todas' : commercialStatusLabel[value]} ({counts[value] ?? 0})
           </button>
         ))}
@@ -199,8 +199,8 @@ export const CommercialSubscriptionsPage: React.FC<{ onBack: () => void }> = ({ 
         <ManagementFilter label="Categoria" value={groupId} onChange={setGroupId} options={[{ value: '', label: 'Todas' }, ...groups.map((group) => ({ value: group.id, label: group.name }))]} />
         <ManagementFilter label="Operadora" value={provider} onChange={setProvider} options={[{ value: '', label: 'Todas' }, { value: 'orange_money', label: 'Orange Money' }, { value: 'telecel', label: 'Telecel' }, { value: 'manual_transfer', label: 'Transferência manual' }]} />
         <ManagementFilter label="Pagamento" value={paymentType} onChange={setPaymentType} options={[{ value: '', label: 'Todos' }, { value: 'initial', label: 'Adesão' }, { value: 'renewal', label: 'Renovação' }, { value: 'upgrade', label: 'Upgrade' }, { value: 'manual', label: 'Manual' }]} />
-        <label className="flex min-w-[140px] flex-col gap-1"><span className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">Início desde</span><input type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] font-bold" /></label>
-        <label className="flex min-w-[140px] flex-col gap-1"><span className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">Início até</span><input type="date" value={to} onChange={(event) => setTo(event.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] font-bold" /></label>
+        <label className="flex min-w-[140px] flex-col gap-1"><span className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">Início desde</span><input type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="rounded-xl border border-[var(--color-border-default)] bg-slate-50 px-2.5 py-2 text-[11px] font-bold" /></label>
+        <label className="flex min-w-[140px] flex-col gap-1"><span className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">Início até</span><input type="date" value={to} onChange={(event) => setTo(event.target.value)} className="rounded-xl border border-[var(--color-border-default)] bg-slate-50 px-2.5 py-2 text-[11px] font-bold" /></label>
       </ManagementToolbar>
       {loading ? <CommercialLoading label="A carregar assinaturas…" /> : (
         <>
@@ -215,11 +215,11 @@ export const CommercialSubscriptionsPage: React.FC<{ onBack: () => void }> = ({ 
         {detail && (
           <div className="space-y-4 text-[10.5px]">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5"><span className="block text-[9px] font-black uppercase text-slate-500">Plano</span>{detail.subscription.planName} · v{detail.subscription.planVersion}</div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5"><span className="block text-[9px] font-black uppercase text-slate-500">Preço / período</span>{formatCommercialXOF(detail.subscription.priceXOF)} · {detail.subscription.billingPeriod}</div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5"><span className="block text-[9px] font-black uppercase text-slate-500">Estado</span><CommercialStatusBadge status={detail.subscription.status} /></div>
+              <div className="rounded-xl border border-[var(--color-border-default)] bg-slate-50 p-2.5"><span className="block text-[9px] font-black uppercase text-slate-500">Plano</span>{detail.subscription.planName} · v{detail.subscription.planVersion}</div>
+              <div className="rounded-xl border border-[var(--color-border-default)] bg-slate-50 p-2.5"><span className="block text-[9px] font-black uppercase text-slate-500">Preço / período</span>{formatCommercialXOF(detail.subscription.priceXOF)} · {detail.subscription.billingPeriod}</div>
+              <div className="rounded-xl border border-[var(--color-border-default)] bg-slate-50 p-2.5"><span className="block text-[9px] font-black uppercase text-slate-500">Estado</span><CommercialStatusBadge status={detail.subscription.status} /></div>
             </div>
-            <div className="rounded-xl border border-[#cfe2df] bg-[#f3faf8] p-3">
+            <div className="rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] p-3">
               <div className="flex flex-wrap items-center justify-between gap-2"><strong>Fotografia contratada</strong><span className="rounded-full bg-white px-2 py-0.5 text-[9px] font-black">catálogo v{detail.snapshot.catalogVersion} · plano v{detail.snapshot.planVersion}</span></div>
               <div className="mt-2 grid grid-cols-2 gap-2 text-[10px]">
                 {Object.entries(detail.snapshot.limitsSnapshot || {}).map(([key, value]) => <div key={key} className="rounded-lg bg-white p-2"><span className="block font-black text-slate-500">{key}</span>{value === null ? 'Ilimitado/negociado' : String(value)}</div>)}
@@ -228,14 +228,14 @@ export const CommercialSubscriptionsPage: React.FC<{ onBack: () => void }> = ({ 
             </div>
             <div>
               <h4 className="text-[11px] font-black text-slate-900">Pagamentos de subscrição</h4>
-              <div className="mt-1 divide-y divide-slate-100 rounded-xl border border-slate-200">
+              <div className="mt-1 divide-y divide-[var(--color-border-subtle)] rounded-xl border border-[var(--color-border-default)]">
                 {detail.payments.map((payment) => <div key={payment.id} className="flex flex-wrap items-center justify-between gap-2 p-2"><div><strong>{payment.useCase}</strong><div className="text-[9px] text-slate-500">{payment.id} · {payment.provider || '—'} · {payment.status}</div></div><div className="text-right font-bold">{formatCommercialXOF(payment.amountXOF)}<div className="text-[9px] font-normal text-slate-500">{formatCommercialDate(payment.createdAt, true)}</div></div></div>)}
                 {detail.payments.length === 0 && <p className="p-3 text-slate-500">Sem pagamentos de subscrição registados para esta empresa.</p>}
               </div>
             </div>
             <div>
               <h4 className="text-[11px] font-black text-slate-900">Histórico auditado</h4>
-              <div className="mt-1 divide-y divide-slate-100 rounded-xl border border-slate-200">
+              <div className="mt-1 divide-y divide-[var(--color-border-subtle)] rounded-xl border border-[var(--color-border-default)]">
                 {detail.history.map((entry) => <div key={entry.id} className="p-2"><div className="flex flex-wrap items-center justify-between gap-2"><strong>{entry.action}</strong><span className="text-[9px] text-slate-500">{entry.actorName} · {formatCommercialDate(entry.createdAt, true)}</span></div>{entry.reason && <div className="text-[9.5px] text-slate-500">{entry.reason}</div>}</div>)}
                 {detail.history.length === 0 && <p className="p-3 text-slate-500">Sem alterações auditadas.</p>}
               </div>

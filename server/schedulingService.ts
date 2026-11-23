@@ -17,39 +17,8 @@ const notify = async (notification: Parameters<typeof persistPostgresNotificatio
   }
 };
 
-let schemaReady: Promise<void> | null = null;
-async function ensureSchema() {
-  if (!databasePool) return;
-  if (!schemaReady) {
-    schemaReady = databasePool.query(`
-      CREATE TABLE IF NOT EXISTS marketing_scheduled_items (
-        id TEXT PRIMARY KEY,
-        business_id TEXT NOT NULL,
-        owner_user_id TEXT,
-        item_type TEXT NOT NULL,
-        item_id TEXT NOT NULL,
-        label TEXT,
-        description TEXT,
-        scheduled_at TIMESTAMPTZ NOT NULL,
-        timezone TEXT NOT NULL DEFAULT 'Africa/Bissau',
-        status TEXT NOT NULL,
-        attempts INTEGER NOT NULL DEFAULT 0,
-        last_attempt_at TIMESTAMPTZ,
-        published_at TIMESTAMPTZ,
-        error_message TEXT,
-        moderation_status TEXT,
-        payment_status TEXT,
-        campaign_id TEXT,
-        ends_at TIMESTAMPTZ,
-        created_at TIMESTAMPTZ NOT NULL,
-        updated_at TIMESTAMPTZ NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS marketing_scheduled_due_idx
-        ON marketing_scheduled_items (status, scheduled_at);
-    `).then(() => undefined);
-  }
-  await schemaReady;
-}
+// O schema de marketing_scheduled_items vive em db/migrations/002. Nenhum DDL
+// corre em runtime.
 
 function rowToItem(row: Record<string, unknown>): ScheduledItem {
   return {
@@ -69,7 +38,6 @@ function rowToItem(row: Record<string, unknown>): ScheduledItem {
 
 async function persistItem(item: ScheduledItem) {
   if (!databasePool) return;
-  await ensureSchema();
   await databasePool.query(`
     INSERT INTO marketing_scheduled_items
       (id,business_id,owner_user_id,item_type,item_id,label,description,scheduled_at,timezone,status,attempts,last_attempt_at,published_at,error_message,moderation_status,payment_status,campaign_id,ends_at,created_at,updated_at)
@@ -97,8 +65,7 @@ async function updateCampaignPayload(item: ScheduledItem, status: 'active' | 'en
 
 export async function ensureDemoScheduledItems(businessId = 'biz-1'): Promise<void> {
   if (databasePool) {
-    await ensureSchema();
-    const count = await databasePool.query('SELECT COUNT(*)::int AS count FROM marketing_scheduled_items WHERE business_id=$1 AND id LIKE $2', [businessId, 'demo-schedule-%']);
+      const count = await databasePool.query('SELECT COUNT(*)::int AS count FROM marketing_scheduled_items WHERE business_id=$1 AND id LIKE $2', [businessId, 'demo-schedule-%']);
     if (count.rows[0]?.count >= 60) return;
   }
   const items = readItems();
@@ -151,8 +118,7 @@ export async function ensureDemoScheduledItems(businessId = 'biz-1'): Promise<vo
 
 export async function listScheduledItems(businessId?: string): Promise<ScheduledItem[]> {
   if (databasePool) {
-    await ensureSchema();
-    const result = await databasePool.query<Record<string, unknown>>(
+      const result = await databasePool.query<Record<string, unknown>>(
       `SELECT * FROM marketing_scheduled_items ${businessId ? 'WHERE business_id=$1' : ''} ORDER BY scheduled_at`,
       businessId ? [businessId] : [],
     );

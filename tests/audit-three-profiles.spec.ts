@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -90,7 +90,7 @@ async function signIn(page: Page, role: Role, account: { email: string; password
     (cookie) => cookie.name === 'guigui_session',
   );
   if (setCookie) {
-    const base = test.info().project.use.baseURL ?? 'http://127.0.0.1:3000';
+    const base = test.info().project.use.baseURL ?? 'http://localhost:3000';
     await page.context().addCookies([
       {
         name: 'guigui_session',
@@ -241,14 +241,14 @@ test.describe('1. Autenticação (interface real)', () => {
     // 1) Palavra-passe errada: a UI tem de comunicar o erro, não falhar em silêncio.
     await email.fill(DEMO.citizen.email);
     await password.fill('PasswordErrada#2026');
-    await page.getByRole('button', { name: 'Entrar Agora' }).click();
+    await page.locator('button[type="submit"]').filter({ hasText: 'Entrar' }).first().click();
     const wrongPasswordError = page.getByText(/incorret|inválid|falhou/i).first();
     await expect(wrongPasswordError, 'palavra-passe errada deve mostrar mensagem de erro').toBeVisible({ timeout: 15_000 });
     record({ kind: 'auth-ui', case: 'wrong-password', outcome: 'error-message-shown' });
 
     // 2) Credenciais corretas: sessão iniciada e área pessoal acessível.
     await password.fill(DEMO.citizen.password);
-    await page.getByRole('button', { name: 'Entrar Agora' }).click();
+    await page.locator('button[type="submit"]').filter({ hasText: 'Entrar' }).first().click();
     await expect(page.getByTitle('Sessão Iniciada')).toBeVisible({ timeout: 30_000 });
 
     await page.getByTitle('Sessão Iniciada').click();
@@ -298,15 +298,22 @@ test.describe('2. Cidadão', () => {
     await openDashboard(page, 'citizen');
     const visited = await sweepSidebar(page, 'citizen');
 
-    for (const expected of ['Visão geral', 'Bilhetes e compras', 'Notificações', 'Suporte', 'Perfil e preferências', 'Segurança e privacidade']) {
+    for (const expected of ['Visão geral', 'Bilhetes e compras', 'Notificações', 'Suporte', 'Conta e perfil', 'Segurança e definições']) {
       expect(visited.join(' | '), `a secção "${expected}" deve estar no menu do cidadão`).toContain(expected);
+    }
+
+    // Os quatro módulos antigos passaram a secções internas dos dois novos
+    // módulos e deixaram de ser opções independentes do menu.
+    for (const old of ['Dados e conta', 'Perfil e preferências', 'Segurança e privacidade', 'Definições do sistema']) {
+      expect(visited.includes(old), `"${old}" não deve continuar como item do menu`).toBe(false);
     }
   });
 
   test('edição de perfil persiste depois de recarregar a página', async ({ page }) => {
     await signIn(page, 'citizen');
     await openDashboard(page, 'citizen');
-    await openSection(page, /perfil e preferências/i);
+    await openSection(page, /conta e perfil/i);
+    await page.getByRole('tab', { name: 'Perfil e preferências' }).click();
 
     const nameInput = page.locator('label', { hasText: /^Nome/ }).locator('input').first();
     await expect(nameInput, 'o formulário de perfil deve ter o campo Nome').toBeVisible({ timeout: 15_000 });
@@ -326,7 +333,8 @@ test.describe('2. Cidadão', () => {
     await expect(reopen).toBeVisible({ timeout: 15_000 });
     await reopen.click();
     await expect(page.locator('.guigui-profile-dashboard')).toBeVisible({ timeout: 30_000 });
-    await openSection(page, /perfil e preferências/i);
+    await openSection(page, /conta e perfil/i);
+    await page.getByRole('tab', { name: 'Perfil e preferências' }).click();
     const persisted = page.locator('label', { hasText: /^Nome/ }).locator('input').first();
     await expect(persisted, 'o nome editado deve sobreviver ao reload').toHaveValue(updated, { timeout: 15_000 });
 
@@ -561,12 +569,12 @@ test.describe('3. Empresa', () => {
     await expect(emailInput, 'o formulário de equipa deve ter um campo de e-mail').toBeVisible({ timeout: 15_000 });
     await page.locator('label').filter({ hasText: 'Nome completo' }).locator('input').fill('Colaborador Inválido');
     await emailInput.fill('nao-e-um-email');
-    await page.locator('label').filter({ hasText: 'Palavra-passe inicial' }).locator('input').fill('Guigui2026!');
     // A validação nativa do browser impediria o submit antes de chegar ao
     // servidor; o objectivo do teste é confirmar que a API também recusa e
     // que o erro é mostrado ao utilizador.
     await emailInput.evaluate((element) => { (element as HTMLInputElement).form!.noValidate = true; });
-    const invite = page.getByRole('button', { name: 'Criar conta' }).first();
+    // O fluxo actual envia um convite por e-mail, sem palavra-passe inicial.
+    const invite = page.getByRole('button', { name: 'Enviar convite' }).first();
     await expect(invite).toBeVisible({ timeout: 10_000 });
     await invite.click();
     await page.waitForTimeout(1500);

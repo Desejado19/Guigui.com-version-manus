@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 
 /**
  * Admin panel data-driven verification (Phase 1 + 2).
@@ -24,7 +24,17 @@ async function loginAsAdmin(page: Page) {
   }, (payload as { user: unknown }).user);
   await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
-  await page.waitForTimeout(3000);
+  await page.waitForTimeout(2000);
+  // Open the admin dashboard from the session menu.
+  const sessionBtn = page.getByTitle('Sessão Iniciada');
+  if (await sessionBtn.isVisible().catch(() => false)) {
+    await sessionBtn.click();
+    const entry = page.locator('button').filter({ hasText: 'Administração Guigui.com' }).first();
+    if (await entry.isVisible({ timeout: 10_000 }).catch(() => false)) {
+      await entry.click();
+      await page.waitForTimeout(1500);
+    }
+  }
 }
 
 test.describe('seed-admin: painel reflecte dados reais do banco', () => {
@@ -83,14 +93,17 @@ test.describe('seed-admin: painel reflecte dados reais do banco', () => {
     // Open the Gestão → Utilizadores section in the sidebar.
     const usersNav = page.getByRole('button', { name: 'Utilizadores', exact: true }).first();
     await usersNav.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
     await page.getByRole('button', { name: /^Todas as contas/ }).first().click();
+    await page.waitForTimeout(1500);
 
     // The hub header reports the real total from the database.
     await expect(page.getByText(`${total} conta`, { exact: false })).toBeVisible({ timeout: 10000 });
 
-    // A real seed business account is listed.
-    await expect(page.getByText('empresa.seed01@guigui.test').first()).toBeVisible();
+    // A real seed business account is found pela pesquisa da própria lista
+    // (a primeira página pode não a incluir).
+    await page.getByPlaceholder(/Pesquisar por nome/i).fill('empresa.seed01');
+    await expect(page.getByText('empresa.seed01@guigui.test').first()).toBeVisible({ timeout: 10_000 });
 
     await page.screenshot({ path: 'test-results/seed-admin-users.png', fullPage: false });
   });

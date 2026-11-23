@@ -66,7 +66,7 @@ const MODE_META: Record<CitizenMode, { title: string; description: string; role?
 };
 
 const inputClass =
-  'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium text-slate-800 outline-none transition focus:border-[#123e3b] focus:ring-2 focus:ring-[#123e3b]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500';
+  'w-full rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2 text-[11px] font-medium text-slate-800 outline-none transition focus:border-[var(--color-focus-ring)] focus:ring-2 focus:ring-[var(--color-focus-ring)]/25 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500';
 
 export const CitizensManagementPage: React.FC<{ mode: CitizenMode; onBack: () => void }> = ({ mode, onBack }) => {
   const meta = MODE_META[mode];
@@ -369,7 +369,7 @@ export const CitizensManagementPage: React.FC<{ mode: CitizenMode; onBack: () =>
       render: (user) => (
         <div className="flex min-w-[200px] items-center gap-2">
           {user.avatarUrl ? (
-            <img src={user.avatarUrl} alt="" className="h-8 w-8 rounded-full border border-slate-200 object-cover" />
+            <img src={user.avatarUrl} alt="" className="h-8 w-8 rounded-full border border-[var(--color-border-default)] object-cover" />
           ) : (
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500"><UserRound className="h-4 w-4" /></div>
           )}
@@ -400,14 +400,14 @@ export const CitizensManagementPage: React.FC<{ mode: CitizenMode; onBack: () =>
       key: 'role',
       label: 'Papel',
       sortable: true,
-      render: (user) => <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-black uppercase text-slate-600">{user.role === 'user' ? 'Cidadão' : user.role === 'business' ? 'Empresa' : 'Admin'}</span>,
+      render: (user) => <span className="rounded-md border border-[var(--color-border-default)] bg-slate-50 px-1.5 py-0.5 text-[9px] font-black uppercase text-slate-600">{user.role === 'user' ? 'Cidadão' : user.role === 'business' ? 'Empresa' : 'Admin'}</span>,
     },
     {
       key: 'status',
       label: 'Estado',
       sortable: true,
       render: (user) => (
-        <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${user.accountStatus === 'active' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>
+        <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${user.accountStatus === 'active' ? 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)]' : 'border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)]'}`}>
           {user.accountStatus === 'active' ? 'Ativa' : 'Suspensa'}
         </span>
       ),
@@ -433,17 +433,17 @@ export const CitizensManagementPage: React.FC<{ mode: CitizenMode; onBack: () =>
 
   const renderDetail = () => {
     if (detailLoading) return <div className="py-10 text-center text-[11px] font-bold text-slate-500">A carregar ficha…</div>;
-    if (detailError) return <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-[11px] font-bold text-rose-800">{detailError}</div>;
+    if (detailError) return <div role="alert" className="rounded-xl border border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] p-3 text-[11px] font-bold text-[var(--tone-danger-text)]">{detailError}</div>;
     if (!detail) return null;
     const user = detail.user;
     const isCitizen = user.role === 'user';
 
     return (
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border-subtle)] pb-3">
           <div className="flex min-w-0 items-center gap-3">
             {user.avatarUrl ? (
-              <img src={user.avatarUrl} alt="" className="h-12 w-12 rounded-full border border-slate-200 object-cover" />
+              <img src={user.avatarUrl} alt="" className="h-12 w-12 rounded-full border border-[var(--color-border-default)] object-cover" />
             ) : (
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500"><UserRound className="h-5 w-5" /></div>
             )}
@@ -453,20 +453,20 @@ export const CitizensManagementPage: React.FC<{ mode: CitizenMode; onBack: () =>
             </div>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${user.accountStatus === 'active' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>
+            <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${user.accountStatus === 'active' ? 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)]' : 'border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)]'}`}>
               {user.accountStatus === 'active' ? 'Conta ativa' : 'Conta suspensa'}
             </span>
-            <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${user.emailVerifiedAt ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+            <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${user.emailVerifiedAt ? 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)]' : 'border-[var(--color-border-default)] bg-slate-50 text-slate-600'}`}>
               Email: {user.emailVerifiedAt ? 'verificado' : 'não verificado'}
             </span>
-            <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${user.phoneVerifiedAt ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+            <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${user.phoneVerifiedAt ? 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)]' : 'border-[var(--color-border-default)] bg-slate-50 text-slate-600'}`}>
               Telefone: {user.phoneVerifiedAt ? 'verificado' : 'não verificado'}
             </span>
           </div>
         </div>
 
         {detailFeedback && (
-          <div role="status" className={`rounded-xl border px-3 py-2 text-[11px] font-bold ${detailFeedback.tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>
+          <div role="status" className={`rounded-xl border px-3 py-2 text-[11px] font-bold ${detailFeedback.tone === 'success' ? 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)]' : 'border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)]'}`}>
             {detailFeedback.message}
           </div>
         )}
@@ -489,7 +489,7 @@ export const CitizensManagementPage: React.FC<{ mode: CitizenMode; onBack: () =>
                 ['Registado em', formatManagementDate(user.createdAt)],
                 ['Atualizado em', formatManagementDate(user.updatedAt)],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-xl border border-slate-100 bg-slate-50/60 p-2.5">
+                <div key={label} className="rounded-xl border border-[var(--color-border-subtle)] bg-slate-50/60 p-2.5">
                   <dt className="text-[8.5px] font-black uppercase tracking-[0.14em] text-slate-400">{label}</dt>
                   <dd className="mt-0.5 font-bold text-slate-700">{value}</dd>
                 </div>
@@ -497,7 +497,7 @@ export const CitizensManagementPage: React.FC<{ mode: CitizenMode; onBack: () =>
             </dl>
 
             {user.accountStatus === 'deactivated' && user.accountStatusReason && (
-              <p className="rounded-xl border border-rose-100 bg-rose-50/60 p-3 text-[10.5px] text-rose-800">
+              <p className="rounded-xl border border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)]/60 p-3 text-[10.5px] text-[var(--tone-danger-text)]">
                 <strong>Motivo da suspensão:</strong> {user.accountStatusReason}
                 {user.statusChangedAt ? ` · ${formatManagementDate(user.statusChangedAt)}` : ''}
               </p>
@@ -544,7 +544,7 @@ export const CitizensManagementPage: React.FC<{ mode: CitizenMode; onBack: () =>
                     <input value={form.reason} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))} maxLength={500} className={inputClass} />
                   </label>
                 </div>
-                <p className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-[10px] text-slate-600">
+                <p className="rounded-xl border border-[var(--color-border-default)] bg-slate-50 p-2.5 text-[10px] text-slate-600">
                   Alterações autorizadas: nome, fotografia, data de nascimento, localização e estado da conta. Palavras-passe nunca são visíveis nem editáveis.
                 </p>
                 <div className="flex flex-wrap justify-end gap-2">
@@ -573,7 +573,7 @@ export const CitizensManagementPage: React.FC<{ mode: CitizenMode; onBack: () =>
                   ))}
                 </dl>
                 {canManage && (
-                  <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-3">
+                  <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--color-border-subtle)] pt-3">
                     {isCitizen && user.accountStatus === 'active' ? (
                       <ManagementActionButton tone="warning" onClick={() => void changeStatus('deactivated')} disabled={actionBusy}>
                         <ShieldOff className="h-3.5 w-3.5" /> Suspender conta
@@ -608,7 +608,7 @@ export const CitizensManagementPage: React.FC<{ mode: CitizenMode; onBack: () =>
                   {(activity?.activity || []).length === 0 ? (
                     <p className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-[11px] text-slate-500">Ainda não existem atividades registadas.</p>
                   ) : (activity?.activity || []).map((entry) => (
-                    <article key={entry.id} className="rounded-xl border border-slate-200 p-2.5 text-[10.5px]">
+                    <article key={entry.id} className="rounded-xl border border-[var(--color-border-default)] p-2.5 text-[10.5px]">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="font-black text-slate-800">{entry.action.replace(/_/g, ' ')}</span>
                         <span className="whitespace-nowrap text-[9px] text-slate-400">{formatManagementDate(entry.timestamp)}</span>
@@ -632,7 +632,7 @@ export const CitizensManagementPage: React.FC<{ mode: CitizenMode; onBack: () =>
                   {(activity?.sessions || []).length === 0 ? (
                     <p className="text-[10.5px] text-slate-500">Sem sessões registadas.</p>
                   ) : (activity?.sessions || []).map((session) => (
-                    <div key={session.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 py-1.5 text-[10px]">
+                    <div key={session.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border-subtle)] py-1.5 text-[10px]">
                       <span className="font-mono">{session.ip_address || 'IP desconhecido'}</span>
                       <span className="max-w-[240px] truncate text-slate-500">{session.user_agent || 'Dispositivo desconhecido'}</span>
                       <span className="text-slate-400">{formatManagementDate(session.last_seen_at)}</span>
@@ -660,7 +660,7 @@ export const CitizensManagementPage: React.FC<{ mode: CitizenMode; onBack: () =>
         </>
       }
     >
-      {feedback && <div role="status" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-700">{feedback}</div>}
+      {feedback && <div role="status" className="rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2 text-[11px] font-bold text-slate-700">{feedback}</div>}
 
       <ManagementToolbar
         query={state.query}
@@ -689,7 +689,7 @@ export const CitizensManagementPage: React.FC<{ mode: CitizenMode; onBack: () =>
         </label>
       </ManagementToolbar>
 
-      {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-bold text-rose-800">{error}</div>}
+      {error && <div role="alert" className="rounded-xl border border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] px-3 py-2 text-[11px] font-bold text-[var(--tone-danger-text)]">{error}</div>}
 
       <ManagementTable
         columns={columns}
@@ -712,8 +712,8 @@ export const CitizensManagementPage: React.FC<{ mode: CitizenMode; onBack: () =>
 
       {detailOpen && (
         <div className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-slate-900/55 p-4" role="dialog" aria-modal="true" aria-label={`Ficha de ${detail?.user.name || 'cidadão'}`}>
-          <div className="my-6 w-full max-w-4xl rounded-2xl border border-[#e6dac8] bg-white shadow-2xl">
-            <div className="flex justify-end border-b border-slate-100 px-4 py-2">
+          <div className="my-6 w-full max-w-4xl rounded-2xl border border-[var(--color-border-default)] bg-white shadow-2xl">
+            <div className="flex justify-end border-b border-[var(--color-border-subtle)] px-4 py-2">
               <button type="button" onClick={closeDetail} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" aria-label="Fechar ficha"><X className="h-4 w-4" /></button>
             </div>
             <div className="max-h-[76vh] overflow-y-auto p-4">{renderDetail()}</div>

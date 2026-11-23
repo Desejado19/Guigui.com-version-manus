@@ -169,18 +169,18 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto overscroll-contain"
+      className="fixed inset-0 z-50 bg-slate-900/70 flex items-center justify-center p-2 sm:p-4 overflow-y-auto overscroll-contain"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div ref={detailScrollRef} className="bg-white rounded-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto shadow-2xl relative text-slate-900 flex flex-col my-auto border border-slate-200 overscroll-contain">
+      <div ref={detailScrollRef} className="bg-[var(--color-bg-surface)] rounded-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto shadow-2xl relative text-slate-900 flex flex-col my-auto border border-[var(--color-border-subtle)] overscroll-contain">
         {/* Botão de retrocesso destacado no canto superior esquerdo */}
         <Button type="button"
           variant="secondary"
           size="sm"
           onClick={onClose}
-          className="absolute top-4 left-4 z-20 rounded-full bg-white/95 shadow-md group"
+          className="absolute top-4 left-4 z-20 rounded-full bg-[var(--color-bg-surface)] shadow-md group"
           title={`${t('back')} ao Diretório / Feed`}
           aria-label={`${t('back')}`}
         >
@@ -193,7 +193,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
           label={t('close')}
           variant="secondary"
           onClick={onClose}
-          className="absolute top-4 right-4 z-20 rounded-full bg-white/90 shadow-sm"
+          className="absolute top-4 right-4 z-20 rounded-full bg-[var(--color-bg-surface)] shadow-sm"
           title={`${t('close')}`}
         >
           <X className="w-5 h-5" />
@@ -222,7 +222,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
           {/* Logo & Main Info */}
           <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-end justify-between gap-4 text-white">
             <div className="flex items-end gap-3">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-white bg-white overflow-hidden shadow-md flex-shrink-0">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-white bg-[var(--color-bg-surface)] overflow-hidden shadow-md flex-shrink-0">
                 {hasLogoImage ? (
                   <img
                     src={business.logo}
@@ -269,7 +269,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                   variant={isFollowed ? 'secondary' : 'primary'}
                   size="sm"
                   onClick={() => onToggleFollow(business.id)}
-                  className={isFollowed ? 'bg-emerald-100 text-emerald-900 border-emerald-300' : 'bg-white/90 text-slate-900 hover:bg-white'}
+                  className={isFollowed ? 'bg-emerald-100 text-emerald-900 border-emerald-300' : 'bg-[var(--color-bg-surface)] text-slate-900 hover:bg-[var(--color-bg-surface)]'}
                   aria-label={isFollowed ? `Deixar de seguir ${business.name}` : `Seguir ${business.name}`}
                 >
                   {isFollowed ? <UserCheck className="w-3.5 h-3.5" /> : <UserPlus className="w-3.5 h-3.5" />}
@@ -306,7 +306,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                 variant="secondary"
                 size="sm"
                 onClick={shareProfile}
-                className="bg-white/90 text-slate-900 hover:bg-white"
+                className="bg-[var(--color-bg-surface)] text-slate-900 hover:bg-[var(--color-bg-surface)]"
               >
                 <Share2 className="w-3.5 h-3.5" />
                 <span>Partilhar</span>
@@ -316,7 +316,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
         </div>
 
         {/* Modal Navigation Tabs */}
-        <div className="grid grid-cols-2 gap-1 bg-slate-50 border-b border-slate-200 px-4 pt-2 text-xs font-semibold sm:flex sm:flex-wrap sm:gap-2">
+        <div className="grid grid-cols-2 gap-1 bg-slate-50 border-b border-[var(--color-border-subtle)] px-4 pt-2 text-xs font-semibold sm:flex sm:flex-wrap sm:gap-2">
           <button type="button"
             onClick={() => setActiveTab('info')}
             className={`w-full py-3 px-3 border-b-2 transition min-h-[44px] text-left sm:w-auto sm:px-4 ${
@@ -387,7 +387,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                     <h3 id="business-about-heading" className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                       Sobre o Negócio
                     </h3>
-                    <p className="text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <p className="text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-xl border border-[var(--color-border-subtle)]">
                       {translatePublishedText(business.description, currentLang, 'description')}
                     </p>
                   </section>
@@ -401,7 +401,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                     </h3>
                     <div className="grid grid-cols-3 gap-2">
                       {business.gallery.filter((image) => image.trim()).map((img, idx) => (
-                        <div key={idx} className="h-28 rounded-xl overflow-hidden bg-slate-100 border border-slate-200">
+                        <div key={idx} className="h-28 rounded-xl overflow-hidden bg-slate-100 border border-[var(--color-border-subtle)]">
                           <img src={img} alt={`Foto ${idx + 1} de ${business.name}`} className="w-full h-full object-cover" />
                         </div>
                       ))}
@@ -426,7 +426,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                     {products.length > 0 && (
                       <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2" aria-label="Produtos">
                         {products.map((product) => (
-                          <li key={product.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                          <li key={product.id} className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-3">
                             <div className="font-bold text-slate-900">{product.name}</div>
                             <div className="mt-1 text-slate-600">
                               {product.priceXOF.toLocaleString('pt-PT')} XOF
@@ -441,13 +441,13 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
 
                 {/* Location Map Box */}
                 {hasLocation && (
-                  <section aria-labelledby="business-location-heading" className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <section aria-labelledby="business-location-heading" className="bg-slate-50 p-4 rounded-xl border border-[var(--color-border-subtle)]">
                     <h3 id="business-location-heading" className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                       <MapPin className="w-4 h-4 text-blue-600" />
                       <span>Localização</span>
                     </h3>
                     {business.address.trim() && <p className="text-slate-500 mb-3">{business.address}</p>}
-                    <div className="h-32 bg-slate-200 rounded-lg flex flex-col items-center justify-center text-slate-700 border border-slate-300">
+                    <div className="h-32 bg-slate-200 rounded-lg flex flex-col items-center justify-center text-slate-700 border border-[var(--color-border-default)]">
                       <MapPin className="w-7 h-7 text-blue-600 animate-bounce" />
                       <span className="font-semibold text-slate-900 mt-1">
                         {[business.name, business.neighborhood].filter((value) => value.trim()).join(' · ')}
@@ -457,7 +457,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                         onClick={() => onContactMetric?.(business.id, 'directionsClicks')}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-2 text-[11px] bg-white border border-slate-300 px-3 py-1 rounded-full text-blue-700 font-bold hover:bg-blue-50 transition shadow-sm"
+                        className="mt-2 text-[11px] bg-[var(--color-bg-surface)] border border-[var(--color-border-default)] px-3 py-1 rounded-full text-blue-700 font-bold hover:bg-blue-50 transition shadow-sm"
                       >
                         Abrir no Google Maps
                       </a>
@@ -466,7 +466,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                 )}
 
                 {business.serviceLanguages?.length > 0 && (
-                  <section className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <section className="bg-slate-50 p-4 rounded-xl border border-[var(--color-border-subtle)]">
                     <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                       <Globe className="w-4 h-4 text-emerald-600" />
                       <span>{t('business.serviceLanguages')}</span>
@@ -485,7 +485,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
               {/* Sidebar Contact Actions */}
               <div className="space-y-4">
                 {hasDirectContacts && (
-                  <section aria-labelledby="business-contacts-heading" className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                  <section aria-labelledby="business-contacts-heading" className="bg-slate-50 p-4 rounded-xl border border-[var(--color-border-subtle)] space-y-3">
                     <h3 id="business-contacts-heading" className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                       Contactos Diretos
                     </h3>
@@ -503,7 +503,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                     {business.publicEmail?.trim() && (
                       <a
                         href={`mailto:${business.publicEmail}`}
-                        className="w-full py-3 px-3 bg-white hover:bg-slate-100 text-slate-800 font-semibold text-xs rounded-xl border border-slate-300 transition flex items-center justify-center gap-2 min-h-[44px]"
+                        className="w-full py-3 px-3 bg-[var(--color-bg-surface)] hover:bg-slate-100 text-slate-800 font-semibold text-xs rounded-xl border border-[var(--color-border-default)] transition flex items-center justify-center gap-2 min-h-[44px]"
                       >
                         <Mail className="w-4 h-4 text-blue-600" />
                         <span>Email público: {business.publicEmail}</span>
@@ -527,7 +527,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                       <a
                         href={`tel:${business.phone}`}
                         onClick={() => onContactMetric?.(business.id, 'phoneClicks')}
-                        className="w-full py-3 px-3 bg-white hover:bg-slate-100 text-slate-800 font-bold text-xs rounded-xl border border-slate-300 transition flex items-center justify-center gap-2 min-h-[44px]"
+                        className="w-full py-3 px-3 bg-[var(--color-bg-surface)] hover:bg-slate-100 text-slate-800 font-bold text-xs rounded-xl border border-[var(--color-border-default)] transition flex items-center justify-center gap-2 min-h-[44px]"
                       >
                         <Phone className="w-4 h-4 text-blue-600" />
                         <span>Ligar pela operadora: {business.phone}</span>
@@ -540,7 +540,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => onContactMetric?.(business.id, 'websiteClicks')}
-                        className="w-full py-3 px-3 bg-white hover:bg-slate-100 text-slate-800 font-semibold text-xs rounded-xl border border-slate-300 transition flex items-center justify-center gap-2 min-h-[44px]"
+                        className="w-full py-3 px-3 bg-[var(--color-bg-surface)] hover:bg-slate-100 text-slate-800 font-semibold text-xs rounded-xl border border-[var(--color-border-default)] transition flex items-center justify-center gap-2 min-h-[44px]"
                       >
                         <Globe className="w-4 h-4 text-slate-600" />
                         <span>Visitar Website</span>
@@ -550,7 +550,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                 )}
 
                 {socialLinks.length > 0 && (
-                  <section aria-label="Redes sociais" className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                  <section aria-label="Redes sociais" className="bg-slate-50 p-4 rounded-xl border border-[var(--color-border-subtle)] space-y-2">
                     <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Redes sociais</h3>
                     {socialLinks.map((link) => (
                       <a
@@ -558,7 +558,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                         href={link.href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block rounded-lg border border-slate-300 bg-white px-3 py-2 font-semibold text-blue-700 hover:bg-blue-50"
+                        className="block rounded-lg border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-3 py-2 font-semibold text-blue-700 hover:bg-blue-50"
                       >
                         {link.label}
                       </a>
@@ -567,7 +567,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                 )}
 
                 {business.openingHours.trim() && (
-                  <section aria-labelledby="business-hours-heading" className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <section aria-labelledby="business-hours-heading" className="bg-slate-50 p-4 rounded-xl border border-[var(--color-border-subtle)]">
                     <h3 id="business-hours-heading" className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                       <Clock className="w-4 h-4 text-blue-600" />
                       <span>Horário de Funcionamento</span>
@@ -619,7 +619,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                 activePromotions.map((promo) => (
                   <Card key={promo.id} className="bg-amber-50/60 p-4 sm:p-5 border-amber-300 flex flex-col sm:flex-row gap-4 items-center justify-between">
                     <div>
-                      <span className="bg-amber-500 text-slate-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">
+                      <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">
                         {promo.discountBadge}
                       </span>
                       <h4 className="text-sm font-bold text-slate-900 mt-2">{translatePublishedText(promo.title, currentLang, 'title')}</h4>
@@ -627,7 +627,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                     </div>
 
                     {promo.code && (
-                      <div className="bg-white border border-amber-400 p-3 rounded-xl text-center flex-shrink-0 shadow-sm">
+                      <div className="bg-[var(--color-bg-surface)] border border-amber-400 p-3 rounded-xl text-center flex-shrink-0 shadow-sm">
                         <div className="text-[10px] text-slate-500 uppercase">Código</div>
                         <div className="font-mono text-sm font-extrabold text-amber-700">
                           {promo.code}
@@ -687,7 +687,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="flex items-center gap-2">
                             <span className="font-extrabold text-slate-900 text-xs">{rev.authorName}</span>
-                            <span className="text-[10px] font-mono text-slate-400">({rev.authorPhone})</span>
+                            <span className="text-[10px] font-mono text-slate-500">({rev.authorPhone})</span>
                             {rev.verifiedSms && (
                               <Badge variant="success" className="px-1.5 py-0.5 text-[9px]" title="Verificado por SMS de 4 dígitos">
                                 <CheckCircle className="w-2.5 h-2.5 text-emerald-600" />
@@ -696,7 +696,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                             )}
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-slate-400">
+                            <span className="text-[10px] text-slate-500">
                               {new Date(rev.createdAt).toLocaleDateString('pt-PT')}
                             </span>
                             {onFlagReview && (
@@ -708,7 +708,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                                     alert('Denúncia enviada à equipa Guigui para moderação.');
                                   }
                                 }}
-                                className="text-[10px] text-slate-400 hover:text-red-600 font-bold flex items-center gap-0.5 px-1.5 py-0.5 rounded hover:bg-red-50 transition"
+                                className="text-[10px] text-slate-500 hover:text-red-600 font-bold flex items-center gap-0.5 px-1.5 py-0.5 rounded hover:bg-red-50 transition"
                                 title="Denunciar avaliação à equipa de moderação"
                               >
                                 <Flag className="w-3 h-3" />
@@ -727,7 +727,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
 
                         {/* Optional Comment */}
                         {rev.comment && (
-                          <p className="text-slate-800 text-xs leading-relaxed bg-white p-3 rounded-xl border border-slate-200">
+                          <p className="text-slate-800 text-xs leading-relaxed bg-[var(--color-bg-surface)] p-3 rounded-xl border border-[var(--color-border-subtle)]">
                             "{rev.comment}"
                           </p>
                         )}
@@ -751,7 +751,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
               </div>
 
               {/* Add Review Form */}
-              <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-4">
+              <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-[var(--color-border-subtle)] space-y-4">
                 <div className="space-y-1">
                   <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                     <Award className="w-4 h-4 text-blue-600" />
@@ -783,7 +783,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                             className={`p-2.5 rounded-xl border text-center font-bold text-xs transition min-h-[44px] ${
                               selectedQualitative === opt.score
                                 ? opt.color + ' ring-2 ring-blue-600 shadow-sm'
-                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+                                : 'border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] text-slate-600 hover:bg-slate-100'
                             }`}
                           >
                             {opt.label}
@@ -801,7 +801,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                           value={authorName}
                           onChange={(e) => setAuthorName(e.target.value)}
                           placeholder="Ex: Mamadu Djaló"
-                          className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900"
+                          className="w-full bg-[var(--color-bg-surface)] border border-[var(--color-border-default)] rounded-xl p-2.5 text-xs text-slate-900"
                         />
                       </div>
 
@@ -810,7 +810,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="block text-slate-700 font-bold text-xs">Comentário Escrito Opcional</label>
-                        <span className={`text-[10px] font-mono font-bold ${commentText.length >= 190 ? 'text-amber-600' : 'text-slate-400'}`}>
+                        <span className={`text-[10px] font-mono font-bold ${commentText.length >= 190 ? 'text-amber-600' : 'text-slate-500'}`}>
                           {commentText.length}/200 caracteres
                         </span>
                       </div>
@@ -820,9 +820,9 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                         value={commentText}
                         onChange={(e) => setCommentText(e.target.value)}
                         placeholder="Ex: Atendimento impecável e refeição típica muito bem confecionada..."
-                        className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900"
+                        className="w-full bg-[var(--color-bg-surface)] border border-[var(--color-border-default)] rounded-xl p-2.5 text-xs text-slate-900"
                       />
-                      <span className="text-[10px] text-slate-400 block mt-0.5">Máximo de 200 caracteres, sujeito a moderação de linguagem.</span>
+                      <span className="text-[10px] text-slate-500 block mt-0.5">Máximo de 200 caracteres, sujeito a moderação de linguagem.</span>
                     </div>
 
                     <button

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 import path from 'node:path';
 
 const PASSWORD = 'Guigui@2026!';
@@ -39,7 +39,7 @@ async function signIn(page: Page, email: string) {
       await page.context().addCookies([{
         name: 'guigui_session',
         value: match[1],
-        url: test.info().project.use.baseURL ?? 'http://127.0.0.1:3000',
+        url: test.info().project.use.baseURL ?? 'http://localhost:3000',
         httpOnly: true,
         sameSite: 'Lax',
         secure: false,

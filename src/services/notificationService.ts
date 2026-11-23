@@ -41,7 +41,6 @@ export interface NotificationEventInput {
 type NotificationCopy = { title: string; message: string };
 const NOTIFICATION_COPY: Record<Language, Partial<Record<NotificationEventType, NotificationCopy>>> = {
   pt: {
-    WELCOME: { title: 'Bem-vindo ao Guigui.com', message: 'A sua conta está pronta. Explore empresas, promoções e eventos em Bissau.' },
     EVENT_REMINDER: { title: 'O seu evento começa amanhã', message: '{event} começa em breve. Consulte horário e local antes de sair.' },
     PASSWORD_CHANGED: { title: 'Palavra-passe alterada', message: 'A palavra-passe da sua conta foi alterada com sucesso.' },
     TICKET_PURCHASED: { title: 'O seu bilhete está disponível', message: 'A compra para {event} foi registada. O código e o QR Code estão disponíveis em Área pessoal > Meus bilhetes.' },
@@ -51,7 +50,6 @@ const NOTIFICATION_COPY: Record<Language, Partial<Record<NotificationEventType, 
     PAYMENT_FAILED: { title: 'Pagamento falhou', message: 'Não foi possível confirmar o pagamento relacionado com {event}.' },
   },
   en: {
-    WELCOME: { title: 'Welcome to Guigui.com', message: 'Your account is ready. Explore businesses, promotions and events in Bissau.' },
     EVENT_REMINDER: { title: 'Your event starts tomorrow', message: '{event} is coming soon. Check the time and location before you leave.' },
     PASSWORD_CHANGED: { title: 'Password changed', message: 'Your account password was changed successfully.' },
     TICKET_PURCHASED: { title: 'Your ticket is available', message: 'Your purchase for {event} was recorded. The code and QR code are available under My area > My tickets.' },
@@ -61,7 +59,6 @@ const NOTIFICATION_COPY: Record<Language, Partial<Record<NotificationEventType, 
     PAYMENT_FAILED: { title: 'Payment failed', message: 'The payment related to {event} could not be confirmed.' },
   },
   fr: {
-    WELCOME: { title: 'Bienvenue sur Guigui.com', message: 'Votre compte est prêt. Découvrez les entreprises, promotions et événements à Bissau.' },
     EVENT_REMINDER: { title: 'Votre événement commence demain', message: '{event} arrive bientôt. Vérifiez l’heure et le lieu avant de partir.' },
     PASSWORD_CHANGED: { title: 'Mot de passe modifié', message: 'Le mot de passe de votre compte a été modifié avec succès.' },
     TICKET_PURCHASED: { title: 'Votre billet est disponible', message: 'Votre achat pour {event} a été enregistré. Le code et le QR code sont disponibles dans Mon espace > Mes billets.' },
@@ -71,7 +68,6 @@ const NOTIFICATION_COPY: Record<Language, Partial<Record<NotificationEventType, 
     PAYMENT_FAILED: { title: 'Échec du paiement', message: 'Le paiement lié à {event} n’a pas pu être confirmé.' },
   },
   es: {
-    WELCOME: { title: 'Bienvenido a Guigui.com', message: 'Su cuenta está lista. Explore empresas, promociones y eventos en Bissau.' },
     EVENT_REMINDER: { title: 'Su evento comienza mañana', message: '{event} comienza pronto. Consulte la hora y el lugar antes de salir.' },
     PASSWORD_CHANGED: { title: 'Contraseña cambiada', message: 'La contraseña de su cuenta se cambió correctamente.' },
     TICKET_PURCHASED: { title: 'Su entrada está disponible', message: 'Su compra para {event} ha sido registrada. El código y el código QR están disponibles en Mi área > Mis entradas.' },
@@ -355,9 +351,6 @@ export function buildNotificationsForEvent(input: NotificationEventInput): AppNo
   const eventLabel = input.eventTitle || 'O evento';
 
   switch (input.eventType) {
-    case 'WELCOME':
-      result.push(makeNotification(input, 'user', 'account', 'normal', 'Bem-vindo ao Guigui.com', 'A sua conta está pronta. Explore empresas, promoções e eventos em Bissau.', 'feed', 'Explorar'));
-      break;
     case 'BUSINESS_REPORTED':
       result.push(makeNotification(input, 'business', 'admin_alert', 'high', 'Empresa denunciada', `${businessLabel} recebeu uma denúncia que requer revisão.`, 'client', 'Ver denúncia'));
       result.push(makeNotification(input, 'admin', 'admin_alert', 'urgent', 'Empresa denunciada', `Foi recebida uma denúncia relacionada com ${businessLabel}.`, 'admin', 'Analisar denúncia'));

@@ -1,12 +1,7 @@
-import type { Language, UserRole } from '../../types';
+import { hasModuleAccess } from '../../config/teamAccess';
+import type { BusinessTeamRole, Language, TeamModuleAccess, UserRole } from '../../types';
 
-/**
- * Conteúdo do guia de boas-vindas.
- *
- * Cidadãos e empresas recebem percursos diferentes: não faz sentido explicar a
- * gestão de eventos a quem só compra bilhetes, nem explicar como comprar a quem
- * gere vendas. Cada passo é curto e aponta para um ecrã que já existe.
- */
+/** Conteúdo do guia de boas-vindas, com um percurso por tipo de conta. */
 
 export type TourIconKey =
   | 'layout'
@@ -221,7 +216,199 @@ export const BUSINESS_TOUR: TourStep[] = [
   },
 ];
 
-export function getTourSteps(role: UserRole): TourStep[] {
+export const ADMIN_TOUR: TourStep[] = [
+  {
+    id: 'overview',
+    icon: 'layout',
+    copy: {
+      pt: { title: 'Visão geral', description: 'Os indicadores da plataforma — empresas, utilizadores, bilhetes e receita — abrem o painel administrativo.' },
+      en: { title: 'Overview', description: 'Platform indicators — businesses, users, tickets and revenue — open the admin dashboard.' },
+      fr: { title: 'Vue d’ensemble', description: 'Les indicateurs de la plateforme — entreprises, utilisateurs, billets et revenus — ouvrent le tableau de bord.' },
+      es: { title: 'Vista general', description: 'Los indicadores de la plataforma — empresas, usuarios, entradas e ingresos — abren el panel.' },
+    },
+  },
+  {
+    id: 'businesses',
+    icon: 'store',
+    copy: {
+      pt: { title: 'Empresas', description: 'Aprovar, destacar e acompanhar empresas. Cada decisão fica registada na auditoria.' },
+      en: { title: 'Businesses', description: 'Approve, feature and follow businesses. Every decision is recorded in the audit trail.' },
+      fr: { title: 'Entreprises', description: 'Approuvez, mettez en avant et suivez les entreprises. Chaque décision est auditée.' },
+      es: { title: 'Empresas', description: 'Apruebe, destaque y siga empresas. Cada decisión queda auditada.' },
+    },
+  },
+  {
+    id: 'moderation',
+    icon: 'shield',
+    copy: {
+      pt: { title: 'Moderação', description: 'Fila de conteúdos e perfis a rever, com motivos e histórico de cada decisão.' },
+      en: { title: 'Moderation', description: 'Queue of content and profiles to review, with reasons and the history of each decision.' },
+      fr: { title: 'Modération', description: 'File de contenus et profils à réviser, avec motifs et historique des décisions.' },
+      es: { title: 'Moderación', description: 'Cola de contenidos y perfiles a revisar, con motivos e historial de cada decisión.' },
+    },
+  },
+  {
+    id: 'events',
+    icon: 'calendar',
+    copy: {
+      pt: { title: 'Eventos e bilhetes', description: 'Agenda, estados de publicação e bilhetes emitidos em toda a plataforma.' },
+      en: { title: 'Events and tickets', description: 'Agenda, publication status and tickets issued across the platform.' },
+      fr: { title: 'Événements et billets', description: 'Agenda, statuts de publication et billets émis sur toute la plateforme.' },
+      es: { title: 'Eventos y entradas', description: 'Agenda, estados de publicación y entradas emitidas en toda la plataforma.' },
+    },
+  },
+  {
+    id: 'users',
+    icon: 'users',
+    copy: {
+      pt: { title: 'Utilizadores e equipa', description: 'Contas cidadãs, empresariais e membros internos, com acessos por módulo.' },
+      en: { title: 'Users and team', description: 'Citizen, business and internal accounts, with per-module access.' },
+      fr: { title: 'Utilisateurs et équipe', description: 'Comptes citoyens, entreprises et internes, avec accès par module.' },
+      es: { title: 'Usuarios y equipo', description: 'Cuentas ciudadanas, empresariales e internas, con accesos por módulo.' },
+    },
+  },
+  {
+    id: 'finance',
+    icon: 'wallet',
+    copy: {
+      pt: { title: 'Financeiro', description: 'Transações, reconciliação, reembolsos e extratos com valores em XOF.' },
+      en: { title: 'Finance', description: 'Transactions, reconciliation, refunds and statements in XOF.' },
+      fr: { title: 'Finances', description: 'Transactions, rapprochement, remboursements et relevés en XOF.' },
+      es: { title: 'Finanzas', description: 'Transacciones, conciliación, reembolsos y extractos en XOF.' },
+    },
+  },
+  {
+    id: 'audit',
+    icon: 'lifebuoy',
+    copy: {
+      pt: { title: 'Auditoria e suporte', description: 'Histórico de acessos, pedidos de suporte e relatórios operacionais.' },
+      en: { title: 'Audit and support', description: 'Access history, support requests and operational reports.' },
+      fr: { title: 'Audit et assistance', description: 'Historique des accès, demandes d’assistance et rapports.' },
+      es: { title: 'Auditoría y soporte', description: 'Historial de accesos, solicitudes de soporte e informes.' },
+    },
+  },
+  {
+    id: 'security',
+    icon: 'settings',
+    copy: {
+      pt: { title: 'A minha conta', description: 'Altere a palavra-passe, o tema e o idioma no seu perfil de administração.' },
+      en: { title: 'My account', description: 'Change your password, theme and language in your admin profile.' },
+      fr: { title: 'Mon compte', description: 'Changez votre mot de passe, thème et langue dans votre profil administrateur.' },
+      es: { title: 'Mi cuenta', description: 'Cambie su contraseña, tema e idioma en su perfil de administración.' },
+    },
+  },
+];
+
+/**
+ * Guia do colaborador: só entram os módulos que lhe foram atribuídos, para o
+ * percurso descrever as tarefas reais daquela conta e não o painel completo.
+ */
+export function getTeamTourSteps(access?: TeamModuleAccess | null): TourStep[] {
+  // Sem permissões conhecidas assume-se o mínimo: visão geral + segurança.
+  const can = (moduleId: string) => hasModuleAccess(access, moduleId);
+  const steps: TourStep[] = [
+    {
+      id: 'overview',
+      icon: 'layout',
+      copy: {
+        pt: { title: 'As suas tarefas', description: 'Este é o painel da equipa. Só aparecem os módulos que a empresa lhe atribuiu.' },
+        en: { title: 'Your tasks', description: 'This is the team dashboard. Only the modules the business assigned to you are shown.' },
+        fr: { title: 'Vos tâches', description: 'Voici le tableau de bord de l’équipe. Seuls les modules attribués par l’entreprise apparaissent.' },
+        es: { title: 'Sus tareas', description: 'Este es el panel del equipo. Solo aparecen los módulos que la empresa le asignó.' },
+      },
+    },
+  ];
+  if (can('events')) {
+    steps.push({
+      id: 'events',
+      icon: 'calendar',
+      copy: {
+        pt: { title: 'Eventos', description: 'Crie e acompanhe eventos da empresa dentro do acesso que lhe foi dado.' },
+        en: { title: 'Events', description: 'Create and follow the business events within the access you were given.' },
+        fr: { title: 'Événements', description: 'Créez et suivez les événements de l’entreprise selon votre accès.' },
+        es: { title: 'Eventos', description: 'Cree y siga los eventos de la empresa según su acceso.' },
+      },
+    });
+  }
+  if (can('tickets') || can('redemptions') || can('order_history')) {
+    steps.push({
+      id: 'tickets',
+      icon: 'ticket',
+      copy: {
+        pt: { title: 'Bilhetes e validação', description: 'Consulte vendas, valide entradas no scanner e descarregue a lista de compradores dos eventos.' },
+        en: { title: 'Tickets and validation', description: 'Check sales, validate entries in the scanner and download each event buyer list.' },
+        fr: { title: 'Billets et validation', description: 'Consultez les ventes, validez les entrées au scanner et téléchargez la liste des acheteurs.' },
+        es: { title: 'Entradas y validación', description: 'Consulte ventas, valide entradas en el escáner y descargue la lista de compradores.' },
+      },
+    });
+  }
+  if (can('content') || can('stories') || can('marketing') || can('reviews')) {
+    steps.push({
+      id: 'content',
+      icon: 'package',
+      copy: {
+        pt: { title: 'Conteúdo e marketing', description: 'Publique no feed, nas stories e nas campanhas conforme a sua permissão.' },
+        en: { title: 'Content and marketing', description: 'Publish to the feed, stories and campaigns according to your permission.' },
+        fr: { title: 'Contenu et marketing', description: 'Publiez dans le fil, les stories et les campagnes selon votre permission.' },
+        es: { title: 'Contenido y marketing', description: 'Publique en el feed, las historias y las campañas según su permiso.' },
+      },
+    });
+  }
+  if (can('clients')) {
+    steps.push({
+      id: 'clients',
+      icon: 'users',
+      copy: {
+        pt: { title: 'Clientes', description: 'Veja as interações permitidas com quem compra e contacta a empresa.' },
+        en: { title: 'Customers', description: 'See the permitted interactions with people who buy from and contact the business.' },
+        fr: { title: 'Clients', description: 'Consultez les interactions autorisées avec ceux qui achètent et contactent l’entreprise.' },
+        es: { title: 'Clientes', description: 'Consulte las interacciones permitidas con quienes compran y contactan la empresa.' },
+      },
+    });
+  }
+  if (can('reports')) {
+    steps.push({
+      id: 'reports',
+      icon: 'wallet',
+      copy: {
+        pt: { title: 'Relatórios', description: 'Exporte vendas, clientes e bilhetes para contabilidade e gestão interna.' },
+        en: { title: 'Reports', description: 'Export sales, customers and tickets for accounting and internal management.' },
+        fr: { title: 'Rapports', description: 'Exportez ventes, clients et billets pour la comptabilité et la gestion.' },
+        es: { title: 'Informes', description: 'Exporte ventas, clientes y entradas para contabilidad y gestión interna.' },
+      },
+    });
+  }
+  if (can('support')) {
+    steps.push({
+      id: 'support',
+      icon: 'lifebuoy',
+      copy: {
+        pt: { title: 'Suporte', description: 'Responda aos pedidos dos clientes e acompanhe cada conversa.' },
+        en: { title: 'Support', description: 'Reply to customer requests and follow every conversation.' },
+        fr: { title: 'Assistance', description: 'Répondez aux demandes des clients et suivez chaque conversation.' },
+        es: { title: 'Soporte', description: 'Responda a las solicitudes de los clientes y siga cada conversación.' },
+      },
+    });
+  }
+  steps.push({
+    id: 'security',
+    icon: 'shield',
+    copy: {
+      pt: { title: 'A sua conta', description: 'Altere a palavra-passe e consulte as sessões ativas. Cada colaborador gere as suas próprias credenciais.' },
+      en: { title: 'Your account', description: 'Change your password and review active sessions. Each team member manages their own credentials.' },
+      fr: { title: 'Votre compte', description: 'Changez votre mot de passe et consultez les sessions actives. Chacun gère ses identifiants.' },
+      es: { title: 'Su cuenta', description: 'Cambie su contraseña y consulte las sesiones activas. Cada colaborador gestiona sus credenciales.' },
+    },
+  });
+  return steps;
+}
+
+export function getTourSteps(
+  role: UserRole,
+  options?: { teamRole?: BusinessTeamRole | null; teamAccess?: TeamModuleAccess | null },
+): TourStep[] {
+  if (role === 'admin') return ADMIN_TOUR;
+  if (role === 'business' && options?.teamRole) return getTeamTourSteps(options.teamAccess);
   return role === 'business' ? BUSINESS_TOUR : CITIZEN_TOUR;
 }
 

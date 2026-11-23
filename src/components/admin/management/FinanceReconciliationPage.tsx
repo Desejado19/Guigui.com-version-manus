@@ -167,12 +167,12 @@ export const FinanceReconciliationPage: React.FC<Props> = ({ onBack }) => {
         { label: 'Divergências', value: divergent, tone: 'danger' },
       ]}
     >
-      <div className="rounded-2xl border border-sky-200 bg-sky-50 p-3 text-[10px] leading-relaxed text-sky-900">
+      <div className="rounded-2xl border border-[var(--tone-info-border)] bg-[var(--tone-info-bg)] p-3 text-[10px] leading-relaxed text-[var(--tone-info-text)]">
         <strong className="font-black">Regra de integridade:</strong> apenas pagamentos reais confirmados podem ser reconciliados.
         Registos de sandbox, simulados e legados ficam visíveis para auditoria, mas não são convertidos em pagamentos confirmados.
       </div>
       {divergent > 0 && (
-        <div role="alert" className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-[10px] leading-relaxed text-rose-900">
+        <div role="alert" className="flex items-start gap-2 rounded-2xl border border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] p-3 text-[10px] leading-relaxed text-[var(--tone-danger-text)]">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
             <strong className="font-black">{divergent} reconciliação(ões) em divergência ou não confirmadas</strong> exigem decisão.
@@ -183,7 +183,7 @@ export const FinanceReconciliationPage: React.FC<Props> = ({ onBack }) => {
 
       {message && <FinanceMessage tone={message.tone}>{message.text}</FinanceMessage>}
 
-      <div className="space-y-2.5 rounded-2xl border border-[#e6dac8] bg-white p-3.5 shadow-sm">
+      <div className="space-y-2.5 rounded-2xl border border-[var(--color-border-default)] bg-white p-3.5 shadow-sm">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <input
@@ -207,17 +207,17 @@ export const FinanceReconciliationPage: React.FC<Props> = ({ onBack }) => {
         </>
       )}
 
-      <section className="space-y-2 rounded-2xl border border-[#e6dac8] bg-white p-4 shadow-sm">
-        <div className="flex items-center gap-2"><Scale className="h-4 w-4 text-[#123e3b]" /><h3 className="text-[12px] font-black text-slate-900">Histórico de reconciliações</h3></div>
+      <section className="space-y-2 rounded-2xl border border-[var(--color-border-default)] bg-white p-4 shadow-sm">
+        <div className="flex items-center gap-2"><Scale className="h-4 w-4 text-[var(--color-green-800)]" /><h3 className="text-[12px] font-black text-slate-900">Histórico de reconciliações</h3></div>
         {data.history.length === 0 ? <p className="text-[10px] text-slate-500">Ainda não existem operações de reconciliação registadas.</p> : (
           <div className="max-h-64 overflow-auto">
             <table className="w-full min-w-[650px] text-left text-[10px]">
-              <thead className="sticky top-0 bg-[#f7f2ec] text-[8.5px] font-black uppercase tracking-[0.12em] text-slate-500">
+              <thead className="sticky top-0 bg-[var(--color-bg-subtle)] text-[8.5px] font-black uppercase tracking-[0.12em] text-slate-500">
                 <tr><th className="px-2 py-2">Operação</th><th className="px-2 py-2">Transação</th><th className="px-2 py-2">Estado</th><th className="px-2 py-2">Responsável</th><th className="px-2 py-2">Data</th></tr>
               </thead>
               <tbody>
                 {data.history.map((item) => (
-                  <tr key={item.id} className="border-t border-slate-100">
+                  <tr key={item.id} className="border-t border-[var(--color-border-subtle)]">
                     <td className="px-2 py-2 font-bold capitalize text-slate-700">{item.actionLabel}</td>
                     <td className="px-2 py-2 font-mono text-[9px]">{item.transactionId || '—'}</td>
                     <td className="px-2 py-2">{item.status || '—'}</td>
@@ -245,7 +245,7 @@ export const FinanceReconciliationPage: React.FC<Props> = ({ onBack }) => {
       >
         {editing && (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[10px]">
+            <div className="grid grid-cols-2 gap-2 rounded-xl border border-[var(--color-border-default)] bg-slate-50 p-3 text-[10px]">
               <div><span className="block font-black text-slate-500">Valor esperado</span>{formatXOF(editing.expectedAmountXOF)}</div>
               <div><span className="block font-black text-slate-500">Operadora</span>{editing.transaction.providerLabel}</div>
               <div><span className="block font-black text-slate-500">Cliente</span>{editing.transaction.payerName}</div>

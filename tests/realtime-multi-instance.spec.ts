@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,8 +15,8 @@ import path from 'node:path';
 const ENTRY = path.join(process.cwd(), 'dist', 'server.mjs');
 const PORT_A = 3101;
 const PORT_B = 3102;
-const ORIGIN_A = `http://127.0.0.1:${PORT_A}`;
-const ORIGIN_B = `http://127.0.0.1:${PORT_B}`;
+const ORIGIN_A = `http://localhost:${PORT_A}`;
+const ORIGIN_B = `http://localhost:${PORT_B}`;
 
 const PASSWORD = 'Guigui@2026!';
 const SEED_PASSWORD = 'Guigui2026!';
@@ -54,7 +54,7 @@ async function stopInstance(port: number): Promise<void> {
   child.kill();
   for (let attempt = 0; attempt < 40; attempt += 1) {
     try {
-      await fetch(`http://127.0.0.1:${port}/api/posts`);
+      await fetch(`http://localhost:${port}/api/posts`);
     } catch {
       return;
     }
