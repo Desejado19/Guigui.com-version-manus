@@ -93,8 +93,11 @@ export const FeaturedHomepageBanner: React.FC<FeaturedHomepageBannerProps> = ({
     <section className="guigui-sponsored-banner" aria-label="Destaques da página inicial" aria-live="polite">
       {activeSlide.type === 'business' ? (
         <div className="guigui-sponsored-slide">
-          {image ? <img src={image} alt="" aria-hidden="true" className="guigui-sponsored-bg" /> : null}
-          <div className="guigui-sponsored-scrim" aria-hidden="true" />
+          {image ? (
+            <div className="guigui-sponsored-media">
+              <img src={image} alt="" aria-hidden="true" className="guigui-sponsored-bg" />
+            </div>
+          ) : null}
           <div className="guigui-sponsored-content">
             <span className="guigui-sponsored-label">Empresa em destaque</span>
             <SlideTitle value={activeSlide.business.name} />
@@ -119,8 +122,11 @@ export const FeaturedHomepageBanner: React.FC<FeaturedHomepageBannerProps> = ({
           onClick={(event) => onCampaignClick(activeSlide.campaign.id, event)}
           className="guigui-sponsored-slide"
         >
-          {image ? <img src={image} alt="" aria-hidden="true" className="guigui-sponsored-bg" /> : null}
-          <div className="guigui-sponsored-scrim" aria-hidden="true" />
+          {image ? (
+            <div className="guigui-sponsored-media">
+              <img src={image} alt="" aria-hidden="true" className="guigui-sponsored-bg" />
+            </div>
+          ) : null}
           <div className="guigui-sponsored-content">
             <span className="guigui-sponsored-label">
               <Megaphone aria-hidden="true" className="h-3.5 w-3.5 text-[#F58220]" />

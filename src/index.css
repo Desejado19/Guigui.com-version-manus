@@ -968,31 +968,27 @@ html.dark .guigui-navbar .guigui-brand-mark svg path { fill: var(--color-green-1
    texto sobreposto à esquerda. O gradiente verde-escuro garante contraste em
    qualquer imagem e repete a identidade da marca; sem fotografia, fica o
    mesmo fundo sólido. */
-/* Altura fixa: todos os destaques (empresas e campanhas) têm exactamente o
-   mesmo tamanho, para o carrossel não saltar de altura ao rodar. O texto é
-   limitado por número de linhas para caber sempre nesta caixa. */
-.guigui-sponsored-banner { position: relative; height: clamp(360px, 33vw, 420px); overflow: hidden; border: 1px solid rgba(11, 59, 55, .18); border-radius: 22px; background: #062a20; box-shadow: 0 26px 50px -34px rgba(11, 59, 55, .75); isolation: isolate; }
-.guigui-sponsored-slide { position: relative; display: flex; width: 100%; height: 100%; min-height: 0; overflow: hidden; color: inherit; text-decoration: none; }
-.guigui-sponsored-bg { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; object-position: 72% center; }
-.guigui-sponsored-scrim {
-  position: absolute; inset: 0; z-index: -1;
-  background:
-    linear-gradient(90deg, rgba(5, 38, 28, .92) 0%, rgba(5, 38, 28, .84) 26%, rgba(5, 38, 28, .46) 44%, rgba(5, 38, 28, 0) 62%),
-    linear-gradient(0deg, rgba(3, 24, 18, .58) 0%, rgba(3, 24, 18, .18) 18%, rgba(3, 24, 18, 0) 34%);
-}
-.guigui-sponsored-content { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 16px; width: min(600px, 62%); min-height: 0; padding: clamp(26px, 3.6vw, 50px); }
-.guigui-sponsored-label { display: inline-flex; width: fit-content; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,.32); border-radius: 999px; background: #0B3B37; padding: 8px 16px; color: #fff; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
-.guigui-sponsored-title { display: -webkit-box; margin: 0; padding-bottom: .14em; overflow: hidden; color: #fff; font-family: var(--font-family); font-size: clamp(28px, 3.4vw, 44px); font-weight: 800; line-height: 1.08; letter-spacing: -.025em; text-shadow: none; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+/* Destaques: a fotografia aparece inteira e sem véu — o texto vive numa faixa
+   sólida por baixo dela, pelo que nenhum pixel da imagem fica tapado. A caixa
+   da imagem tem proporção fixa (3:1) para todos os slides manterem o mesmo
+   tamanho e o carrossel não saltar de altura ao rodar. */
+.guigui-sponsored-banner { position: relative; overflow: hidden; border: 1px solid rgba(11, 59, 55, .18); border-radius: 22px; background: #0B3B37; box-shadow: 0 26px 50px -34px rgba(11, 59, 55, .75); isolation: isolate; }
+.guigui-sponsored-slide { position: relative; display: flex; flex-direction: column; width: 100%; overflow: hidden; color: inherit; text-decoration: none; }
+.guigui-sponsored-media { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 3 / 1; max-height: 420px; overflow: hidden; background: #0B3B37; }
+.guigui-sponsored-bg { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; }
+.guigui-sponsored-content { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: clamp(20px, 3vw, 40px); row-gap: 10px; padding: clamp(20px, 2.4vw, 30px) clamp(22px, 3vw, 40px) clamp(54px, 5vw, 64px); }
+.guigui-sponsored-label { grid-column: 1; display: inline-flex; width: fit-content; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,.32); border-radius: 999px; background: #062a20; padding: 8px 16px; color: #fff; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.guigui-sponsored-title { grid-column: 1; display: -webkit-box; margin: 0; padding-bottom: .14em; overflow: hidden; color: #fff; font-family: var(--font-family); font-size: clamp(26px, 2.6vw, 36px); font-weight: 800; line-height: 1.1; letter-spacing: -.025em; text-shadow: none; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .guigui-sponsored-accent { color: #F58220; }
-.guigui-sponsored-description { display: -webkit-box; max-width: 430px; margin: 0; overflow: hidden; color: rgba(255, 255, 255, .9); font-size: 15px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.guigui-sponsored-cta { display: inline-flex; width: fit-content; align-items: center; gap: 8px; border: 0; border-radius: 999px; background: #F58220; padding: 13px 26px; color: #2B1200; font-size: 14px; font-weight: 700; line-height: 1; cursor: pointer; box-shadow: 0 14px 26px -16px rgba(245, 130, 32, .95); transition: background-color .2s ease, transform .2s ease; }
+.guigui-sponsored-description { grid-column: 1; display: -webkit-box; max-width: 640px; margin: 0; overflow: hidden; color: rgba(255, 255, 255, .9); font-size: 15px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.guigui-sponsored-cta { grid-column: 2; grid-row: 1 / span 3; align-self: center; display: inline-flex; width: fit-content; align-items: center; gap: 8px; border: 0; border-radius: 999px; background: #F58220; padding: 13px 26px; color: #2B1200; font-size: 14px; font-weight: 700; line-height: 1; cursor: pointer; box-shadow: 0 14px 26px -16px rgba(245, 130, 32, .95); transition: background-color .2s ease, transform .2s ease; }
 .guigui-sponsored-slide:hover .guigui-sponsored-cta { background: #E6730F; }
 .guigui-sponsored-cta:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
-.guigui-sponsored-pager { position: absolute; right: clamp(18px, 3vw, 36px); bottom: clamp(14px, 2.4vw, 24px); z-index: 2; display: flex; align-items: center; gap: 14px; }
+.guigui-sponsored-pager { position: absolute; right: clamp(18px, 3vw, 36px); bottom: clamp(16px, 2vw, 22px); z-index: 2; display: flex; align-items: center; gap: 14px; }
 .guigui-sponsored-progress { width: clamp(90px, 20vw, 230px); height: 2px; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, .3); }
 .guigui-sponsored-progress > span { display: block; height: 100%; border-radius: inherit; background: #F58220; transition: width .45s ease; }
-.guigui-sponsored-controls { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255, 255, 255, .24); border-radius: 999px; background: #0B3B37; padding: 4px 7px; }
-.guigui-sponsored-nav { display: inline-flex; height: 28px; width: 28px; align-items: center; justify-content: center; border: 1px solid rgba(255, 255, 255, .28); border-radius: 999px; background: #0B3B37; color: #fff; cursor: pointer; transition: background-color .2s ease; }
+.guigui-sponsored-controls { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255, 255, 255, .24); border-radius: 999px; background: #062a20; padding: 4px 7px; }
+.guigui-sponsored-nav { display: inline-flex; height: 28px; width: 28px; align-items: center; justify-content: center; border: 1px solid rgba(255, 255, 255, .28); border-radius: 999px; background: #062a20; color: #fff; cursor: pointer; transition: background-color .2s ease; }
 .guigui-sponsored-nav:hover { background: #14574A; }
 .guigui-sponsored-nav:focus-visible { outline: 2px solid #F58220; outline-offset: 2px; }
 .guigui-sponsored-counter { min-width: 30px; text-align: center; color: #fff; font-size: 13px; font-weight: 700; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
@@ -1195,15 +1191,13 @@ html:not(.dark) .guigui-app-shell .text-emerald-600, html:not(.dark) .guigui-app
   .guigui-search-button { padding: 10px 12px; }
   .guigui-category-grid { display: flex; overflow-x: auto; margin: 0 -2px; padding-bottom: 4px; }
   .guigui-category-card { min-width: 82px; }
-  /* Em ecrã estreito o gradiente passa a vertical: o texto fica por cima da
-     parte inferior da fotografia, onde o contraste é maior. */
-  .guigui-sponsored-banner { height: 380px; }
-  .guigui-sponsored-slide { min-height: 0; height: 100%; }
-  .guigui-sponsored-scrim { background: linear-gradient(0deg, rgba(4, 28, 22, .97) 0%, rgba(4, 28, 22, .84) 45%, rgba(4, 28, 22, .3) 76%, rgba(4, 28, 22, .16) 100%); }
-  .guigui-sponsored-bg { object-position: 68% center; }
-  .guigui-sponsored-content { width: 100%; gap: 12px; padding: 22px 20px 76px; }
-  .guigui-sponsored-title { font-size: clamp(26px, 7vw, 36px); }
+  /* Em ecrã estreito a fotografia mantém-se inteira e o texto passa para
+     baixo dela, a toda a largura. */
+  .guigui-sponsored-media { aspect-ratio: 16 / 9; max-height: 260px; }
+  .guigui-sponsored-content { grid-template-columns: minmax(0, 1fr); row-gap: 10px; padding: 20px 20px 72px; }
+  .guigui-sponsored-title { font-size: clamp(24px, 6.4vw, 30px); }
   .guigui-sponsored-description { font-size: 13.5px; -webkit-line-clamp: 2; }
+  .guigui-sponsored-cta { grid-column: 1; grid-row: auto; justify-self: start; }
   .guigui-sponsored-pager { right: 20px; bottom: 16px; left: 20px; justify-content: space-between; gap: 10px; }
   .guigui-sponsored-progress { flex: 1; width: auto; }
   /* Cartões do diretório em ecrã estreito: uma coluna, para a fotografia,
@@ -1298,6 +1292,65 @@ html.dark .guigui-light-dashboard * {
   background-color: transparent !important;
   background: transparent !important;
   box-shadow: none !important;
+}
+
+/* Controlos de acção com preenchimento próprio: o reset acima apaga todos os
+   fundos do subtree, o que deixava o texto escuro (#06231d) dos filtros activos,
+   do botão «Nova mensagem» e do «Enviar mensagem» sobre a superfície escura.
+   Repõe-se apenas o preenchimento de acento, sem mudar a identidade visual. */
+html.dark .guigui-light-dashboard .guigui-inbox-filters button.is-active,
+html.dark .guigui-light-dashboard .guigui-inbox-new,
+html.dark .guigui-light-dashboard button.guigui-composer-send {
+  background: var(--color-green-400) !important;
+  border-color: var(--color-green-400) !important;
+  color: #06231d !important;
+}
+
+html.dark .guigui-light-dashboard .guigui-inbox-filters button.is-active span {
+  background: rgba(255, 255, 255, 0.24) !important;
+  color: #06231d !important;
+}
+
+/* Avatares do fio de conversa: o mesmo reset retira o fundo claro e deixava as
+   iniciais (#08332c) sobre a superfície escura. Usa-se a paleta de avatar
+   escura já aplicada aos avatares da lista lateral. */
+.dark .guigui-message-avatar {
+  background: #1c4a3e;
+  color: #bfe8d5;
+}
+
+html.dark .guigui-light-dashboard .guigui-message-avatar {
+  background: #1c4a3e !important;
+  color: #bfe8d5 !important;
+}
+
+.dark .guigui-message-avatar.is-support {
+  background: #3d2a12;
+  color: #ffdca8;
+}
+
+html.dark .guigui-light-dashboard .guigui-message-avatar.is-support {
+  background: #3d2a12 !important;
+  color: #ffdca8 !important;
+}
+
+/* Nome do autor dentro do balão: a cor de tema claro (#3f5a52) ficava sobre a
+   superfície escura do balão. Usa-se o cinza-esverdeado claro já presente nos
+   metadados do tema escuro. */
+.dark .guigui-message-row .guigui-message-bubble .guigui-message-author {
+  color: #a7c3b8;
+}
+
+html.dark .guigui-light-dashboard .guigui-message-row .guigui-message-bubble .guigui-message-author {
+  color: #a7c3b8 !important;
+}
+
+.dark .guigui-message-row.is-own .guigui-message-bubble .guigui-message-author {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+html.dark .guigui-light-dashboard .guigui-message-row.is-own .guigui-message-bubble .guigui-message-author {
+  color: rgba(255, 255, 255, 0.82) !important;
 }
 
 /* Parágrafos de identificação (ex.: linha de empresa+data atrás do cartão de bilhete):
