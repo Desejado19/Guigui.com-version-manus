@@ -62,7 +62,7 @@ O **Guigui.com** é uma plataforma digital multifacetada desenhada especificamen
 ├── metadata.json                       # Metadados e permissões da plataforma
 ├── .env.example                        # Variáveis de ambiente
 ├── README.md                           # Documentação pública
-├── INSTRUCTIONS_FOR_MANUS.md           # Este manual técnico
+├── docs/manual/                        # Este manual técnico
 │
 └── src/
     ├── main.tsx                        # Ponto de entrada do React

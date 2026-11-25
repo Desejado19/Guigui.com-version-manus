@@ -8,7 +8,20 @@
 
 O sistema unifica a experiência de descoberta local, rede social comercial, bilhética digital com validação na porta do evento via QR Code/PIN, pagamentos móveis em Francos CFA (XOF) com Orange Money e Telecel, moderação inteligente com Inteligência Artificial (Google Gemini) adaptada a Português, Francês e Inglês, e painéis de gestão robustos para comerciantes e administradores.
 
-> **Manual funcional completo:** consulte [MANUAL-FUNCIONAL-COMPLETO-GUIGUI.md](MANUAL-FUNCIONAL-COMPLETO-GUIGUI.md) para a descrição integral de perfis, módulos, fluxos, permissões, API, segurança, validações, operação e limitações.
+> **Manual funcional completo:** consulte [MANUAL-FUNCIONAL-COMPLETO-GUIGUI.md](docs/manual/MANUAL-FUNCIONAL-COMPLETO-GUIGUI.md) para a descrição integral de perfis, módulos, fluxos, permissões, API, segurança, validações, operação e limitações.
+
+### 📚 Por onde começar
+
+| Documento | Para quê |
+| :--- | :--- |
+| [docs/ENTREGA.md](docs/ENTREGA.md) | receber o repositório: requisitos, variáveis de ambiente, base de dados, verificação, deploy e publicação noutra conta GitHub |
+| [docs/manual/README-EXECUCAO-DOWNLOAD.md](docs/manual/README-EXECUCAO-DOWNLOAD.md) | execução local passo a passo e download do pacote |
+| [docs/manual/DADOS-SEED-DEMO.md](docs/manual/DADOS-SEED-DEMO.md) | contas e dados criados por `npm run db:seed-demo` |
+| [docs/DEPLOY.md](docs/DEPLOY.md) | deploy em Render (recomendado) e Vercel |
+| [docs/OPERATIONS.md](docs/OPERATIONS.md) · [docs/RUNBOOKS.md](docs/RUNBOOKS.md) | operação, backups, incidentes |
+| [CAPABILITY-MAP.md](CAPABILITY-MAP.md) | mapa de capacidades por domínio |
+| [docs/openapi.json](docs/openapi.json) | contrato OpenAPI da API |
+| [docs/relatorios/](docs/relatorios/) | auditorias, validações e relatórios de estado |
 
 ---
 

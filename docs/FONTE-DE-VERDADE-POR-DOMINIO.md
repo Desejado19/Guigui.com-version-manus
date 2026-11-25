@@ -21,7 +21,7 @@ de titularidade nem registo financeiro.
 ## Dados demonstrativos
 
 Contas demo (`cidadao.teste@guigui.com`, `empresa.teste@guigui.com`,
-`admin.teste@guigui.com`) e os dados semeados (`DADOS-SEED-DEMO.md`,
+`admin.teste@guigui.com`) e os dados semeados (`docs/manual/DADOS-SEED-DEMO.md`,
 `ensureDemoScheduledItems`) existem apenas para demonstração e não devem ser
 apresentados como operação real. Pagamentos em modo `simulated`, envios de
 e-mail/SMS simulados e o scanner de portaria em modo de desenvolvimento são

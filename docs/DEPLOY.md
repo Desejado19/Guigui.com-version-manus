@@ -15,15 +15,13 @@ O repositório já contém o blueprint `render.yaml`, que define o serviço web
 
 ### Passo 1 — Colocar o código no GitHub
 
-O Render faz deploy a partir de um repositório Git. Crie um repositório e faça
-push do conteúdo desta pasta (a pasta do projeto é `Guigui.com-tema-escuro-testado/`):
+O Render faz deploy a partir de um repositório Git. Crie um repositório vazio e
+faça push da branch `main` deste projecto (se estiver a receber o código numa
+conta nova, ver [ENTREGA.md](ENTREGA.md), secção 9):
 
 ```bash
-cd Guigui.com-tema-escuro-testado
-git init
-git add .
-git commit -m "Deploy inicial Guigui.com"
-git branch -M main
+git clone https://github.com/SEU_UTILIZADOR/guigui.git  # ou: git init numa pasta nova
+cd guigui
 git remote add origin https://github.com/SEU_UTILIZADOR/guigui.git
 git push -u origin main
 ```

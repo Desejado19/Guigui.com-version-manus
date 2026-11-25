@@ -19,12 +19,12 @@ Contudo, a implementação atual ainda é uma camada visual distribuída, não u
 
 ### Evidências observadas
 
-- Os tokens base vivem em [src/index.css](src/index.css), mas vários componentes usam cores Tailwind e hexadecimais próprios.
+- Os tokens base vivem em [src/index.css](../../src/index.css), mas vários componentes usam cores Tailwind e hexadecimais próprios.
 - A folha global já possui mais de 250 declarações CSS específicas e regras de componentes com prefixo `guigui-*`.
-- Foram encontrados milhares de ocorrências de utilitários visuais nos componentes, com forte concentração em [BusinessDashboard.tsx](src/components/BusinessDashboard.tsx), [AdminDashboard.tsx](src/components/AdminDashboard.tsx) e [LoginModal.tsx](src/components/LoginModal.tsx).
+- Foram encontrados milhares de ocorrências de utilitários visuais nos componentes, com forte concentração em [BusinessDashboard.tsx](../../src/components/BusinessDashboard.tsx), [AdminDashboard.tsx](../../src/components/AdminDashboard.tsx) e [LoginModal.tsx](../../src/components/LoginModal.tsx).
 - O `font-serif` é sobrescrito para usar a mesma família sans, portanto ainda não existe uma hierarquia tipográfica real.
 - O tema escuro existe principalmente como overrides globais, sem uma escala semântica completa para superfícies, texto, bordas e estados.
-- O PWA já possui [manifest.json](public/manifest.json) e [sw.js](public/sw.js), mas esses artefactos ainda não fazem parte de uma fundação visual/operacional integrada.
+- O PWA já possui [manifest.json](../../public/manifest.json) e [sw.js](../../public/sw.js), mas esses artefactos ainda não fazem parte de uma fundação visual/operacional integrada.
 - Não existe uma biblioteca explícita de componentes base em `src/components/ui/`.
 
 ## 2. Direção de identidade

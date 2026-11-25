@@ -749,7 +749,7 @@ A validação acumulada incluiu:
 | Password | Erro 400 para entrada inválida e fluxo de alteração 200 validado. |
 | Build/API | `check`, `build` e `/api/health` aprovados. |
 
-As notas de validação detalhadas estão em [validation-notes-step-2.md](validation-notes-step-2.md) e o relatório de segurança em [GUI-SECURITY-VALIDATION.md](GUI-SECURITY-VALIDATION.md).
+As notas de validação detalhadas estão em [validation-notes-step-2.md](../relatorios/validation-notes-step-2.md) e o relatório de segurança em [GUI-SECURITY-VALIDATION.md](../relatorios/GUI-SECURITY-VALIDATION.md).
 
 ## 24. Procedimentos operacionais rápidos
 
@@ -777,12 +777,12 @@ A autenticação demo ainda não representa uma sessão de produção com autori
 
 ## 26. Referências do projecto
 
-[1]: [README funcional e técnico](README.md)  
-[2]: [Relatório de validação funcional e segurança](GUI-SECURITY-VALIDATION.md)  
-[3]: [Notas detalhadas de validação browser](validation-notes-step-2.md)  
-[4]: [Tipos globais do domínio](src/types.ts)  
-[5]: [Servidor Express e rotas REST](server.ts)  
-[6]: [Relatório de testes de seguimento](FOLLOW-BUSINESS-TEST-REPORT.md)
+[1]: [README funcional e técnico](../../README.md)  
+[2]: [Relatório de validação funcional e segurança](../relatorios/GUI-SECURITY-VALIDATION.md)  
+[3]: [Notas detalhadas de validação browser](../relatorios/validation-notes-step-2.md)  
+[4]: [Tipos globais do domínio](../../src/types.ts)  
+[5]: [Servidor Express e rotas REST](../../server.ts)  
+[6]: [Relatório de testes de seguimento](../relatorios/FOLLOW-BUSINESS-TEST-REPORT.md)
 
 
 ## Pipeline de Segurança & Auditoria Humana — estados e filtros

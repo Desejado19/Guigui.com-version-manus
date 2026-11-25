@@ -212,7 +212,7 @@ As regras atuais são:
 - o botão Voltar preserva o contexto de navegação pública;
 - login não reutiliza a secção anterior do painel empresarial ou administrativo.
 
-A política está centralizada em [src/utils/navigationBehavior.ts](src/utils/navigationBehavior.ts).
+A política está centralizada em [src/utils/navigationBehavior.ts](../../src/utils/navigationBehavior.ts).
 
 ## 6. APIs principais
 

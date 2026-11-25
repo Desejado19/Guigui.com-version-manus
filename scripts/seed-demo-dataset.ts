@@ -2,7 +2,7 @@
  * Seed de demonstracao: 30 empresas + 50 cidadaos funcionais.
  * 30 contas business (empresa.seed01@guigui.test ... seed30) com a sua
  * company (seed-co-01 ... seed-co-30); 50 cidadaos (cidadao.seed01 ... seed50).
- * Password unica: Guigui2026! (ver DADOS-SEED-DEMO.md).
+ * Password unica: Guigui2026! (ver docs/manual/DADOS-SEED-DEMO.md).
  * Idempotente: verifica email antes de criar; companies com ON CONFLICT.
  * seed-co-01..20 ficam active; seed-co-21..30 ficam pending (fila do admin).
  * Correr em C:\guigui:  npx tsx scripts/seed-demo-dataset.ts [--clean]
