@@ -235,6 +235,9 @@ Removido do versionamento (continua no histórico antigo, não na árvore):
   `diag-*.mjs`, `check-front.*`, `qa-*.mjs`, `test-db*.js`, `list-*.mjs`, …).
 - Lockfiles redundantes: `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `bun.lock`
   (o projecto é npm; o CI usa `npm ci` com `package-lock.json`).
+- Atalhos locais desta máquina: `guigui-limpo.cmd` e `GUIGUI-CAMINHO-LIMPO.md`
+  (espelhavam o projecto para `C:\guigui` por causa de `#` no caminho) e
+  `scripts/_temp_zip.ps1` (empacotava a partir de `C:\Users\...`).
 
 Organização: relatórios e auditorias passaram para `docs/relatorios/`, manuais
 para `docs/manual/`; os links relativos foram reescritos e verificados.
