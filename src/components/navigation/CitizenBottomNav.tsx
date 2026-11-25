@@ -5,7 +5,7 @@ import {
   isCitizenPrimaryModulePrivate,
   type CitizenPrimaryModule,
 } from '../../config/navigation';
-import { GlassBottomNav } from './GlassBottomNav';
+import { BottomNav } from './BottomNav';
 
 interface CitizenBottomNavProps {
   activeId: CitizenPrimaryModule;
@@ -20,7 +20,7 @@ interface CitizenBottomNavProps {
 
 /**
  * Navegação principal do cidadão: os mesmos destinos e permissões de sempre,
- * apresentados numa barra flutuante de fundo sólido (ver `GlassBottomNav`).
+ * apresentados numa barra flutuante de fundo sólido (ver `BottomNav`).
  *
  * Visitantes (ou sessões por confirmar) vêem Feed, Diretório, Ofertas e Agenda;
  * Mensagens e Conta só aparecem depois de a sessão ser validada no servidor.
@@ -32,7 +32,7 @@ export const CitizenBottomNav: React.FC<CitizenBottomNavProps> = ({
   badges = {},
   isAuthenticated,
 }) => (
-  <GlassBottomNav
+  <BottomNav
     ariaLabel="Navegação principal"
     testId="citizen-bottom-nav"
     activeId={activeId}

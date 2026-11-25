@@ -81,6 +81,8 @@ export interface InstitutionalRepository {
   reorderEntities(kind: EntityKind, ids: number[]): Promise<void>;
   publish(snapshot: InstitutionalSnapshot, publishedBy: string | null): Promise<ReleaseSnapshot>;
   latestRelease(): Promise<ReleaseSnapshot | null>;
+  unpublish(withdrawnBy: string | null): Promise<ReleaseSnapshot | null>;
+  isPublished(): Promise<boolean>;
   listReleases(limit?: number): Promise<ReleaseMeta[]>;
   getRelease(id: number): Promise<ReleaseSnapshot | null>;
   listAudit(filters?: { entity?: string; action?: string; limit?: number }): Promise<AuditEntry[]>;
@@ -97,6 +99,11 @@ export interface InstitutionalRepository {
     changedBy: string | null;
     createdAt: string;
   }>>;
+  restoreDocumentVersion(
+    documentId: number,
+    versionId: number,
+    changedBy: string | null,
+  ): Promise<{ item: EntityRow; restoredFrom: { id: number; version: string } } | null>;
   restoreRelease(snapshot: InstitutionalSnapshot, changedBy: string | null): Promise<void>;
   audit(entry: {
     entity: string;
@@ -265,21 +272,63 @@ export function createInstitutionalRepository(pool: Pool): InstitutionalReposito
     },
 
     async publish(snapshot, publishedBy) {
-      const result = await pool.query<DbRow>(
-        `INSERT INTO institutional_releases (snapshot, published_by)
-         VALUES ($1::jsonb, $2)
-         RETURNING id, snapshot, published_at, published_by, note`,
-        [JSON.stringify(snapshot), publishedBy],
-      );
-      return mapRelease(result.rows[0] ?? {});
+      // Uma nova publicação substitui a anterior: só existe uma release ativa,
+      // para que despublicar não faça reaparecer uma versão antiga.
+      const client: PoolClient = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const result = await client.query<DbRow>(
+          `INSERT INTO institutional_releases (snapshot, published_by)
+           VALUES ($1::jsonb, $2)
+           RETURNING id, snapshot, published_at, published_by, note`,
+          [JSON.stringify(snapshot), publishedBy],
+        );
+        const release = mapRelease(result.rows[0] ?? {});
+        await client.query(
+          `UPDATE institutional_releases
+              SET withdrawn_at = now(), withdrawn_by = $2
+            WHERE withdrawn_at IS NULL AND id <> $1`,
+          [release.id, publishedBy],
+        );
+        await client.query('COMMIT');
+        return release;
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
     },
 
     async latestRelease() {
       const result = await pool.query<DbRow>(
         `SELECT id, snapshot, published_at, published_by, note
-           FROM institutional_releases ORDER BY published_at DESC, id DESC LIMIT 1`,
+           FROM institutional_releases
+          WHERE withdrawn_at IS NULL
+          ORDER BY published_at DESC, id DESC LIMIT 1`,
       );
       return result.rows[0] ? mapRelease(result.rows[0]) : null;
+    },
+
+    // Despublicar não apaga a release: apenas a retira do site.
+    async unpublish(withdrawnBy) {
+      const result = await pool.query<DbRow>(
+        `UPDATE institutional_releases
+            SET withdrawn_at = now(), withdrawn_by = $1
+          WHERE id = (SELECT id FROM institutional_releases
+                       WHERE withdrawn_at IS NULL
+                       ORDER BY published_at DESC, id DESC LIMIT 1)
+          RETURNING id, snapshot, published_at, published_by, note`,
+        [withdrawnBy],
+      );
+      return result.rows[0] ? mapRelease(result.rows[0]) : null;
+    },
+
+    async isPublished() {
+      const result = await pool.query<{ exists: boolean }>(
+        `SELECT EXISTS (SELECT 1 FROM institutional_releases WHERE withdrawn_at IS NULL) AS exists`,
+      );
+      return result.rows[0]?.exists === true;
     },
 
     async listReleases(limit = 10) {
@@ -436,6 +485,57 @@ export function createInstitutionalRepository(pool: Pool): InstitutionalReposito
         changedBy: row.changed_by === null || row.changed_by === undefined ? null : String(row.changed_by),
         createdAt: new Date(String(row.created_at)).toISOString(),
       }));
+    },
+
+    // Restaura uma versão guardada: o conteúdo/versão/estado voltam ao registo
+    // actual e a própria restauração fica registada no histórico de versões.
+    async restoreDocumentVersion(documentId, versionId, changedBy) {
+      const client: PoolClient = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const versionResult = await client.query<DbRow>(
+          `SELECT id, version, content, status
+             FROM institutional_document_versions
+            WHERE id = $1 AND document_id = $2
+            LIMIT 1`,
+          [versionId, documentId],
+        );
+        const versionRow = versionResult.rows[0];
+        if (!versionRow) {
+          await client.query('ROLLBACK');
+          return null;
+        }
+        const version = String(versionRow.version ?? '1.0');
+        const content = String(versionRow.content ?? '');
+        const status = String(versionRow.status ?? 'draft');
+        const updateResult = await client.query<DbRow>(
+          `UPDATE institutional_documents
+              SET version = $1, content = $2, status = $3, updated_at = now()
+            WHERE id = $4
+            RETURNING *`,
+          [version, content, status, documentId],
+        );
+        const item = updateResult.rows[0];
+        if (!item) {
+          await client.query('ROLLBACK');
+          return null;
+        }
+        await client.query(
+          `INSERT INTO institutional_document_versions (document_id, version, content, status, changed_by)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [documentId, version, content, status, changedBy],
+        );
+        await client.query('COMMIT');
+        return {
+          item: mapInstitutionalRow(item),
+          restoredFrom: { id: Number(versionRow.id), version },
+        };
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
     },
 
     async audit(entry) {

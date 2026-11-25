@@ -8,12 +8,27 @@ type PaymentTransaction = {
   status: string;
   amountXOF: number;
   payerName?: string;
-  payerPhone?: string;  useCase?: string;
+  payerPhone?: string;
+  useCase?: string;
   businessId?: string;
   providerMode?: string;
   confirmedAt?: string;
   createdAt?: string;
+  /** Bilhetes emitidos nesta cobrança; permitem resolver os pedidos reais. */
+  ticketIds?: string[];
+  orderId?: string;
+  eventId?: string;
+  companyId?: string;
+  buyerUserId?: string;
 };
+
+interface TicketOrderLink {
+  order_id: string;
+  event_id: string;
+  company_id: string | null;
+  buyer_user_id: string | null;
+  amount_xof: number;
+}
 
 const statusMap: Record<string, string> = {
   confirmed_api: 'paid',
@@ -92,17 +107,85 @@ export async function listPostgresPayments(limit = 500): Promise<FrontendPayment
   }));
 }
 
+/**
+ * Resolve os pedidos reais de uma cobrança de bilhetes. Cada bilhete tem o seu
+ * próprio pedido; a ligação é feita pelos bilhetes emitidos, nunca por valores
+ * ou por identificadores fornecidos pelo cliente.
+ */
+async function resolveTicketOrders(
+  client: { query: (sql: string, values?: unknown[]) => Promise<{ rows: TicketOrderLink[] }> },
+  transaction: PaymentTransaction,
+): Promise<TicketOrderLink[]> {
+  const ticketIds = Array.isArray(transaction.ticketIds) ? transaction.ticketIds.filter(Boolean) : [];
+  if (ticketIds.length > 0) {
+    const linked = await client.query(
+      `SELECT DISTINCT o.id AS order_id, o.event_id, e.company_id, o.buyer_user_id, o.gross_amount_xof AS amount_xof
+         FROM tickets t
+         JOIN orders o ON o.id = t.order_id
+         LEFT JOIN events e ON e.id = o.event_id
+        WHERE t.id = ANY($1::text[])`,
+      [ticketIds],
+    );
+    return linked.rows;
+  }
+  if (transaction.orderId) {
+    const linked = await client.query(
+      `SELECT o.id AS order_id, o.event_id, e.company_id, o.buyer_user_id, o.gross_amount_xof AS amount_xof
+         FROM orders o LEFT JOIN events e ON e.id = o.event_id
+        WHERE o.id = $1`,
+      [transaction.orderId],
+    );
+    return linked.rows;
+  }
+  return [];
+}
+
 export async function persistPostgresPayment(transaction: PaymentTransaction, idempotencyKey?: string): Promise<void> {
   if (!databasePool) return;
-  await databasePool.query(
-    `INSERT INTO payment_transactions
-      (id,provider,provider_reference,status,gross_amount_xof,net_amount_xof,payer_name,payer_phone,use_case,business_id,provider_mode,confirmed_at,created_at,updated_at,idempotency_key)
-     VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$12,$13)
-     ON CONFLICT (id) DO UPDATE SET status=EXCLUDED.status, provider_reference=EXCLUDED.provider_reference,
-       payer_name=EXCLUDED.payer_name, payer_phone=EXCLUDED.payer_phone, business_id=EXCLUDED.business_id,
-       confirmed_at=EXCLUDED.confirmed_at, updated_at=NOW()`,
-    [transaction.id, transaction.provider, transaction.providerRef || null, statusMap[transaction.status] || 'pending', transaction.amountXOF, transaction.payerName || null, transaction.payerPhone || null, transaction.useCase || null, transaction.businessId || null, transaction.providerMode || null, transaction.confirmedAt || null, transaction.createdAt || new Date().toISOString(), idempotencyKey || null],
-  );
+  const dbStatus = statusMap[transaction.status] || 'pending';
+  const isTicketPayment = transaction.useCase === 'event_tickets';
+  const isConfirmed = dbStatus === 'paid' || dbStatus === 'authorized';
+  const client = await databasePool.connect();
+  try {
+    await client.query('BEGIN');
+    const orders = isTicketPayment ? await resolveTicketOrders(client, transaction) : [];
+    // Uma cobrança confirmada de bilhetes só é registada depois de os pedidos e
+    // bilhetes existirem; a segunda gravação da compra traz essa ligação.
+    if (isTicketPayment && isConfirmed && orders.length === 0) {
+      await client.query('ROLLBACK');
+      return;
+    }
+    const primary = orders[0];
+    const eventId = primary?.event_id || transaction.eventId || null;
+    const companyId = primary?.company_id || transaction.companyId || transaction.businessId || null;
+    const buyerUserId = primary?.buyer_user_id || transaction.buyerUserId || null;
+    await client.query(
+      `INSERT INTO payment_transactions
+        (id,provider,provider_reference,status,gross_amount_xof,net_amount_xof,payer_name,payer_phone,use_case,business_id,provider_mode,confirmed_at,created_at,updated_at,idempotency_key,order_id,event_id,company_id,buyer_user_id)
+       VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$12,$13,$14,$15,$16,$17)
+       ON CONFLICT (id) DO UPDATE SET status=EXCLUDED.status, provider_reference=EXCLUDED.provider_reference,
+         payer_name=EXCLUDED.payer_name, payer_phone=EXCLUDED.payer_phone, business_id=EXCLUDED.business_id,
+         order_id=COALESCE(EXCLUDED.order_id, payment_transactions.order_id),
+         event_id=COALESCE(EXCLUDED.event_id, payment_transactions.event_id),
+         company_id=COALESCE(EXCLUDED.company_id, payment_transactions.company_id),
+         buyer_user_id=COALESCE(EXCLUDED.buyer_user_id, payment_transactions.buyer_user_id),
+         confirmed_at=EXCLUDED.confirmed_at, updated_at=NOW()`,
+      [transaction.id, transaction.provider, transaction.providerRef || null, dbStatus, transaction.amountXOF, transaction.payerName || null, transaction.payerPhone || null, transaction.useCase || null, companyId, transaction.providerMode || null, transaction.confirmedAt || null, transaction.createdAt || new Date().toISOString(), idempotencyKey || null, primary?.order_id || null, eventId, companyId, buyerUserId],
+    );
+    for (const order of orders) {
+      await client.query(
+        `INSERT INTO payment_transaction_orders (transaction_id, order_id, amount_xof)
+         VALUES ($1,$2,$3) ON CONFLICT (transaction_id, order_id) DO NOTHING`,
+        [transaction.id, order.order_id, Number(order.amount_xof) || 0],
+      );
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function recordPostgresPaymentEvent(provider: string, transactionId: string, payload: unknown, signatureValid: boolean, eventReference?: string): Promise<void> {

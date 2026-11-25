@@ -8,9 +8,10 @@ import path from 'node:path';
  * upload, a criação na API e a presença das duas no anel da empresa na faixa.
  */
 
-const DEMO_EMAIL = 'empresa.teste@guigui.com';
-const DEMO_PASSWORD = 'Guigui@2026!';
-const BUSINESS_LABEL = /Coqueiros/i;
+// Empresa publicada pela seed de demonstração (scripts/seed-demo-dataset.ts).
+const DEMO_EMAIL = 'empresa.seed01@guigui.test';
+const DEMO_PASSWORD = 'Guigui2026!';
+const BUSINESS_LABEL = /Cantina Sabores de Bandim/i;
 
 /** PNG 1x1 válido — o servidor valida os magic bytes. */
 const PHOTO_BYTES = Buffer.from(
@@ -74,9 +75,15 @@ async function openFeed(page: Page): Promise<void> {
 /** Número de stories do anel da empresa na faixa (1 quando não há badge). */
 async function ringStoryCount(page: Page): Promise<number> {
   const ring = page.getByTestId('story-ring').filter({ hasText: BUSINESS_LABEL }).first();
+  // A empresa da seed começa sem stories, por isso o anel pode ainda não existir
+  // quando se lê a contagem de partida: nesse caso a contagem é zero.
+  await page.waitForTimeout(1_500);
+  if (!(await ring.count())) return 0;
   await expect(ring).toBeVisible({ timeout: 15_000 });
-  const match = (await ring.innerText()).match(/^\s*(\d+)/);
-  return match ? Number(match[1]) : 1;
+  // O texto do anel começa pelo inicial do logótipo; o número é o badge que só
+  // aparece com mais de uma story (sem badge, a contagem é uma).
+  const match = (await ring.innerText()).match(/\d+/);
+  return match ? Number(match[0]) : 1;
 }
 
 /** Publica um ficheiro pelo editor e devolve a story criada no servidor. */

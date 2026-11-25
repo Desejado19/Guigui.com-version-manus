@@ -308,7 +308,9 @@ export const StoryModal: React.FC<StoryModalProps> = ({
       }
     } catch {
       setNotice('Não foi possível partilhar a story.');
+      return;
     }
+    await storyApi.recordShare(story.id).catch(() => undefined);
   };
 
   const openStats = async () => {

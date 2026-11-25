@@ -84,14 +84,14 @@ test.describe('Configurações do cidadão reorganizadas', () => {
     // Secção interna 2: alteração de palavra-passe e preferência de comunicação.
     await page.getByRole('tab', { name: 'Definições do sistema' }).click();
     await expect(page.getByRole('tab', { name: 'Definições do sistema' })).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByPlaceholder('Nova palavra-passe', { exact: true })).toBeVisible();
-    await expect(page.getByPlaceholder('Confirmar nova palavra-passe', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Nova palavra-passe', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Repetir nova palavra-passe', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Atualizar palavra-passe' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'E-mail e telefone' })).toBeVisible();
 
     // Voltar à privacidade não deixa vestígios do formulário anterior.
     await page.getByRole('tab', { name: 'Segurança e privacidade' }).click();
-    await expect(page.getByPlaceholder('Nova palavra-passe', { exact: true })).toHaveCount(0);
+    await expect(page.getByLabel('Nova palavra-passe', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Perfil privado', { exact: true })).toBeVisible();
 
     expect(pageErrors).toEqual([]);

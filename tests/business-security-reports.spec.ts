@@ -1,4 +1,4 @@
-import { expect, request as playwrightRequest, test, type Page } from './fixtures';
+import { expect, patchApiContext, request as playwrightRequest, test, type Page } from './fixtures';
 
 const DEMO_PASSWORD = 'Guigui@2026!';
 const BUSINESS_EMAIL = 'empresa.teste@guigui.com';
@@ -54,9 +54,9 @@ test.describe('Segurança, Relatórios e Exportação', () => {
     expect(missing.status()).toBe(404);
 
     // A sessão do administrador pertence a outra conta: a empresa não a pode encerrar.
-    const adminContext = await playwrightRequest.newContext({
+    const adminContext = patchApiContext(await playwrightRequest.newContext({
       baseURL: (test.info().project.use as { baseURL?: string }).baseURL,
-    });
+    }));
     const adminLogin = await adminContext.post('/api/auth/login', { data: { email: ADMIN_EMAIL, password: DEMO_PASSWORD } });
     expect(adminLogin.ok()).toBeTruthy();
     const adminSessions = await adminContext.get('/api/auth/sessions');
@@ -126,8 +126,8 @@ test.describe('Segurança, Relatórios e Exportação', () => {
     const file = await download;
     expect(file.suggestedFilename()).toMatch(/\.csv$/);
 
-    // A exportação fica registada no histórico partilhado do módulo de Exportação.
-    await openNav(page, 'Exportação');
+    // A exportação fica registada no histórico integrado no módulo Relatórios.
+    await page.getByRole('button', { name: 'Exportação de dados' }).click();
     const historyTable = page.getByTestId('export-history-table');
     await expect(historyTable).toBeVisible({ timeout: 20_000 });
     await expect(historyTable.getByText('Relatórios · Comercial')).toBeVisible();
@@ -136,12 +136,8 @@ test.describe('Segurança, Relatórios e Exportação', () => {
     await page.getByTestId('prepare-export').click();
     await page.getByTestId('wizard-area').selectOption('sales');
     await page.getByTestId('wizard-report-orders').check();
-    await page.getByTestId('wizard-next').click();
     await page.getByTestId('wizard-period-all').click();
-    await page.getByTestId('wizard-next').click();
-    await page.getByTestId('wizard-next').click();
     await page.getByTestId('wizard-format-csv').click();
-    await page.getByTestId('wizard-next').click();
     await expect(page.getByTestId('preview-records')).toContainText('registo(s)');
 
     const downloadDataset = page.waitForEvent('download');
@@ -151,13 +147,13 @@ test.describe('Segurança, Relatórios e Exportação', () => {
     await expect(historyTable.getByText(/\.csv/).first()).toBeVisible();
   });
 
-  test('navegação entre Segurança, Relatórios, Configurações e Exportação mantém o módulo correto', async ({ page }) => {
+  test('navegação entre Segurança, Relatórios, Configurações e Exportação integrada mantém o módulo correto', async ({ page }) => {
     await signIn(page, BUSINESS_EMAIL);
     await openBusinessDashboard(page);
 
     await openNav(page, 'Relatórios');
-    await expect(page.getByRole('button', { name: 'Abrir Exportação' })).toBeVisible();
-    await page.getByRole('button', { name: 'Abrir Exportação' }).click();
+    await expect(page.getByRole('button', { name: 'Exportação de dados' })).toBeVisible();
+    await page.getByRole('button', { name: 'Exportação de dados' }).click();
     await expect(page.getByRole('heading', { name: 'Histórico de exportações' })).toBeVisible();
 
     await openNav(page, 'Segurança');

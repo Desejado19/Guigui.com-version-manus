@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from './fixtures';
+import { expect, patchApiContext, test, type APIRequestContext, type Page } from './fixtures';
 
 /**
  * Feed + localizações + interações: 11 cenários exigidos.
@@ -163,7 +163,7 @@ test.describe('Feed, localizações e interações', () => {
     await request.post(`/api/posts/${ownPost.id}/comments`, { data: { text: 'Métrica real' } });
     await request.post(`/api/posts/${ownPost.id}/share`);
 
-    const businessRequest = await playwright.request.newContext({ baseURL: BASE_URL });
+    const businessRequest = patchApiContext(await playwright.request.newContext({ baseURL: BASE_URL }));
     await login(businessRequest, BUSINESS);
     const metricsResponse = await businessRequest.get('/api/businesses/biz-1/post-metrics');
     expect(metricsResponse.ok(), await metricsResponse.text()).toBeTruthy();
@@ -181,7 +181,7 @@ test.describe('Feed, localizações e interações', () => {
     expect(foreign.status()).toBe(403);
     expect((await foreign.json()).code).toBe('BUSINESS_SCOPE_REQUIRED');
 
-    const citizenRequest = await playwright.request.newContext({ baseURL: BASE_URL });
+    const citizenRequest = patchApiContext(await playwright.request.newContext({ baseURL: BASE_URL }));
     await login(citizenRequest, CITIZEN);
     expect((await citizenRequest.get('/api/businesses/biz-1/post-metrics')).status()).toBe(403);
     await businessRequest.dispose();
@@ -194,10 +194,10 @@ test.describe('Feed, localizações e interações', () => {
     expect(anonymous.status()).toBe(401);
     expect((await page.request.post(`/api/posts/${postId}/share`)).status()).toBe(401);
 
-    const businessRequest = await playwright.request.newContext({ baseURL: BASE_URL });
+    const businessRequest = patchApiContext(await playwright.request.newContext({ baseURL: BASE_URL }));
     await login(businessRequest, BUSINESS);
 
-    const citizenRequest = await playwright.request.newContext({ baseURL: BASE_URL });
+    const citizenRequest = patchApiContext(await playwright.request.newContext({ baseURL: BASE_URL }));
     await login(citizenRequest, CITIZEN);
     await citizenRequest.post(`/api/posts/${postId}/reaction`, { data: { reaction: 'like' } });
     await citizenRequest.post(`/api/posts/${postId}/reaction`, { data: { reaction: 'like' } });

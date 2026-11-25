@@ -1,4 +1,4 @@
-import { expect, request as playwrightRequest, test, type Page } from './fixtures';
+import { expect, patchApiContext, request as playwrightRequest, test, type Page } from './fixtures';
 
 /**
  * Barra de navegação inferior do cidadão (mobile).
@@ -108,7 +108,7 @@ test.describe('Barra de navegação inferior mobile', () => {
     await loginThroughUi(page);
 
     // Revoga a sessão no servidor, como um administrador a suspender a conta.
-    const api = await playwrightRequest.newContext({ baseURL });
+    const api = patchApiContext(await playwrightRequest.newContext({ baseURL }));
     const login = await api.post('/api/auth/login', { data: { email: CITIZEN_EMAIL, password: DEMO_PASSWORD } });
     expect(login.ok()).toBeTruthy();
     expect((await api.post('/api/auth/sessions/revoke-all')).ok()).toBeTruthy();

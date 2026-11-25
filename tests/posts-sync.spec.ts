@@ -1,4 +1,5 @@
-import { expect, test, type Page } from './fixtures';
+import type { APIRequestContext } from '@playwright/test';
+import { expect, patchApiContext, test, type Page } from './fixtures';
 
 /**
  * SINCRONIZAÇÃO GLOBAL DAS PUBLICAÇÕES E INTERAÇÕES.
@@ -13,6 +14,67 @@ const DEMO_PASSWORD = 'Guigui@2026!';
 const CITIZEN = 'cidadao.teste@guigui.com';
 const SECOND_CITIZEN = 'cidadao.seed02@guigui.test';
 const SEED_PASSWORD = 'Guigui2026!';
+const ADMIN = 'admin.teste@guigui.com';
+
+// A empresa de demonstração é a primeira da seed (scripts/seed-demo-dataset.ts):
+// Cantina Sabores de Bandim (seed-co-01). A seed não traz publicações de empresa,
+// por isso o próprio teste garante (e no fim remove) a publicação que sincroniza.
+const SEED_BUSINESS_ID = 'seed-co-01';
+const SEED_BUSINESS_NAME = 'Cantina Sabores de Bandim';
+const SYNC_POST = {
+  id: 'post-pw-sync-seed-co-01',
+  title: 'Publicação de teste sincronizada',
+  content: 'Conteúdo criado pelo teste de sincronização feed/ficha.',
+  status: 'approved',
+};
+
+interface SeedPost {
+  id: string;
+}
+
+/**
+ * Grava (ou remove, com `post` nulo) a publicação de teste na ficha da empresa da
+ * seed, autenticado como administração. A gravação passa pela API da aplicação
+ * para atingir exatamente a base de dados do servidor em teste.
+ */
+async function writeSeedPost(request: APIRequestContext, post: typeof SYNC_POST | null) {
+  const login = await request.post('/api/auth/login', { data: { email: ADMIN, password: SEED_PASSWORD } });
+  expect(login.ok(), 'a conta de administração deve autenticar').toBeTruthy();
+
+  let business: Record<string, unknown> | undefined;
+  for (let offset = 0; offset < 500; offset += 100) {
+    const response = await request.get(`/api/businesses?limit=100&offset=${offset}`);
+    expect(response.ok()).toBeTruthy();
+    const payload = await response.json() as { businesses: Array<Record<string, unknown>>; pagination?: { hasMore?: boolean } };
+    business = payload.businesses.find((entry) => entry.id === SEED_BUSINESS_ID);
+    if (business || !payload.pagination?.hasMore) break;
+  }
+  expect(business, `a empresa ${SEED_BUSINESS_NAME} deve existir na seed`).toBeTruthy();
+
+  const current = Array.isArray(business!.posts) ? (business!.posts as SeedPost[]) : [];
+  const posts = post
+    ? [...current.filter((entry) => entry.id !== post.id), {
+      ...post,
+      businessId: SEED_BUSINESS_ID,
+      businessName: SEED_BUSINESS_NAME,
+      neighborhood: typeof business!.neighborhood === 'string' ? business!.neighborhood : 'Bandim',
+      createdAt: new Date().toISOString(),
+    }]
+    : current.filter((entry) => entry.id !== SYNC_POST.id);
+  // A gravação substitui as colunas enviadas: a categoria tem de viajar no
+  // corpo, senão a ficha da empresa ficava sem categoria no directório.
+  const categoryId = typeof business!.categoryId === 'string' ? business!.categoryId : null;
+  const write = await request.post('/api/businesses', {
+    data: {
+      id: SEED_BUSINESS_ID,
+      name: typeof business!.name === 'string' ? business!.name : SEED_BUSINESS_NAME,
+      status: business!.status,
+      categoryId,
+      posts,
+    },
+  });
+  expect(write.ok(), 'a publicação de teste deve ser gravada na empresa da seed').toBeTruthy();
+}
 
 async function signIn(page: Page, email: string, password = DEMO_PASSWORD) {
   for (let attempt = 0; attempt <= 3; attempt += 1) {
@@ -56,8 +118,8 @@ async function feedPost(page: Page): Promise<FeedPost> {
   const response = await page.request.get('/api/posts');
   expect(response.ok()).toBeTruthy();
   const payload = await response.json() as { posts: FeedPost[] };
-  const post = payload.posts.find((entry) => Boolean(entry.businessId) && entry.title && entry.status === 'approved');
-  expect(post, 'deve existir uma publicação de empresa aprovada no feed').toBeTruthy();
+  const post = payload.posts.find((entry) => entry.businessId === SEED_BUSINESS_ID && entry.title && entry.status === 'approved');
+  expect(post, `deve existir uma publicação aprovada de ${SEED_BUSINESS_NAME} no feed`).toBeTruthy();
   return post as FeedPost;
 }
 
@@ -93,6 +155,14 @@ async function closeProfile(page: Page) {
 }
 
 test.describe('Publicações sincronizadas entre Feed e Ficha', () => {
+  test.beforeAll(async ({ request }) => {
+    await writeSeedPost(request, SYNC_POST);
+  });
+
+  test.afterAll(async ({ request }) => {
+    await writeSeedPost(request, null);
+  });
+
   test.beforeEach(async ({ page }) => {
     await signIn(page, CITIZEN);
   });
@@ -230,6 +300,8 @@ test.describe('Publicações sincronizadas entre Feed e Ficha', () => {
 
     const otherContext = await browser.newContext();
     const otherPage = await otherContext.newPage();
+    // Um contexto novo não herda a fixture que injeta o token CSRF.
+    patchApiContext(otherPage.request);
     try {
       await signIn(otherPage, SECOND_CITIZEN, SEED_PASSWORD);
       await openFeed(otherPage);
@@ -247,6 +319,8 @@ test.describe('Publicações sincronizadas entre Feed e Ficha', () => {
 
     const otherContext = await browser.newContext();
     const otherPage = await otherContext.newPage();
+    // Um contexto novo não herda a fixture que injeta o token CSRF.
+    patchApiContext(otherPage.request);
     try {
       await signIn(otherPage, SECOND_CITIZEN, SEED_PASSWORD);
       await openFeed(otherPage);

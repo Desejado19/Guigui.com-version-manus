@@ -56,7 +56,7 @@ interface CitizenDashboardProps {
   onOpenNotification?: (notification: AppNotification) => void;
   notificationPreferences?: NotificationPreferences;
   onNotificationPreferencesChange?: (next: NotificationPreferences) => void;
-  onProfileChange?: (profile: Partial<UserProfile>) => void;
+  onProfileChange?: (profile: Partial<UserProfile>) => void | Promise<void>;
   onDeactivateAccount?: () => Promise<void>;
   onDeleteAccount?: () => Promise<void>;
   sidebarCollapsed?: boolean;
@@ -162,6 +162,7 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
     avatarUrl: currentUser.avatarUrl,
   });
   const [profileSaved, setProfileSaved] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState('');
   const [privacySettings, setPrivacySettings] = useState(currentUser.privacySettings || {
     privateProfile: true,
@@ -175,7 +176,7 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
   const [csrfToken, setCsrfToken] = useState<string>('');
   useEffect(() => {
     const cookieHeader = document.cookie || '';
-    const csrfMatch = cookieHeader.match(/(?:^|;\s*)csrf=([^;]+)/);
+          const csrfMatch = cookieHeader.match(/(?:^|;\s*)_csrf=([^;]+)/);
     if (csrfMatch) {
       setCsrfToken(csrfMatch[1]);
     }
@@ -271,18 +272,46 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
       setProfileError('A fotografia deve ter no máximo 5 MB.');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result !== 'string') {
-        setProfileError('Não foi possível carregar a fotografia.');
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      const maxSide = 512;
+      const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      const context = canvas.getContext('2d');
+      URL.revokeObjectURL(objectUrl);
+      if (!context) {
+        setProfileError('Não foi possível preparar a fotografia.');
         return;
       }
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
       setProfileError('');
-      setProfileForm((current) => ({ ...current, avatarUrl: result }));
+      setProfileForm((current) => ({ ...current, avatarUrl: canvas.toDataURL('image/jpeg', 0.86) }));
     };
-    reader.onerror = () => setProfileError('Não foi possível carregar a fotografia.');
-    reader.readAsDataURL(file);
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      setProfileError('Não foi possível carregar a fotografia.');
+    };
+    image.src = objectUrl;
+  };
+
+  const handleProfileSave = async () => {
+    if (!onProfileChange) return;
+    setProfileError('');
+    setProfileSaving(true);
+    try {
+      await onProfileChange(profileForm);
+      setProfileSaved(true);
+      window.setTimeout(() => setProfileSaved(false), 2500);
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : 'Não foi possível guardar os dados.');
+    } finally {
+      setProfileSaving(false);
+    }
   };
 
   const renderOrderCard = (order: PurchaseOrder, isTicket = false) => (
@@ -536,8 +565,6 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
 
           <section className="space-y-4" aria-labelledby="citizen-dashboard-title">
             <div className="relative overflow-hidden rounded-2xl bg-[var(--color-bg-surface-dark)] px-4 py-4 text-white shadow-xl sm:px-6 sm:py-5">
-              <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[var(--color-blue-500)]/20 blur-3xl" />
-              <div className="absolute -bottom-24 left-1/3 h-48 w-48 rounded-full bg-[var(--color-amber-400)]/15 blur-3xl" />
               <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
                   <div className="relative shrink-0">
@@ -711,7 +738,7 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
       </div>}
 
       {section === 'account-profile' && accountProfileTab === 'profile' && <div className="space-y-5">
-        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4"><div className="flex items-start gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-blue-100)] text-[var(--color-blue-700)] dark:bg-[var(--color-blue-950)]/40 dark:text-[var(--color-blue-300)]"><UserRound className="h-5 w-5" /></div><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-green-600)]">{t('citizen.citizenData')}</p><h2 className="mt-1 text-base sm:text-lg font-black text-[var(--color-text-strong)]">{t('citizen.personalSettings')}</h2><p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">{t('citizen.citizenDataHint')}</p></div></div><div className="mt-5 grid gap-4 sm:grid-cols-2"><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)]">Nome<input value={profileForm.name} onChange={(event) => setProfileForm((current) => ({ ...current, name: event.target.value }))} className={fieldClass} /></label><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)]">Fotografia de perfil<input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarUpload} className={`${fieldClass} file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--color-green-600)] file:px-3 file:py-1.5 file:text-xs file:font-black file:text-white`} /><span className="mt-1 block text-[10px] font-semibold text-[var(--color-text-muted)]">{t('citizen.photoFormats')}</span>{profileForm.avatarUrl && <img src={profileForm.avatarUrl} alt={t('citizen.photoPreview')} className="mt-2 h-16 w-16 rounded-2xl object-cover" />}</label><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)]">E-mail<input type="email" value={profileForm.email} onChange={(event) => setProfileForm((current) => ({ ...current, email: event.target.value }))} className={fieldClass} /></label><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)]">Telefone<input value={profileForm.phone} onChange={(event) => setProfileForm((current) => ({ ...current, phone: event.target.value }))} className={fieldClass} /></label><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)] sm:col-span-2">{t('citizen.neighborhood')}<input value={profileForm.neighborhood} onChange={(event) => setProfileForm((current) => ({ ...current, neighborhood: event.target.value }))} className={fieldClass} /></label></div><button type="button" onClick={() => { onProfileChange?.(profileForm); setProfileSaved(true); window.setTimeout(() => setProfileSaved(false), 2500); }} className="mt-4 rounded-xl bg-[var(--color-green-600)] px-4 py-2.5 text-xs font-black text-white hover:bg-[var(--color-green-700)]">Guardar dados pessoais</button>{profileSaved && <span className="ml-3 text-xs font-bold text-[var(--color-emerald-600)]">Dados guardados.</span>}{profileError && <p className="mt-2 text-xs font-bold text-[var(--color-rose-600)]">{profileError}</p>}</div>
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4"><div className="flex items-start gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-blue-100)] text-[var(--color-blue-700)] dark:bg-[var(--color-blue-950)]/40 dark:text-[var(--color-blue-300)]"><UserRound className="h-5 w-5" /></div><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-green-600)]">{t('citizen.citizenData')}</p><h2 className="mt-1 text-base sm:text-lg font-black text-[var(--color-text-strong)]">{t('citizen.personalSettings')}</h2><p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">{t('citizen.citizenDataHint')}</p></div></div><div className="mt-5 grid gap-4 sm:grid-cols-2"><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)]">Nome<input value={profileForm.name} onChange={(event) => setProfileForm((current) => ({ ...current, name: event.target.value }))} className={fieldClass} /></label><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)]">Fotografia de perfil<input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarUpload} className={`${fieldClass} file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--color-green-600)] file:px-3 file:py-1.5 file:text-xs file:font-black file:text-white`} /><span className="mt-1 block text-[10px] font-semibold text-[var(--color-text-muted)]">{t('citizen.photoFormats')}</span>{profileForm.avatarUrl && <img src={profileForm.avatarUrl} alt={t('citizen.photoPreview')} className="mt-2 h-16 w-16 rounded-2xl object-cover" />}</label><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)]">E-mail<input type="email" value={profileForm.email} onChange={(event) => setProfileForm((current) => ({ ...current, email: event.target.value }))} className={fieldClass} /></label><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)]">Telefone<input value={profileForm.phone} onChange={(event) => setProfileForm((current) => ({ ...current, phone: event.target.value }))} className={fieldClass} /></label><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)] sm:col-span-2">{t('citizen.neighborhood')}<input value={profileForm.neighborhood} onChange={(event) => setProfileForm((current) => ({ ...current, neighborhood: event.target.value }))} className={fieldClass} /></label></div><button type="button" onClick={() => void handleProfileSave()} disabled={profileSaving} className="mt-4 rounded-xl bg-[var(--color-green-600)] px-4 py-2.5 text-xs font-black text-white hover:bg-[var(--color-green-700)] disabled:opacity-60">{profileSaving ? 'A guardar...' : 'Guardar dados pessoais'}</button>{profileSaved && <span className="ml-3 text-xs font-bold text-[var(--color-emerald-600)]">Dados guardados.</span>}{profileError && <p className="mt-2 text-xs font-bold text-[var(--color-rose-600)]">{profileError}</p>}</div>
         <div className="grid gap-4 lg:grid-cols-2"><div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4"><div className="mb-4 flex items-center gap-2"><Ticket className="h-5 w-5 text-[var(--color-green-600)]" /><h2 className="text-base font-black text-[var(--color-text-strong)]">{t('citizen.ticketPreferences')}</h2></div><div className="flex flex-wrap gap-2">{(['digital', 'both'] as const).map((option) =>         <button key={option} type="button" onClick={() => { setTicketPreference(option); updateProfile({ ticketPreference: option }); }} className={`rounded-xl px-3 py-2 text-xs font-black ${ticketPreference === option ? 'bg-[var(--color-green-600)] text-white' : 'bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] dark:bg-[var(--color-bg-surface-dark)] dark:text-[var(--color-text-muted-dark)]'}`}>{option === 'digital' ? 'Bilhete digital' : 'Digital e comprovativo'}</button>)}</div></div><div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4"><div className="mb-4 flex items-center gap-2"><Heart className="h-5 w-5 text-[var(--color-rose-600)]" /><h2 className="text-base font-black text-[var(--color-text-strong)]">Favoritos e mensagens</h2></div><p className="text-xs leading-relaxed text-[var(--color-text-muted)]">{favoriteBusinesses.length ? `${favoriteBusinesses.length} empresa(s) seguida(s) na sua conta.` : 'Ainda não segue nenhuma empresa.'} As mensagens comerciais e pedidos de suporte permanecem separados.</p></div></div>
       </div>}
 

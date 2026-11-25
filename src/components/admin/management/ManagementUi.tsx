@@ -301,7 +301,7 @@ export const ManagementActionButton: React.FC<
   React.ButtonHTMLAttributes<HTMLButtonElement> & { tone?: 'neutral' | 'primary' | 'success' | 'danger' | 'warning' }
 > = ({ tone = 'neutral', className = '', children, ...rest }) => {
   const tones: Record<string, string> = {
-    neutral: 'border-[var(--color-border-default)] bg-white text-slate-700 hover:border-[var(--color-green-700)]',
+    neutral: 'border-[var(--color-border-default)] bg-white text-slate-700 hover:border-[var(--color-green-700)] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-emerald-500',
     primary: 'border-[var(--color-green-700)] bg-[var(--color-green-800)] text-white hover:bg-[#0c2f2c]',
     success: 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)] hover:bg-[var(--tone-success-bg)]',
     danger: 'border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)] hover:bg-[var(--tone-danger-bg)]',

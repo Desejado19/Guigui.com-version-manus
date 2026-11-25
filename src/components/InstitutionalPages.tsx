@@ -254,7 +254,7 @@ export const InstitutionalPages: React.FC<InstitutionalPagesProps> = ({ currentL
 
   const [contentBlocks, setContentBlocks] = useState<Record<string, Array<{ id: string; type: 'html' | 'list'; content: string }>>>({});
   const [publicServices, setPublicServices] = useState<Array<{ id: string; name: string; description: string; detailedDescription?: string; linkUrl?: string }>>([]);
-  const [publicDocuments, setPublicDocuments] = useState<Array<{ id: string; name: string; description?: string; content?: string; version?: string; category?: string; fileUrl?: string; publishedAt?: string }>>([]);
+  const [publicDocuments, setPublicDocuments] = useState<Array<{ id: string; name: string; slug?: string; description?: string; content?: string; version?: string; category?: string; fileUrl?: string; publishedAt?: string }>>([]);
   const [publicCommunications, setPublicCommunications] = useState<Array<{ id: string; title: string; type?: string; body: string; publishAt?: string; author?: string }>>([]);
   const [publicContacts, setPublicContacts] = useState<Array<{ id: string; label?: string; purpose?: string; email?: string; phone?: string; whatsapp?: string; address?: string; city?: string; hours?: string }>>([]);
   const [publicSocials, setPublicSocials] = useState<Array<{ id: string; label?: string; network?: string; url: string }>>([]);
@@ -308,6 +308,7 @@ export const InstitutionalPages: React.FC<InstitutionalPagesProps> = ({ currentL
             .map((doc) => ({
               id: doc.id,
               name: doc.name,
+              slug: doc.slug,
               description: doc.description,
               content: doc.content,
               version: doc.version,
@@ -746,11 +747,20 @@ export const InstitutionalPages: React.FC<InstitutionalPagesProps> = ({ currentL
 
           {publicDocuments.length > 0 ? (
             <div className="space-y-2">
-              <h3 className="text-[11px] font-black uppercase tracking-wide text-slate-500">Documentos oficiais</h3>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-[11px] font-black uppercase tracking-wide text-slate-500">Documentos oficiais</h3>
+                <a href="/politicas" className="text-[10.5px] font-bold text-blue-700 hover:underline dark:text-blue-300">Ver todas as políticas</a>
+              </div>
               {publicDocuments.map((doc) => (
                 <details key={doc.id} className="rounded-2xl border border-[var(--color-border-subtle)] p-3 dark:border-slate-700">
                   <summary className="cursor-pointer text-[12px] font-black text-slate-900 dark:text-white">
-                    {doc.name}
+                    <a
+                      href={`/politicas/${encodeURIComponent(doc.slug || doc.id)}`}
+                      className="hover:underline"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {doc.name}
+                    </a>
                     {doc.version ? <span className="ml-2 text-[10px] font-bold text-slate-500">v{doc.version}</span> : null}
                   </summary>
                   {doc.description ? <p className="mt-2 text-[11.5px] text-slate-600 dark:text-slate-300">{doc.description}</p> : null}

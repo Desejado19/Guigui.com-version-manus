@@ -31,7 +31,7 @@ X-CSRF-Token: <token-value>
 _csrf=<token-value>
 ```
 
-The server reads the token from **either** the `X-CSRF-Token` header **or** the `_csrf` cookie field. The frontend must send the token in the header while the server also checks the cookie for the double-submit pattern.
+O servidor emite o cookie `_csrf` automaticamente em qualquer pedido (ou em `GET /api/csrf`, que devolve `{ csrfToken }`). Em métodos que alteram estado exige **os dois**: o cookie `_csrf` e o cabeçalho `X-CSRF-Token` com exatamente o mesmo valor. O `Origin` (ou, na sua falta, o `Referer`) também tem de pertencer ao próprio site. O único pedido dispensado é `POST /api/payments/webhook/:provider`, autenticado pela assinatura HMAC do fornecedor.
 
 ---
 
@@ -45,7 +45,7 @@ On page load, read the `_csrf` cookie:
 // Example: CitizenDashboard.tsx
 useEffect(() => {
   const cookieHeader = document.cookie || '';
-  const csrfMatch = cookieHeader.match(/(?:^|;\\s*)csrf=([^;]+)/);
+  const csrfMatch = cookieHeader.match(/(?:^|;\\s*)_csrf=([^;]+)/);
   if (csrfMatch) {
     // Store token in state for use in API calls
     setCsrfToken(csrfMatch[1]);
@@ -129,14 +129,13 @@ Without `credentials: 'include'`, the `_csrf` cookie won't be transmitted and th
 
 ## Rate Limiting
 
-API requests are rate-limited per IP:
+A API global é limitada por IP. Além disso, existem baldes distribuídos por conta em `rate_limit_buckets`:
 
-- **Development:** 30,000 requests per 30 seconds
-- **Production:** 1,000 requests per 30 seconds
+- **Login:** 10 tentativas falhadas por 15 minutos; um login bem-sucedido limpa o balde.
+- **Lookup de bilhetes:** 5 tentativas por 10 minutos, por telefone.
+- **Reset de palavra-passe:** 5 pedidos por 15 minutos, por e-mail; e 5 tentativas por 15 minutos por token.
 
-Exempt from rate limiting:
-- `/api/app-state/` prefix (batch read operations)
-- `GET`, `HEAD`, `OPTIONS` methods
+O IP usado é `req.ip`, respeitando `TRUST_PROXY` (por omissão `loopback` em desenvolvimento e `1` em produção).
 
 Exceeding the limit returns:
 

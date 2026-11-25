@@ -1,3 +1,92 @@
+export interface TicketFinanceTotals {
+  grossXOF: number;
+  commissionXOF: number;
+  netXOF: number;
+  paidOutXOF: number;
+  processingXOF: number;
+  pendingPayoutXOF: number;
+  paidOrders: number;
+  pendingOrders: number;
+  pendingOrdersXOF: number;
+  failedOrders: number;
+  failedOrdersXOF: number;
+  refundedOrders: number;
+  refundedOrdersXOF: number;
+  unlinkedTransactionsCount: number;
+  unlinkedTransactionsXOF: number;
+  eventsWithRevenue: number;
+  companiesWithRevenue: number;
+}
+
+export interface TicketFinanceEvent {
+  eventId: string;
+  eventTitle: string;
+  companyId: string | null;
+  companyName: string | null;
+  grossXOF: number;
+  commissionXOF: number;
+  netXOF: number;
+  paidOutXOF: number;
+  processingXOF: number;
+  pendingPayoutXOF: number;
+  paidOrders: number;
+}
+
+export interface EventPayout {
+  id: string;
+  companyId: string;
+  companyName: string;
+  eventId: string | null;
+  eventTitle: string | null;
+  amountXOF: number;
+  currency: string;
+  method: 'manual_transfer' | 'orange_money' | 'telecel' | 'bank_transfer';
+  methodLabel: string;
+  reference: string | null;
+  proofReference: string | null;
+  status: 'pending' | 'processing' | 'confirmed' | 'failed' | 'cancelled';
+  statusLabel: string;
+  notes: string | null;
+  createdBy: string | null;
+  createdByName: string | null;
+  confirmedBy: string | null;
+  confirmedByName: string | null;
+  confirmedAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface TicketFinanceOverview {
+  scope: 'platform' | 'company';
+  companyId: string | null;
+  totals: TicketFinanceTotals;
+  events: TicketFinanceEvent[];
+  companies: Array<{
+    companyId: string;
+    companyName: string;
+    grossXOF: number;
+    commissionXOF: number;
+    netXOF: number;
+    paidOutXOF: number;
+    processingXOF: number;
+    pendingPayoutXOF: number;
+    events: number;
+  }>;
+  providers: Array<{ provider: string; providerLabel: string; transactions: number; amountXOF: number }>;
+  unlinkedTransactions?: Array<{
+    id: string;
+    provider: string;
+    providerLabel: string;
+    providerReference: string | null;
+    amountXOF: number;
+    payerName: string;
+    payerPhone: string;
+    createdAt: string | null;
+    confirmedAt: string | null;
+  }>;
+  generatedAt: string;
+}
+
 export interface FinanceSummary {
   platform: {
     transactionCount: number;
@@ -25,6 +114,7 @@ export interface FinanceSummary {
     revenueXOF: number;
     refundedXOF: number;
   };
+  ticketFinance: TicketFinanceOverview;
   scopeAudit: {
     ordersPaidCount: number;
     ordersPaidXOF: number;

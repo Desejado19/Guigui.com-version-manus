@@ -1,4 +1,4 @@
-import { expect, request as playwrightRequest, test, type Page } from './fixtures';
+import { expect, patchApiContext, request as playwrightRequest, test, type Page } from './fixtures';
 
 const DEMO_PASSWORD = 'Guigui@2026!';
 const BUSINESS_EMAIL = 'empresa.teste@guigui.com';
@@ -6,11 +6,20 @@ const MEMBER_PASSWORD = 'Colab@2026!';
 
 async function signIn(page: Page, email: string, password = DEMO_PASSWORD): Promise<Record<string, unknown>> {
   const response = await page.request.post('/api/auth/login', { data: { email, password } });
-  expect(response.ok()).toBeTruthy();
+  expect(response.ok(), await response.text()).toBeTruthy();
   const payload = await response.json();
   await page.addInitScript((account) => {
     window.localStorage.setItem('guigui_current_user', JSON.stringify(account));
     window.localStorage.setItem('guigui_current_lang', JSON.stringify('pt'));
+    // Contextos de browser criados manualmente não passam pela fixture que
+    // dispensa o WelcomeTour; repetir aqui mantém o teste sobre o painel.
+    const originalGetItem = Storage.prototype.getItem;
+    Storage.prototype.getItem = function getItem(key: string) {
+      if (typeof key === 'string' && key.startsWith('guigui_onboarding_v1')) {
+        return JSON.stringify({ status: 'skipped', step: 0 });
+      }
+      return originalGetItem.call(this, key);
+    };
   }, payload.user);
   return payload.user as Record<string, unknown>;
 }
@@ -42,7 +51,7 @@ test.describe('Gestão de utilizadores, acessos e permissões', () => {
         password: MEMBER_PASSWORD,
         jobTitle: 'Marketing',
         role: 'marketing',
-        access: { overview: ['view'], marketing: ['view', 'create'], content: ['view'] },
+        access: { overview: ['view'], stories: ['view', 'create'], content: ['view'] },
       },
     });
     expect(created.status()).toBe(201);
@@ -56,14 +65,14 @@ test.describe('Gestão de utilizadores, acessos e permissões', () => {
     expect(duplicate.status()).toBe(409);
 
     // Contexto próprio do colaborador para verificar sessão e permissões reais.
-    const memberContext = await playwrightRequest.newContext({
+    const memberContext = patchApiContext(await playwrightRequest.newContext({
       baseURL: (test.info().project.use as { baseURL?: string }).baseURL,
-    });
+    }));
     const memberLogin = await memberContext.post('/api/auth/login', { data: { email, password: MEMBER_PASSWORD } });
     expect(memberLogin.ok()).toBeTruthy();
     const memberAccess = await (await memberContext.get('/api/me/access')).json();
     expect(memberAccess.fullAccess).toBe(false);
-    expect(Object.keys(memberAccess.access).sort()).toEqual(['content', 'marketing', 'overview']);
+    expect(Object.keys(memberAccess.access).sort()).toEqual(['content', 'overview', 'stories']);
     expect(memberAccess.access.tickets).toBeUndefined();
 
     // Sem permissão: bilhetes, financeiro e equipa bloqueados no backend.
@@ -142,7 +151,8 @@ test.describe('Gestão de utilizadores, acessos e permissões', () => {
     const members = await (await page.request.get('/api/business/team/members')).json();
     const member = members.members.find((entry: { email: string }) => entry.email === email);
     expect(member).toBeTruthy();
-    expect(Object.keys(member.access)).toContain('marketing');
+    expect(Object.keys(member.access)).toContain('stories');
+    expect(Object.keys(member.access)).not.toContain('marketing');
     expect(member.access.tickets).toBeUndefined();
     expect(member.status).toBe('active');
 
@@ -173,7 +183,7 @@ test.describe('Gestão de utilizadores, acessos e permissões', () => {
         password: MEMBER_PASSWORD,
         jobTitle: 'Conteúdo',
         role: 'marketing',
-        access: { overview: ['view'], stories: ['view', 'create'], content: ['view', 'create'], marketing: ['view', 'create'] },
+        access: { overview: ['view'], stories: ['view', 'create'], content: ['view', 'create'] },
       },
     });
     expect(created.status()).toBe(201);
@@ -181,11 +191,12 @@ test.describe('Gestão de utilizadores, acessos e permissões', () => {
 
     const context = await browser.newContext();
     const page = await context.newPage();
+    patchApiContext(page.request);
     await signIn(page, email, MEMBER_PASSWORD);
     await openBusinessDashboard(page);
 
     const sidebar = page.locator('aside').first();
-    await expect(sidebar.getByRole('button', { name: 'Marketing', exact: true })).toBeVisible();
+    await expect(sidebar.getByRole('button', { name: 'Marketing', exact: true })).toHaveCount(0);
     await expect(sidebar.getByRole('button', { name: 'Stories', exact: true })).toBeVisible();
     await expect(sidebar.getByRole('button', { name: 'Bilhetes', exact: true })).toHaveCount(0);
     await expect(sidebar.getByRole('button', { name: 'Clientes', exact: true })).toHaveCount(0);
@@ -195,8 +206,8 @@ test.describe('Gestão de utilizadores, acessos e permissões', () => {
     await expect(sidebar.getByRole('button', { name: 'Segurança', exact: true })).toHaveCount(0);
 
     // Módulo autorizado abre normalmente.
-    await page.getByRole('button', { name: 'Marketing', exact: true }).first().click();
-    await expect(page.getByRole('tab', { name: 'Campanhas' })).toBeVisible({ timeout: 20_000 });
+    await page.getByRole('button', { name: 'Stories', exact: true }).first().click();
+    await expect(page.getByText('Gestão de Stories').first()).toBeVisible({ timeout: 20_000 });
 
     // Acesso directo à API de um módulo bloqueado é recusado no servidor.
     const forbidden = await page.request.get('/api/payments/transactions');
@@ -206,5 +217,15 @@ test.describe('Gestão de utilizadores, acessos e permissões', () => {
     await context.close();
     await request.delete(`/api/business/team/members/${memberId}`);
     await request.post('/api/auth/login', { data: { email: BUSINESS_EMAIL, password: DEMO_PASSWORD } });
+  });
+
+  test('o painel da empresa não expõe o módulo de Marketing', async ({ page }) => {
+    await signIn(page, BUSINESS_EMAIL);
+    await openBusinessDashboard(page);
+
+    const sidebar = page.locator('aside').first();
+    await expect(sidebar.getByRole('button', { name: 'Marketing', exact: true })).toHaveCount(0);
+    await expect(page.getByTestId('business-bottom-nav').getByRole('button', { name: 'Marketing', exact: true })).toHaveCount(0);
+    await expect(sidebar.getByRole('button', { name: 'Stories', exact: true })).toBeVisible();
   });
 });

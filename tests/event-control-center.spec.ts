@@ -123,7 +123,7 @@ test.describe('Centro de controlo do evento — API', () => {
     expect(other).toBeTruthy();
 
     const filtered = await page.request.get(
-      `/api/events/${OWN_EVENT}/control-center/export?format=csv&sections=buyers&q=${encodeURIComponent(first.orderId)}`,
+      `/api/events/${OWN_EVENT}/control-center/export?format=csv&sections=buyers&buyerQuery=${encodeURIComponent(first.orderId)}`,
     );
     expect(filtered.ok(), await filtered.text()).toBeTruthy();
     const csv = (await filtered.body()).toString('utf8');
@@ -138,6 +138,68 @@ test.describe('Centro de controlo do evento — API', () => {
     const acceptedCsv = (await accepted.body()).toString('utf8');
     expect(acceptedCsv).not.toContain('rejected');
     expect(acceptedCsv).not.toContain('"rejeitada"');
+  });
+
+  test('exportação de bilhetes aplica estado e pesquisa e documenta os filtros', async ({ page }) => {
+    await signIn(page, BUSINESS);
+    const snapshot = await page.request.get(`/api/events/${OWN_EVENT}/control-center`);
+    expect(snapshot.ok(), await snapshot.text()).toBeTruthy();
+    const { data } = await snapshot.json();
+    const used = data.tickets.find((ticket: { status: string }) => ticket.status === 'used');
+    const valid = data.tickets.find((ticket: { status: string }) => ticket.status === 'valid');
+    expect(used).toBeTruthy();
+    expect(valid).toBeTruthy();
+
+    const filtered = await page.request.get(
+      `/api/events/${OWN_EVENT}/control-center/export?format=csv&sections=tickets&ticketStatus=used&ticketQuery=${encodeURIComponent(used.ticketCode)}`,
+    );
+    expect(filtered.ok(), await filtered.text()).toBeTruthy();
+    const csv = (await filtered.body()).toString('utf8');
+    expect(csv).toContain(used.ticketCode);
+    if (valid) expect(csv).not.toContain(valid.ticketCode);
+    // O detalhe filtrado substitui a lista completa, mas mantém o resumo por tipo.
+    expect(csv).toContain('Bilhetes (detalhe filtrado)');
+    expect(csv).toContain('Bilhetes (por tipo)');
+    // O relatório declara o âmbito usado.
+    expect(csv).toContain('Filtros aplicados');
+    expect(csv).toContain('Pesquisa de bilhetes');
+    expect(csv).toContain('Estado do bilhete');
+    expect(csv).toContain('Utilizado');
+  });
+
+  test('cada pesquisa filtra apenas a sua lista na exportação', async ({ page }) => {
+    await signIn(page, BUSINESS);
+    const snapshot = await page.request.get(`/api/events/${OWN_EVENT}/control-center`);
+    expect(snapshot.ok(), await snapshot.text()).toBeTruthy();
+    const { data } = await snapshot.json();
+    const ticket = data.tickets[0];
+    const buyer = data.buyers[0];
+    const otherBuyer = data.buyers.find(
+      (candidate: { orderId: string }) => candidate.orderId !== buyer.orderId,
+    );
+    expect(ticket).toBeTruthy();
+    expect(otherBuyer).toBeTruthy();
+
+    // A pesquisa de bilhetes não pode filtrar nem esvaziar a lista de compradores.
+    const ticketSearch = await page.request.get(
+      `/api/events/${OWN_EVENT}/control-center/export?format=csv&sections=tickets,buyers&ticketQuery=${encodeURIComponent(ticket.ticketCode)}`,
+    );
+    expect(ticketSearch.ok(), await ticketSearch.text()).toBeTruthy();
+    const ticketCsv = (await ticketSearch.body()).toString('utf8');
+    expect(ticketCsv).toContain(ticket.ticketCode);
+    expect(ticketCsv).toContain(otherBuyer.orderId);
+    expect(ticketCsv).toContain('Pesquisa de bilhetes');
+    expect(ticketCsv).toContain('Pesquisa de compradores');
+
+    // A pesquisa de compradores restringe os compradores, mas não os bilhetes.
+    const buyerSearch = await page.request.get(
+      `/api/events/${OWN_EVENT}/control-center/export?format=csv&sections=tickets,buyers&buyerQuery=${encodeURIComponent(buyer.orderId)}`,
+    );
+    expect(buyerSearch.ok(), await buyerSearch.text()).toBeTruthy();
+    const buyerCsv = (await buyerSearch.body()).toString('utf8');
+    expect(buyerCsv).toContain(buyer.orderId);
+    expect(buyerCsv).not.toContain(otherBuyer.orderId);
+    expect(buyerCsv).toContain(ticket.ticketCode);
   });
 
   test('formato de exportação inválido é rejeitado', async ({ page }) => {
@@ -205,7 +267,7 @@ test.describe('Centro de controlo do evento — painel', () => {
       document.querySelectorAll('[role="dialog"][aria-labelledby="welcome-tour-title"]').forEach((node) => node.remove());
     });
 
-    await page.getByRole('button', { name: 'Eventos & Bilhetes', exact: true }).first().click();
+    await page.getByRole('button', { name: /Eventos e Bilhetes/ }).first().click();
     // O módulo abre primeiro o hub com os dois submódulos (Eventos / Bilhetes).
     await page.getByRole('button').filter({ hasText: /Eventos/ }).filter({ hasNotText: /Bilhetes/ }).last().click();
     await expect(page.getByText(/Gestão de eventos/i).first()).toBeVisible({ timeout: 20000 });

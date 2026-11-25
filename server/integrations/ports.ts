@@ -59,6 +59,13 @@ export interface TicketPurchaseEmailInput {
   tickets: TicketForValidation[];
 }
 
+export interface PasswordResetEmailInput {
+  recipientEmail: string;
+  recipientName: string;
+  token: string;
+  expiresInMinutes?: number;
+}
+
 export interface TeamInvitationEmailInput {
   invitationId: string;
   recipientEmail: string;
@@ -81,6 +88,7 @@ export interface SmsDeliveryInput {
 export interface EmailDeliveryPort {
   sendTicketPurchase(input: TicketPurchaseEmailInput): Promise<IntegrationDeliveryResult>;
   sendTeamInvitation(input: TeamInvitationEmailInput): Promise<IntegrationDeliveryResult>;
+  sendPasswordReset(input: PasswordResetEmailInput): Promise<IntegrationDeliveryResult>;
 }
 
 export interface SmsDeliveryPort {

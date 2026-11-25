@@ -23,6 +23,50 @@ let baseUrl: string;
 let auth: typeof import('../../server/modules/identity-access/infrastructure/jsonIdentityRepository');
 let businessService: typeof import('../../server/postgresBusinessService');
 
+// Contrato CSRF da aplicação: métodos que alteram estado exigem `Origin`, o
+// cookie `_csrf` e o cabeçalho `X-CSRF-Token` com o mesmo valor (duplo envio).
+// Os testes falam com o servidor por `fetch` cru, sem o jar nem o wrapper da
+// SPA, por isso o contrato é aplicado aqui — sem ele a API responde
+// 403 CSRF_ORIGIN_MISSING/CSRF_TOKEN_MISSING e nenhuma rota chega a correr.
+const rawFetch = globalThis.fetch;
+const CSRF_COOKIE_PATTERN = /(?:^|;\s*)_csrf=/;
+let csrfToken = '';
+let restoreFetch: (() => void) | undefined;
+
+async function fetchCsrfToken(): Promise<string> {
+  if (csrfToken) return csrfToken;
+  const response = await rawFetch(`${baseUrl}/api/csrf`);
+  const payload = await response.json().catch(() => ({})) as { csrfToken?: string };
+  csrfToken = typeof payload.csrfToken === 'string' ? payload.csrfToken : '';
+  return csrfToken;
+}
+
+async function withCsrfContract(init: RequestInit | undefined): Promise<RequestInit | undefined> {
+  const method = String(init?.method || 'GET').toUpperCase();
+  if (!init || ['GET', 'HEAD', 'OPTIONS'].includes(method)) return init;
+  const token = await fetchCsrfToken();
+  const headers = new Headers(init.headers);
+  headers.set('Origin', baseUrl);
+  if (token) {
+    headers.set('X-CSRF-Token', token);
+    const cookies = headers.get('Cookie') || '';
+    if (!CSRF_COOKIE_PATTERN.test(cookies)) {
+      headers.set('Cookie', [cookies, `_csrf=${token}`].filter(Boolean).join('; '));
+    }
+  }
+  return { ...init, headers };
+}
+
+function installCsrfContract(): () => void {
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : String((input as { url?: string })?.url ?? input);
+    if (!url.startsWith(baseUrl)) return original(input as never, init);
+    return original(input as never, await withCsrfContract(init));
+  }) as typeof globalThis.fetch;
+  return () => { globalThis.fetch = original; };
+}
+
 async function login(email: string, password: string): Promise<string> {
   const response = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST',
@@ -90,9 +134,11 @@ beforeAll(async () => {
   });
   const address = server.address() as AddressInfo;
   baseUrl = `http://127.0.0.1:${address.port}`;
+  restoreFetch = installCsrfContract();
 }, 30_000);
 
 afterAll(async () => {
+  restoreFetch?.();
   if (server) await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   fs.rmSync(tempDir, { recursive: true, force: true });
 });
@@ -191,7 +237,7 @@ describe('identity credential routes', () => {
     })).status).toBe(200);
   });
 
-  it('keeps reset responses generic in production and consumes valid tokens once', async () => {
+  it('only reports recovery success after an accepted delivery and consumes valid tokens once', async () => {
     const email = 'credential-reset@test.guigui';
     auth.createUser({
       name: 'Credential Reset',
@@ -204,14 +250,17 @@ describe('identity credential routes', () => {
     const token = auth.createPasswordReset(email);
     expect(token).toBeTruthy();
 
+    // Sem fornecedor de email configurado o adaptador é simulado: o pedido não
+    // pode dizer que as instruções foram enviadas.
     const request = await postJson('/api/auth/request-password-reset', undefined, { email });
-    expect(request.status).toBe(200);
+    expect(request.status).toBe(503);
     const requestPayload = await request.json() as Record<string, unknown>;
-    expect(requestPayload).toMatchObject({
-      success: true,
-      message: 'Se existir uma conta com este e-mail, receberá instruções para recuperar a palavra-passe.',
-    });
+    expect(requestPayload).toMatchObject({ success: false, code: 'PASSWORD_RESET_DELIVERY_FAILED' });
     expect(requestPayload).not.toHaveProperty('resetToken');
+
+    const unknown = await postJson('/api/auth/request-password-reset', undefined, { email: 'unknown-reset@test.guigui' });
+    expect(unknown.status).toBe(200);
+    await expect(unknown.json()).resolves.toMatchObject({ success: true });
 
     const reset = await postJson('/api/auth/reset-password', undefined, {
       token,

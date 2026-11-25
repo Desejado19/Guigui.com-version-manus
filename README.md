@@ -167,7 +167,6 @@ A Área da Minha Empresa é aberta directamente pelo perfil empresarial e permit
     │   ├── admin/                   # Subcomponentes do Painel Admin
     │   │   ├── AdminAuditLogsHub.tsx      # Hub de Logs de Auditoria
 │   │   ├── AdminOverview.tsx          # Resumo executivo de métricas
-│   │   ├── AdminCapabilityHub.tsx     # Mapa completo de capacidades Super Admin
 │   │   ├── AdminReportsHub.tsx        # Hub de relatórios e exportações
 │   │   └── AdminStaffManagement.tsx   # Gestão de Administradores e papéis
     │   │

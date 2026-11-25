@@ -23,7 +23,8 @@ async function openExportHub(page: Page) {
   await page.getByTitle('Sessão Iniciada').click();
   await page.getByRole('button', { name: /Área da Minha Empresa/ }).first().click();
   await expect(page.locator('.guigui-profile-dashboard')).toBeVisible({ timeout: 30_000 });
-  await page.getByRole('button', { name: 'Exportação', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Relatórios', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Exportação de dados' }).click();
   await expect(page.getByTestId('prepare-export')).toBeVisible({ timeout: 20_000 });
 }
 
@@ -280,7 +281,8 @@ test.describe('Exportação guiada', () => {
     await expect(page.getByTitle('Sessão Iniciada')).toBeVisible({ timeout: 30_000 });
     await page.getByTitle('Sessão Iniciada').click();
     await page.getByRole('button', { name: /Área da Minha Empresa/ }).first().click();
-    await page.getByRole('button', { name: 'Exportação', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Relatórios', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Exportação de dados' }).click();
     await expect(page.getByTestId('prepare-export')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('export-history-table').locator('tbody tr').first()).toContainText('Suporte');
   });

@@ -500,7 +500,7 @@ export const FeedPostCard: React.FC<FeedPostCardProps> = ({
 
       {/* Inline Comments Section (desktop) */}
       {commentsOpen && !isMobileViewport && (
-        <div className="p-3.5 sm:p-4 bg-slate-50/80 space-y-3 text-xs">
+        <div className="p-3.5 sm:p-4 bg-slate-50 space-y-3 text-xs">
           {/* Comment Input */}
           <form onSubmit={handleAddComment} className="flex items-center gap-2">
             {currentUser?.avatarUrl ? (

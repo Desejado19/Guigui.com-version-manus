@@ -38,7 +38,6 @@ import {
   HelpCircle,
   RefreshCw,
   FileText,
-  SlidersHorizontal,
   ShieldAlert,
   Smartphone,
   Download,
@@ -69,10 +68,9 @@ import { AdminTeamHub } from './admin/AdminTeamHub';
 import { AdminAuditLogsHub } from './admin/AdminAuditLogsHub';
 import { AdminOverview } from './admin/AdminOverview';
 import { LocationCatalogAdmin } from './admin/LocationCatalogAdmin';
-import { AdminCapabilityHub } from './admin/AdminCapabilityHub';
 import { AdminPermissionsMatrix } from './admin/AdminPermissionsMatrix';
 import { AdminReportsHub } from './admin/AdminReportsHub';
-import { StoriesModerationPanel } from './admin/StoriesModerationPanel';
+import { SystemModule } from './admin/system/SystemModule';
 import { AdminSupportHub } from './admin/AdminSupportHub';
 import { SubscriptionPlansAdmin } from './admin/SubscriptionPlansAdmin';
 import { CommercialModule } from './admin/management/CommercialModule';
@@ -94,6 +92,7 @@ import { TicketsManagementPage } from './admin/management/TicketsManagementPage'
 import { TransactionsManagementPage } from './admin/management/TransactionsManagementPage';
 import { FinanceModule } from './admin/management/FinanceModule';
 import { FinanceTransactionsPage } from './admin/management/FinanceTransactionsPage';
+import { FinancePayoutsPage } from './admin/management/FinancePayoutsPage';
 import { FinanceReconciliationPage } from './admin/management/FinanceReconciliationPage';
 import { FinanceOperatorsPage } from './admin/management/FinanceOperatorsPage';
 import { FinancePendingPage } from './admin/management/FinancePendingPage';
@@ -151,7 +150,7 @@ import { DEFAULT_MONETIZATION_CATALOG } from '../data/monetizationCatalog';
 import { usePageEntryScroll } from '../utils/navigationBehavior';
 import { Badge, Button, Card, EmptyState, IconButton } from './ui';
 import { ADMIN_NAVIGATION } from '../config/navigation';
-import { GlassBottomNav } from './navigation/GlassBottomNav';
+import { BottomNav } from './navigation/BottomNav';
 import { ModuleSubnav } from './navigation/ModuleSubnav';
 
 interface AdminDashboardProps {
@@ -176,7 +175,7 @@ interface AdminDashboardProps {
   onReplySupport?: (requestId: string, text: string) => void;
   onUpdateSupportStatus?: (requestId: string, status: SupportRequest['status']) => void;
   focusSupportId?: string | null;
-  initialTab?: 'capabilities' | 'profile' | 'overview' | 'businesses' | 'moderation' | 'pricing' | 'categories' | 'roles' | 'admin_staff' | 'audit_logs' | 'events' | 'financials' | 'architecture' | 'reports' | 'notifications' | 'support' | 'external_email' | 'sobre-nos';
+  initialTab?: 'profile' | 'overview' | 'businesses' | 'moderation' | 'pricing' | 'categories' | 'roles' | 'admin_staff' | 'audit_logs' | 'events' | 'financials' | 'architecture' | 'reports' | 'notifications' | 'support' | 'external_email' | 'sobre-nos';
   currentUser?: UserProfile | null;
   onLogout?: () => void;
   sidebarCollapsed?: boolean;
@@ -339,7 +338,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         { label: t('admin.team'), tab: 'admin_staff', icon: UserCheck, help: t('adminNavStaffHelp') },
         { label: t('adminNavCategories'), tab: 'categories', icon: Tag, help: t('adminNavCategoriesHelp') },
         { label: t('adminNavSystem'), tab: 'architecture', icon: Server, help: t('adminNavSystemHelp') },
-        { label: t('adminNavGlobal'), tab: 'capabilities', icon: SlidersHorizontal, help: t('adminNavGlobalHelp') },
         { label: 'Identidade Institucional', tab: 'sobre-nos', icon: Building2, help: '21 submódulos: visão geral, identidade, conteúdo, serviços, contactos, media, políticas, comunicação, publicação e auditoria.' },
       ],
     },
@@ -358,14 +356,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const allAdminItems = adminNavigationGroups.flatMap((group) => group.items);
   const configuredAdminNavigation = ADMIN_NAVIGATION;
-  const [activeTab, setActiveTab] = useState<'capabilities' | 'profile' | 'overview' | 'businesses' | 'moderation' | 'pricing' | 'categories' | 'users' | 'roles' | 'admin_staff' | 'audit_logs' | 'events' | 'financials' | 'architecture' | 'reports' | 'notifications' | 'support' | 'external_email' | 'sobre-nos'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'profile' | 'overview' | 'businesses' | 'moderation' | 'pricing' | 'categories' | 'users' | 'roles' | 'admin_staff' | 'audit_logs' | 'events' | 'financials' | 'architecture' | 'reports' | 'notifications' | 'support' | 'external_email' | 'sobre-nos'>(initialTab);
   const [commercialView, setCommercialView] = useState<'summary' | CommercialSection>('summary');
   // Submódulos que antes apareciam empilhados na mesma página.
-  const [moderationSection, setModerationSection] = useState<'stories' | 'pipeline' | 'queue'>('pipeline');
+  const [moderationSection, setModerationSection] = useState<'pipeline' | 'queue'>('pipeline');
   const [notificationSection, setNotificationSection] = useState<'send' | 'preferences'>('send');
   // Páginas independentes de gestão. A sidebar mantém o módulo destacado e o
   // botão de retorno devolve o utilizador ao módulo de origem.
-  const [managementPage, setManagementPage] = useState<'businesses' | 'featured' | 'events' | 'tickets' | 'transactions' | 'promotions' | 'support' | 'users' | 'users-all' | 'users-citizens' | 'users-business' | 'users-admins' | 'users-suspended' | 'users-activity' | 'staff' | 'audit' | 'reports' | 'sessions' | 'campaigns' | 'finance-transactions' | 'finance-reconciliation' | 'finance-operators' | 'finance-pending' | 'finance-refunds' | 'finance-statements' | null>(null);
+  const [managementPage, setManagementPage] = useState<'businesses' | 'featured' | 'events' | 'tickets' | 'transactions' | 'promotions' | 'support' | 'users' | 'users-all' | 'users-citizens' | 'users-business' | 'users-admins' | 'users-suspended' | 'users-activity' | 'staff' | 'audit' | 'reports' | 'sessions' | 'campaigns' | 'finance-transactions' | 'finance-payouts' | 'finance-reconciliation' | 'finance-operators' | 'finance-pending' | 'finance-refunds' | 'finance-statements' | null>(null);
   // Badge informativo: actualiza ao abrir o Financeiro e ao mudar de subpágina,
   // sem duplicar o painel de alertas que continua a ser a fonte de verdade.
   useEffect(() => {
@@ -606,50 +604,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setAnnouncementChannels(['in_app']);
   };
 
-  // Section 11 Architecture & Security State
-  const [archBackupLogs, setArchBackupLogs] = useState([
-    {
-      id: 'BKP-2026-08-04-0200',
-      type: 'automatic_daily',
-      regionPrimary: 'DigitalOcean Frankfurt (fra1)',
-      regionSecondary: 'DigitalOcean Amsterdam (ams3)',
-      status: 'completed_verified',
-      sizeMB: 842,
-      timestamp: '2026-08-04 02:00:00',
-    },
-    {
-      id: 'BKP-2026-08-03-0200',
-      type: 'automatic_daily',
-      regionPrimary: 'DigitalOcean Frankfurt (fra1)',
-      regionSecondary: 'DigitalOcean Amsterdam (ams3)',
-      status: 'completed_verified',
-      sizeMB: 835,
-      timestamp: '2026-08-03 02:00:00',
-    },
-  ]);
-
-  const [consentLogsList, setConsentLogsList] = useState([
-    {
-      id: 'CONSENT-2026-001',
-      userName: 'Mamadu Djaló',
-      phone: '+245 955 12 34 56',
-      ipAddress: '197.214.42.10 (Bissau)',
-      acceptedAt: '2026-08-01 10:14:22',
-      termsVersion: 'v2.4_GDPR_Guigui_2026',
-      diasporaGdprCompliant: true,
-    },
-    {
-      id: 'CONSENT-2026-002',
-      userName: 'Soraia Gomes',
-      phone: '+245 966 44 33 22',
-      ipAddress: '82.155.192.4 (Lisboa)',
-      acceptedAt: '2026-08-04 14:18:02',
-      termsVersion: 'v2.4_GDPR_Guigui_2026',
-      diasporaGdprCompliant: true,
-    },
-  ]);
-
-  const [isTriggeringBackup, setIsTriggeringBackup] = useState(false);
 
   // Category Structure Management State (Section 5)
   const [categoriesList, setCategoriesList] = useState<BusinessCategory[]>([]);
@@ -1221,36 +1175,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // Trigger Cloud Backup (Section 11.4)
-  const handleTriggerManualCloudBackup = async () => {
-    setIsTriggeringBackup(true);
-    try {
-      const res = await fetch('/api/system/backup/trigger', { method: 'POST' });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success || !data.backup) throw new Error(data.error || 'O backup não foi confirmado pelo servidor.');
-      setIsTriggeringBackup(false);
-      if (data.backup) {
-        setArchBackupLogs((prev) => [data.backup, ...prev]);
-        onSystemEvent?.({
-          eventType: 'BACKUP_COMPLETED',
-          entityType: 'system',
-          entityId: data.backup.id,
-          message: 'Backup manual replicado na região secundária.',
-        });
-        alert('Backup manual acionado com sucesso e replicado na região secundária (Amsterdam ams3)!');
-      }
-    } catch (err) {
-      console.error(err);
-      setIsTriggeringBackup(false);
-      onSystemEvent?.({
-        eventType: 'BACKUP_FAILED',
-        entityType: 'system',
-        message: 'Não foi possível concluir o backup manual.',
-      });
-      alert('Erro ao acionar backup na nuvem.');
-    }
-  };
-
   // Refund Handler
   const handleRefundTransaction = async (txnId: string) => {
     if (!isPlatformTransaction(txnId)) return;
@@ -1775,7 +1699,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   return (
     <>
-      <GlassBottomNav
+      <BottomNav
         ariaLabel="Navegação principal da administração"
         testId="admin-bottom-nav"
         activeId={String(activeTab)}
@@ -2069,6 +1993,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {managementPage === 'finance-transactions' && (
             <FinanceTransactionsPage onBack={() => setManagementPage(null)} />
           )}
+          {managementPage === 'finance-payouts' && (
+            <FinancePayoutsPage onBack={() => setManagementPage(null)} />
+          )}
           {managementPage === 'finance-reconciliation' && (
             <FinanceReconciliationPage onBack={() => setManagementPage(null)} />
           )}
@@ -2169,31 +2096,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         />
       )}
 
-      {/* TAB 0: Complete Admin Capability Map */}
-      {activeTab === 'capabilities' && (
-        <AdminCapabilityHub
-          currentLang={currentLang}
-          onNavigateTab={navigateAdminTab}
-          dataSummary={{
-            businesses: businessesList.length,
-            activeBusinesses: businessesList.filter((business) => business.status === 'active').length,
-            events: events.length,
-            moderationItems: moderationLogsList.length,
-            paymentTransactions: paymentTransactionsList.length,
-            auditLogs: logsList.length,
-            supportRequests: supportRequests.length,
-          }}
-          dataPreview={{
-            businesses: businessesList.slice(0, 5).map((business) => ({ label: business.name, status: business.status })),
-            events: events.slice(0, 5).map((event) => ({ label: event.title, status: event.status })),
-            auditLogs: logsList.slice(0, 5).map((log) => ({ label: log.actionLabel, status: log.severity })),
-            moderation: moderationLogsList.slice(0, 5).map((item) => ({ label: item.contentSnippet, status: item.status })),
-            payments: paymentTransactionsList.slice(0, 5).map((transaction) => ({ label: transaction.useCaseLabel, status: transaction.status })),
-            support: supportRequests.slice(0, 5).map((request) => ({ label: request.subject, status: request.status })),
-          }}
-        />
-      )}
-
       {/* TAB 1: Executive Overview */}
       {activeTab === 'overview' && (
         <AdminOverview
@@ -2222,15 +2124,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             panelLabel="Administração"
             moduleLabel="Moderação"
             activeId={moderationSection}
-            onChange={(id) => setModerationSection(id as 'stories' | 'pipeline' | 'queue')}
+            onChange={(id) => setModerationSection(id as 'pipeline' | 'queue')}
             items={[
               { id: 'pipeline', label: 'Pipeline IA', description: 'Resumo e regras de moderação automática' },
               { id: 'queue', label: 'Fila de revisão', description: 'Itens pendentes e decisões humanas' },
-              { id: 'stories', label: 'Stories', description: 'Moderação de stories' },
             ]}
           />
-
-          {moderationSection === 'stories' && <StoriesModerationPanel />}
 
           {moderationSection === 'pipeline' && (<>
           {/* Section 9 Summary & Classification Banner */}
@@ -2659,7 +2558,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* TAB: Sobre Nós */}
       {activeTab === 'sobre-nos' && (
-        <InstitutionalManagementPage onBack={() => setActiveTab('capabilities')} />
+        <InstitutionalManagementPage onBack={() => setActiveTab('overview')} />
       )}
 
       {/* TAB: Categories Structure Management (Section 5) */}
@@ -3149,6 +3048,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           onOpenSection={(section) => {
             const target = {
               transactions: 'finance-transactions',
+              payouts: 'finance-payouts',
               reconciliation: 'finance-reconciliation',
               operators: 'finance-operators',
               pending: 'finance-pending',
@@ -3201,270 +3101,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </ManagementPage>
       )}
 
-      {/* TAB 6: Section 11 Technical Architecture & Infrastructure */}
       {activeTab === 'architecture' && (
-        <div className="space-y-4 text-xs">
-          {/* Section 11 Header Banner */}
-          <div className="bg-slate-900 text-white p-6 rounded-2xl border border-slate-800 shadow-md space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-3">
-              <div>
-                <span className="bg-emerald-400 text-slate-950 px-2.5 py-0.5 rounded font-black text-[10px] uppercase tracking-wider">
-                  Secção 11 - Requisitos Técnicos & Arquitectura do Sistema
-                </span>
-                <h3 className="font-extrabold text-base sm:text-lg text-white mt-1 flex items-center gap-2">
-                  <Server className="w-5 h-5 text-emerald-400" />
-                  <span>Stack Recomendada, PWA, Hospedagem Nuvem, Segurança RGPD & Backups</span>
-                </h3>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button type="button"
-                  onClick={handleTriggerManualCloudBackup}
-                  disabled={isTriggeringBackup}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm text-xs disabled:opacity-50"
-                >
-                  <DownloadCloud className="w-4 h-4" />
-                  <span>{isTriggeringBackup ? 'A Executar Backup...' : 'Executar Backup Nuvem Agora'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Sub-section 11.1 & 11.2 Overview Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 pt-1">
-              {/* Stack Card */}
-              <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl space-y-2">
-                <div className="flex items-center gap-2 font-black text-slate-200 text-sm">
-                  <Layers className="w-4 h-4 text-blue-400" />
-                  <span>11.1 Stack Recomendada</span>
-                </div>
-                <ul className="space-y-1.5 text-[11px] text-slate-300">
-                  <li className="flex items-start gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span><strong>Frontend:</strong> React 19 + Vite + Tailwind CSS v4 + TypeScript</span>
-                  </li>
-                  <li className="flex items-start gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span><strong>Backend:</strong> Node.js REST API + Express + TypeScript</span>
-                  </li>
-                  <li className="flex items-start gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span><strong>Persistência:</strong> JSON em desenvolvimento + localStorage; base relacional recomendada para produção</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Hosting Card (11.2) */}
-              <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl space-y-2">
-                <div className="flex items-center gap-2 font-black text-slate-200 text-sm">
-                  <Globe2 className="w-4 h-4 text-emerald-400" />
-                  <span>11.2 Hospedagem Nuvem vs Local</span>
-                </div>
-                <div className="space-y-1.5 text-[11px] text-slate-300">
-                  <div className="bg-slate-900 p-2 rounded-xl border border-slate-700 flex items-center justify-between">
-                    <span>DigitalOcean Frankfurt (fra1)</span>
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-bold border border-emerald-500/30">
-                      Nó Primário Ativo
-                    </span>
-                  </div>
-                  <div className="bg-slate-900 p-2 rounded-xl border border-slate-700 flex items-center justify-between">
-                    <span>Hetzner Amsterdam (ams3)</span>
-                    <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded font-bold border border-blue-500/30">
-                      Cópia Fria Replicada
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-amber-300/90 leading-tight pt-1">
-                    ⚠️ Servidor Local: Apenas posto de trabalho. Produção 100% na Nuvem para isolar do risco de falhas elétricas/internet locais.
-                  </p>
-                </div>
-              </div>
-
-              {/* PWA & Gate Scanner Card (11.3) */}
-              <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl space-y-2">
-                <div className="flex items-center gap-2 font-black text-slate-200 text-sm">
-                  <Smartphone className="w-4 h-4 text-purple-400" />
-                  <span>11.3 PWA & Scanner de Porta</span>
-                </div>
-                <div className="space-y-1.5 text-[11px] text-slate-300">
-                  <div className="flex items-center justify-between">
-                    <span>PWA Manifest & Service Worker:</span>
-                    <span className="text-emerald-400 font-bold">✓ Ativo & Instalável</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Cache Offline 3G/4G:</span>
-                    <span className="text-emerald-400 font-bold">✓ Tolerante a Quebras</span>
-                  </div>
-                  <div className="pt-1">
-                    <button type="button"
-                      onClick={() => alert('Download do APK Android "Guigui Gate Scanner v1.2" iniciado no seu dispositivo.')}
-                      className="w-full bg-purple-600 hover:bg-purple-500 text-white font-extrabold py-1.5 px-3 rounded-xl transition text-[11px] flex items-center justify-center gap-1.5"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Descarregar APK Android (Scanner de Porta)</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Sub-section 11.4: Segurança, Privacidade (RGPD / Diáspora) & supervisão empresarial */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Ticket security architecture — no operational access */}
-            <div className="bg-[var(--color-bg-surface)] border border-[var(--color-border-subtle)] p-5 rounded-2xl space-y-4 shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h4 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-blue-600" />
-                  <span>11.4 Arquitectura de segurança da bilhética</span>
-                </h4>
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">
-                  Apenas supervisão
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-600 leading-relaxed">
-                A assinatura de uso único, o QR e a validação de entradas são processados pelo scanner autenticado da empresa organizadora. O Super Admin não introduz tokens, não lê QR e não acede a compras ou compradores.
-              </p>
-              <div className="grid grid-cols-1 gap-2 text-[11px]">
-                <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3">
-                  <strong className="text-blue-900">Responsável operacional:</strong> empresa organizadora e equipa de portaria autorizada.
-                </div>
-                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3">
-                  <strong className="text-emerald-900">Responsável de governação:</strong> Super Admin gere acesso, plano, auditoria e configuração da plataforma.
-                </div>
-              </div>
-            </div>
-
-            {/* Password Security, 2FA & Consent Terms Log */}
-            <div className="bg-[var(--color-bg-surface)] border border-[var(--color-border-subtle)] p-5 rounded-2xl space-y-4 shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h4 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  <span>Segurança, 2FA & Registo de Consentimento (RGPD / Diáspora)</span>
-                </h4>
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">
-                  Conformidade Jurídica
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 text-[11px]">
-                <div className="bg-slate-50 border border-[var(--color-border-subtle)] p-3 rounded-2xl space-y-1">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase block">Hash de Passwords</span>
-                  <div className="font-bold text-slate-800 font-mono">scrypt + Salt</div>
-                  <span className="text-[10px] text-slate-500">Sem armazenamento em plaintext</span>
-                </div>
-
-                <div className="bg-slate-50 border border-[var(--color-border-subtle)] p-3 rounded-2xl space-y-1">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase block">Autenticação 2FA</span>
-                  <div className="font-bold text-emerald-700">Obrigatório no Super Admin</div>
-                  <span className="text-[10px] text-slate-500">Entrega externa ainda simulada na demo</span>
-                </div>
-              </div>
-
-              {/* Consent Log Snippet */}
-              <div className="space-y-2">
-                <span className="text-[10px] font-bold text-slate-500 uppercase block">
-                  Registo de Consentimento Explícito aos Termos (IP + Data/Hora)
-                </span>
-                <div className="bg-slate-900 text-slate-200 p-3 rounded-2xl space-y-2 font-mono text-[10px]">
-                  {consentLogsList.map((log) => (
-                    <div key={log.id} className="border-b border-slate-800 pb-2 last:border-b-0 last:pb-0 flex items-center justify-between">
-                      <div>
-                        <span className="font-bold text-white">{log.userName}</span> ({log.phone})
-                        <div className="text-slate-500">IP: {log.ipAddress} • {log.acceptedAt}</div>
-                      </div>
-                      <span className="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded text-[9px] font-bold">
-                        {log.termsVersion}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Cloud Backups Log Table */}
-          <div className="bg-[var(--color-bg-surface)] border border-[var(--color-border-subtle)] rounded-2xl overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-              <h4 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
-                <Database className="w-4 h-4 text-indigo-600" />
-                <span>Histórico de Backups Automáticos Diários na Nuvem (Segunda Região)</span>
-              </h4>
-              <span className="text-[10px] text-slate-500">Replicado em Frankfurt & Amsterdam</span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-500 border-b border-[var(--color-border-subtle)] font-bold uppercase text-[10px] tracking-wider">
-                    <th className="py-3 px-4">ID Backup</th>
-                    <th className="py-3 px-4">Tipo</th>
-                    <th className="py-3 px-4">Região Primária</th>
-                    <th className="py-3 px-4">Região Secundária</th>
-                    <th className="py-3 px-4">Tamanho</th>
-                    <th className="py-3 px-4">Data / Hora</th>
-                    <th className="py-3 px-4 text-right">Estado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
-                  {archBackupLogs.map((bkp) => (
-                    <tr key={bkp.id} className="hover:bg-slate-50 transition">
-                      <td className="py-3.5 px-4 font-mono font-bold text-slate-900">{bkp.id}</td>
-                      <td className="py-3.5 px-4">
-                        <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-[10px] font-bold uppercase">
-                          {bkp.type === 'automatic_daily' ? 'Diário Automático' : 'Manual / Pedido'}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 font-mono text-slate-700">{bkp.regionPrimary}</td>
-                      <td className="py-3.5 px-4 font-mono text-slate-700">{bkp.regionSecondary}</td>
-                      <td className="py-3.5 px-4 font-mono font-bold text-slate-900">{bkp.sizeMB} MB</td>
-                      <td className="py-3.5 px-4 text-slate-500">{bkp.timestamp}</td>
-                      <td className="py-3.5 px-4 text-right">
-                        <span className="bg-emerald-100 text-emerald-900 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-emerald-200">
-                          ✓ Integridade Verificada
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Sub-section 11.5 Non-Functional Requirements Summary Grid */}
-          <div className="bg-slate-900 text-white p-6 rounded-2xl border border-slate-800 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h4 className="font-extrabold text-sm text-white flex items-center gap-2">
-                <Wifi className="w-4 h-4 text-emerald-400" />
-                <span>11.5 Requisitos Não-Funcionais & Resiliência de Rede em Bissau</span>
-              </h4>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase font-bold">Idiomas Suportados</span>
-                <div className="text-sm font-black text-emerald-400">Português, Francês, Inglês</div>
-                <p className="text-[10px] text-slate-300">Arquitectura multilingue pronta com fallback PT</p>
-              </div>
-
-              <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase font-bold">Otimização de Largura de Banda</span>
-                <div className="text-sm font-black text-blue-400">Suporte a Ligações 3G/4G Instáveis</div>
-                <p className="text-[10px] text-slate-300">Compressão de dados e minificação extrema de assets</p>
-              </div>
-
-              <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase font-bold">Funcionamento Offline</span>
-                <div className="text-sm font-black text-amber-400">Sem Perda de Dados no Scanner</div>
-                <p className="text-[10px] text-slate-300">Validação local bufferizada com sincronização posterior</p>
-              </div>
-
-              <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase font-bold">Escalabilidade</span>
-                <div className="text-sm font-black text-purple-400">Dezenas a Milhares de Clientes</div>
-                <p className="text-[10px] text-slate-300">Sem necessidade de reescrita estrutural do MVP</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <SystemModule />
       )}
 
       {/* TAB: Notification Management & Preferences */}

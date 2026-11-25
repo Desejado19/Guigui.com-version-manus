@@ -232,6 +232,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<'orange_money' | 'telecel'>('orange_money');
   const [paymentPhone, setPaymentPhone] = useState('');
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'pending' | 'success'>('idle');
+  // A conta é criada antes do pagamento para que /api/payments/create tenha
+  // sessão e possa validar a posse do businessId. O botão final apenas entra.
+  const [registeredBusinessAccount, setRegisteredBusinessAccount] = useState<{ user: UserProfile; business?: Partial<Business> } | null>(null);
   const [transactionRef, setTransactionRef] = useState('');
   // Modo devolvido pelo backend para cada provider. A UI adapta-se a simulated,
   // sandbox ou live sem precisar de conhecer a API concreta da operadora.
@@ -267,7 +270,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setRegisteredBusinessAccount(null);
+      return;
+    }
     if (formScrollRef.current) formScrollRef.current.scrollTop = 0;
   }, [isOpen, modalView, regStep]);
 
@@ -357,8 +363,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     const response = await fetch('/api/auth/request-password-reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: resetEmail }) });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) { setError(payload.error || t('requestFailed')); return; }
-    setResetToken(payload.resetToken || '');
-    setResetMessage(payload.resetToken ? t('auth.resetGenerated') : payload.message);
+    // O código chega por email; a resposta nunca o devolve.
+    setResetToken('');
+    setResetMessage(payload.message || t('auth.resetGenerated'));
   };
 
   const handleResetPassword = async (event: React.FormEvent) => {
@@ -441,6 +448,51 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setRegStep(3);
   };
 
+  const businessRegistrationPayload = () => ({
+    name: regName,
+    email: regEmail,
+    password: regPassword,
+    role: 'business',
+    phone: regPhone,
+    neighborhood: regNeighborhood || t('business.Todos'),
+    businessName: regName,
+    categoryId: regCategoryGroup,
+    groupGroupId: regCategoryGroup,
+    subcategoryId: regSubcategory.trim(),
+    description: regDescription.trim(),
+    businessPhone: regBusinessPhone.trim(),
+    businessNeighborhood: regBusinessNeighborhood.trim(),
+    ...(regPublicEmail.trim() ? { publicEmail: regPublicEmail.trim() } : {}),
+  });
+
+  const ensureBusinessAccount = async () => {
+    if (registeredBusinessAccount) return registeredBusinessAccount;
+    const response = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(businessRegistrationPayload()),
+    });
+    let payload = await response.json().catch(() => ({})) as {
+      user?: UserProfile;
+      business?: Partial<Business>;
+      error?: string;
+    };
+    if (!response.ok && response.status === 409) {
+      // Registo já concluído numa tentativa anterior: recupera a sessão.
+      const login = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: regEmail, password: regPassword }),
+      });
+      payload = await login.json().catch(() => ({}));
+      if (!login.ok) throw new Error(payload.error || 'Não foi possível iniciar sessão.');
+    }
+    if (!payload.user) throw new Error(payload.error || 'Não foi possível criar a conta empresarial.');
+    const account = { user: payload.user, business: payload.business };
+    setRegisteredBusinessAccount(account);
+    return account;
+  };
+
   const handleExecuteOrangeMoneyPayment = async () => {
     setError(null);
     if (!paymentPhone.trim()) {
@@ -450,13 +502,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
     setPaymentStatus('processing');
     try {
+      const businessAccount = await ensureBusinessAccount();
       const response = await fetch('/api/payments/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           useCase: 'subscription_initial',
           useCaseLabel: `Subscrição ${selectedPlan.name} · ${regName}`,
-          businessName: regName,
+          businessId: businessAccount.business?.id || businessAccount.user.businessId,
+          businessName: businessAccount.business?.name || regName,
           payerName: regName,
           payerPhone: paymentPhone,
           amountXOF: calculateFinalAmount(),
@@ -489,33 +543,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const handleFinalizeBusinessRegistration = async () => {
     setError(null);
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: regName,
-          email: regEmail,
-          password: regPassword,
-          role: 'business',
-          phone: regPhone,
-          neighborhood: regNeighborhood || t('business.Todos'),
-          businessName: regName,
-          categoryId: regCategoryGroup,
-          groupGroupId: regCategoryGroup,
-          subcategoryId: regSubcategory.trim(),
-          description: regDescription.trim(),
-          businessPhone: regBusinessPhone.trim(),
-          businessNeighborhood: regBusinessNeighborhood.trim(),
-          ...(regPublicEmail.trim() ? { publicEmail: regPublicEmail.trim() } : {}),
-        }),
-      });
-      const payload = await response.json().catch(() => ({})) as {
-        user?: UserProfile;
-        business?: Partial<Business>;
-        error?: string;
-      };
-      if (!response.ok || !payload.user) throw new Error(payload.error || 'Não foi possível criar a conta empresarial.');
-      onLogin(payload.user, payload.business);
+      const account = await ensureBusinessAccount();
+      onLogin(account.user, account.business);
     } catch (registerError) {
       setError(registerError instanceof Error ? registerError.message : 'Não foi possível criar a conta empresarial.');
     }
@@ -571,7 +600,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-stretch justify-center overflow-y-auto overscroll-contain bg-slate-950/80 p-0 no-scrollbar sm:items-center sm:p-4"
+      className="fixed inset-0 z-[200] flex items-stretch justify-center overflow-y-auto overscroll-contain bg-[var(--color-bg-canvas)] p-0 no-scrollbar sm:items-center sm:p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget && onClose) onClose();
       }}
@@ -925,14 +954,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 <button type="submit" className="w-full px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl">Enviar código de recuperação</button>
               </form>
               {resetMessage && <p className="rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-700">{resetMessage}</p>}
-              {resetToken && <form onSubmit={handleResetPassword} className="space-y-3 border-t border-[var(--color-border-subtle)] dark:border-slate-700 pt-4">
+              <form onSubmit={handleResetPassword} className="space-y-3 border-t border-[var(--color-border-subtle)] dark:border-slate-700 pt-4">
                 <label className="block text-xs font-bold text-slate-700">Código de recuperação
                   <input required value={resetToken} onChange={(event) => setResetToken(event.target.value)} className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-xs font-mono text-slate-900" />
                 </label>
                 <input type="password" required minLength={8} value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} placeholder="Nova palavra-passe (mínimo 8)" className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900" />
                 <input type="password" required minLength={8} value={resetConfirmation} onChange={(event) => setResetConfirmation(event.target.value)} placeholder="Confirmar nova palavra-passe" className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900" />
                 <button type="submit" className="w-full px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl">Redefinir palavra-passe</button>
-              </form>}
+              </form>
               {error && <p className="text-xs font-bold text-rose-600">{error}</p>}
             </div>
           )}
@@ -1426,7 +1455,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
                       <div className="text-[11px] text-slate-500 leading-relaxed">
                         {isSimulatedPayment
-                          ? <>Ao simular, nenhum pedido é enviado à operadora. O pagamento de <strong>{calculateFinalAmount().toLocaleString('pt-PT')} XOF</strong> será confirmado apenas para testar a ativação do plano.</>
+                          ? <>Ao simular, nenhum pedido é enviado à operadora e o plano não é activado. A conta é criada e o pagamento fica pendente de liquidação real.</>
                           : <>Ao clicar em confirmar, será aberto o pedido de pagamento de <strong>{calculateFinalAmount().toLocaleString('pt-PT')} XOF</strong> no provider selecionado.</>}
                       </div>
 
@@ -1479,6 +1508,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         </a>
                       )}
                       <div className="font-mono text-[11px] text-sky-900">Ref.: {transactionRef} · Modo: {transactionMode}</div>
+                      <button
+                        type="button"
+                        onClick={handleFinalizeBusinessRegistration}
+                        className="mx-auto block w-full rounded-xl bg-[#0B3B37] px-4 py-2.5 text-xs font-black text-white hover:bg-[#176158]"
+                      >
+                        Continuar para o painel da empresa
+                      </button>
                     </div>
                   )}
 

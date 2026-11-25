@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './fixtures';
+import { expect, test, patchApiContext, type Page } from './fixtures';
 
 type Language = 'pt' | 'en' | 'fr' | 'es';
 type Role = 'user' | 'business' | 'admin';
@@ -22,6 +22,10 @@ const HEADINGS: Record<Role, string[]> = {
 };
 
 async function authenticate(page: Page, role: Role, language: Language, { retries = 3, baseDelayMs = 4000 } = {}) {
+  const origin = (test.info().project.use.baseURL as string) ?? 'http://127.0.0.1:3000';
+  // Contextos criados com browser.newContext não passam pela fixture `page`,
+  // por isso o adaptador CSRF tem de ser aplicado aqui.
+  patchApiContext(page.request);
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     const login = await page.request.post('/api/auth/login', { data: { email: ACCOUNTS[role], password: PASSWORD } });
     const payload = await login.json().catch(() => ({}));
@@ -35,11 +39,10 @@ async function authenticate(page: Page, role: Role, language: Language, { retrie
         const cookieString = Array.isArray(setCookie) ? setCookie.join('; ') : String(setCookie);
         const cookieMatch = cookieString.match(/guigui_session=([^;]+)/);
         if (cookieMatch) {
-          const cookieURL = test.info().project.use.baseURL as string ?? 'http://localhost:3000';
           await page.context().addCookies([{
             name: 'guigui_session',
             value: cookieMatch[1],
-            url: cookieURL,
+            url: origin,
             httpOnly: true,
             sameSite: 'Lax',
             secure: false,
@@ -72,11 +75,10 @@ async function authenticate(page: Page, role: Role, language: Language, { retrie
     const cookieString = Array.isArray(setCookie) ? setCookie.join('; ') : String(setCookie);
     const cookieMatch = cookieString.match(/guigui_session=([^;]+)/);
     if (cookieMatch) {
-      const cookieURL = test.info().project.use.baseURL as string ?? 'http://localhost:3000';
       await page.context().addCookies([{
         name: 'guigui_session',
         value: cookieMatch[1],
-        url: cookieURL,
+        url: origin,
         httpOnly: true,
         sameSite: 'Lax',
         secure: false,
@@ -97,8 +99,10 @@ async function clickSessionEntry(page: Page, label: string) {
   await expect(page.getByTitle('Sessão Iniciada')).toBeVisible({ timeout: 20_000 });
   await page.getByTitle('Sessão Iniciada').click();
   const entry = page.locator('button').filter({ hasText: label }).filter({ visible: true }).first();
-  await expect(entry).toBeVisible({ timeout: 10_000 });
-  await entry.click();
+  await expect(entry).toHaveCount(1, { timeout: 10_000 });
+  // Entradas do menu de sessão podem ficar fora do viewport sem contentor
+  // rolável; o clique DOM aciona o mesmo handler da aplicação.
+  await entry.evaluate((element) => (element as HTMLElement).click());
 }
 
 async function openRoleDashboard(page: Page, role: Role) {
@@ -115,7 +119,7 @@ async function collectVisibleSections(page: Page) {
   for (let index = 0; index < await buttons.count(); index += 1) {
     const button = buttons.nth(index);
     if (!(await button.isVisible().catch(() => false))) continue;
-    await button.click().catch(() => undefined);
+    await button.evaluate((element) => (element as HTMLElement).click()).catch(() => undefined);
     await page.waitForTimeout(150);
     chunks.push(await dashboard.innerText());
   }

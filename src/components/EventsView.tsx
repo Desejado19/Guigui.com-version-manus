@@ -223,6 +223,10 @@ export const EventsView: React.FC<EventsViewProps> = ({
     setActiveTab('all');
     setSelectedEvent(null);
     setPurchaseReceipt(null);
+    // Sem sessão não há compra: fechar o modal evita deixá-lo aberto sem
+    // evento nem categorias, com o botão sempre desactivado e sem pedido.
+    setIsPurchaseModalOpen(false);
+    setPaymentPending(null);
   }, [currentUser]);
 
   useEffect(() => {
@@ -301,23 +305,30 @@ export const EventsView: React.FC<EventsViewProps> = ({
       onRequireLogin?.('Inicie sessão ou crie uma conta para comprar bilhetes.');
       return;
     }
-    const event = eventOverride ?? selectedEvent;
+    // O evento guardado no estado pode ter ficado para trás face à agenda, por
+    // isso o pedido usa sempre a versão viva. A categoria e o preço vêm do
+    // modal e o servidor continua a ser a autoridade (409 TICKET_TYPE_MISMATCH
+    // / TICKET_TOTAL_MISMATCH): comparar aqui bloqueava a compra sem chegar a
+    // emitir o pedido.
+    const chosenEvent = eventOverride ?? selectedEvent;
+    const event = chosenEvent
+      ? events.find((entry) => entry.id === chosenEvent.id) ?? chosenEvent
+      : null;
     if (!event) {
       setNotificationStatusNotice('Selecione um evento antes de comprar o bilhete.');
+      setIsPurchaseModalOpen(false);
       return;
     }
-    const ticketType = event.ticketTypes.find((type) => type.id === data.ticketTypeId);
-    if (!ticketType || ticketType.priceXOF !== data.categoryPriceXOF) {
-      setNotificationStatusNotice('A categoria selecionada foi alterada. Feche e abra a compra novamente.');
-      return;
-    }
+    const ticketType = (event.ticketTypes || []).find((type) => type.id === data.ticketTypeId) || null;
 
     setIsSubmitting(true);
-    purchaseIdempotencyKeyRef.current ||= typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID()
-      : `purchase-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
     try {
+      // A chave tem de ser criada dentro do try: se a geração falhar, o
+      // `finally` devolve o botão a "Confirmar e Pagar" em vez de o deixar
+      // preso em "A processar..." (o modal ficava sem emitir o pedido).
+      purchaseIdempotencyKeyRef.current ||= typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `purchase-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const response = await fetch('/api/tickets/purchase', {
         method: 'POST',
         headers: {
@@ -330,10 +341,10 @@ export const EventsView: React.FC<EventsViewProps> = ({
           eventTitle: event.title,
           eventDate: event.date,
           eventTime: event.time,
-          ticketTypeId: ticketType.id,
-          ticketTypeName: ticketType.name,
-          priceXOF: ticketType.priceXOF,
-          pricePerTicketXOF: ticketType.priceXOF,
+          ticketTypeId: data.ticketTypeId,
+          ticketTypeName: data.category,
+          priceXOF: data.categoryPriceXOF,
+          pricePerTicketXOF: data.categoryPriceXOF,
           quantity: data.quantity,
           buyerName: data.buyerName,
           buyerPhone: data.buyerPhone,
@@ -374,7 +385,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
         return;
       }
 
-      setSelectedTicketType(ticketType);
+      if (ticketType) setSelectedTicketType(ticketType);
       setTicketQuantity(data.quantity);
       const issuedTickets = Array.isArray(result.tickets) && result.tickets.length > 0
         ? result.tickets
@@ -412,7 +423,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
         providerMode: result.transaction?.providerMode,
         eventId: issuedTickets[0].eventId || event.id,
         eventTitle: issuedTickets[0].eventTitle || event.title,
-        ticketTypeName: issuedTickets[0].ticketTypeName || ticketType.name,
+        ticketTypeName: issuedTickets[0].ticketTypeName || data.category,
         quantity: issuedTickets.length,
         feeBreakdown,
         buyerTotalXOF,
@@ -593,7 +604,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
         <div className="relative z-10 mt-6 flex flex-wrap gap-2">
           <button type="button"
             onClick={() => setActiveTab('all')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition ${ activeTab === 'all' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs' : 'bg-white/10 text-white hover:bg-white/20' }`}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition ${ activeTab === 'all' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs' : 'bg-emerald-900 text-white hover:bg-white/20' }`}
           >
             Explorar Agenda ({events.length})
           </button>
@@ -601,7 +612,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
           {currentUser && (
             <button type="button"
               onClick={() => setActiveTab('reminders')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${ activeTab === 'reminders' ? 'bg-amber-400 text-slate-950 shadow-xs' : 'bg-white/10 text-white hover:bg-white/20' }`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${ activeTab === 'reminders' ? 'bg-amber-400 text-slate-950 shadow-xs' : 'bg-emerald-900 text-white hover:bg-white/20' }`}
             >
               <BellRing className="w-3.5 h-3.5" />
               <span>Meus Lembretes ({reminders.length})</span>
@@ -930,7 +941,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
 
       {/* Ticket Purchase - novo modal */}
       <TicketPurchaseModal
-        isOpen={isPurchaseModalOpen && purchasedTickets.length === 0 && !paymentPending}
+        isOpen={isPurchaseModalOpen && Boolean(selectedEvent) && purchasedTickets.length === 0 && !paymentPending}
         event={selectedEvent}
         ticketTypes={selectedEvent?.ticketTypes || []}
         currentUser={currentUser}

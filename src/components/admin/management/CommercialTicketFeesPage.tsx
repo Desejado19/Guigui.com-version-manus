@@ -49,7 +49,8 @@ export const CommercialTicketFeesPage: React.FC<{ onBack: () => void }> = ({ onB
   const kpis: ManagementKpi[] = [
     { label: 'Comissão por bilhete', value: `${ticket?.commissionPercentage ?? 10}%`, hint: 'Configuração atual', tone: 'success' },
     { label: 'Taxa fixa por emissão', value: formatCommercialXOF(ticket?.fixedFeeXOF ?? 200), hint: 'Por bilhete emitido', tone: 'neutral' },
-    { label: 'Receita gerada', value: formatCommercialXOF(ticket?.generatedRevenueXOF), hint: `${ticket?.ticketCount ?? 0} ordens pagas`, tone: 'warning' },
+    { label: 'Receita gerada', value: formatCommercialXOF(ticket?.generatedRevenueXOF), hint: `${ticket?.ticketCount ?? 0} ordens pagas · orders.fee_amount_xof`, tone: 'warning' },
+    { label: 'Valor líquido das empresas', value: formatCommercialXOF(ticket?.netTicketVolumeXOF), hint: 'orders.net_amount_xof', tone: 'success' },
     { label: 'Volume de bilhetes', value: formatCommercialXOF(ticket?.grossTicketVolumeXOF), hint: 'Receita das empresas organizadoras', tone: 'info' },
   ];
 

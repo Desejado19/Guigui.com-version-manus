@@ -80,6 +80,7 @@ import { TicketScannerView } from './components/TicketScannerView';
 import { BusinessDashboard, type BusinessDashboardTab } from './components/BusinessDashboard';
 import { CommunicationHub } from './components/CommunicationHub';
 import { InstitutionalPages } from './components/InstitutionalPages';
+import { PublicPolicyPage } from './components/PublicPolicyPage';
 import { Footer } from './components/Footer';
 import { BusinessComparisonModal } from './components/BusinessComparisonModal';
 import { EventAlertsManager } from './components/EventAlertsManager';
@@ -366,6 +367,10 @@ export default function App() {
   // da última publicação e a SPA abre directamente o conteúdo institucional.
   const isInstitutionalPath = typeof window !== 'undefined'
     && window.location.pathname.replace(/\/+$/, '') === '/sobre-nos';
+  // Páginas públicas de políticas (`/politicas` e `/politicas/:slug`) leem os
+  // documentos publicados na Identidade Institucional.
+  const isPolicyPath = typeof window !== 'undefined'
+    && /^\/politicas(\/|$)/.test(window.location.pathname);
   const [currentTab, setCurrentTab] = useState<
     'feed' | 'directory' | 'map' | 'promotions' | 'events' | 'scanner' | 'client' | 'messages' | 'support' | 'admin' | 'institutional'
   >(() => (isInstitutionalPath ? 'institutional' : getRoleLandingTab(currentUser?.role || null)));
@@ -375,7 +380,7 @@ export default function App() {
   const [feedRefreshToken, setFeedRefreshToken] = useState(0);
   const [businessDashboardStartTab, setBusinessDashboardStartTab] = useState<BusinessDashboardTab>('overview');
   const [adminDashboardStartTab, setAdminDashboardStartTab] = useState<
-    'capabilities' | 'profile' | 'overview' | 'businesses' | 'moderation' | 'pricing' | 'categories' | 'roles' | 'admin_staff' | 'audit_logs' | 'events' | 'financials' | 'architecture' | 'reports' | 'notifications' | 'support'
+    'profile' | 'overview' | 'businesses' | 'moderation' | 'pricing' | 'categories' | 'roles' | 'admin_staff' | 'audit_logs' | 'events' | 'financials' | 'architecture' | 'reports' | 'notifications' | 'support'
   >('overview');
   const [clientStartSection, setClientStartSection] = useState<'overview' | 'support' | 'tickets'>('overview');
   const [clientSidebarCollapsed, setClientSidebarCollapsed] = useState(false);
@@ -740,7 +745,9 @@ export default function App() {
       case 'refund':
         return 'tickets';
       case 'post':
-        return 'posts';
+        // O módulo de marketing (que albergava as publicações) foi retirado
+        // do painel da empresa.
+        return 'overview';
       case 'event':
         return 'events';
       default:
@@ -2352,6 +2359,11 @@ export default function App() {
       : 0;
   const visibleReminders = currentUser ? reminders : [];
   const unreadNotificationCount = visibleNotifications.filter((notification) => !notification.read).length;
+
+  if (isPolicyPath) {
+    return <PublicPolicyPage currentLang={currentLang} />;
+  }
+
   return (
     <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm font-bold text-slate-600 dark:bg-slate-950 dark:text-slate-300">A carregar o painel...</div>}>
 
@@ -2796,13 +2808,13 @@ export default function App() {
 
                   <div className="relative z-10 flex flex-wrap items-center justify-center gap-3">
                     {/* View Switcher: Horizontal List vs Grid */}
-                    <div className="bg-white/10 p-1 rounded-2xl flex items-center border border-white/20">
+                    <div className="bg-[#0B3B37] p-1 rounded-2xl flex items-center border border-white/25">
                       <button type="button"
                         onClick={() => setDirectoryViewMode('horizontal')}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
                           directoryViewMode === 'horizontal'
                             ? 'bg-white text-slate-900 shadow-sm'
-                            : 'text-white/85 hover:bg-white/10 hover:text-white'
+                            : 'text-white/85 hover:bg-[#14574A] hover:text-white'
                         }`}
                         title="Lista Horizontal de Empresas em Bissau"
                       >
@@ -2814,7 +2826,7 @@ export default function App() {
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
                           directoryViewMode === 'grid'
                             ? 'bg-white text-slate-900 shadow-sm'
-                            : 'text-white/85 hover:bg-white/10 hover:text-white'
+                            : 'text-white/85 hover:bg-[#14574A] hover:text-white'
                         }`}
                         title="Grelha de Cartões"
                       >
@@ -2822,7 +2834,7 @@ export default function App() {
                         <span className="hidden xs:inline">Grelha</span>
                       </button>
                     </div>
-                    <span className="text-xs font-black text-white bg-white/10 px-3.5 py-2 rounded-2xl border border-white/20">
+                    <span className="text-xs font-black text-white bg-[#0B3B37] px-3.5 py-2 rounded-2xl border border-white/25">
                       {filteredBusinesses.length} empresas
                     </span>
                     <label className="flex items-center gap-2 text-xs font-bold text-white/90">
@@ -2830,7 +2842,7 @@ export default function App() {
                       <select
                         value={directorySort}
                         onChange={(event) => setDirectorySort(event.target.value as typeof directorySort)}
-                        className="rounded-2xl border border-white/20 bg-white/10 px-3 py-2 font-bold text-white outline-none focus:border-white/60 [&>option]:text-slate-900"
+                        className="rounded-2xl border border-white/25 bg-[#0B3B37] px-3 py-2 font-bold text-white outline-none focus:border-white/60 [&>option]:text-slate-900"
                         aria-label="Ordenar empresas"
                       >
                         <option value="relevance">Relevância</option>
@@ -3214,7 +3226,24 @@ export default function App() {
                 onOpenNotification={handleOpenNotification}
                 notificationPreferences={activeNotificationPreferences}
                 onNotificationPreferencesChange={updateNotificationPreferences}
-                onProfileChange={(profile) => setCurrentUser((previous) => previous ? { ...previous, ...profile } : previous)}
+                onProfileChange={async (profile) => {
+                  const response = await fetch('/api/account/profile', {
+                    method: 'PATCH',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      name: profile.name,
+                      phone: profile.phone,
+                      neighborhood: profile.neighborhood,
+                      avatarUrl: profile.avatarUrl,
+                    }),
+                  });
+                  const payload = await response.json().catch(() => ({}));
+                  if (!response.ok || !payload.user) {
+                    throw new Error(payload.error || 'Não foi possível guardar o perfil.');
+                  }
+                  setCurrentUser((previous) => previous ? { ...previous, ...payload.user } : payload.user);
+                }}
                 onDeactivateAccount={handleCitizenDeactivateAccount}
                 onDeleteAccount={handleCitizenDeleteAccount}
                 initialSection={clientStartSection}

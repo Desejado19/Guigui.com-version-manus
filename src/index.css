@@ -964,24 +964,38 @@ html.dark .guigui-navbar .guigui-brand-mark svg path { fill: var(--color-green-1
 .guigui-hero-copy { max-width: 650px; margin: 0 auto 26px; color: var(--color-green-100); font-size: 15px; line-height: 1.65; }
 .guigui-home-hero { padding-top: clamp(30px, 5vw, 58px); padding-bottom: 34px; }
 .guigui-home-hero .guigui-hero-title { font-size: clamp(30px, 4.5vw, 52px); }
-.guigui-sponsored-banner { overflow: hidden; border: 1px solid rgba(11, 59, 55, .16); border-radius: 24px; background: var(--ink); box-shadow: 0 18px 38px -28px rgba(11, 59, 55, .55); }
-/* O primeiro filho é sempre o slide (empresa ou campanha): garante o mesmo
-   piso de altura mesmo quando o destaque não tem fotografia. */
-.guigui-sponsored-banner > :first-child { min-height: 190px; }
-.guigui-sponsored-copy { display: flex; flex-direction: column; justify-content: center; gap: 7px; padding: 18px 24px; }
-.guigui-sponsored-label { width: fit-content; border: 1px solid rgba(255,255,255,.28); border-radius: 999px; background: rgba(255,255,255,.08); padding: 6px 11px; color: var(--color-green-100); font-size: 10px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
-.guigui-sponsored-copy h2 { margin: 0; color: #fff; font-family: var(--font-family); font-size: clamp(22px, 2.4vw, 32px); font-weight: 600; line-height: 1.08; }
-.guigui-sponsored-copy p { max-width: 520px; margin: 0; color: #C5D8D3; font-size: 13px; line-height: 1.5; }
-.guigui-sponsored-link { color: var(--gold); font-size: 12px; font-weight: 600; }
-/* Moldura da fotografia: a imagem cabe sempre inteira dentro da área
-   reservada, com qualquer proporção, sem cortes nem transbordo. */
-.guigui-sponsored-media { display: flex; height: 100%; align-items: center; justify-content: center; overflow: hidden; padding: 14px; background: rgba(255, 255, 255, .035); }
-.guigui-sponsored-image { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; border-radius: 14px; box-shadow: 0 16px 30px -22px rgba(0, 0, 0, .85); }
-.guigui-sponsored-pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 2px 12px 12px; }
-.guigui-sponsored-nav { display: inline-flex; height: 26px; width: 26px; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: transparent; color: rgba(255, 255, 255, .34); cursor: pointer; transition: color .2s ease, background-color .2s ease; }
-.guigui-sponsored-nav:hover { color: rgba(255, 255, 255, .88); background: rgba(255, 255, 255, .06); }
-.guigui-sponsored-nav:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-.guigui-sponsored-counter { min-width: 42px; text-align: center; color: rgba(255, 255, 255, .40); font-size: 10px; font-weight: 600; letter-spacing: .22em; font-variant-numeric: tabular-nums; }
+/* Destaque da página inicial: fotografia a preencher o cartão inteiro e o
+   texto sobreposto à esquerda. O gradiente verde-escuro garante contraste em
+   qualquer imagem e repete a identidade da marca; sem fotografia, fica o
+   mesmo fundo sólido. */
+/* Altura fixa: todos os destaques (empresas e campanhas) têm exactamente o
+   mesmo tamanho, para o carrossel não saltar de altura ao rodar. O texto é
+   limitado por número de linhas para caber sempre nesta caixa. */
+.guigui-sponsored-banner { position: relative; height: clamp(360px, 33vw, 420px); overflow: hidden; border: 1px solid rgba(11, 59, 55, .18); border-radius: 22px; background: #062a20; box-shadow: 0 26px 50px -34px rgba(11, 59, 55, .75); isolation: isolate; }
+.guigui-sponsored-slide { position: relative; display: flex; width: 100%; height: 100%; min-height: 0; overflow: hidden; color: inherit; text-decoration: none; }
+.guigui-sponsored-bg { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; object-position: 72% center; }
+.guigui-sponsored-scrim {
+  position: absolute; inset: 0; z-index: -1;
+  background:
+    linear-gradient(90deg, rgba(5, 38, 28, .92) 0%, rgba(5, 38, 28, .84) 26%, rgba(5, 38, 28, .46) 44%, rgba(5, 38, 28, 0) 62%),
+    linear-gradient(0deg, rgba(3, 24, 18, .58) 0%, rgba(3, 24, 18, .18) 18%, rgba(3, 24, 18, 0) 34%);
+}
+.guigui-sponsored-content { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 16px; width: min(600px, 62%); min-height: 0; padding: clamp(26px, 3.6vw, 50px); }
+.guigui-sponsored-label { display: inline-flex; width: fit-content; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,.32); border-radius: 999px; background: #0B3B37; padding: 8px 16px; color: #fff; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.guigui-sponsored-title { display: -webkit-box; margin: 0; padding-bottom: .14em; overflow: hidden; color: #fff; font-family: var(--font-family); font-size: clamp(28px, 3.4vw, 44px); font-weight: 800; line-height: 1.08; letter-spacing: -.025em; text-shadow: none; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.guigui-sponsored-accent { color: #F58220; }
+.guigui-sponsored-description { display: -webkit-box; max-width: 430px; margin: 0; overflow: hidden; color: rgba(255, 255, 255, .9); font-size: 15px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.guigui-sponsored-cta { display: inline-flex; width: fit-content; align-items: center; gap: 8px; border: 0; border-radius: 999px; background: #F58220; padding: 13px 26px; color: #2B1200; font-size: 14px; font-weight: 700; line-height: 1; cursor: pointer; box-shadow: 0 14px 26px -16px rgba(245, 130, 32, .95); transition: background-color .2s ease, transform .2s ease; }
+.guigui-sponsored-slide:hover .guigui-sponsored-cta { background: #E6730F; }
+.guigui-sponsored-cta:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.guigui-sponsored-pager { position: absolute; right: clamp(18px, 3vw, 36px); bottom: clamp(14px, 2.4vw, 24px); z-index: 2; display: flex; align-items: center; gap: 14px; }
+.guigui-sponsored-progress { width: clamp(90px, 20vw, 230px); height: 2px; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, .3); }
+.guigui-sponsored-progress > span { display: block; height: 100%; border-radius: inherit; background: #F58220; transition: width .45s ease; }
+.guigui-sponsored-controls { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255, 255, 255, .24); border-radius: 999px; background: #0B3B37; padding: 4px 7px; }
+.guigui-sponsored-nav { display: inline-flex; height: 28px; width: 28px; align-items: center; justify-content: center; border: 1px solid rgba(255, 255, 255, .28); border-radius: 999px; background: #0B3B37; color: #fff; cursor: pointer; transition: background-color .2s ease; }
+.guigui-sponsored-nav:hover { background: #14574A; }
+.guigui-sponsored-nav:focus-visible { outline: 2px solid #F58220; outline-offset: 2px; }
+.guigui-sponsored-counter { min-width: 30px; text-align: center; color: #fff; font-size: 13px; font-weight: 700; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
 .guigui-search {
   display: flex;
   align-items: center;
@@ -1023,7 +1037,7 @@ html.dark .guigui-navbar .guigui-brand-mark svg path { fill: var(--color-green-1
   border: 1px solid rgba(255,255,255,.26);
   border-radius: 999px;
   padding: 7px 12px;
-  background: rgba(255,255,255,.08);
+  background: #0B3B37;
   color: #EAF2EF;
   font-size: 11px;
   font-weight: 700;
@@ -1031,7 +1045,7 @@ html.dark .guigui-navbar .guigui-brand-mark svg path { fill: var(--color-green-1
 }
 .guigui-quick-link:hover {
   border-color: rgba(232,162,58,.75);
-  background: rgba(232,162,58,.16);
+  background: #6B3F0D;
   color: #fff;
 }
 .guigui-section { margin-top: 28px; }
@@ -1092,39 +1106,60 @@ html.dark .guigui-navbar .guigui-brand-mark svg path { fill: var(--color-green-1
   background: linear-gradient(135deg, var(--ink), #0f4d4a);
   color: #fff;
 }
+/* Cartão do diretório — mesma estrutura do destaque: fotografia full-bleed,
+   selos sobrepostos e corpo verde-escuro com logótipo, etiquetas e CTA. */
 .guigui-business-card {
+  position: relative;
   overflow: hidden;
   height: 100%;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-xl);
-  background: var(--color-bg-surface);
-  box-shadow: var(--shadow-md);
+  border: 1px solid rgba(20, 87, 74, .65);
+  border-radius: 20px;
+  background: linear-gradient(180deg, #0C3B33 0%, #072B25 100%);
+  box-shadow: 0 22px 44px -34px rgba(4, 32, 26, .9);
   transition: transform var(--duration-normal) var(--ease-standard), box-shadow var(--duration-normal) var(--ease-standard), border-color var(--duration-normal) var(--ease-standard);
 }
-.guigui-business-card:hover { transform: translateY(-3px); border-color: var(--color-border-strong); box-shadow: var(--shadow-lg); }
-/* Fotografia premium: a imagem aparece inteira dentro de uma moldura com
-   fundo subtil e cantos arredondados, sem cortes — mesmo tratamento dos
-   destaques da página inicial (.guigui-sponsored-media).
-   Os badges ficam numa barra própria acima da moldura (e o "Comparar" abaixo
-   dela), alinhados com as suas margens, para nunca taparem a fotografia. */
-.guigui-business-cover { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 12px 12px 0; background: var(--color-bg-subtle); }
-.guigui-business-cover-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
-.guigui-business-cover-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
-/* A fotografia ocupa toda a área reservada da moldura (o espaço previsto antes
-   era este 16/9): sem margem interior, a imagem escala até às bordas e só sobra
-   fundo verde nas proporções que não coincidem com a moldura. */
-.guigui-business-cover-frame { position: relative; display: flex; width: 100%; aspect-ratio: 16 / 9; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--color-green-100); border-radius: 14px; background: var(--color-green-50); }
-html.dark .guigui-business-cover-frame { border-color: var(--color-green-900); background: var(--color-green-950); }
-.guigui-business-cover-frame img { display: block; width: 100%; height: 100%; object-fit: contain; }
-.guigui-business-cover-footer { display: flex; align-items: center; justify-content: flex-end; padding-bottom: 12px; }
-.guigui-business-content { padding: 0; }
-.guigui-business-content h3 { margin: 0; color: var(--color-text-strong); font-family: var(--font-family); font-size: 16px; font-weight: 700; }
-.guigui-business-content p { margin: 0; color: var(--color-text-default); font-size: 13px; line-height: 1.6; }
-.guigui-business-actions { display: flex; gap: 8px; margin-top: 0; padding-top: 0; border-top: 1px solid var(--color-border-subtle); }
-.guigui-business-actions a, .guigui-business-actions button { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid; transition: all var(--duration-fast) var(--ease-standard); }
-.guigui-business-actions .contact { width: 44px; }
-.guigui-business-actions .view { flex: 1; }
-.guigui-business-actions .view:hover { }
+.guigui-business-card:hover { transform: translateY(-3px); border-color: rgba(255, 255, 255, .3); box-shadow: 0 28px 50px -34px rgba(4, 32, 26, .95); }
+.guigui-business-cover { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #0A332B; }
+.guigui-business-cover-image { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 320ms var(--guigui-ease); }
+.guigui-business-card:hover .guigui-business-cover-image { transform: scale(1.03); }
+.guigui-business-cover-fallback { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; background: radial-gradient(circle at 30% 20%, #1C6E5C, #062A24 70%); color: rgba(255, 255, 255, .85); font-size: 44px; font-weight: 800; letter-spacing: .08em; }
+.guigui-business-cover-tags { position: absolute; top: 12px; left: 12px; display: flex; max-width: calc(100% - 132px); flex-wrap: wrap; gap: 6px; }
+.guigui-business-tag { display: inline-flex; align-items: center; gap: 5px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 999px; background: #0A352C; padding: 5px 10px; color: #fff; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.guigui-business-tag--gold { border-color: rgba(255, 214, 153, .45); color: #FFD79A; }
+.guigui-business-status { position: absolute; top: 12px; right: 12px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 999px; background: #0A352C; padding: 7px 14px; color: #fff; font-size: 12px; font-weight: 600; }
+.guigui-business-status-dot { width: 8px; height: 8px; border-radius: 999px; background: #8FA7A0; }
+.guigui-business-status-dot.is-open { background: #37D67A; box-shadow: 0 0 0 3px rgba(55, 214, 122, .18); }
+.guigui-business-status-dot.is-closed { background: #F0A04B; }
+.guigui-business-compare { position: absolute; right: 12px; bottom: 12px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(255, 255, 255, .2); border-radius: 999px; background: #0A352C; padding: 7px 14px; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; transition: background-color .2s ease, border-color .2s ease; }
+.guigui-business-compare:hover { background: #0D4238; }
+.guigui-business-compare.is-selected { border-color: #F58220; background: #F58220; }
+.guigui-business-compare:disabled { cursor: not-allowed; opacity: .5; }
+.guigui-business-compare:focus-visible, .guigui-business-actions .contact:focus-visible, .guigui-business-actions .view:focus-visible { outline: 2px solid #F58220; outline-offset: 2px; }
+.guigui-business-body { display: flex; flex: 1; flex-direction: column; padding: 16px 18px 18px; }
+.guigui-business-heading { display: flex; align-items: center; gap: 12px; }
+.guigui-business-logo { width: 54px; height: 54px; flex-shrink: 0; border: 2px solid rgba(255, 255, 255, .9); border-radius: 999px; background: #fff; object-fit: cover; }
+.guigui-business-logo.is-fallback { display: flex; align-items: center; justify-content: center; color: #0C3B33; font-size: 16px; font-weight: 800; letter-spacing: .02em; }
+.guigui-business-title { display: -webkit-box; min-width: 0; margin: 0; overflow: hidden; color: #fff; font-family: var(--font-family); font-size: clamp(18px, 1.5vw, 23px); font-weight: 800; line-height: 1.15; letter-spacing: -.01em; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.guigui-business-title:hover { color: #FFD79A; }
+.guigui-business-verified { width: 18px; height: 18px; flex-shrink: 0; color: #37D67A; fill: #37D67A; }
+.guigui-business-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; color: rgba(255, 255, 255, .86); font-size: 12.5px; }
+.guigui-business-location { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.guigui-business-location svg { color: rgba(255, 255, 255, .72); }
+.guigui-business-meta-divider { width: 1px; height: 16px; background: rgba(255, 255, 255, .22); }
+.guigui-business-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255, 255, 255, .22); border-radius: 999px; padding: 5px 11px; color: rgba(255, 255, 255, .9); font-size: 12px; font-weight: 500; }
+.guigui-business-chip svg { color: rgba(255, 255, 255, .65); }
+.guigui-business-description { display: -webkit-box; margin: 12px 0 0; overflow: hidden; color: rgba(255, 255, 255, .78); font-size: 13px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.guigui-business-more { color: #FFB067; font-weight: 700; }
+.guigui-business-rating { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; color: #FFD79A; font-size: 12px; font-weight: 600; }
+.guigui-business-rating svg { color: #FFB067; fill: #FFB067; }
+.guigui-business-rating-count { color: rgba(255, 255, 255, .55); font-weight: 500; }
+.guigui-business-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, .12); background: transparent; }
+.guigui-business-actions a, .guigui-business-actions button { display: inline-flex; align-items: center; justify-content: center; border: 1px solid; cursor: pointer; transition: background-color .2s ease, border-color .2s ease, color .2s ease; }
+.guigui-business-actions .contact { width: 40px; height: 40px; flex-shrink: 0; border-color: rgba(255, 255, 255, .22); border-radius: 999px; background: #0A352C; color: #fff; }
+.guigui-business-actions .contact:hover { border-color: rgba(255, 255, 255, .36); background: #14574A; }
+.guigui-business-actions .contact.is-active { border-color: rgba(245, 130, 32, .6); background: #8A5211; color: #FFD79A; }
+.guigui-business-actions .view { flex: 1 1 120px; min-height: 44px; gap: 8px; border: 0; border-radius: 999px; background: #F58220; color: #fff; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.guigui-business-actions .view:hover { background: #E6730F; }
 
 /* Identidade: ação primária e ligações em verde da marca, não no azul informativo.
    (As restantes equivalências são garantidas pela normalização de paleta em :root.) */
@@ -1160,16 +1195,25 @@ html:not(.dark) .guigui-app-shell .text-emerald-600, html:not(.dark) .guigui-app
   .guigui-search-button { padding: 10px 12px; }
   .guigui-category-grid { display: flex; overflow-x: auto; margin: 0 -2px; padding-bottom: 4px; }
   .guigui-category-card { min-width: 82px; }
-  .guigui-sponsored-banner > :first-child { min-height: 0; }
-  .guigui-sponsored-copy { padding: 18px 20px; }
-  /* Em ecrã estreito o banner empilha: a imagem ocupa uma faixa proporcional
-     em vez de uma altura fixa que sobrava por baixo. */
-  .guigui-sponsored-media { height: auto; min-height: 0; aspect-ratio: 16 / 9; padding: 10px; }
-  /* Cartões do diretório em ecrã estreito: margem e espaçamento ligeiramente
-     mais curtos para a moldura da foto manter área útil. */
-  .guigui-business-cover { gap: 8px; padding: 10px 10px 0; }
-  .guigui-business-cover-footer { padding-bottom: 10px; }
-  .guigui-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; }
+  /* Em ecrã estreito o gradiente passa a vertical: o texto fica por cima da
+     parte inferior da fotografia, onde o contraste é maior. */
+  .guigui-sponsored-banner { height: 380px; }
+  .guigui-sponsored-slide { min-height: 0; height: 100%; }
+  .guigui-sponsored-scrim { background: linear-gradient(0deg, rgba(4, 28, 22, .97) 0%, rgba(4, 28, 22, .84) 45%, rgba(4, 28, 22, .3) 76%, rgba(4, 28, 22, .16) 100%); }
+  .guigui-sponsored-bg { object-position: 68% center; }
+  .guigui-sponsored-content { width: 100%; gap: 12px; padding: 22px 20px 76px; }
+  .guigui-sponsored-title { font-size: clamp(26px, 7vw, 36px); }
+  .guigui-sponsored-description { font-size: 13.5px; -webkit-line-clamp: 2; }
+  .guigui-sponsored-pager { right: 20px; bottom: 16px; left: 20px; justify-content: space-between; gap: 10px; }
+  .guigui-sponsored-progress { flex: 1; width: auto; }
+  /* Cartões do diretório em ecrã estreito: uma coluna, para a fotografia,
+     as etiquetas e as acções manterem a mesma estrutura do cartão largo. */
+  .guigui-business-body { padding: 14px 14px 16px; }
+  .guigui-business-logo { width: 48px; height: 48px; }
+  .guigui-business-actions { gap: 8px; padding-top: 14px; }
+  .guigui-business-actions .contact { width: 40px; height: 40px; }
+  .guigui-business-actions .view { min-height: 42px; font-size: 12.5px; }
+  .guigui-card-grid { grid-template-columns: 1fr; padding: 12px; }
   .guigui-mini-thumb { height: 82px; }
   .guigui-directory-header { align-items: start; flex-direction: column; }
 }
@@ -1545,17 +1589,17 @@ html:not(.dark) .guigui-business-content .text-emerald-700, html:not(.dark) .gui
 .guigui-support-card { padding: 16px; border: 1px solid var(--line); border-radius: 17px; background: #fff; }
 .guigui-support-card.is-focused { border-color: #d69a3e; box-shadow: 0 0 0 3px rgba(214,154,62,.16); }
 .guigui-support-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.guigui-support-category { color: #a66b1e; font-size: 9px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; }
+.guigui-support-category { color: #8a5714; font-size: 9px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; }
 .guigui-support-card h3 { margin: 4px 0 0; color: var(--ink); font-size: 14px; font-weight: 600; }
 .guigui-support-card-header b { padding: 5px 8px; border-radius: 999px; background: #fff0d2; color: #8b5b17; font-size: 9px; white-space: nowrap; }
-.guigui-support-description { margin: 10px 0 0; color: var(--mute); font-size: 11px; line-height: 1.55; }
+.guigui-support-description { margin: 10px 0 0; color: #435c54; font-size: 11px; line-height: 1.55; }
 .guigui-support-replies, .guigui-support-last-reply { display: grid; gap: 8px; margin-top: 13px; }
 .guigui-support-replies > div, .guigui-support-last-reply { padding: 10px 12px; border-radius: 12px; background: #f4f8f6; color: var(--text); }
 .guigui-support-replies > div.is-own { background: #e5f3ec; }
-.guigui-support-replies small, .guigui-support-last-reply small { color: var(--mute); font-size: 9px; font-weight: 500; text-transform: uppercase; }
+.guigui-support-replies small, .guigui-support-last-reply small { color: #4a645c; font-size: 9px; font-weight: 500; text-transform: uppercase; }
 .guigui-support-replies p, .guigui-support-last-reply p { margin: 4px 0 0; font-size: 11px; line-height: 1.5; }
-.guigui-support-card footer { display: flex; align-items: center; gap: 5px; margin-top: 13px; color: #39836d; font-size: 10px; font-weight: 500; }
-.guigui-communication-notice { display: flex; align-items: flex-start; gap: 8px; margin: 0 26px 22px; padding: 11px 13px; border-radius: 12px; background: #f3f7f5; color: var(--mute); font-size: 10px; font-weight: 700; line-height: 1.45; }
+.guigui-support-card footer { display: flex; align-items: center; gap: 5px; margin-top: 13px; color: #1f6b58; font-size: 10px; font-weight: 600; }
+.guigui-communication-notice { display: flex; align-items: flex-start; gap: 8px; margin: 0 26px 22px; padding: 11px 13px; border-radius: 12px; background: #f3f7f5; color: #435c54; font-size: 10px; font-weight: 700; line-height: 1.45; }
 .guigui-communication-notice svg { flex: 0 0 auto; color: #39836d; }
 
 @media (max-width: 760px) {
@@ -1747,7 +1791,7 @@ html.dark [class~="bg-white"] {
 
 /* Barra fixa inferior (mobile): acompanha o tema escuro. */
 html.dark [class*="max-[1100px]:flex"] {
-  background-color: rgba(13, 41, 36, 0.96) !important;
+  background-color: #0D2924 !important;
   border-color: #285849 !important;
 }
 
@@ -1847,7 +1891,7 @@ html.dark .guigui-profile-dashboard table td { background-color: transparent !im
   border: 1px solid var(--line);
   border-radius: 999px;
   background: #fff;
-  color: var(--mute);
+  color: var(--ink);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -1882,9 +1926,9 @@ html.dark .guigui-profile-dashboard table td { background-color: transparent !im
   box-shadow: 0 12px 26px -24px rgba(11, 59, 55, .75);
 }
 .guigui-message-bubble.is-own {
-  border-color: var(--color-bg-surface);
+  border-color: #0b3b37;
   border-radius: 16px 16px 5px 16px;
-  background: var(--color-bg-surface);
+  background: #0b3b37;
   color: #fff;
 }
 .guigui-message-bubble > p.guigui-message-author {
@@ -2468,7 +2512,7 @@ html.dark a.bg-white svg {
 
 .guigui-message-row .guigui-message-bubble .guigui-message-author {
   margin: 0 0 3px;
-  color: #5d7d74;
+  color: #3f5a52;
   font-size: 9.5px;
   font-weight: 800;
   letter-spacing: .04em;
@@ -2491,7 +2535,7 @@ html.dark a.bg-white svg {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  color: #7b8f88;
+  color: #4f665f;
   font-size: 9.5px;
   font-weight: 600;
 }
@@ -2797,7 +2841,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #f6f9f8;
-  color: #6b837b;
+  color: #4f665f;
 }
 .guigui-communication-sidebar .guigui-inbox-search:focus-within {
   border-color: #78b9a4;
@@ -2823,7 +2867,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   border: 1px solid var(--line);
   border-radius: 999px;
   background: #fff;
-  color: #5d7d74;
+  color: #435c54;
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
@@ -2918,7 +2962,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
 }
 .guigui-communication-sidebar .guigui-conversation-top time {
   flex: 0 0 auto;
-  color: #7b8f88;
+  color: #566f67;
   font-size: 10.5px;
   font-weight: 600;
   white-space: nowrap;
@@ -2936,7 +2980,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
 .guigui-communication-sidebar .guigui-conversation-preview {
   overflow: hidden;
   margin: 0;
-  color: #6b837b;
+  color: #4d665e;
   font-size: 11.5px;
   line-height: 1.4;
   text-overflow: ellipsis;
@@ -2965,13 +3009,13 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   gap: 6px;
   margin: 1px 0 0;
 }
-.guigui-communication-sidebar .guigui-ticket-category { margin: 0; color: #a66b1e; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.guigui-communication-sidebar .guigui-ticket-category { margin: 0; color: #8a5714; font-size: 10px; font-weight: 700; white-space: nowrap; }
 .guigui-communication-sidebar .guigui-ticket-state {
   margin: 0;
   padding: 1px 7px;
   border-radius: 999px;
   background: #eef4f2;
-  color: #4c6a61;
+  color: #37534a;
   font-size: 9.5px;
   font-weight: 800;
   white-space: nowrap;
@@ -3019,7 +3063,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
 .dark .guigui-communication-sidebar .guigui-inbox-search { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #9dbcb1; }
 .dark .guigui-communication-sidebar .guigui-inbox-search input { color: #f1fbf6; }
 .dark .guigui-communication-sidebar .guigui-inbox-filters button { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #cfe8dd; }
-.dark .guigui-communication-sidebar .guigui-inbox-filters button span { background: rgba(255, 255, 255, .1); }
+.dark .guigui-communication-sidebar .guigui-inbox-filters button span { background: rgba(255, 255, 255, .1); color: #cfe8dd; }
 .dark .guigui-communication-sidebar .guigui-inbox-filters button.is-active { background: var(--color-green-400); border-color: var(--color-green-400); color: #06231d; }
 .dark .guigui-communication-sidebar .guigui-conversation-item:hover,
 .dark .guigui-communication-sidebar .guigui-ticket-item:hover { background: #133229; }
@@ -3029,7 +3073,10 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
 .dark .guigui-communication-sidebar .guigui-conversation-preview { color: #a9c7bc; }
 .dark .guigui-communication-sidebar .guigui-conversation-item.is-unread .guigui-conversation-preview { color: #e6f6ef; }
 .dark .guigui-communication-sidebar .guigui-conversation-subject { color: #8dd4b8; }
-.dark .guigui-communication-sidebar .guigui-conversation-top time { color: #8aa79c; }
+.dark .guigui-communication-sidebar .guigui-conversation-top time { color: #a7c3b8; }
+.dark .guigui-composer-status { color: #a7c3b8; }
+.dark .guigui-communication-sidebar .guigui-conversation-avatar,
+.dark .guigui-communication-sidebar .guigui-ticket-icon { background: #1c4a3e; color: #bfe8d5; }
 .dark .guigui-communication-sidebar .guigui-ticket-state { background: var(--color-bg-subtle); color: var(--color-green-200); }
 .dark .guigui-communication-thread > .guigui-thread-notice { background: #081c19; border-color: #285849; }
 /* === Mensagens: desenho de referência (barra, lista e conversa) === */.guigui-communication-shell {
@@ -3124,9 +3171,10 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
 .guigui-communication-sidebar .guigui-inbox-new {
   min-height: 36px;
   gap: 7px;
-  border-color: var(--color-bg-surface);
+  border-color: var(--color-green-800);
   border-radius: 10px;
-  background: var(--color-bg-surface);
+  background: var(--color-green-800);
+  color: #fff;
   font-size: 11.5px;
   font-weight: 600;
 }
@@ -3153,9 +3201,9 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   font-size: 11.5px;
   font-weight: 600;
 }
-.guigui-communication-sidebar .guigui-inbox-filters button span { background: #eef2f0; color: #6b7f77; }
-.guigui-communication-sidebar .guigui-inbox-filters button.is-active { border-color: var(--color-bg-surface); background: var(--color-bg-surface); color: #fff; }
-.guigui-communication-sidebar .guigui-inbox-filters button.is-active span { background: rgba(255, 255, 255, .2); color: #fff; }
+.guigui-communication-sidebar .guigui-inbox-filters button span { background: #eef2f0; color: #43584f; }
+.guigui-communication-sidebar .guigui-inbox-filters button.is-active { border-color: var(--color-green-800); background: var(--color-green-800); color: #fff; }
+.guigui-communication-sidebar .guigui-inbox-filters button.is-active span { background: rgba(255, 255, 255, .2); color: inherit; }
 
 .guigui-communication-sidebar > .guigui-communication-list { gap: 2px; padding: 6px; }
 .guigui-communication-sidebar .guigui-conversation-item,
@@ -3175,8 +3223,8 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   font-weight: 700;
 }
 .guigui-communication-sidebar .guigui-conversation-top strong { color: #17211e; font-size: 13px; font-weight: 700; }
-.guigui-communication-sidebar .guigui-conversation-top time { color: #8a9a94; font-size: 11px; font-weight: 500; }
-.guigui-communication-sidebar .guigui-conversation-preview { margin-top: 1px; color: #6d7f78; font-size: 12px; }
+.guigui-communication-sidebar .guigui-conversation-top time { color: #5b7169; font-size: 11px; font-weight: 500; }
+.guigui-communication-sidebar .guigui-conversation-preview { margin-top: 1px; color: #566b64; font-size: 12px; }
 .guigui-communication-sidebar .guigui-conversation-item.is-unread .guigui-conversation-preview { color: #33473f; font-weight: 600; }
 .guigui-communication-sidebar .guigui-unread-badge {
   min-width: 18px;
@@ -3200,7 +3248,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   font-size: 13px;
 }
 .guigui-thread-back:hover,
-.guigui-thread-info:hover { background: #f2f7f4; color: var(--color-bg-surface); }
+.guigui-thread-info:hover { background: #f2f7f4; color: #0b3b37; }
 .guigui-thread-avatar { width: 40px; height: 40px; flex-basis: 40px; background: #e2f0e8; color: #1d5a47; font-size: 13px; font-weight: 700; }
 .guigui-thread-identity strong { color: var(--color-text-strong); font-size: 15px; font-weight: 700; }
 .guigui-thread-status { gap: 6px; margin-top: 2px; color: #5f7a71; font-size: 11.5px; font-weight: 500; }
@@ -3239,9 +3287,9 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   box-shadow: none;
 }
 .guigui-message-row.is-own .guigui-message-bubble {
-  border-color: var(--color-bg-surface);
+  border-color: #0b3b37;
   border-radius: 12px 12px 4px 12px;
-  background: var(--color-bg-surface);
+  background: #0b3b37;
   color: #f4faf7;
 }
 .guigui-message-content { display: grid; gap: 4px; }
@@ -3283,7 +3331,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   color: #5b7169;
   font-size: 16px;
 }
-.guigui-message-reply .guigui-composer-action:hover { background: #eef4f1; color: var(--color-bg-surface); }
+.guigui-message-reply .guigui-composer-action:hover { background: #eef4f1; color: #0b3b37; }
 .guigui-message-reply > button.guigui-composer-send {
   display: inline-flex;
   width: auto;
@@ -3294,7 +3342,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   padding: 0 16px;
   border: 0;
   border-radius: 10px;
-  background: var(--color-bg-surface);
+  background: var(--color-green-800);
   color: #fff;
   font-size: 12px;
   font-weight: 600;
@@ -3306,7 +3354,7 @@ html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
   padding: 7px 18px;
   border-top: 1px solid #f0f3f1;
   background: #fbfcfb;
-  color: #8a9a94;
+  color: #5b7169;
   font-size: 10px;
   font-weight: 500;
 }
@@ -3537,15 +3585,15 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   border: 1px solid #d7e3dd;
   border-radius: 999px;
   background: #f6faf8;
-  color: var(--color-bg-surface);
+  color: #0b3b37;
   font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
   transition: border-color .15s ease, background .15s ease;
 }
-.guigui-communication-external-email:hover { border-color: var(--color-bg-surface); background: #eaf4ef; }
-.guigui-communication-external-email:focus-visible { outline: 2px solid var(--color-bg-surface); outline-offset: 2px; }
+.guigui-communication-external-email:hover { border-color: #0b3b37; background: #eaf4ef; }
+.guigui-communication-external-email:focus-visible { outline: 2px solid #0b3b37; outline-offset: 2px; }
 
 .guigui-email-overlay {
   position: fixed;
@@ -3601,7 +3649,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   color: #58706a;
   cursor: pointer;
 }
-.guigui-email-close:hover { border-color: var(--color-bg-surface); color: var(--color-bg-surface); }
+.guigui-email-close:hover { border-color: #0b3b37; color: #0b3b37; }
 
 .guigui-email-identity {
   display: flex;
@@ -3681,12 +3729,12 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   border: 1px solid #d7e3dd;
   border-radius: 11px;
   background: #fff;
-  color: var(--color-bg-surface);
+  color: #0b3b37;
   font-size: 11.5px;
   font-weight: 800;
   cursor: pointer;
 }
-.guigui-email-secondary:hover { border-color: var(--color-bg-surface); background: #f6faf8; }
+.guigui-email-secondary:hover { border-color: #0b3b37; background: #f6faf8; }
 
 @media (max-width: 640px) {
   .guigui-communication-external-email span { display: none; }

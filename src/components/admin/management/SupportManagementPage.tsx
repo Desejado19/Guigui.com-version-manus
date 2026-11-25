@@ -30,26 +30,26 @@ const SupportDetail: React.FC<{
         ].map(([label, value]) => (
           <div key={label}>
             <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">{label}</div>
-            <div className="mt-0.5 font-medium text-slate-700">{value || '—'}</div>
+            <div className="mt-0.5 font-medium text-slate-700 dark:text-slate-100">{value || '—'}</div>
           </div>
         ))}
       </div>
 
       <div>
         <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Descrição</div>
-        <p className="mt-1 whitespace-pre-wrap rounded-xl bg-slate-50 p-3 leading-relaxed text-slate-700">{request.description}</p>
+        <p className="mt-1 whitespace-pre-wrap rounded-xl bg-slate-50 p-3 leading-relaxed text-slate-700 dark:bg-slate-800 dark:text-slate-100">{request.description}</p>
       </div>
 
       <div>
         <div className="mb-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Respostas</div>
         {(request.replies || []).length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-300 p-3 text-slate-500">Ainda não existem respostas neste pedido.</p>
+          <p className="rounded-xl border border-dashed border-slate-300 p-3 text-slate-500 dark:border-slate-600 dark:text-slate-300">Ainda não existem respostas neste pedido.</p>
         ) : (
           <ul className="space-y-2">
             {(request.replies || []).map((item) => (
               <li key={item.id} className="rounded-xl border border-[var(--color-border-default)] p-2.5">
                 <div className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">{item.senderRole} · {formatManagementDate(item.createdAt)}</div>
-                <p className="mt-1 whitespace-pre-wrap text-slate-700">{item.text}</p>
+                <p className="mt-1 whitespace-pre-wrap text-slate-700 dark:text-slate-100">{item.text}</p>
               </li>
             ))}
           </ul>
@@ -59,7 +59,7 @@ const SupportDetail: React.FC<{
       <div className="space-y-2 rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] p-3">
         <label className="flex flex-col gap-1">
           <span className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">Responder ao pedido</span>
-          <textarea value={reply} onChange={(event) => setReply(event.target.value)} rows={3} className="rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2 text-[11px] text-slate-800 outline-none focus:border-[var(--color-focus-ring)]" placeholder="Escreva a resposta administrativa…" />
+          <textarea value={reply} onChange={(event) => setReply(event.target.value)} rows={3} className="rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-2 text-[11px] text-slate-800 outline-none focus:border-[var(--color-focus-ring)] dark:border-slate-600 dark:bg-slate-900 dark:text-white" placeholder="Escreva a resposta administrativa…" />
         </label>
         <div className="flex flex-wrap items-center gap-2">
           <ManagementActionButton

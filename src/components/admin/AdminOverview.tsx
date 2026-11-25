@@ -371,6 +371,9 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
                     <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[var(--color-green-600)]" aria-hidden="true" />Confirmado</span>
                     <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[var(--color-amber-500)]" aria-hidden="true" />Pendente: {formatXOF(pendingRevenue)}</span>
                     <span>Receita total confirmada: {formatXOF(confirmedRevenue)}</span>
+                    <span className="basis-full text-[9.5px] font-semibold text-[var(--color-text-muted)]">
+                      Faturação = pedidos pagos (orders.gross_amount_xof). Comissão = orders.fee_amount_xof; o líquido da empresa = orders.net_amount_xof — a mesma fonte do financeiro e do centro de controlo do evento.
+                    </span>
                   </div>
                 </div>
               ) : (

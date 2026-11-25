@@ -155,31 +155,10 @@ async function loadPostgresOffer(eventId: string, ticketTypeId: string): Promise
   const snapshot = (event.data ?? {}) as Record<string, unknown>;
   if (String(snapshot.salesOpen ?? snapshot.ticketSalesOpen ?? 'true') === 'false') return null;
 
-  const ticketType = snapshotTypes.find((candidate) => String(candidate.id) === ticketTypeId);
-  if (!ticketType) return null;
-  if (String(ticketType.salesOpen ?? 'true') === 'false') return null;
+  const snapshotTicketType = snapshotTypes.find((candidate) => String(candidate.id) === ticketTypeId);
+  if (snapshotTicketType && String(snapshotTicketType.salesOpen ?? 'true') === 'false') return null;
 
-  const unitPriceXOF = Number(ticketType.priceXOF);
-  const availableQuantity = Number(ticketType.availableQuantity);
-  const snapshotSold = Number(ticketType.soldQuantity);
-  if (!Number.isSafeInteger(unitPriceXOF) || unitPriceXOF <= 0 || unitPriceXOF > 100_000_000) return null;
-  if (!Number.isSafeInteger(availableQuantity) || availableQuantity < 0) return null;
-
-  const ticketTypeName = String(ticketType.name ?? 'Entrada Geral');
-
-  const rowResult = await databasePool.query<{ id: string }>(
-    `SELECT id
-       FROM ticket_types
-      WHERE event_id = $1 AND (id = $2 OR name = $3)
-      ORDER BY CASE WHEN id = $2 THEN 0 ELSE 1 END
-      LIMIT 1`,
-    [eventId, ticketTypeId, ticketTypeName],
-  );
-  const storedTicketTypeId = rowResult.rows[0]?.id;
-
-  let storedSold = 0;
-  let reservedQuantity = 0;
-  if (storedTicketTypeId) {
+  const countStoredUsage = async (storedId: string) => {
     const soldResult = await databasePool.query<{ sold: number }>(
       `SELECT COUNT(t.id)::integer AS sold
          FROM tickets t
@@ -188,18 +167,66 @@ async function loadPostgresOffer(eventId: string, ticketTypeId: string): Promise
             t.status IN ('valid', 'used')
             OR (t.status = 'pending' AND t.created_at > NOW() - INTERVAL '15 minutes')
           )`,
-      [storedTicketTypeId],
+      [storedId],
     );
-    storedSold = Number(soldResult.rows[0]?.sold ?? 0);
-
     const reservedResult = await databasePool.query<{ reserved: number }>(
       `SELECT COALESCE(SUM(tr.quantity), 0)::integer AS reserved
          FROM ticket_reservations tr
         WHERE tr.ticket_type_id = $1 AND tr.status = 'pending' AND tr.expires_at > NOW()`,
-      [storedTicketTypeId],
+      [storedId],
     );
-    reservedQuantity = Number(reservedResult.rows[0]?.reserved ?? 0);
+    return {
+      sold: Number(soldResult.rows[0]?.sold ?? 0),
+      reserved: Number(reservedResult.rows[0]?.reserved ?? 0),
+    };
+  };
+
+  let unitPriceXOF: number;
+  let availableQuantity: number;
+  let snapshotSold = 0;
+  let ticketTypeName: string;
+  let storedTicketTypeId: string | undefined;
+
+  if (snapshotTicketType) {
+    unitPriceXOF = Number(snapshotTicketType.priceXOF);
+    availableQuantity = Number(snapshotTicketType.availableQuantity);
+    snapshotSold = Number(snapshotTicketType.soldQuantity);
+    ticketTypeName = String(snapshotTicketType.name ?? 'Entrada Geral');
+
+    const rowResult = await databasePool.query<{ id: string }>(
+      `SELECT id
+         FROM ticket_types
+        WHERE event_id = $1 AND (id = $2 OR name = $3)
+        ORDER BY CASE WHEN id = $2 THEN 0 ELSE 1 END
+        LIMIT 1`,
+      [eventId, ticketTypeId, ticketTypeName],
+    );
+    storedTicketTypeId = rowResult.rows[0]?.id;
+  } else {
+    // Eventos importados antes de existir o snapshot JSON: o catálogo desses
+    // eventos só está em `ticket_types`, e sem esta leitura a oferta nunca
+    // resolvia e a compra respondia `TICKET_OFFER_NOT_FOUND`.
+    const fallbackResult = await databasePool.query<{ id: string; name: string; price_xof: number; quantity: number }>(
+      `SELECT id, name, price_xof::integer AS price_xof, quantity::integer AS quantity
+         FROM ticket_types
+        WHERE event_id = $1 AND id = $2
+        LIMIT 1`,
+      [eventId, ticketTypeId],
+    );
+    const storedRow = fallbackResult.rows[0];
+    if (!storedRow) return null;
+    unitPriceXOF = Number(storedRow.price_xof);
+    availableQuantity = Number(storedRow.quantity);
+    ticketTypeName = String(storedRow.name || 'Entrada Geral');
+    storedTicketTypeId = storedRow.id;
   }
+
+  if (!Number.isSafeInteger(unitPriceXOF) || unitPriceXOF <= 0 || unitPriceXOF > 100_000_000) return null;
+  if (!Number.isSafeInteger(availableQuantity) || availableQuantity < 0) return null;
+
+  const usage = storedTicketTypeId ? await countStoredUsage(storedTicketTypeId) : { sold: 0, reserved: 0 };
+  const storedSold = usage.sold;
+  const reservedQuantity = usage.reserved;
 
   const eventDate = typeof snapshot.date === 'string'
     ? snapshot.date

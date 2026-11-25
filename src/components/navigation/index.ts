@@ -1,4 +1,4 @@
 export * from './CitizenBottomNav';
-export * from './GlassBottomNav';
+export * from './BottomNav';
 export * from './ProfileSidebar';
 

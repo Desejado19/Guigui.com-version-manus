@@ -222,6 +222,124 @@ function mapSubscription(row: any) {
   };
 }
 
+const USAGE_FIELD_BY_CODE: Record<string, string> = {
+  posts: 'postsUsed',
+  promotions: 'promotionsUsed',
+  events: 'eventsUsed',
+  images: 'imagesUsed',
+  campaigns: 'campaignsUsed',
+};
+
+function mapExceptions(raw: unknown) {
+  const value = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, any> : {};
+  const limits = value.limits && typeof value.limits === 'object' && !Array.isArray(value.limits) ? value.limits : {};
+  const features = value.features && typeof value.features === 'object' && !Array.isArray(value.features) ? value.features : {};
+  return {
+    priceXOF: value.priceXOF === undefined || value.priceXOF === null ? null : asInt(value.priceXOF),
+    billingPeriod: value.billingPeriod === 'annual' ? 'annual' : value.billingPeriod === 'monthly' ? 'monthly' : null,
+    limits: Object.fromEntries(Object.entries(limits).map(([code, limit]) => [code, limit === 'unlimited' || limit === 'negotiated' ? limit : asInt(limit)])),
+    features: Object.fromEntries(Object.entries(features).filter(([, enabled]) => typeof enabled === 'boolean')),
+    notes: typeof value.notes === 'string' ? value.notes : '',
+    updatedAt: value.updatedAt ? String(value.updatedAt) : null,
+    updatedBy: value.updatedBy ? String(value.updatedBy) : null,
+  };
+}
+
+function usageFromCompanyData(data: unknown) {
+  const source = data && typeof data === 'object' && !Array.isArray(data)
+    ? (data as Record<string, any>).subscriptionUsage
+    : null;
+  const usage = source && typeof source === 'object' ? source : {};
+  const read = (field: string) => Math.max(0, asInt(usage[field]));
+  return {
+    postsUsed: read('postsUsed'),
+    promotionsUsed: read('promotionsUsed'),
+    eventsUsed: read('eventsUsed'),
+    imagesUsed: read('imagesUsed'),
+    campaignsUsed: read('campaignsUsed'),
+  };
+}
+
+/**
+ * Cruza a fotografia contratual com as exceções negociadas e o uso medido.
+ * A fotografia nunca é reescrita: as exceções são uma camada adicional.
+ */
+function computeEntitlements(
+  featureSnapshot: unknown,
+  limitsSnapshot: unknown,
+  exceptions: ReturnType<typeof mapExceptions>,
+  catalog: Array<{ code: string; name: string; category: string; unit: string | null; valueType: string }>,
+  usage: Record<string, number>,
+) {
+  const snapshotFeatures = featureSnapshot && typeof featureSnapshot === 'object' ? featureSnapshot as Record<string, any> : {};
+  const snapshotLimits = limitsSnapshot && typeof limitsSnapshot === 'object' ? limitsSnapshot as Record<string, any> : {};
+  const byCode = new Map(catalog.map((feature) => [feature.code, feature]));
+  const codes = new Set<string>([
+    ...Object.keys(snapshotFeatures),
+    ...Object.keys(snapshotLimits),
+    ...catalog.map((feature) => feature.code),
+  ]);
+  const entitlements = Array.from(codes).filter(Boolean).map((code) => {
+    const meta = byCode.get(code);
+    const base = snapshotFeatures[code] && typeof snapshotFeatures[code] === 'object' ? snapshotFeatures[code] : null;
+    const hasBaseLimit = Object.prototype.hasOwnProperty.call(snapshotLimits, code);
+    const baseEnabled = base ? Boolean(base.enabled) : hasBaseLimit;
+    const baseKind = String(base?.limitKind || (hasBaseLimit ? 'number' : 'flag'));
+    const baseLimit = hasBaseLimit ? snapshotLimits[code] : base?.numericValue ?? null;
+    const enabled = Object.prototype.hasOwnProperty.call(exceptions.features, code)
+      ? Boolean((exceptions.features as Record<string, boolean>)[code])
+      : baseEnabled;
+    const hasExceptionLimit = Object.prototype.hasOwnProperty.call(exceptions.limits, code);
+    let limitKind = baseKind;
+    let limit: number | 'unlimited' | 'negotiated' | null = baseLimit === null || baseLimit === undefined ? null : baseLimit;
+    if (hasExceptionLimit) {
+      const exceptionLimit = (exceptions.limits as Record<string, any>)[code];
+      if (exceptionLimit === 'unlimited' || exceptionLimit === 'negotiated') {
+        limitKind = exceptionLimit;
+        limit = null;
+      } else {
+        limitKind = 'number';
+        limit = asInt(exceptionLimit);
+      }
+    }
+    const used = Math.max(0, asInt(usage[USAGE_FIELD_BY_CODE[code] || '']));
+    const percent = limitKind === 'number' && typeof limit === 'number'
+      ? (limit <= 0 ? (used > 0 ? 100 : 0) : Math.min(999, Math.round((used / limit) * 100)))
+      : null;
+    const remaining = limitKind === 'number' && typeof limit === 'number'
+      ? Math.max(0, limit - used)
+      : limitKind === 'unlimited' || limitKind === 'negotiated' ? limitKind : null;
+    return {
+      code,
+      name: meta?.name || code,
+      category: meta?.category || 'custom',
+      unit: meta?.unit || null,
+      valueType: meta?.valueType || (limitKind === 'flag' ? 'flag' : 'quota'),
+      enabled,
+      limitKind,
+      limit,
+      baseLimit: baseLimit === undefined ? null : baseLimit,
+      source: hasExceptionLimit || Object.prototype.hasOwnProperty.call(exceptions.features, code) ? 'exception' : 'snapshot',
+      used,
+      remaining,
+      percent,
+      allowed: enabled && !(limitKind === 'number' && typeof limit === 'number' && used >= limit),
+    };
+  });
+  const alerts = entitlements
+    .filter((item) => item.percent !== null && item.percent >= 70)
+    .map((item) => ({
+      code: item.code,
+      percent: item.percent as number,
+      severity: (item.percent as number) >= 100 ? 'critical' : (item.percent as number) >= 90 ? 'warning' : 'info',
+      message: (item.percent as number) >= 100
+        ? `Limite de ${item.name} atingido (${item.used}/${item.limit}).`
+        : `${item.name} em ${item.percent}% do limite (${item.used}/${item.limit}).`,
+    }))
+    .sort((a, b) => b.percent - a.percent);
+  return { entitlements, alerts };
+}
+
 const SUBSCRIPTION_SELECT = `
   SELECT s.*, c.name AS company_name, c.status AS company_status,
          p.name AS plan_name, p.code AS plan_code,
@@ -365,34 +483,50 @@ export async function getCommercialOverview() {
     dbc.query(planConfigsQuery()),
     dbc.query(`SELECT plan_id, COUNT(*)::int AS n FROM subscriptions GROUP BY plan_id`),
     dbc.query(`SELECT id, version, old_values, new_values, changed_by, reason, created_at FROM ticket_fee_history ORDER BY version DESC LIMIT 100`),
-    // A receita de taxas tem de refletir o que é efetivamente cobrado. O checkout
-    // grava agora em orders.fee_amount_xof a taxa calculada com a política em vigor
-    // nesse momento, e esse valor prevalece. Ordens antigas (sem taxa registada)
-    // continuam a ser estimadas com a fórmula do checkout — percentagem sobre o valor
-    // bruto + taxa fixa por unidade, conforme o modelo atual.
-    dbc.query(`WITH policy AS (
-                 SELECT commission_percentage, fixed_fee_xof, billing_model, is_active
-                   FROM ticket_fee_settings WHERE id = 'default'
-               )
-               SELECT COUNT(*)::int AS ticket_count,
-                      COALESCE(SUM(o.gross_amount_xof),0)::bigint AS gross_xof,
-                      COALESCE(SUM(
-                        CASE
-                          WHEN o.fee_amount_xof > 0 THEN o.fee_amount_xof
-                          WHEN p.is_active IS NOT TRUE THEN 0
-                          WHEN p.billing_model = 'percentage_only'
-                            THEN ROUND(o.gross_amount_xof * p.commission_percentage / 100.0)
-                          WHEN p.billing_model = 'fixed_only' THEN p.fixed_fee_xof
-                          ELSE ROUND(o.gross_amount_xof * p.commission_percentage / 100.0) + p.fixed_fee_xof
-                        END
-                      ),0)::bigint AS revenue_xof
-                 FROM orders o
-                 LEFT JOIN policy p ON TRUE
-                WHERE o.status = 'paid'`),
+    // A receita de taxas reflete o que foi efetivamente cobrado: o checkout grava
+    // orders.fee_amount_xof e orders.net_amount_xof com a política em vigor no
+    // momento da compra. Não se recalcula com a política atual nem se usa
+    // payment_transactions.commission_amount_xof (legado, sempre 0), para que o
+    // evento, a empresa e a plataforma mostrem exatamente os mesmos valores.
+    dbc.query(`SELECT COUNT(*)::int AS ticket_count,
+                      COALESCE(SUM(gross_amount_xof),0)::bigint AS gross_xof,
+                      COALESCE(SUM(fee_amount_xof),0)::bigint AS revenue_xof,
+                      COALESCE(SUM(net_amount_xof),0)::bigint AS net_xof
+                 FROM orders
+                WHERE status = 'paid'`),
   ]);
   const statusMap = Object.fromEntries(subscriptions.rows.map((row: any) => [String(row.status), asInt(row.count)]));
   const activePlans = plans.rows.filter((row: any) => row.is_active).length;
   const activeProducts = products.rows.filter((row: any) => row.is_active).length;
+  // Indicadores de utilização: lidos da fotografia + exceções de cada contrato ativo.
+  const usageContracts = (await dbc.query(
+    `SELECT s.id, s.company_id, s.plan_id, s.ends_at, s.feature_snapshot, s.limits_snapshot,
+            s.commercial_exceptions, c.name AS company_name, c.data
+       FROM subscriptions s JOIN companies c ON c.id = s.company_id
+      WHERE s.status = 'active'`,
+  )).rows;
+  const catalogue = features.rows.map((feature: any) => ({
+    code: String(feature.code), name: String(feature.name), category: String(feature.category || 'custom'),
+    unit: feature.unit ? String(feature.unit) : null, valueType: String(feature.value_type || 'flag'),
+  }));
+  const usageAlerts: Array<{ subscriptionId: string; companyName: string; code: string; percent: number; severity: string; message: string }> = [];
+  const today = Date.now();
+  let expiringSubscriptions = 0;
+  for (const contract of usageContracts as any[]) {
+    if (contract.ends_at) {
+      const ends = new Date(contract.ends_at).getTime();
+      if (ends >= today && ends <= today + 30 * 24 * 60 * 60 * 1000) expiringSubscriptions += 1;
+    }
+    const { alerts } = computeEntitlements(
+      contract.feature_snapshot, contract.limits_snapshot, mapExceptions(contract.commercial_exceptions),
+      catalogue, usageFromCompanyData(contract.data),
+    );
+    for (const alert of alerts) {
+      if (alert.severity === 'info') continue;
+      usageAlerts.push({ subscriptionId: String(contract.id), companyName: String(contract.company_name || '—'), ...alert });
+    }
+  }
+  usageAlerts.sort((a, b) => b.percent - a.percent);
   return {
     summary: {
       revenueXOF: asInt(revenue.rows[0]?.amount),
@@ -404,8 +538,11 @@ export async function getCommercialOverview() {
       cancelledSubscriptions: asInt(statusMap.cancelled),
       activePlans,
       activeProducts,
+      expiringSubscriptions,
+      usageAlertSubscriptions: new Set(usageAlerts.map((alert) => alert.subscriptionId)).size,
       catalogVersion: asInt(versions.rows[0]?.version) || 1,
     },
+    usageAlerts: usageAlerts.slice(0, 8),
     plans: plans.rows.map(mapPlan),
     plans_with_config: plans.rows.map((plan: any) => ({
       ...mapPlan(plan),
@@ -468,6 +605,7 @@ export async function getCommercialOverview() {
       version: asInt(ticket.rows[0].version) || 1,
       updatedAt: ticket.rows[0].updated_at ? new Date(ticket.rows[0].updated_at).toISOString() : null,
       generatedRevenueXOF: asInt(ticketRevenue.rows[0]?.revenue_xof),
+      netTicketVolumeXOF: asInt(ticketRevenue.rows[0]?.net_xof),
       grossTicketVolumeXOF: asInt(ticketRevenue.rows[0]?.gross_xof),
       ticketCount: asInt(ticketRevenue.rows[0]?.ticket_count),
       history: ticketHistory.rows.map((row: any) => ({
@@ -1074,6 +1212,7 @@ export async function getCommercialSubscriptionDetail(id: string) {
       catalogVersion: asInt(row.catalog_version),
       planVersion: asInt(row.plan_version),
     },
+    exceptions: mapExceptions(row.commercial_exceptions),
     currentPlan: { plan: mapPlan(planConfig.plan), features: planConfig.features },
     matrix: matrix.rows[0] ? {
       monthlyXOF: asInt(matrix.rows[0].monthly_xof),
@@ -1185,6 +1324,244 @@ export async function quoteCommercialSubscription(companyId: string, planId: str
     annualXOF: matrix.rows[0] ? asInt(matrix.rows[0].annual_xof) : Math.round(monthly * 12 * 0.85),
     source: matrix.rows[0] ? 'matrix' : 'plan_reference',
   };
+}
+
+export async function getSubscriptionEntitlements(id: string) {
+  const result = await db().query(`${SUBSCRIPTION_SELECT} WHERE s.id = $1`, [id]);
+  if (!result.rows[0]) throw new CommercialError(404, 'SUBSCRIPTION_NOT_FOUND', 'Assinatura não encontrada.');
+  const row = result.rows[0];
+  const [company, catalogue, wallet] = await Promise.all([
+    db().query('SELECT data FROM companies WHERE id = $1', [row.company_id]),
+    db().query('SELECT code, name, category, unit, value_type FROM subscription_features ORDER BY category, name'),
+    db().query('SELECT posts_extra_purchased, promotions_extra_purchased, posts_extra_used, promotions_extra_used FROM monetization_wallets WHERE business_id = $1', [row.company_id]),
+  ]);
+  const exceptions = mapExceptions(row.commercial_exceptions);
+  const startsAt = row.starts_at ? new Date(row.starts_at) : new Date();
+  const endsAt = row.ends_at ? new Date(row.ends_at) : null;
+  const periodEnd = endsAt && endsAt.getTime() < Date.now() ? endsAt : new Date();
+  const liveEvents = await db().query(
+    `SELECT COUNT(*)::int AS n FROM events
+      WHERE company_id = $1 AND COALESCE(starts_at, created_at) >= $2 AND COALESCE(starts_at, created_at) <= $3`,
+    [row.company_id, startsAt.toISOString(), periodEnd.toISOString()],
+  );
+  const usage = usageFromCompanyData(company.rows[0]?.data);
+  usage.eventsUsed = Math.max(usage.eventsUsed, asInt(liveEvents.rows[0]?.n));
+  const { entitlements, alerts } = computeEntitlements(
+    row.feature_snapshot, row.limits_snapshot, exceptions,
+    catalogue.rows.map((feature: any) => ({
+      code: String(feature.code), name: String(feature.name), category: String(feature.category || 'custom'),
+      unit: feature.unit ? String(feature.unit) : null, valueType: String(feature.value_type || 'flag'),
+    })),
+    usage,
+  );
+  const walletRow = wallet.rows[0] || {};
+  const extras = {
+    posts: {
+      purchased: asInt(walletRow.posts_extra_purchased),
+      used: asInt(walletRow.posts_extra_used),
+      available: Math.max(0, asInt(walletRow.posts_extra_purchased) - asInt(walletRow.posts_extra_used)),
+    },
+    promotions: {
+      purchased: asInt(walletRow.promotions_extra_purchased),
+      used: asInt(walletRow.promotions_extra_used),
+      available: Math.max(0, asInt(walletRow.promotions_extra_purchased) - asInt(walletRow.promotions_extra_used)),
+    },
+  };
+  return {
+    subscription: mapSubscription(row),
+    period: {
+      startsAt: startsAt.toISOString(),
+      endsAt: endsAt ? endsAt.toISOString() : null,
+      key: `${startsAt.getUTCFullYear()}-${String(startsAt.getUTCMonth() + 1).padStart(2, '0')}`,
+    },
+    exceptions,
+    entitlements,
+    extras,
+    alerts,
+    usage,
+  };
+}
+
+/**
+ * Quota de eventos do plano ativo de uma empresa.
+ *
+ * O limite de eventos passou a ser verificado no servidor: usa a mesma
+ * contagem real do painel de direitos (eventos criados no período da
+ * assinatura), para que o plano não dependa apenas da interface. Empresas sem
+ * assinatura ativa, ou cujo plano não define um limite numérico de eventos,
+ * mantêm o comportamento anterior e a quota não é imposta.
+ */
+export async function getCompanyPlanEventQuota(companyId: string): Promise<
+  | { enforced: false; reason: 'no_subscription' | 'no_numeric_limit' }
+  | { enforced: true; subscriptionId: string; limit: number; used: number; remaining: number }
+> {
+  if (!companyId) return { enforced: false, reason: 'no_subscription' };
+  const active = await db().query(
+    `SELECT s.id FROM subscriptions s WHERE s.company_id = $1 AND ${ACTIVE_SUBSCRIPTION} ORDER BY s.starts_at DESC LIMIT 1`,
+    [companyId],
+  );
+  const subscriptionId = active.rows[0]?.id ? String(active.rows[0].id) : '';
+  if (!subscriptionId) return { enforced: false, reason: 'no_subscription' };
+  const { entitlements } = await getSubscriptionEntitlements(subscriptionId);
+  const events = entitlements.find((item) => item.code === 'events');
+  if (!events || events.limitKind !== 'number' || typeof events.limit !== 'number') {
+    return { enforced: false, reason: 'no_numeric_limit' };
+  }
+  // O contador de entitlements conta eventos já realizados no período. Para
+  // uma quota de criação isso deixaria criar eventos futuros sem limite, pelo
+  // que a guarda conta também os eventos criados desde o início da assinatura.
+  const created = await db().query(
+    `SELECT COUNT(*)::int AS n FROM events
+      WHERE company_id = $1
+        AND created_at >= (SELECT starts_at FROM subscriptions WHERE id = $2)`,
+    [companyId, subscriptionId],
+  );
+  const used = Math.max(events.used, Number(created.rows[0]?.n) || 0);
+  return {
+    enforced: true,
+    subscriptionId,
+    limit: events.limit,
+    used,
+    remaining: Math.max(0, events.limit - used),
+  };
+}
+
+export async function updateSubscriptionExceptions(id: string, input: any, actor: CommercialActor, reason: string) {
+  const actorLabel = await actorName(actor);
+  return withTransaction(async (client) => {
+    const before = (await client.query('SELECT * FROM subscriptions WHERE id = $1 FOR UPDATE', [id])).rows[0];
+    if (!before) throw new CommercialError(404, 'SUBSCRIPTION_NOT_FOUND', 'Assinatura não encontrada.');
+    const existing = mapExceptions(before.commercial_exceptions);
+    const next: ReturnType<typeof mapExceptions> = {
+      ...existing,
+      limits: { ...existing.limits },
+      features: { ...existing.features },
+    };
+    if (Object.prototype.hasOwnProperty.call(input, 'priceXOF')) {
+      next.priceXOF = input.priceXOF === null || input.priceXOF === '' ? null : money(input.priceXOF, 'Preço excecional');
+    }
+    if (Object.prototype.hasOwnProperty.call(input, 'billingPeriod')) {
+      const period = input.billingPeriod === null || input.billingPeriod === '' ? null : String(input.billingPeriod);
+      if (period !== null && !['monthly', 'annual'].includes(period)) {
+        throw new CommercialError(400, 'INVALID_BILLING_PERIOD', 'Periodicidade inválida.');
+      }
+      next.billingPeriod = period as 'monthly' | 'annual' | null;
+    }
+    if (Object.prototype.hasOwnProperty.call(input, 'limits')) {
+      if (!input.limits || typeof input.limits !== 'object' || Array.isArray(input.limits)) {
+        throw new CommercialError(400, 'INVALID_EXCEPTION_LIMITS', 'Os limites da exceção são inválidos.');
+      }
+      const features = await client.query('SELECT code FROM subscription_features');
+      const known = new Set(features.rows.map((feature: any) => String(feature.code)));
+      for (const [code, value] of Object.entries(input.limits as Record<string, unknown>)) {
+        if (!known.has(code)) throw new CommercialError(400, 'FEATURE_NOT_FOUND', `Funcionalidade desconhecida: ${code}.`);
+        if (value === null || value === '') { delete next.limits[code]; continue; }
+        if (value === 'unlimited' || value === 'negotiated') { next.limits[code] = value; continue; }
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric) || numeric < 0) {
+          throw new CommercialError(400, 'INVALID_EXCEPTION_LIMIT', `O limite de ${code} deve ser um valor não negativo.`);
+        }
+        next.limits[code] = Math.trunc(numeric);
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(input, 'features')) {
+      if (!input.features || typeof input.features !== 'object' || Array.isArray(input.features)) {
+        throw new CommercialError(400, 'INVALID_EXCEPTION_FEATURES', 'As funcionalidades da exceção são inválidas.');
+      }
+      for (const [code, value] of Object.entries(input.features as Record<string, unknown>)) {
+        if (value === null || value === 'inherit') delete next.features[code];
+        else if (typeof value === 'boolean') next.features[code] = value;
+        else throw new CommercialError(400, 'INVALID_EXCEPTION_FEATURE', `O estado de ${code} é inválido.`);
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(input, 'notes')) next.notes = text(input.notes, 2000);
+    next.updatedAt = new Date().toISOString();
+    next.updatedBy = actorLabel;
+    await client.query(
+      'UPDATE subscriptions SET commercial_exceptions = $2, updated_at = NOW() WHERE id = $1',
+      [id, JSON.stringify(next)],
+    );
+    const catalogVersion = await currentCatalogVersion(client);
+    await writeAudit(client, {
+      entityType: 'subscription', entityId: id, action: 'exceptions_updated', field: 'commercial_exceptions',
+      oldValue: existing, newValue: next, reason, actor: actorLabel, actorId: actor.id, catalogVersion,
+    });
+    return { id, exceptions: next, catalogVersion };
+  });
+}
+
+export async function changeSubscriptionPlan(id: string, input: any, actor: CommercialActor, reason: string) {
+  const targetPlanId = text(input.planId, 120);
+  if (!targetPlanId) throw new CommercialError(400, 'PLAN_REQUIRED', 'Indique o plano de destino.');
+  const actorLabel = await actorName(actor);
+  return withTransaction(async (client) => {
+    const before = (await client.query('SELECT * FROM subscriptions WHERE id = $1 FOR UPDATE', [id])).rows[0];
+    if (!before) throw new CommercialError(404, 'SUBSCRIPTION_NOT_FOUND', 'Assinatura não encontrada.');
+    if (before.status === 'cancelled') throw new CommercialError(409, 'SUBSCRIPTION_CANCELLED', 'Uma assinatura cancelada não pode mudar de plano.');
+    if (String(before.plan_id) === targetPlanId) throw new CommercialError(409, 'PLAN_UNCHANGED', 'A assinatura já está neste plano.');
+    const rules = (await client.query('SELECT allow_plan_change, annual_discount_percent FROM commercial_rules WHERE id = $1', ['default'])).rows[0];
+    if (rules && !rules.allow_plan_change) {
+      throw new CommercialError(409, 'PLAN_CHANGE_NOT_ALLOWED', 'As regras comerciais atuais não permitem mudança de plano.');
+    }
+    const currentPlan = (await client.query('SELECT * FROM plans WHERE id = $1', [before.plan_id])).rows[0];
+    const snapshot = await planSnapshot(client, targetPlanId);
+    if (!snapshot.plan.is_active) throw new CommercialError(409, 'PLAN_INACTIVE', 'O plano de destino não está ativo no catálogo.');
+    const groupId = before.category_group_id || await resolveCompanyGroup(client, String(before.company_id));
+    const [currentMatrix, targetMatrix] = await Promise.all([
+      client.query('SELECT monthly_xof, annual_xof FROM commercial_price_matrix WHERE group_id = $1 AND plan_id = $2', [groupId, before.plan_id]),
+      client.query('SELECT monthly_xof, annual_xof FROM commercial_price_matrix WHERE group_id = $1 AND plan_id = $2', [groupId, targetPlanId]),
+    ]);
+    const currentMonthly = currentMatrix.rows[0] ? asInt(currentMatrix.rows[0].monthly_xof) : asInt(currentPlan?.price_xof);
+    const targetMonthly = targetMatrix.rows[0] ? asInt(targetMatrix.rows[0].monthly_xof) : asInt(snapshot.plan.price_xof);
+    const discount = rules ? Number(rules.annual_discount_percent) : 15;
+    const targetAnnual = targetMatrix.rows[0]
+      ? asInt(targetMatrix.rows[0].annual_xof)
+      : Math.round(targetMonthly * 12 * (1 - Math.min(100, Math.max(0, discount)) / 100));
+    const billingPeriod = ['monthly', 'annual'].includes(String(input.billingPeriod))
+      ? String(input.billingPeriod)
+      : String(before.billing_period || 'monthly') === 'annual' ? 'annual' : 'monthly';
+    const contractedPrice = input.contractedPriceXOF === undefined || input.contractedPriceXOF === null || input.contractedPriceXOF === ''
+      ? billingPeriod === 'annual' ? targetAnnual : targetMonthly
+      : money(input.contractedPriceXOF, 'Preço contratado');
+    const changeType = targetMonthly > currentMonthly ? 'upgrade' : targetMonthly < currentMonthly ? 'downgrade' : 'lateral';
+    const catalogVersion = await currentCatalogVersion(client);
+    const planVersion = asInt(snapshot.plan.version);
+    const features = Object.fromEntries(snapshot.features.map((feature: any) => [feature.code, feature]));
+    const limits = Object.fromEntries(snapshot.features
+      .filter((feature: any) => ['number', 'unlimited', 'negotiated'].includes(feature.limitKind))
+      .map((feature: any) => [feature.code, feature.numericValue]));
+    const contractSnapshot = {
+      source: 'administrative-plan-change',
+      plan: mapPlan(snapshot.plan),
+      features,
+      limits,
+      catalogVersion,
+      planVersion,
+      priceXOF: contractedPrice,
+      billingPeriod,
+      previousPlanId: String(before.plan_id),
+      changeType,
+      changedAt: new Date().toISOString(),
+    };
+    const resetExceptions = input.resetExceptions === true;
+    await client.query(
+      `UPDATE subscriptions SET plan_id = $2, contracted_price_xof = $3, billing_period = $4,
+        catalog_version = $5, plan_version = $6, feature_snapshot = $7, limits_snapshot = $8,
+        contract_snapshot = $9, payment_type = $10,
+        commercial_exceptions = CASE WHEN $11 THEN '{}'::jsonb ELSE commercial_exceptions END,
+        updated_at = NOW()
+       WHERE id = $1`,
+      [id, targetPlanId, contractedPrice, billingPeriod, catalogVersion, planVersion,
+        JSON.stringify(features), JSON.stringify(limits), JSON.stringify(contractSnapshot), changeType, resetExceptions],
+    );
+    await writeAudit(client, {
+      entityType: 'subscription', entityId: id, action: 'plan_changed', field: 'plan_id',
+      oldValue: { planId: String(before.plan_id), name: currentPlan?.name || null, priceXOF: asInt(before.contracted_price_xof), planVersion: asInt(before.plan_version) },
+      newValue: { planId: targetPlanId, name: snapshot.plan.name, priceXOF: contractedPrice, planVersion, changeType, billingPeriod },
+      reason: reason || `Mudança de plano (${changeType}).`, actor: actorLabel, actorId: actor.id, catalogVersion,
+    });
+    return { id, planId: targetPlanId, planName: snapshot.plan.name, changeType, priceXOF: contractedPrice, billingPeriod, catalogVersion, planVersion };
+  });
 }
 
 export async function listCommercialAudit(filters: any = {}) {

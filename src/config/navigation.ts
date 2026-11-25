@@ -12,13 +12,11 @@ import {
   Home,
   LayoutDashboard,
   Mail,
-  Megaphone,
   MessageCircle,
   ScanLine,
   Settings,
   ShieldCheck,
   ShoppingBag,
-  SlidersHorizontal,
   Star,
   Tag,
   Ticket,
@@ -50,15 +48,11 @@ export type BusinessModule =
   | 'analytics'
   | 'team'
   | 'billing'
-  | 'marketing'
-  | 'marketing_campaigns'
-  | 'marketing_calendar'
   | 'support'
   | 'settings'
   | 'reviews'
   | 'order_history'
   | 'redemptions'
-  | 'export'
   | 'notifications';
 
 export type AdminModule =
@@ -79,7 +73,6 @@ export type AdminModule =
   | 'categories'
   | 'notifications'
   | 'architecture'
-  | 'capabilities'
   | 'profile'
   | 'sobre-nos';
 
@@ -145,7 +138,6 @@ export const BUSINESS_NAVIGATION: NavigationGroup<BusinessModule>[] = [
     items: [
       { id: 'events', label: 'Eventos', icon: CalendarDays, help: 'Agenda e bilhetes' },
       { id: 'reviews', label: 'Avaliações', icon: Star, help: 'Feedback de clientes' },
-      { id: 'marketing', label: 'Marketing', icon: Megaphone, help: 'Campanhas e posts', aliases: ['marketing_campaigns', 'marketing_calendar', 'posts', 'promotions'] },
     ],
   },
   {
@@ -169,7 +161,6 @@ export const BUSINESS_NAVIGATION: NavigationGroup<BusinessModule>[] = [
       { id: 'notifications', label: 'Notificações', icon: Bell, help: 'Alertas' },
       { id: 'support', label: 'Suporte', icon: HelpCircle, help: 'Ajuda' },
       { id: 'settings', label: 'Definições', icon: Settings, help: 'Segurança' },
-      { id: 'export', label: 'Exportação', icon: Settings, help: 'Relatórios' },
     ],
   },
 ];
@@ -222,7 +213,6 @@ export const ADMIN_NAVIGATION: NavigationGroup<AdminModule>[] = [
       { id: 'admin_staff', label: 'Equipa Admin', icon: Users },
       { id: 'categories', label: 'Categorias & Tags', icon: Tag },
       { id: 'architecture', label: 'Sistema', icon: Settings },
-      { id: 'capabilities', label: 'Configurações Globais', icon: SlidersHorizontal },
       { id: 'sobre-nos', label: 'Sobre Nós', icon: Building2, help: 'Gerencie a identidade visual, informações institucionais e apresentação pública da sua empresa.' },
     ],
   },

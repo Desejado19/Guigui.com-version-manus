@@ -151,14 +151,14 @@ describe('Google authentication account resolution', () => {
     name: 'Fatou Google',
   };
 
-  it('does not link an existing password account on e-mail match alone', async () => {
+  it('links an existing password account automatically on a verified e-mail match', async () => {
     const { repository, users, create } = accountRepository([{ ...seedAccount }]);
 
     const result = await authenticateUser({ googleIdToken: 'token' }, authDependencies(repository, identity));
 
-    expect(result).toEqual({ kind: 'rejected', reason: 'google_link_required', email: 'fatou@guigui.com' });
+    expect(result.kind).toBe('authenticated');
     expect(users).toHaveLength(1);
-    expect(users[0].googleSubject).toBeUndefined();
+    expect(users[0].googleSubject).toBe('google-subject-1');
     expect(create).not.toHaveBeenCalled();
   });
 
@@ -177,7 +177,7 @@ describe('Google authentication account resolution', () => {
     expect(result.kind === 'authenticated' ? result.user : null).not.toHaveProperty('googleSubject');
   });
 
-  it('rejects an incorrect password instead of linking the account', async () => {
+  it('does not depend on a password when the Google e-mail is already verified', async () => {
     const { repository, users } = accountRepository([{ ...seedAccount }]);
 
     const result = await authenticateUser(
@@ -185,8 +185,8 @@ describe('Google authentication account resolution', () => {
       authDependencies(repository, identity, 'correct-password'),
     );
 
-    expect(result).toEqual({ kind: 'rejected', reason: 'google_link_required', email: 'fatou@guigui.com' });
-    expect(users[0].googleSubject).toBeUndefined();
+    expect(result.kind).toBe('authenticated');
+    expect(users[0].googleSubject).toBe('google-subject-1');
   });
 
   it('returns a conflict instead of throwing when the Google subject is taken during linking', async () => {
@@ -285,7 +285,7 @@ describe('Google authentication with a signed ID token (mocked JWKS, no network)
     expect(createdInput?.password).not.toBe(token);
   });
 
-  it('requires password confirmation for an existing password account instead of linking it', async () => {
+  it('links an existing password account with a signed Google token', async () => {
     const { repository, users, create } = accountRepository([
       { ...seedAccount, email: identity.email },
     ]);
@@ -298,14 +298,10 @@ describe('Google authentication with a signed ID token (mocked JWKS, no network)
       authDependencies(repository, null, 'correct-password', verifier()),
     );
 
-    expect(result).toEqual({
-      kind: 'rejected',
-      reason: 'google_link_required',
-      email: 'novo.cidadao@guigui.com',
-    });
-    expect(linkGoogleSubject).not.toHaveBeenCalled();
+    expect(result.kind).toBe('authenticated');
+    expect(linkGoogleSubject).toHaveBeenCalledWith('user-existing', 'google-subject-new');
     expect(create).not.toHaveBeenCalled();
     expect(users).toHaveLength(1);
-    expect(users[0].googleSubject).toBeUndefined();
+    expect(users[0].googleSubject).toBe('google-subject-new');
   });
 });

@@ -12,7 +12,7 @@ export type EmailLocale = 'pt' | 'fr' | 'en' | 'es';
  * Tipos de email realmente enviados hoje. Novos fluxos acrescentam o seu tipo
  * aqui quando forem ligados, em vez de manter um catálogo de intenções.
  */
-export type EmailKind = 'team_invitation' | 'ticket_delivery' | 'external_message';
+export type EmailKind = 'team_invitation' | 'ticket_delivery' | 'password_reset' | 'external_message';
 
 /**
  * Estados de entrega.

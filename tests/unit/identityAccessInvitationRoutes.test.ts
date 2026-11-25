@@ -38,6 +38,50 @@ let server: Server;
 let baseUrl: string;
 let auth: typeof import('../../server/modules/identity-access/infrastructure/jsonIdentityRepository');
 
+// Contrato CSRF da aplicação: os métodos que alteram estado exigem `Origin`, o
+// cookie `_csrf` e o cabeçalho `X-CSRF-Token` com o mesmo valor (duplo envio).
+// Estes testes usam `fetch` cru, sem o jar nem o wrapper da SPA, por isso o
+// contrato é aplicado aqui; sem ele o convite morre em 403 CSRF_TOKEN_MISSING
+// antes de chegar à rota.
+const rawFetch = globalThis.fetch;
+const CSRF_COOKIE_PATTERN = /(?:^|;\s*)_csrf=/;
+let csrfToken = '';
+let restoreFetch: (() => void) | undefined;
+
+async function fetchCsrfToken(): Promise<string> {
+  if (csrfToken) return csrfToken;
+  const response = await rawFetch(`${baseUrl}/api/csrf`);
+  const payload = await response.json().catch(() => ({})) as { csrfToken?: string };
+  csrfToken = typeof payload.csrfToken === 'string' ? payload.csrfToken : '';
+  return csrfToken;
+}
+
+async function withCsrfContract(init: RequestInit | undefined): Promise<RequestInit | undefined> {
+  const method = String(init?.method || 'GET').toUpperCase();
+  if (!init || ['GET', 'HEAD', 'OPTIONS'].includes(method)) return init;
+  const token = await fetchCsrfToken();
+  const headers = new Headers(init.headers);
+  headers.set('Origin', baseUrl);
+  if (token) {
+    headers.set('X-CSRF-Token', token);
+    const cookies = headers.get('Cookie') || '';
+    if (!CSRF_COOKIE_PATTERN.test(cookies)) {
+      headers.set('Cookie', [cookies, `_csrf=${token}`].filter(Boolean).join('; '));
+    }
+  }
+  return { ...init, headers };
+}
+
+function installCsrfContract(): () => void {
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : String((input as { url?: string })?.url ?? input);
+    if (!url.startsWith(baseUrl)) return original(input as never, init);
+    return original(input as never, await withCsrfContract(init));
+  }) as typeof globalThis.fetch;
+  return () => { globalThis.fetch = original; };
+}
+
 const editorPermissions = {
   profile: true,
   content: true,
@@ -111,9 +155,11 @@ beforeAll(async () => {
     const listener = (app as Express).listen(0, '127.0.0.1', () => resolve(listener));
   });
   baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  restoreFetch = installCsrfContract();
 }, 30_000);
 
 afterAll(async () => {
+  restoreFetch?.();
   if (server) {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }

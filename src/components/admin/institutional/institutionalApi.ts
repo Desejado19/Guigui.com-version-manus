@@ -18,6 +18,7 @@ import {
   type InstitutionalSnapshot,
   type MissingField,
 } from '@/server/institutional/model'
+import { invalidateInstitutionalPublicCache } from '../../../hooks/useInstitutionalPublic'
 
 export type { EntityKind, EntityRow, FieldSpec, SectionKey, InstitutionalDocument, InstitutionalSnapshot, MissingField }
 export {
@@ -50,6 +51,8 @@ export interface InstitutionalAdminMeta {
   isDirty: boolean
   missing: MissingField[]
   canPublish: boolean
+  /** `false` quando a última publicação foi retirada do site. */
+  published?: boolean
   releases: InstitutionalReleaseMeta[]
 }
 
@@ -76,7 +79,9 @@ export interface InstitutionalAuditPayload {
 const BASE = '/api/admin/institutional'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${BASE}${path}`, {
+  // O BASE não termina em barra de propósito; normalizamos aqui para que
+  // todos os pedidos (entities, documents, publish…) fiquem em /institutional/….
+  const response = await fetch(`${BASE}/${path.replace(/^\/+/, '')}`, {
     credentials: 'same-origin',
     headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
     ...init,
@@ -134,8 +139,53 @@ export function reorderEntities(kind: EntityKind, ids: number[]): Promise<{ succ
   return request(`entities/${kind}/reorder`, { method: 'POST', body: JSON.stringify({ ids }) })
 }
 
-export function publishInstitutional(): Promise<{ success: boolean; releaseId: number; publishedAt: string | null }> {
-  return request('publish', { method: 'POST' })
+export interface InstitutionalDocumentVersion {
+  id: number
+  version: string
+  content: string
+  status: string
+  changedBy: string | null
+  createdAt: string
+}
+
+export function loadDocumentVersions(
+  documentId: number,
+): Promise<{ versions: InstitutionalDocumentVersion[] }> {
+  return request(`documents/${documentId}/versions`)
+}
+
+export function restoreDocumentVersion(
+  documentId: number,
+  versionId: number,
+): Promise<{
+  success: boolean
+  item: EntityRow
+  restoredFrom: { id: number; version: string }
+}> {
+  return request(`documents/${documentId}/versions/${versionId}/restore`, { method: 'POST' })
+}
+
+export async function publishInstitutional(): Promise<{ success: boolean; releaseId: number; publishedAt: string | null }> {
+  const result = await request<{ success: boolean; releaseId: number; publishedAt: string | null }>('publish', {
+    method: 'POST',
+  })
+  // O site público tem de reler a publicação assim que esta termina.
+  invalidateInstitutionalPublicCache()
+  return result
+}
+
+/** Retira o site institucional sem apagar o histórico de versões. */
+export async function unpublishInstitutional(): Promise<{
+  success: boolean
+  withdrawnReleaseId: number | null
+  published: boolean
+}> {
+  const result = await request<{ success: boolean; withdrawnReleaseId: number | null; published: boolean }>(
+    'unpublish',
+    { method: 'POST' },
+  )
+  invalidateInstitutionalPublicCache()
+  return result
 }
 
 export function restoreRelease(id: number): Promise<{ success: boolean; restoredFrom: number }> {

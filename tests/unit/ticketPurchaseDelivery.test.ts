@@ -53,6 +53,7 @@ function createPorts() {
     email: {
       sendTicketPurchase: deliveryMocks.emailSendTicketPurchase,
       sendTeamInvitation: deliveryMocks.emailSendTeamInvitation,
+      sendPasswordReset: deliveryMocks.emailSendTeamInvitation,
     },
     sms: { send: deliveryMocks.smsSend },
   };

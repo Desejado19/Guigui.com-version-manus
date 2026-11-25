@@ -73,6 +73,52 @@ function readVisibleFlag(value: unknown): boolean {
   return value === true || value === 'true';
 }
 
+interface PageMeta {
+  title: string;
+  description: string;
+  canonical: string;
+  siteName: string;
+  type?: 'website' | 'article';
+  image?: string;
+  noIndex?: boolean;
+}
+
+function escapeMeta(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * Substitui título, descrição, canónica e Open Graph do shell da SPA.
+ * Os metadados do `index.html` são globais; sem os remover, cada página ficaria
+ * com dois títulos e duas descrições no HTML inicial.
+ */
+function applyPageMeta(html: string, meta: PageMeta): string {
+  const tags = [
+    `<title>${escapeMeta(meta.title)}</title>`,
+    `<meta name="description" content="${escapeMeta(meta.description)}" />`,
+    `<link rel="canonical" href="${escapeMeta(meta.canonical)}" />`,
+    `<meta property="og:type" content="${meta.type ?? 'website'}" />`,
+    `<meta property="og:title" content="${escapeMeta(meta.title)}" />`,
+    `<meta property="og:description" content="${escapeMeta(meta.description)}" />`,
+    `<meta property="og:url" content="${escapeMeta(meta.canonical)}" />`,
+    `<meta property="og:site_name" content="${escapeMeta(meta.siteName)}" />`,
+    ...(meta.image ? [`<meta property="og:image" content="${escapeMeta(meta.image)}" />`] : []),
+    ...(meta.noIndex ? ['<meta name="robots" content="noindex" />'] : []),
+  ].join('\n    ');
+
+  const stripped = html
+    .replace(/<meta name="description"[^>]*>\s*/g, '')
+    .replace(/<meta name="robots"[^>]*>\s*/g, '')
+    .replace(/<link rel="canonical"[^>]*>\s*/g, '')
+    .replace(/<meta property="og:[^>]*>\s*/g, '');
+
+  return stripped.replace(/<title>[\s\S]*?<\/title>/, tags);
+}
+
 /** Injeta os metadados institucionais no HTML da SPA (rota /sobre-nos). */
 export function injectInstitutionalMeta(
   html: string,
@@ -82,38 +128,75 @@ export function injectInstitutionalMeta(
   if (!snapshot) return html;
   const profile = snapshot.profile ?? {};
   const seo = snapshot.seo ?? {};
-  const title = String(seo.seo_title || `${String(profile.official_name || 'Guigui.com')} — Sobre Nós`);
-  const description = String(seo.meta_description || profile.short_description || '');
-  const canonical = String(seo.canonical_url || `${origin.replace(/\/+$/, '')}/sobre-nos`);
-  const image = String(seo.og_image_url || profile.share_image_url || '');
   const siteName = String(profile.official_name || 'Guigui.com');
 
-  const escape = (value: string) =>
-    value
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+  return applyPageMeta(html, {
+    title: String(seo.seo_title || `${siteName} — Sobre Nós`),
+    description: String(seo.meta_description || profile.short_description || ''),
+    canonical: String(seo.canonical_url || `${origin.replace(/\/+$/, '')}/sobre-nos`),
+    image: String(seo.og_image_url || profile.share_image_url || ''),
+    siteName,
+    noIndex: seo.no_index === true,
+  });
+}
 
-  const tags = [
-    `<title>${escape(title)}</title>`,
-    `<meta name="description" content="${escape(description)}" />`,
-    `<link rel="canonical" href="${escape(canonical)}" />`,
-    `<meta property="og:type" content="website" />`,
-    `<meta property="og:title" content="${escape(title)}" />`,
-    `<meta property="og:description" content="${escape(description)}" />`,
-    `<meta property="og:url" content="${escape(canonical)}" />`,
-    `<meta property="og:site_name" content="${escape(siteName)}" />`,
-    ...(image ? [`<meta property="og:image" content="${escape(image)}" />`] : []),
-    ...(seo.no_index === true ? ['<meta name="robots" content="noindex" />'] : []),
-  ].join('\n    ');
+function summariseDocument(document: Record<string, unknown>): string {
+  const description = String(document.description ?? '').trim();
+  if (description) return description;
+  const content = String(document.content ?? '').replace(/\s+/g, ' ').trim();
+  return content.length > 155 ? `${content.slice(0, 152).trimEnd()}…` : content;
+}
 
-  const stripped = html
-    .replace(/<meta name="description"[^>]*>\s*/g, '')
-    .replace(/<link rel="canonical"[^>]*>\s*/g, '')
-    .replace(/<meta property="og:[^>]*>\s*/g, '');
+/**
+ * Metadados de `/politicas` e `/politicas/:slug`.
+ *
+ * Lê sempre a publicação activa e aplica as mesmas regras da API pública
+ * (`toPublicSnapshot`): documentos em rascunho ou arquivo nunca produzem
+ * metadados próprios nem ficam indexáveis.
+ */
+export function injectPolicyMeta(
+  html: string,
+  snapshot: InstitutionalSnapshot | null,
+  slug: string | undefined,
+  origin: string,
+): string {
+  const base = origin.replace(/\/+$/, '');
+  const visible = snapshot ? toPublicSnapshot(snapshot) : null;
+  const profile = visible?.profile ?? {};
+  const seo = visible?.seo ?? {};
+  const siteName = String(profile.official_name || 'Guigui.com');
+  const image = String(seo.og_image_url || profile.share_image_url || '');
+  const documents = visible?.entities?.documents ?? [];
+  const document = slug
+    ? documents.find((item) => (String(item.slug ?? '') === slug) || String(item.id) === slug)
+    : undefined;
 
-  return stripped.replace(/<title>[\s\S]*?<\/title>/, tags);
+  if (!document) {
+    return applyPageMeta(html, {
+      title: `Políticas e documentos legais — ${siteName}`,
+      description: slug
+        ? 'Este documento não existe ou ainda não foi publicado.'
+        : 'Documentos oficiais publicados pelo Guigui.com. Só aparecem versões publicadas.',
+      canonical: `${base}/politicas${slug ? `/${encodeURIComponent(slug)}` : ''}`,
+      siteName,
+      image,
+      // Um slug desconhecido não deve competir nos motores de busca com a
+      // página publicada correspondente.
+      noIndex: Boolean(slug) || seo.no_index === true,
+    });
+  }
+
+  const name = String(document.name ?? 'Documento');
+  const version = String(document.version ?? '').trim();
+  return applyPageMeta(html, {
+    title: `${name}${version ? ` (v${version})` : ''} — ${siteName}`,
+    description: summariseDocument(document) || `Documento oficial publicado pelo ${siteName}.`,
+    canonical: `${base}/politicas/${encodeURIComponent(String(document.slug || document.id))}`,
+    siteName,
+    type: 'article',
+    image,
+    noIndex: seo.no_index === true,
+  });
 }
 
 export function registerInstitutionalRoutes(app: Express, deps: InstitutionalRouteDeps): void {
@@ -147,6 +230,7 @@ export function registerInstitutionalRoutes(app: Express, deps: InstitutionalRou
       const repository = createInstitutionalRepository(pool);
       const release = await repository.latestRelease();
       if (!release) {
+        res.setHeader('Cache-Control', 'no-store');
         res.status(404).json({
           error: 'A página institucional ainda não foi publicada.',
           code: 'INSTITUTIONAL_NOT_PUBLISHED',
@@ -154,12 +238,13 @@ export function registerInstitutionalRoutes(app: Express, deps: InstitutionalRou
         return;
       }
       const etag = `W/"institutional-${release.id}"`;
+      // `no-cache` permite revalidar por ETag: despublicar reflecte-se logo.
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('ETag', etag);
       if (req.headers['if-none-match'] === etag) {
         res.status(304).end();
         return;
       }
-      res.setHeader('ETag', etag);
-      res.setHeader('Cache-Control', 'public, max-age=300');
       res.json({
         data: toPublicSnapshot(release.snapshot),
         publishedAt: release.publishedAt,
@@ -190,6 +275,7 @@ export function registerInstitutionalRoutes(app: Express, deps: InstitutionalRou
           isDirty: isDocumentDirty(snapshot, latest?.snapshot ?? null),
           missing,
           canPublish: missing.length === 0,
+          published: latest !== null,
           releases,
         },
         loadedBy: userId,
@@ -455,6 +541,38 @@ export function registerInstitutionalRoutes(app: Express, deps: InstitutionalRou
     });
   });
 
+  // Restaura uma versão anterior de um documento legal a partir do histórico.
+  app.post(
+    '/api/admin/institutional/documents/:id/versions/:versionId/restore',
+    admin,
+    async (req, res) => {
+      noStore(res);
+      const id = Number(req.params.id);
+      const versionId = Number(req.params.versionId);
+      if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(versionId) || versionId <= 0) {
+        res.status(400).json({ error: 'Versão inválida.', code: 'INVALID_INSTITUTIONAL_VERSION' });
+        return;
+      }
+      await withPool(res, async (pool) => {
+        const repository = createInstitutionalRepository(pool);
+        const userId = await deps.userIdFrom(req);
+        const restored = await repository.restoreDocumentVersion(id, versionId, userId);
+        if (!restored) {
+          res.status(404).json({ error: 'Versão não encontrada para este documento.', code: 'ENTITY_NOT_FOUND' });
+          return;
+        }
+        await repository.audit({
+          entity: 'documents',
+          entityId: id,
+          action: 'restore_version',
+          changedBy: userId,
+          metadata: { versionId: restored.restoredFrom.id, version: restored.restoredFrom.version },
+        });
+        res.json({ success: true, item: restored.item, restoredFrom: restored.restoredFrom });
+      });
+    },
+  );
+
   app.get('/api/admin/institutional/audit', admin, async (req, res) => {
     noStore(res);
     await withPool(res, async (pool) => {
@@ -517,6 +635,24 @@ export function registerInstitutionalRoutes(app: Express, deps: InstitutionalRou
         changedBy: userId,
       });
       res.json({ success: true, releaseId: release.id, publishedAt: release.publishedAt });
+    });
+  });
+
+  // Despublica o site institucional sem apagar a release: o histórico fica
+  // intacto e uma nova publicação volta a expor o conteúdo.
+  app.post('/api/admin/institutional/unpublish', admin, async (req, res) => {
+    noStore(res);
+    await withPool(res, async (pool) => {
+      const repository = createInstitutionalRepository(pool);
+      const userId = await deps.userIdFrom(req);
+      const withdrawn = await repository.unpublish(userId);
+      await repository.audit({
+        entity: 'release',
+        entityId: withdrawn?.id ?? null,
+        action: 'unpublish',
+        changedBy: userId,
+      });
+      res.json({ success: true, withdrawnReleaseId: withdrawn?.id ?? null, published: false });
     });
   });
 

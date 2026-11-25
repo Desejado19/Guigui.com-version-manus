@@ -138,6 +138,15 @@ export const TicketPurchaseModal: React.FC<TicketPurchaseModalProps> = ({
     return messages[currentLang]?.[key] || messages.pt[key] || key;
   };
   if (!isOpen) return null;
+  // O botão fica desactivado até a política ser aceite: sem dizer porquê, o
+  // clique parece não fazer nada e o pedido nunca chega a ser emitido.
+  const blockingReason = !selectedTicketType
+    ? errorMessage('category')
+    : soldOut
+      ? errorMessage('soldOut')
+      : !policyAccepted
+        ? errorMessage('policy')
+        : null;
   const handleOpenLoginIfNeeded = () => {
     onClose();
   };
@@ -447,18 +456,24 @@ export const TicketPurchaseModal: React.FC<TicketPurchaseModalProps> = ({
             </p>
             <div className="flex items-start gap-2">
               <input
+                id="ticket-policy-acceptance"
                 type="checkbox"
                 checked={policyAccepted}
                 onChange={(e) => setPolicyAccepted(e.target.checked)}
                 className="h-4 w-4 mt-0.5 rounded border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 text-[var(--color-green-600)] focus:ring-2 focus:ring-[var(--color-green-600)]"
                 required
               />
-              <label className="text-[10px] leading-relaxed text-[var(--color-text-strong)] cursor-pointer">
+              <label htmlFor="ticket-policy-acceptance" className="text-[10px] leading-relaxed text-[var(--color-text-strong)] cursor-pointer">
                 Li e aceito a política de bilhética da Guigui.com (versão {POLICY_VERSION})
               </label>
             </div>
           </div>
 
+          {!validationError && blockingReason && (
+            <p className="mb-3 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-3 py-2 text-[11px] font-semibold text-[var(--color-text-muted)] dark:bg-slate-800">
+              {blockingReason}
+            </p>
+          )}
           {validationError && (
             <p role="alert" className="mb-3 rounded-xl border border-[var(--color-red-500)]/40 bg-[var(--color-red-500)]/10 px-3 py-2 text-[11px] font-semibold text-[var(--color-red-500)]">
               {validationError}

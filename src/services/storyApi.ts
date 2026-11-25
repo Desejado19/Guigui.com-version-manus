@@ -129,11 +129,12 @@ export const storyApi = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ emoji }),
   }),
-  reply: (id: string, text: string) => request<{ replyId: string; conversationId?: string }>(`/api/stories/${encodeURIComponent(id)}/reply`, {
+  reply: (id: string, text: string) => request<{ replyId: string }>(`/api/stories/${encodeURIComponent(id)}/reply`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text }),
   }),
+  recordShare: (id: string) => request<{ shares: number }>(`/api/stories/${encodeURIComponent(id)}/share`, { method: 'POST' }),
   vote: (id: string, elementId: string, optionIndex: number) => request<{ counts: number[]; optionIndex: number }>(`/api/stories/${encodeURIComponent(id)}/poll-vote`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -22,3 +22,12 @@ export async function consumeDistributedRateLimit(key: string, windowMs: number,
   ));
   return Number(result.rows[0]?.request_count || maxRequests + 1) <= maxRequests;
 }
+
+/** Remove um balde (ex.: login bem-sucedido limpa as falhas dessa conta). */
+export async function resetDistributedRateLimit(key: string): Promise<boolean | null> {
+  if (!databasePool) return null;
+  await withDbIdentity({ userId: '', role: 'anon', system: true }, () =>
+    databasePool!.query('DELETE FROM rate_limit_buckets WHERE bucket_key=$1', [key]),
+  );
+  return true;
+}

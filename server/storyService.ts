@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { databasePool, acquireClient, releaseClient } from './db';
 import { foldedLikePattern, foldedSql } from './sqlSearch';
-import { createPostgresConversation, persistPostgresNotification } from './postgresCommunicationService';
+import { persistPostgresNotification } from './postgresCommunicationService';
 
 export type StoryRole = 'user' | 'business' | 'admin';
 
@@ -447,7 +447,8 @@ const STORY_SELECT = `
     (SELECT COUNT(*)::int FROM story_reactions r WHERE r.story_id=s.id) AS reaction_count,
     (SELECT COUNT(*)::int FROM story_replies r WHERE r.story_id=s.id) AS reply_count,
     (SELECT COUNT(*)::int FROM story_poll_votes p WHERE p.story_id=s.id) AS poll_vote_count,
-    (SELECT COUNT(*)::int FROM story_question_responses q WHERE q.story_id=s.id) AS question_response_count
+    (SELECT COUNT(*)::int FROM story_question_responses q WHERE q.story_id=s.id) AS question_response_count,
+    (SELECT COUNT(*)::int FROM story_audit a WHERE a.story_id=s.id AND a.action='share') AS share_count
   FROM stories s
   LEFT JOIN users u ON u.id=s.owner_user_id
 `;
@@ -700,12 +701,24 @@ export async function setStoryLike(actor: StoryActor, storyId: string, liked: bo
   const story = await getStory(storyId, actor.userId);
   if (!story) throw new StoryError(404, 'STORY_NOT_FOUND', 'Story não encontrada.');
   const db = requireDb();
+  let added = false;
   if (liked) {
-    await db.query(`INSERT INTO story_likes (story_id,user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [storyId, actor.userId]);
+    const inserted = await db.query(`INSERT INTO story_likes (story_id,user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [storyId, actor.userId]);
+    added = Boolean(inserted.rowCount);
   } else {
     await db.query(`DELETE FROM story_likes WHERE story_id=$1 AND user_id=$2`, [storyId, actor.userId]);
   }
   const count = await db.query('SELECT COUNT(*)::int AS total FROM story_likes WHERE story_id=$1', [storyId]);
+  if (added && story.ownerUserId && story.ownerUserId !== actor.userId) {
+    await persistPostgresNotification({
+      id: `notification-${randomUUID()}`,
+      userId: story.ownerUserId,
+      category: 'story_interaction',
+      title: `Nova curtida no Story de ${story.businessName}`,
+      message: `${actor.name} gostou da sua story.`,
+      metadata: { storyId, actorId: actor.userId, eventType: 'STORY_LIKE' },
+    }).catch(() => undefined);
+  }
   return { liked, likes: Number(count.rows[0]?.total || 0) };
 }
 
@@ -714,13 +727,47 @@ export async function setStoryReaction(actor: StoryActor, storyId: string, emoji
   const story = await getStory(storyId, actor.userId);
   if (!story) throw new StoryError(404, 'STORY_NOT_FOUND', 'Story não encontrada.');
   const db = requireDb();
+  const previous = await db.query('SELECT emoji FROM story_reactions WHERE story_id=$1 AND user_id=$2', [storyId, actor.userId]);
+  const changed = previous.rows[0]?.emoji !== emoji;
   await db.query(
     `INSERT INTO story_reactions (story_id,user_id,emoji) VALUES ($1,$2,$3)
      ON CONFLICT (story_id,user_id) DO UPDATE SET emoji=EXCLUDED.emoji, updated_at=NOW()`,
     [storyId, actor.userId, emoji],
   );
   const count = await db.query('SELECT COUNT(*)::int AS total FROM story_reactions WHERE story_id=$1', [storyId]);
+  if (changed && story.ownerUserId && story.ownerUserId !== actor.userId) {
+    await persistPostgresNotification({
+      id: `notification-${randomUUID()}`,
+      userId: story.ownerUserId,
+      category: 'story_interaction',
+      title: `Nova reação ${emoji} no Story de ${story.businessName}`,
+      message: `${actor.name} reagiu à sua story.`,
+      metadata: { storyId, actorId: actor.userId, eventType: 'STORY_REACTION' },
+    }).catch(() => undefined);
+  }
   return { reaction: emoji, reactions: Number(count.rows[0]?.total || 0) };
+}
+
+export async function shareStory(actor: StoryActor, storyId: string): Promise<{ shares: number }> {
+  const story = await getStory(storyId, actor.userId);
+  if (!story) throw new StoryError(404, 'STORY_NOT_FOUND', 'Story não encontrada.');
+  const db = requireDb();
+  await db.query(
+    `INSERT INTO story_audit (id,story_id,actor_user_id,action,metadata) VALUES ($1,$2,$3,'share','{}'::jsonb)`,
+    [randomUUID(), storyId, actor.userId],
+  );
+  if (story.ownerUserId && story.ownerUserId !== actor.userId) {
+    await persistPostgresNotification({
+      id: `notification-${randomUUID()}`,
+      userId: story.ownerUserId,
+      category: 'story_interaction',
+      title: `Story partilhada por ${actor.name}`,
+      message: `A sua story "${story.caption || story.businessName}" foi partilhada.`,
+      metadata: { storyId, actorId: actor.userId, eventType: 'STORY_SHARE' },
+    }).catch(() => undefined);
+  }
+  const count = await db.query(`SELECT COUNT(*)::int AS total FROM story_audit WHERE story_id=$1 AND action='share'`, [storyId]);
+  return { shares: Number(count.rows[0]?.total || 0) };
 }
 
 export async function replyToStory(actor: StoryActor, storyId: string, message: string): Promise<{ replyId: string; conversationId?: string }> {
@@ -730,26 +777,10 @@ export async function replyToStory(actor: StoryActor, storyId: string, message: 
   const result = await db.query(`${STORY_SELECT} WHERE s.id=$1`, [storyId]);
   if (!result.rowCount) throw new StoryError(404, 'STORY_NOT_FOUND', 'Story não encontrada.');
   const story = result.rows[0] as Row;
-  let conversationId: string | undefined;
-  if (story.business_id && actor.role === 'user') {
-    try {
-      conversationId = await createPostgresConversation({
-        id: `conversation-${randomUUID()}`,
-        userId: actor.userId,
-        businessId: story.business_id,
-        subject: `Resposta ao Story de ${story.business_name}`,
-        text: body,
-        senderId: actor.userId,
-        senderRole: 'user',
-      });
-    } catch (error) {
-      console.error('[Guigui.com] story reply conversation failed:', error instanceof Error ? error.message : error);
-    }
-  }
   const replyId = `story-reply-${randomUUID()}`;
   await db.query(
-    `INSERT INTO story_replies (id,story_id,user_id,text,conversation_id) VALUES ($1,$2,$3,$4,$5)`,
-    [replyId, storyId, actor.userId, body, conversationId || null],
+    `INSERT INTO story_replies (id,story_id,user_id,text) VALUES ($1,$2,$3,$4)`,
+    [replyId, storyId, actor.userId, body],
   );
   if (story.owner_user_id && story.owner_user_id !== actor.userId) {
     try {
@@ -757,15 +788,15 @@ export async function replyToStory(actor: StoryActor, storyId: string, message: 
         id: `notification-${randomUUID()}`,
         userId: story.owner_user_id,
         category: 'story_interaction',
-        title: `Nova resposta ao Story de ${story.business_name}`,
-        message: body,
-        metadata: { storyId, conversationId, actorId: actor.userId, eventType: 'STORY_REPLY' },
+        title: `Novo comentário no Story de ${story.business_name}`,
+        message: `${actor.name}: ${body}`,
+        metadata: { storyId, actorId: actor.userId, eventType: 'STORY_REPLY' },
       });
     } catch (error) {
       console.error('[Guigui.com] story reply notification failed:', error instanceof Error ? error.message : error);
     }
   }
-  return { replyId, conversationId };
+  return { replyId };
 }
 
 async function storyElement(storyId: string, elementId: string): Promise<Row> {

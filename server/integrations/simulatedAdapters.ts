@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type {
   EmailDeliveryPort,
   IntegrationDeliveryResult,
@@ -19,6 +20,10 @@ export function createSimulatedEmailAdapter(): EmailDeliveryPort {
     },
     async sendTeamInvitation({ invitationId }) {
       return simulatedReceipt(`SIM-EMAIL-INVITATION-${safeReference(invitationId)}`);
+    },
+    async sendPasswordReset({ token }) {
+      const fingerprint = createHash('sha256').update(token).digest('hex').slice(0, 24);
+      return simulatedReceipt(`SIM-EMAIL-PASSWORD-RESET-${fingerprint}`);
     },
   };
 }

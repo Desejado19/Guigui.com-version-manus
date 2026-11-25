@@ -1,8 +1,9 @@
 import 'dotenv/config';
 import express from 'express';
+import type { Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { randomBytes, randomInt, randomUUID, timingSafeEqual } from 'crypto';
+import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'crypto';
 import { BODY_PARSED, latin1JsonBody } from './server/latin1Json';
 import { normalizeDeep } from './shared/textNormalization';
 import { GoogleGenAI } from '@google/genai';
@@ -94,6 +95,14 @@ import {
   updateReconciliation,
 } from './server/financeAdminService';
 import {
+  PayoutError,
+  createPayout,
+  getCompanyFinance,
+  getTicketFinanceOverview,
+  listPayouts,
+  updatePayoutStatus,
+} from './server/financePayoutService';
+import {
   CommercialError,
   changeSubscriptionStatus,
   createCommercialPlan,
@@ -105,11 +114,15 @@ import {
   getCommercialOverview,
   getCommercialPlanConfiguration,
   getCommercialSubscriptionDetail,
+  getSubscriptionEntitlements,
+  changeSubscriptionPlan,
+  updateSubscriptionExceptions,
   getLegacyTicketFeePolicy,
   getProductSales,
   getPublicCommercialCatalog,
   listCommercialAudit,
   listCommercialSubscriptions,
+  getCompanyPlanEventQuota,
   renewSubscription,
   resolveDatabaseCommercialPrice,
   toggleCommercialPlan,
@@ -124,7 +137,7 @@ import {
 import { createCategoryRouter } from './server/categoryRoutes';
 import { createStoryRouter } from './server/storyRoutes';
 import { readFile } from 'node:fs/promises';
-import { injectInstitutionalMeta, registerInstitutionalRoutes } from './server/institutional/routes';
+import { injectInstitutionalMeta, injectPolicyMeta, registerInstitutionalRoutes } from './server/institutional/routes';
 import { createInstitutionalRepository } from './server/institutional/repository';
 import { createHealthHandler } from './server/modules/platform-foundation/http/healthHandler';
 import { createHttpCompressionMiddleware } from './server/httpCompression';
@@ -161,11 +174,30 @@ import {
   updateLocation,
 } from './server/locationCatalogService';
 import { consumeDistributedRateLimit } from './server/rateLimitService';
+import { consumeAccountRateLimit, resetAccountRateLimit } from './server/accountRateLimit';
 import { createPostgresObservabilityRepository } from './server/modules/platform-foundation/observability/adapters/postgresObservabilityRepository';
 import { createObservabilityHandlers } from './server/modules/platform-foundation/observability/http/observabilityHandlers';
 import { createObservabilityMiddleware } from './server/modules/platform-foundation/observability/http/observabilityMiddleware';
 import { HttpMetricsRegistry } from './server/modules/platform-foundation/observability/domain/httpMetrics';
 import { getProductFunnel, persistProductEvent } from './server/productAnalyticsService';
+import {
+  createSystemIncident,
+  getSystemApiMonitoring,
+  getSystemAvailability,
+  getSystemDatabase,
+  getSystemIncident,
+  getSystemInfrastructure,
+  getSystemOverview,
+  getSystemResources,
+  getSystemSecurity,
+  getSystemSettings,
+  listSystemIncidents,
+  listSystemLogs,
+  startSystemMonitor,
+  updateSystemIncident,
+  updateSystemSettings,
+} from './server/systemMonitoringService';
+import { createSystemLogMiddleware } from './server/systemLogService';
 import { canViewTransaction, resolveTransactionAccess } from './server/paymentAccessService';
 import { listOwnedTickets } from './server/ticketAccessService';
 import { isPublicAppStateKey, readAppStateForSession, resolveAppStateValue, resolveAppStateWrite, resolveBusinessScope, resolveBusinessWrite, resolveEventWrite, visibleConversationIds } from './server/platformWriteAccess';
@@ -174,7 +206,7 @@ import { describeSmsGateway } from './server/smsGatewayService';
 import { deliverConfirmedTicketPurchase } from './server/ticketPurchaseDeliveryService';
 import { getTicketOffer } from './server/ticketCatalogService';
 import { ticketInventory } from './server/ticketInventoryService';
-import { quoteTicketPurchase, ticketFeeSnapshotForUnit } from './server/ticketPurchaseDomain';
+import { buildTicketFeeSnapshot, quoteTicketPurchase, ticketFeeSnapshotForUnit } from './server/ticketPurchaseDomain';
 import {
   EXPORT_SECTIONS,
   buildEventCsv,
@@ -302,6 +334,10 @@ const observabilityHandlers = createObservabilityHandlers({
 });
 
 app.disable('x-powered-by');
+// Atrás do proxy/balanceador, confiar apenas no número de proxies configurado.
+// Sem isto `req.ip` seria o IP interno do proxy e RateLimit/auditoria agregavam
+// todos os clientes no mesmo balde.
+app.set('trust proxy', runtimeConfig.trustProxy);
 // gzip/brotli para JSON e outros corpos de texto; SSE e ficheiros em streaming passam intactos.
 app.use(createHttpCompressionMiddleware({
   minBytes: 1024,
@@ -322,6 +358,8 @@ app.use(createObservabilityMiddleware({
   requestIdFrom,
   logger: console,
 }));
+// Logs técnicos reais: apenas respostas com erro ou lentas, sem corpos de pedido.
+app.use(createSystemLogMiddleware(requestIdFrom));
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
@@ -354,6 +392,110 @@ app.use((req, res, next) => {
 const allowedOrigins = new Set(
   runtimeConfig.allowedOrigins,
 );
+
+const CSRF_COOKIE_NAME = '_csrf';
+const CSRF_HEADER_NAME = 'x-csrf-token';
+const CSRF_TOKEN_PATTERN = /^[a-f0-9]{64}$/;
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+function readCookie(req: express.Request, name: string): string | undefined {
+  const cookieHeader = req.headers.cookie || '';
+  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
+  if (!match) return undefined;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
+
+function createCsrfToken(): string {
+  return randomBytes(32).toString('hex');
+}
+
+// Emite o cookie em qualquer pedido (incluindo a página inicial), para a SPA
+// poder ler o token mesmo antes do primeiro GET /api.
+app.use((req, res, next) => {
+  const current = readCookie(req, CSRF_COOKIE_NAME);
+  const token = current && CSRF_TOKEN_PATTERN.test(current) ? current : createCsrfToken();
+  if (token !== current) {
+    res.cookie(CSRF_COOKIE_NAME, token, {
+      httpOnly: false,
+      sameSite: 'lax',
+      secure: isProduction,
+      path: '/',
+      maxAge: 2 * 60 * 60 * 1000,
+    });
+  }
+  res.locals.csrfToken = token;
+  next();
+});
+
+app.get('/api/csrf', (req, res) => {
+  res.json({ csrfToken: res.locals.csrfToken });
+});
+
+function normalizeOrigin(value: string): string | undefined {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return undefined;
+  }
+}
+
+function trustedRequestOrigins(req: express.Request): Set<string> {
+  const trusted = new Set<string>();
+  for (const value of [...allowedOrigins, runtimeConfig.appUrl || '']) {
+    const origin = normalizeOrigin(value);
+    if (origin) trusted.add(origin);
+  }
+  const ownOrigin = normalizeOrigin(`${req.protocol}://${req.get('host') || ''}`);
+  if (ownOrigin) trusted.add(ownOrigin);
+  return trusted;
+}
+
+function isTrustedNavigationOrigin(req: express.Request, value: string): boolean {
+  const origin = normalizeOrigin(value);
+  return Boolean(origin && trustedRequestOrigins(req).has(origin));
+}
+
+function sameToken(left: string, right: string): boolean {
+  if (left.length !== right.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(left), Buffer.from(right));
+  } catch {
+    return false;
+  }
+}
+
+function validateStateChangingRequest(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (SAFE_METHODS.has(req.method)) return next();
+  // Webhooks de pagamento autenticam-se pela assinatura HMAC do fornecedor e
+  // não têm browser/cookie; o Origin/CSRF não se aplica a este chamador.
+  if (/^\/(?:api\/)?payments\/webhook\/[^/]+\/?$/.test(req.path)) return next();
+
+  const origin = req.get('origin');
+  const referer = req.get('referer');
+  if (!origin && !referer) {
+    return res.status(403).json({ error: 'Origem do pedido ausente.', code: 'CSRF_ORIGIN_MISSING' });
+  }
+  if (origin && !isTrustedNavigationOrigin(req, origin)) {
+    return res.status(403).json({ error: 'Origem não autorizada.', code: 'CSRF_ORIGIN_DENIED' });
+  }
+  if (!origin && referer && !isTrustedNavigationOrigin(req, referer)) {
+    return res.status(403).json({ error: 'Origem não autorizada.', code: 'CSRF_ORIGIN_DENIED' });
+  }
+
+  const cookieToken = readCookie(req, CSRF_COOKIE_NAME);
+  const headerToken = req.get(CSRF_HEADER_NAME);
+  if (!cookieToken || !headerToken) {
+    return res.status(403).json({ error: 'Token CSRF ausente.', code: 'CSRF_TOKEN_MISSING' });
+  }
+  if (!sameToken(cookieToken, headerToken)) {
+    return res.status(403).json({ error: 'Token CSRF inválido.', code: 'CSRF_TOKEN_INVALID' });
+  }
+  next();
+}
 // Keep the existing API stable while exposing an explicit versioned entry point.
 app.use((req, _res, next) => {
   if (req.url === '/api/v1' || req.url.startsWith('/api/v1/')) {
@@ -367,7 +509,7 @@ app.use('/api', (req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Vary', 'Origin');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Request-Id, Idempotency-Key, X-Payment-Signature, X-Webhook-Signature');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token, X-Request-Id, Idempotency-Key, X-Payment-Signature, X-Webhook-Signature');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   } else if (origin && req.method === 'OPTIONS') {
     return res.status(403).json({ error: 'Origem não autorizada.', code: 'CORS_ORIGIN_DENIED' });
@@ -375,6 +517,11 @@ app.use('/api', (req, res, next) => {
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
+// S4: Origin/Referer do próprio site + token de duplo envio em todos os
+// métodos que alteram estado. Aplicado depois do CORS para os preflights
+// continuarem a funcionar e antes dos limitadores para não gastar baldes com
+// pedidos forjados.
+app.use('/api', validateStateChangingRequest);
 
 const requestWindows = new Map<string, { startedAt: number; count: number }>();
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -494,24 +641,19 @@ const persistAuditLogs = () => saveJson('audit-logs.json', securityAuditLogs);
 const purchaseIdempotency = new Map<string, { createdAt: number; response: Record<string, unknown>; status: number; result?: TicketPurchaseResult }>();
 const purchaseIdempotencyLocks = new Map<string, Promise<void>>();
 const paymentIdempotency = new Map<string, { createdAt: number; response: unknown }>();
-const ticketLookupWindows = new Map<string, { startedAt: number; count: number }>();
 const smsResendWindows = new Map<string, { lastSentAt: number; dayKey: string; count: number }>();
 const TICKET_LOOKUP_WINDOW_MS = 10 * 60_000;
 const SMS_RESEND_COOLDOWN_MS = 60_000;
 const SMS_RESEND_DAILY_MAX = 3;
 const TICKET_LOOKUP_MAX_ATTEMPTS = 5;
 const normalizeLookupPhone = (value: unknown) => String(value || '').replace(/\D/g, '').slice(-9);
-const allowTicketLookup = (phone: string) => {
-  const now = Date.now();
-  const current = ticketLookupWindows.get(phone);
-  if (!current || now - current.startedAt >= TICKET_LOOKUP_WINDOW_MS) {
-    ticketLookupWindows.set(phone, { startedAt: now, count: 1 });
-    return true;
-  }
-  if (current.count >= TICKET_LOOKUP_MAX_ATTEMPTS) return false;
-  current.count += 1;
-  return true;
-};
+const allowTicketLookup = (phone: string) =>
+  consumeAccountRateLimit('ticket-lookup', phone, TICKET_LOOKUP_WINDOW_MS, TICKET_LOOKUP_MAX_ATTEMPTS);
+
+const LOGIN_RATE_LIMIT_WINDOW_MS = 15 * 60_000;
+const LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 10;
+const PASSWORD_RESET_RATE_LIMIT_WINDOW_MS = 15 * 60_000;
+const PASSWORD_RESET_MAX_ATTEMPTS = 5;
 const monetizationCatalogStore = loadJson<MonetizationCatalog>('monetization-catalog.json', DEFAULT_MONETIZATION_CATALOG);
 void persistPostgresCatalog(monetizationCatalogStore).catch((error: unknown) => {
   console.error('postgres-catalog-bootstrap-failed', error);
@@ -1276,6 +1418,64 @@ app.post('/api/app-state/:key', requireSession, async (req, res) => {
   }
 });
 
+type PublicViewer = { role: 'user' | 'business' | 'admin'; userId: string; businessId?: string } | null;
+
+/** Sessão opcional das rotas públicas: identifica o dono sem exigir login. */
+async function resolvePublicViewer(req: express.Request): Promise<PublicViewer> {
+  const context = await sessionContext(req);
+  if (!context) return null;
+  let businessId: string | undefined;
+  if (context.role === 'business') {
+    const account = await identityAccess.findById(context.userId);
+    businessId = account?.businessId;
+  }
+  return { role: context.role, userId: context.userId, businessId };
+}
+
+function isPublishedEvent(event: Record<string, any>): boolean {
+  return event.status === 'published' || event.status === 'active';
+}
+
+function filterEventsForViewer(events: any[], viewer: PublicViewer): any[] {
+  if (viewer?.role === 'admin') return events;
+  if (viewer?.role === 'business' && viewer.businessId) {
+    return events.filter((event) => isPublishedEvent(event) || event.businessId === viewer.businessId);
+  }
+  return events.filter(isPublishedEvent);
+}
+
+function filterBusinessesForViewer(businesses: any[], viewer: PublicViewer): any[] {
+  if (viewer?.role === 'admin') return businesses;
+  if (viewer?.role === 'business' && viewer.businessId) {
+    return businesses.filter((business) => business.status === 'active' || business.id === viewer.businessId);
+  }
+  return businesses.filter((business) => business.status === 'active');
+}
+
+function isPublishedStory(story: Record<string, any>, now = Date.now()): boolean {
+  // Stories antigas não têm estado: continuam públicas enquanto não houver um
+  // estado explícito que as retire. Qualquer draft/removida/suspensa fica fora.
+  if (story.status !== undefined && story.status !== null && story.status !== 'active') return false;
+  if (story.moderationStatus !== undefined && story.moderationStatus !== null && story.moderationStatus !== 'approved') return false;
+  if (story.visibility !== undefined && story.visibility !== null && story.visibility !== 'public') return false;
+  if (story.expiresAt) {
+    const expiresAt = Date.parse(String(story.expiresAt));
+    if (Number.isFinite(expiresAt) && expiresAt <= now) return false;
+  }
+  return true;
+}
+
+function filterStoriesForViewer(stories: any, viewer: PublicViewer): any {
+  if (!Array.isArray(stories)) return stories;
+  if (viewer?.role === 'admin') return stories;
+  return stories.filter((story) => {
+    if (!story || typeof story !== 'object') return false;
+    const owned = (viewer?.role === 'business' && viewer.businessId && story.businessId === viewer.businessId)
+      || (viewer && story.ownerUserId === viewer.userId);
+    return owned || isPublishedStory(story);
+  });
+}
+
 app.get('/api/sync/bootstrap', async (req, res) => {
   const pagingResult = parseCollectionPaging(req.query as Record<string, unknown>);
   if ('error' in pagingResult) {
@@ -1289,13 +1489,17 @@ app.get('/api/sync/bootstrap', async (req, res) => {
   const sections = sectionsResult.sections;
   const summary = req.query.view === 'summary';
   try {
+    const viewer = await resolvePublicViewer(req);
     // Só toca nas fontes das secções pedidas: `?sections=stories` evita ler
     // empresas, eventos e publicações por completo.
-    const businesses = sections.has('businesses') ? await listPostgresBusinesses() : [];
-    const events = sections.has('events') ? await listPostgresEvents() : [];
+    const businessSource = sections.has('businesses') ? await listPostgresBusinesses() : [];
+    const eventSource = sections.has('events') ? await listPostgresEvents() : [];
     const userPosts = sections.has('posts') ? await getAppState('guigui_user_posts') : null;
     const promotions = sections.has('promotions') ? await getAppState('guigui_promotions') : null;
-    const stories = sections.has('stories') ? await getAppState('guigui_stories') : null;
+    const storySource = sections.has('stories') ? await getAppState('guigui_stories') : null;
+    const businesses = filterBusinessesForViewer(businessSource, viewer);
+    const events = filterEventsForViewer(eventSource, viewer);
+    const stories = filterStoriesForViewer(storySource, viewer);
 
     const businessDtos = businesses.map(summary ? toBusinessSummaryDto : toPublicBusinessDto);
     const businessesPage = paginateCollection(businessDtos, paging);
@@ -1308,8 +1512,10 @@ app.get('/api/sync/bootstrap', async (req, res) => {
       success: true,
       database: { connected: Boolean(databasePool) },
       data: {
-        businesses: businesses.length > 0 ? businessesPage.items : null,
-        events: events.length > 0 ? eventsPage.items : null,
+        // Se a fonte tinha registos mas todos eram privados, devolve uma lista
+        // vazia (não null) para o cliente não reutilizar dados locais.
+        businesses: businessSource.length > 0 ? businessesPage.items : null,
+        events: eventSource.length > 0 ? eventsPage.items : null,
         userPosts,
         promotions,
         stories: storiesPage.items,
@@ -1339,7 +1545,8 @@ app.get('/api/businesses', async (req, res) => {
   }
   const summary = req.query.view === 'summary';
   try {
-    const businesses = await listPostgresBusinesses();
+    const viewer = await resolvePublicViewer(req);
+    const businesses = filterBusinessesForViewer(await listPostgresBusinesses(), viewer);
     const dtos = businesses.map(summary ? toBusinessSummaryDto : toPublicBusinessDto);
     const { items, pagination } = paginateCollection(dtos, pagingResult.paging);
     res.json({
@@ -1427,6 +1634,37 @@ app.get('/sobre-nos', async (req, res) => {
     console.error('[Guigui.com] institutional shell failed:', error);
     res.status(500).type('text').send('Página institucional indisponível.');
   }
+});
+
+// As páginas de políticas têm endereço próprio e recebem no HTML inicial o
+// título, a descrição e a canónica do documento publicado. Como em /sobre-nos,
+// a SPA continua a carregar, mas motores de busca e pré-visualizações de
+// partilha lêem os metadados sem executar JavaScript. A fonte é sempre a
+// publicação activa: rascunhos e documentos apagados não geram metadados.
+async function renderPolicyShell(req: express.Request, res: express.Response, slug?: string): Promise<void> {
+  try {
+    const html = await readInstitutionalShell();
+    const release = databasePool
+      ? await createInstitutionalRepository(databasePool).latestRelease()
+      : null;
+    const origin = (process.env.APP_URL?.trim() || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+    res
+      .type('html')
+      .setHeader('Cache-Control', 'no-cache')
+      .send(injectPolicyMeta(html, release?.snapshot ?? null, slug, origin));
+  } catch (error) {
+    console.error('[Guigui.com] policy shell failed:', error);
+    res.status(500).type('text').send('Página de políticas indisponível.');
+  }
+}
+
+app.get('/politicas', (req, res) => {
+  void renderPolicyShell(req, res);
+});
+
+app.get('/politicas/:slug', (req, res) => {
+  const slug = typeof req.params.slug === 'string' ? req.params.slug.trim() : '';
+  void renderPolicyShell(req, res, slug || undefined);
 });
 
 app.get('/sitemap.xml', async (req, res) => {
@@ -1769,7 +2007,7 @@ app.get('/api/admin/stats', requireRole('admin'), async (_req, res) => {
       companiesByStatus, companiesByMonth,
       eventsByStatus, ordersByStatus, ticketsByStatus,
       paymentsByStatus, paymentsByUseCase,
-      revenueAgg, revenueByMonth, supportByStatus, moderationByStatus,
+      revenueAgg, revenueByMonth, revenueByMonthStatus, supportByStatus, moderationByStatus,
     ] = await Promise.all([
       group(`SELECT role AS key, count(*)::int AS n FROM users GROUP BY role`),
       group(`SELECT account_status AS key, count(*)::int AS n FROM users GROUP BY account_status`),
@@ -1781,12 +2019,28 @@ app.get('/api/admin/stats', requireRole('admin'), async (_req, res) => {
       group(`SELECT status AS key, count(*)::int AS n FROM tickets GROUP BY status`),
       group(`SELECT status AS key, count(*)::int AS n FROM payment_transactions GROUP BY status`),
       group(`SELECT use_case AS key, count(*)::int AS n FROM payment_transactions GROUP BY use_case`),
-      rows(`SELECT COALESCE(sum(gross_amount_xof),0)::bigint AS total, COALESCE(sum(commission_amount_xof),0)::bigint AS commission FROM payment_transactions WHERE status = 'paid'`),
-      rows(`SELECT to_char(created_at,'YYYY-MM') AS month, COALESCE(sum(gross_amount_xof),0)::bigint AS revenue, COALESCE(sum(commission_amount_xof),0)::bigint AS commission FROM payment_transactions WHERE status = 'paid' GROUP BY month ORDER BY month`),
+      // Fonte de verdade da comissão/repasses: o pedido pago. `orders.fee_amount_xof`
+      // e `orders.net_amount_xof` são gravados no momento da compra com a política
+      // em vigor; `payment_transactions.commission_amount_xof` é legado (fica a 0
+      // nos dados históricos e não tem sequer order_id preenchido). Usar os
+      // pedidos garante que o financeiro global, o da empresa e o centro de
+      // controlo do evento mostram exatamente o mesmo valor.
+      rows(`SELECT COALESCE(sum(gross_amount_xof),0)::bigint AS total, COALESCE(sum(fee_amount_xof),0)::bigint AS commission, COALESCE(sum(net_amount_xof),0)::bigint AS net FROM orders WHERE status = 'paid'`),
+      rows(`SELECT to_char(created_at,'YYYY-MM') AS month, COALESCE(sum(gross_amount_xof),0)::bigint AS revenue, COALESCE(sum(fee_amount_xof),0)::bigint AS commission, COALESCE(sum(net_amount_xof),0)::bigint AS net FROM orders WHERE status = 'paid' GROUP BY month ORDER BY month`),
+      // Série mensal com confirmado/pendente/comissão. É a mesma definição de
+      // faturação usada no financeiro: pedidos pagos (gross_amount_xof).
+      rows(`SELECT to_char(created_at,'YYYY-MM') AS month,
+                   COALESCE(sum(gross_amount_xof) FILTER (WHERE status = 'paid'),0)::bigint AS confirmed,
+                   COALESCE(sum(gross_amount_xof) FILTER (WHERE status IN ('created','pending')),0)::bigint AS pending,
+                   COALESCE(sum(fee_amount_xof) FILTER (WHERE status = 'paid'),0)::bigint AS commission
+              FROM orders GROUP BY month ORDER BY month`),
       group(`SELECT status AS key, count(*)::int AS n FROM support_tickets GROUP BY status`),
       group(`SELECT status AS key, count(*)::int AS n FROM moderation_items GROUP BY status`),
     ]);
     const sum = (obj: Record<string, number>) => Object.values(obj).reduce((a, b) => a + b, 0);
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const currentRevenue = revenueByMonthStatus.find((row) => row.month === currentMonth);
+    const pendingXOF = revenueByMonthStatus.reduce((total, row) => total + Number(row.pending ?? 0), 0);
     res.json({
       users: { total: sum(usersByRole), byRole: usersByRole, byStatus: usersByStatus, byMonth: usersByMonth },
       companies: { total: sum(companiesByStatus), byStatus: companiesByStatus, byMonth: companiesByMonth },
@@ -1794,7 +2048,17 @@ app.get('/api/admin/stats', requireRole('admin'), async (_req, res) => {
       orders: { total: sum(ordersByStatus), byStatus: ordersByStatus },
       tickets: { total: sum(ticketsByStatus), byStatus: ticketsByStatus },
       payments: { total: sum(paymentsByStatus), byStatus: paymentsByStatus, byUseCase: paymentsByUseCase },
-      revenue: { grossXOF: Number(revenueAgg[0]?.total ?? 0), commissionXOF: Number(revenueAgg[0]?.commission ?? 0), byMonth: revenueByMonth },
+      revenue: {
+        grossXOF: Number(revenueAgg[0]?.total ?? 0),
+        commissionXOF: Number(revenueAgg[0]?.commission ?? 0),
+        netXOF: Number(revenueAgg[0]?.net ?? 0),
+        source: 'orders.fee_amount_xof',
+        byMonth: revenueByMonth,
+        byMonthStatus: revenueByMonthStatus,
+        thisMonthXOF: Number(currentRevenue?.confirmed ?? 0),
+        commissionThisMonthXOF: Number(currentRevenue?.commission ?? 0),
+        pendingXOF,
+      },
       support: { total: sum(supportByStatus), byStatus: supportByStatus },
       moderation: { total: sum(moderationByStatus), byStatus: moderationByStatus },
     });
@@ -1954,7 +2218,7 @@ app.get('/api/admin/finance/transactions/:transactionId', requireRole('admin'), 
   try {
     const transaction = await getFinanceTransaction(req.params.transactionId);
     if (!transaction) return res.status(404).json({ error: 'Transação não encontrada.', code: 'TRANSACTION_NOT_FOUND' });
-    const [actions, refunds, events] = await Promise.all([
+    const [actions, refunds, events, orders] = await Promise.all([
       databasePool.query(
         `SELECT a.id, a.action, a.reason, a.proof_reference, u.name AS actor_name, a.created_at
            FROM payment_manual_actions a
@@ -1972,8 +2236,25 @@ app.get('/api/admin/finance/transactions/:transactionId', requireRole('admin'), 
            FROM payment_events WHERE transaction_id = $1 ORDER BY received_at DESC`,
         [req.params.transactionId],
       ),
+      databasePool.query(
+        `SELECT o.id, o.status, o.gross_amount_xof, o.fee_amount_xof, o.net_amount_xof,
+                o.event_id, e.title AS event_title, e.company_id, c.name AS company_name,
+                COUNT(t.id)::int AS ticket_count,
+                string_agg(t.ticket_code, ', ' ORDER BY t.ticket_code) AS ticket_codes,
+                string_agg(DISTINCT tt.name, ', ') AS ticket_types
+           FROM payment_transaction_orders pto
+           JOIN orders o ON o.id = pto.order_id
+           LEFT JOIN events e ON e.id = o.event_id
+           LEFT JOIN companies c ON c.id = e.company_id
+           LEFT JOIN tickets t ON t.order_id = o.id
+           LEFT JOIN ticket_types tt ON tt.id = t.ticket_type_id
+          WHERE pto.transaction_id = $1
+          GROUP BY o.id, e.title, e.company_id, c.name
+          ORDER BY o.created_at ASC`,
+        [req.params.transactionId],
+      ),
     ]);
-    res.json({ transaction, actions: actions.rows, refunds: refunds.rows, events: events.rows });
+    res.json({ transaction, actions: actions.rows, refunds: refunds.rows, events: events.rows, orders: orders.rows });
   } catch (error) {
     sendFinanceError(res, error, 'GET /api/admin/finance/transactions/:id');
   }
@@ -2091,6 +2372,103 @@ app.get('/api/admin/finance/statements', requireRole('admin'), async (req, res) 
     res.json(await getFinanceStatements(req.query as Record<string, unknown>));
   } catch (error) {
     sendFinanceError(res, error, 'GET /api/admin/finance/statements');
+  }
+});
+
+function sendPayoutError(res: express.Response, error: unknown, context: string) {
+  if (error instanceof PayoutError) {
+    return res.status(error.status).json({ error: error.message, code: error.code });
+  }
+  console.error(`[Guigui.com] ${context}:`, error);
+  return res.status(500).json({ error: 'Não foi possível concluir a operação de repasse.', code: 'PAYOUT_OPERATION_FAILED' });
+}
+
+// Central financeira de bilhetes: receita própria, comissões, valores devidos
+// às empresas e repasses, calculados exclusivamente a partir dos pedidos pagos.
+app.get('/api/admin/finance/tickets', requireRole('admin'), async (req, res) => {
+  try {
+    const companyId = typeof req.query.companyId === 'string' ? req.query.companyId.trim() : '';
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(await getTicketFinanceOverview(companyId || undefined));
+  } catch (error) {
+    sendPayoutError(res, error, 'GET /api/admin/finance/tickets');
+  }
+});
+
+app.get('/api/admin/finance/payouts', requireRole('admin'), async (req, res) => {
+  try {
+    const payouts = await listPayouts({
+      companyId: typeof req.query.companyId === 'string' ? req.query.companyId.trim() : undefined,
+      eventId: typeof req.query.eventId === 'string' ? req.query.eventId.trim() : undefined,
+      status: typeof req.query.status === 'string' ? req.query.status.trim() : undefined,
+    });
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ payouts });
+  } catch (error) {
+    sendPayoutError(res, error, 'GET /api/admin/finance/payouts');
+  }
+});
+
+app.post('/api/admin/finance/payouts', requireRole('admin'), async (req, res) => {
+  try {
+    const context = await sessionContext(req);
+    const payout = await createPayout(req.body || {}, context?.userId || '');
+    recordAudit({
+      action: 'event_payout_created',
+      resource: 'event_payout',
+      resourceId: payout.id,
+      actorRole: 'admin',
+      actorId: context?.userId,
+      requestId: requestIdFrom(req),
+      success: true,
+      metadata: { companyId: payout.companyId, eventId: payout.eventId, amountXOF: payout.amountXOF, method: payout.method },
+    });
+    res.status(201).json(payout);
+  } catch (error) {
+    sendPayoutError(res, error, 'POST /api/admin/finance/payouts');
+  }
+});
+
+app.patch('/api/admin/finance/payouts/:payoutId', requireRole('admin'), async (req, res) => {
+  try {
+    const context = await sessionContext(req);
+    const payout = await updatePayoutStatus(req.params.payoutId, req.body || {}, context?.userId || '');
+    recordAudit({
+      action: `event_payout_${payout.status}`,
+      resource: 'event_payout',
+      resourceId: payout.id,
+      actorRole: 'admin',
+      actorId: context?.userId,
+      requestId: requestIdFrom(req),
+      success: true,
+      metadata: {
+        companyId: payout.companyId,
+        eventId: payout.eventId,
+        amountXOF: payout.amountXOF,
+        reference: payout.reference,
+        proofReference: payout.proofReference,
+      },
+    });
+    res.json(payout);
+  } catch (error) {
+    sendPayoutError(res, error, 'PATCH /api/admin/finance/payouts/:payoutId');
+  }
+});
+
+// A empresa vê apenas os seus eventos, valores e repasses. Nunca escolhe a
+// empresa no pedido: o âmbito vem da sessão autenticada.
+app.get('/api/business/finance', requireRole('business'), async (req, res) => {
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  const stored = await identityAccess.findById(context.userId);
+  if (!stored?.businessId) {
+    return res.status(403).json({ error: 'A sua conta não está associada a uma empresa.', code: 'BUSINESS_ACCOUNT_REQUIRED' });
+  }
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(await getCompanyFinance(stored.businessId));
+  } catch (error) {
+    sendPayoutError(res, error, 'GET /api/business/finance');
   }
 });
 
@@ -2288,6 +2666,236 @@ app.post('/api/admin/commercial/subscriptions/:subscriptionId/renew', requireRol
     res.json(await renewSubscription(req.params.subscriptionId, req.body || {}, actor, String(req.body?.reason || '')));
   } catch (error) {
     sendCommercialError(res, error, 'POST /api/admin/commercial/subscriptions/:subscriptionId/renew');
+  }
+});
+
+app.get('/api/admin/commercial/subscriptions/:subscriptionId/entitlements', requireRole('admin'), async (req, res) => {
+  try {
+    res.json(await getSubscriptionEntitlements(req.params.subscriptionId));
+  } catch (error) {
+    sendCommercialError(res, error, 'GET /api/admin/commercial/subscriptions/:subscriptionId/entitlements');
+  }
+});
+
+app.post('/api/admin/commercial/subscriptions/:subscriptionId/plan-change', requireRole('admin'), async (req, res) => {
+  try {
+    const actor = await commercialActor(req);
+    res.json(await changeSubscriptionPlan(req.params.subscriptionId, req.body || {}, actor, String(req.body?.reason || '')));
+  } catch (error) {
+    sendCommercialError(res, error, 'POST /api/admin/commercial/subscriptions/:subscriptionId/plan-change');
+  }
+});
+
+app.put('/api/admin/commercial/subscriptions/:subscriptionId/exceptions', requireRole('admin'), async (req, res) => {
+  try {
+    const actor = await commercialActor(req);
+    res.json(await updateSubscriptionExceptions(req.params.subscriptionId, req.body || {}, actor, String(req.body?.reason || '')));
+  } catch (error) {
+    sendCommercialError(res, error, 'PUT /api/admin/commercial/subscriptions/:subscriptionId/exceptions');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Módulo Sistema — monitorização técnica real (exclusivo da administração)
+// ---------------------------------------------------------------------------
+
+function sendSystemError(res: Response, error: unknown, context: string) {
+  const code = (error as { code?: string }).code;
+  if (code === 'SYSTEM_MONITORING_UNAVAILABLE') {
+    return res.status(503).json({
+      error: (error as Error).message,
+      code,
+      hint: 'Aplique a migração 036_system_monitoring.sql (npm run db:migrate).',
+    });
+  }
+  if (code === 'SYSTEM_SETTING_INVALID' || code === 'SYSTEM_INCIDENT_INVALID') {
+    return res.status(400).json({ error: (error as Error).message, code });
+  }
+  if (code === 'NOT_FOUND') {
+    return res.status(404).json({ error: (error as Error).message, code });
+  }
+  console.error(`[Guigui.com] ${context}:`, error);
+  return res.status(500).json({ error: 'Não foi possível concluir a operação de monitorização.', code: 'SYSTEM_MONITORING_FAILED' });
+}
+
+async function systemActorName(req: Request): Promise<string> {
+  const context = await sessionContext(req);
+  if (!context) return 'Administração';
+  const stored = await identityAccess.findById(context.userId);
+  return stored?.name || 'Administração';
+}
+
+app.get('/api/admin/system/overview', requireRole('admin'), async (_req, res) => {
+  try {
+    res.json(await getSystemOverview());
+  } catch (error) {
+    sendSystemError(res, error, 'GET /api/admin/system/overview');
+  }
+});
+
+app.get('/api/admin/system/infrastructure', requireRole('admin'), async (_req, res) => {
+  try {
+    res.json(await getSystemInfrastructure());
+  } catch (error) {
+    sendSystemError(res, error, 'GET /api/admin/system/infrastructure');
+  }
+});
+
+app.get('/api/admin/system/resources', requireRole('admin'), async (req, res) => {
+  try {
+    res.json(await getSystemResources(Number(req.query.hours || 24)));
+  } catch (error) {
+    sendSystemError(res, error, 'GET /api/admin/system/resources');
+  }
+});
+
+app.get('/api/admin/system/database', requireRole('admin'), async (_req, res) => {
+  try {
+    res.json(await getSystemDatabase());
+  } catch (error) {
+    sendSystemError(res, error, 'GET /api/admin/system/database');
+  }
+});
+
+app.get('/api/admin/system/apis', requireRole('admin'), async (req, res) => {
+  try {
+    res.json(await getSystemApiMonitoring(Number(req.query.days || 7)));
+  } catch (error) {
+    sendSystemError(res, error, 'GET /api/admin/system/apis');
+  }
+});
+
+app.get('/api/admin/system/incidents', requireRole('admin'), async (req, res) => {
+  try {
+    res.json(await listSystemIncidents({
+      status: typeof req.query.status === 'string' ? req.query.status : undefined,
+      severity: typeof req.query.severity === 'string' ? req.query.severity : undefined,
+      service: typeof req.query.service === 'string' ? req.query.service : undefined,
+      query: typeof req.query.q === 'string' ? req.query.q : undefined,
+      limit: Number(req.query.limit || 50),
+    }));
+  } catch (error) {
+    sendSystemError(res, error, 'GET /api/admin/system/incidents');
+  }
+});
+
+app.get('/api/admin/system/incidents/:incidentId', requireRole('admin'), async (req, res) => {
+  try {
+    const detail = await getSystemIncident(req.params.incidentId);
+    if (!detail) return res.status(404).json({ error: 'Incidente não encontrado.', code: 'NOT_FOUND' });
+    res.json(detail);
+  } catch (error) {
+    sendSystemError(res, error, 'GET /api/admin/system/incidents/:incidentId');
+  }
+});
+
+app.post('/api/admin/system/incidents', requireRole('admin'), async (req, res) => {
+  try {
+    const actorName = await systemActorName(req);
+    const incident = await createSystemIncident(req.body || {}, actorName);
+    recordAudit({
+      action: 'system_incident_created',
+      resource: 'system_incident',
+      resourceId: incident.id,
+      actorRole: 'admin',
+      actorName,
+      requestId: requestIdFrom(req),
+      success: true,
+      metadata: { severity: incident.severity, service: incident.service },
+    });
+    res.status(201).json({ incident });
+  } catch (error) {
+    sendSystemError(res, error, 'POST /api/admin/system/incidents');
+  }
+});
+
+app.patch('/api/admin/system/incidents/:incidentId', requireRole('admin'), async (req, res) => {
+  try {
+    const actorName = await systemActorName(req);
+    const incident = await updateSystemIncident(req.params.incidentId, req.body || {}, actorName);
+    recordAudit({
+      action: 'system_incident_updated',
+      resource: 'system_incident',
+      resourceId: incident.id,
+      actorRole: 'admin',
+      actorName,
+      requestId: requestIdFrom(req),
+      success: true,
+      metadata: { status: incident.status, severity: incident.severity },
+    });
+    res.json({ incident });
+  } catch (error) {
+    sendSystemError(res, error, 'PATCH /api/admin/system/incidents/:incidentId');
+  }
+});
+
+app.get('/api/admin/system/logs', requireRole('admin'), async (req, res) => {
+  try {
+    res.json(await listSystemLogs({
+      level: typeof req.query.level === 'string' ? req.query.level : undefined,
+      service: typeof req.query.service === 'string' ? req.query.service : undefined,
+      query: typeof req.query.q === 'string' ? req.query.q : undefined,
+      requestId: typeof req.query.requestId === 'string' ? req.query.requestId : undefined,
+      hours: Number(req.query.hours || 24),
+      limit: Number(req.query.limit || 100),
+    }));
+  } catch (error) {
+    sendSystemError(res, error, 'GET /api/admin/system/logs');
+  }
+});
+
+app.get('/api/admin/system/availability', requireRole('admin'), async (_req, res) => {
+  try {
+    res.json(await getSystemAvailability());
+  } catch (error) {
+    sendSystemError(res, error, 'GET /api/admin/system/availability');
+  }
+});
+
+app.get('/api/admin/system/security', requireRole('admin'), async (req, res) => {
+  try {
+    res.json(await getSystemSecurity(Number(req.query.days || 7)));
+  } catch (error) {
+    sendSystemError(res, error, 'GET /api/admin/system/security');
+  }
+});
+
+app.get('/api/admin/system/settings', requireRole('admin'), async (_req, res) => {
+  try {
+    res.json(await getSystemSettings());
+  } catch (error) {
+    sendSystemError(res, error, 'GET /api/admin/system/settings');
+  }
+});
+
+app.put('/api/admin/system/settings', requireRole('admin'), async (req, res) => {
+  try {
+    const actorName = await systemActorName(req);
+    const body = req.body || {};
+    const input = {
+      intervalSeconds: Number(body.intervalSeconds),
+      cpuThreshold: Number(body.cpuThreshold),
+      memoryThreshold: Number(body.memoryThreshold),
+      dbLatencyThresholdMs: Number(body.dbLatencyThresholdMs),
+      errorRateThreshold: Number(body.errorRateThreshold),
+      retentionDays: Number(body.retentionDays),
+      sloTarget: Number(body.sloTarget),
+      alertsEnabled: body.alertsEnabled !== false,
+    };
+    const result = await updateSystemSettings(input, actorName);
+    recordAudit({
+      action: 'system_settings_updated',
+      resource: 'system_monitoring_settings',
+      resourceId: '1',
+      actorRole: 'admin',
+      actorName,
+      requestId: requestIdFrom(req),
+      success: true,
+      metadata: input,
+    });
+    res.json(result);
+  } catch (error) {
+    sendSystemError(res, error, 'PUT /api/admin/system/settings');
   }
 });
 
@@ -2559,12 +3167,52 @@ app.patch('/api/admin/users/:userId', requireRole('admin'), async (req, res) => 
 });
 
 app.post('/api/admin/users/:userId/request-password-reset', requireRole('admin'), async (req, res) => {
+  const requestId = requestIdFrom(req);
   const context = await sessionContext(req);
   if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
   try {
     const user = await findAdminUser(req.params.userId);
     if (!user) return res.status(404).json({ error: 'Conta não encontrada.', code: 'USER_NOT_FOUND' });
-    await identityAccess.requestPasswordReset(user.email);
+    if (!await consumeAccountRateLimit('password-reset', user.email, PASSWORD_RESET_RATE_LIMIT_WINDOW_MS, PASSWORD_RESET_MAX_ATTEMPTS)) {
+      return res.status(429).json({ error: 'Demasiados pedidos de recuperação para esta conta. Tente novamente mais tarde.', code: 'PASSWORD_RESET_RATE_LIMITED' });
+    }
+    const token = await identityAccess.requestPasswordReset(user.email);
+    if (!token) {
+      recordAudit({
+        action: 'admin_user_password_reset_failed',
+        resource: 'user',
+        resourceId: user.id,
+        actorId: context.userId,
+        actorRole: 'admin',
+        success: false,
+        requestId,
+        metadata: { reason: 'token_not_created' },
+      });
+      return res.status(409).json({ error: 'Não foi possível gerar o código de recuperação para esta conta.', code: 'PASSWORD_RESET_NOT_CREATED' });
+    }
+    const delivery = await emailDelivery.sendPasswordReset({
+      recipientEmail: user.email,
+      recipientName: user.name,
+      token,
+      expiresInMinutes: 15,
+    });
+    if (delivery.state !== 'accepted') {
+      recordAudit({
+        action: 'admin_user_password_reset_failed',
+        resource: 'user',
+        resourceId: user.id,
+        actorId: context.userId,
+        actorRole: 'admin',
+        success: false,
+        requestId,
+        metadata: { reason: 'delivery_not_accepted', mode: delivery.mode, state: delivery.state },
+      });
+      return res.status(503).json({
+        success: false,
+        error: 'O código foi gerado mas o email não foi aceite pelo fornecedor. Nenhuma instrução foi enviada.',
+        code: 'PASSWORD_RESET_DELIVERY_FAILED',
+      });
+    }
     recordAudit({
       action: 'admin_user_password_reset_requested',
       resource: 'user',
@@ -2572,11 +3220,21 @@ app.post('/api/admin/users/:userId/request-password-reset', requireRole('admin')
       actorId: context.userId,
       actorRole: 'admin',
       success: true,
-      requestId: requestIdFrom(req),
+      requestId,
+      metadata: { deliveryMode: delivery.mode },
     });
-    res.json({ success: true, message: 'Processo seguro de redefinição iniciado. O utilizador receberá as instruções no email registado.' });
+    res.json({ success: true, message: 'Código de recuperação enviado para o email registado do utilizador.' });
   } catch (error) {
     console.error('[Guigui.com] reset de credenciais falhou:', error);
+    recordAudit({
+      action: 'admin_user_password_reset_failed',
+      resource: 'user',
+      actorId: context.userId,
+      actorRole: 'admin',
+      success: false,
+      requestId,
+      metadata: { reason: 'exception' },
+    });
     res.status(500).json({ error: 'Não foi possível iniciar a redefinição.', code: 'ADMIN_USER_RESET_FAILED' });
   }
 });
@@ -2996,12 +3654,13 @@ app.post('/api/businesses', requireSession, async (req, res) => {
   }
 });
 
-app.get('/api/events', async (_req, res) => {
+app.get('/api/events', async (req, res) => {
   try {
     const events = databaseConfigured
       ? await listPostgresEvents()
       : Array.from(eventSnapshots.values());
-    res.json({ events });
+    const viewer = await resolvePublicViewer(req);
+    res.json({ events: filterEventsForViewer(events, viewer) });
   } catch (error) {
     res.status(500).json({ error: 'Erro ao listar eventos.' });
   }
@@ -3043,6 +3702,38 @@ app.post('/api/events', requireSession, async (req, res) => {
 
   try {
     const previousEvent = eventSnapshots.get(event.id);
+    // Limite do plano aplicado no servidor: a quota de eventos deixa de existir
+    // apenas na interface. Só a criação é limitada; editar um evento existente
+    // (incluindo publicar ou corrigir) continua permitido.
+    if (!previousEvent && context.role === 'business' && resolvedBusinessId) {
+      try {
+        const quota = await getCompanyPlanEventQuota(String(resolvedBusinessId));
+        if (quota.enforced && quota.remaining <= 0) {
+          recordAudit({
+            action: 'event_write_denied',
+            resource: 'event',
+            resourceId: String(event.id || ''),
+            actorRole: 'business',
+            actorId: context.userId,
+            requestId,
+            success: false,
+            metadata: { code: 'PLAN_EVENT_LIMIT_REACHED', limit: quota.limit, used: quota.used },
+          });
+          return res.status(409).json({
+            error: `O plano da empresa atingiu o limite de ${quota.limit} eventos (${quota.used} usados).`,
+            code: 'PLAN_EVENT_LIMIT_REACHED',
+            limit: quota.limit,
+            used: quota.used,
+            requestId,
+          });
+        }
+      } catch (error) {
+        // Uma falha na leitura da assinatura não deve impedir a criação do
+        // evento: o limite é uma política comercial, não uma condição de
+        // integridade dos dados.
+        console.error('[Guigui.com] Falha ao verificar a quota de eventos do plano:', error);
+      }
+    }
     const storedEvent = {
       ...previousEvent,
       ...event,
@@ -3150,17 +3841,24 @@ app.get('/api/events/:eventId/control-center/export', requireRole('business', 'a
     return res.status(400).json({ error: 'Formato de exportação inválido.', code: 'INVALID_EXPORT_FORMAT', formats: ['csv', 'xlsx', 'pdf'] });
   }
   const sections = normaliseSections(req.query.sections ?? EXPORT_SECTIONS);
+  if (sections.length === 0) {
+    return res.status(400).json({ error: 'Selecione pelo menos uma secção para exportar.', code: 'EXPORT_SECTIONS_REQUIRED', sections: EXPORT_SECTIONS });
+  }
   try {
     // A exportação carrega o evento com um limite alto para não truncar dados.
     const loaded = await loadEventControlCenter(databasePool, eventId, resolved.viewer, { ticketLimit: 50000 });
     if (!loaded) return res.status(404).json({ error: 'Evento não encontrado.', code: 'EVENT_NOT_FOUND' });
-    // A exportação respeita os filtros aplicados no centro de controlo.
-    const data = filterEventData(loaded, {
-      query: typeof req.query.q === 'string' ? req.query.q : undefined,
+    // A exportação respeita os filtros aplicados no centro de controlo e
+    // documenta-os no próprio relatório.
+    const exportFilter = {
+      ticketQuery: typeof req.query.ticketQuery === 'string' ? req.query.ticketQuery : undefined,
+      buyerQuery: typeof req.query.buyerQuery === 'string' ? req.query.buyerQuery : undefined,
+      validationQuery: typeof req.query.validationQuery === 'string' ? req.query.validationQuery : undefined,
       ticketStatus: typeof req.query.ticketStatus === 'string' ? req.query.ticketStatus : undefined,
       orderStatus: typeof req.query.orderStatus === 'string' ? req.query.orderStatus : undefined,
       validationResult: typeof req.query.validationResult === 'string' ? req.query.validationResult : undefined,
-    });
+    };
+    const data = filterEventData(loaded, exportFilter);
     const slug = (data.event.title || 'evento')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
@@ -3170,19 +3868,19 @@ app.get('/api/events/:eventId/control-center/export', requireRole('business', 'a
       .slice(0, 60) || 'evento';
     const filename = `evento-${slug}-${new Date().toISOString().slice(0, 10)}`;
     if (format === 'csv') {
-      const csv = buildEventCsv(data, sections);
+      const csv = buildEventCsv(data, sections, exportFilter);
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
       res.setHeader('Cache-Control', 'no-store');
       res.send(csv);
     } else if (format === 'xlsx') {
-      const buffer = await buildEventXlsx(data, sections);
+      const buffer = await buildEventXlsx(data, sections, exportFilter);
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}.xlsx"`);
       res.setHeader('Cache-Control', 'no-store');
       res.send(buffer);
     } else {
-      const buffer = await buildEventPdf(data, sections);
+      const buffer = await buildEventPdf(data, sections, exportFilter);
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}.pdf"`);
       res.setHeader('Cache-Control', 'no-store');
@@ -3196,7 +3894,7 @@ app.get('/api/events/:eventId/control-center/export', requireRole('business', 'a
       actorId: resolved.viewer.userId,
       requestId: requestIdFrom(req),
       success: true,
-      metadata: { format, sections },
+      metadata: { format, sections, filters: exportFilter },
     });
   } catch (error) {
     if ((error as { code?: string }).code === 'EVENT_FORBIDDEN') {
@@ -3408,6 +4106,12 @@ app.post('/api/auth/login', async (req, res) => {
   }
   if (!email || password.length < 6) return res.status(400).json({ error: 'Indique um e-mail e uma palavra-passe válida.' });
 
+  // Balde distribuído por conta: tentativas falhadas acumulam; um login
+  // bem-sucedido limpa o balde dessa conta.
+  if (!await consumeAccountRateLimit('login', email, LOGIN_RATE_LIMIT_WINDOW_MS, LOGIN_RATE_LIMIT_MAX_ATTEMPTS)) {
+    return res.status(429).json({ error: 'Demasiadas tentativas de início de sessão. Tente novamente mais tarde.', code: 'LOGIN_RATE_LIMITED' });
+  }
+
   const result = await identityAccess.authenticate({
     email,
     password,
@@ -3423,6 +4127,11 @@ app.post('/api/auth/login', async (req, res) => {
     if (result.reason === 'mfa_invalid') return res.status(401).json({ error: 'Código MFA inválido ou já utilizado.', code: 'MFA_INVALID' });
     return res.status(401).json({ error: 'E-mail ou palavra-passe incorretos.' });
   }
+  // A limpeza do balde é otimização de segurança, não deve impedir um login
+  // válido se a base de dados tiver um soluço momentâneo.
+  await resetAccountRateLimit('login', email).catch((error) => {
+    console.warn('login-rate-limit-reset-failed', error);
+  });
   setSessionCookie(res, result.sessionToken);
   res.json({ success: true, user: result.user });
 });
@@ -3494,18 +4203,39 @@ app.get('/api/security/events', requireSession, async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     return res.json({ events: [], source: 'Indisponível sem base de dados PostgreSQL.' });
   }
-  const limit = Math.min(Math.max(Number(req.query.limit) || 40, 1), 200);
-  const result = await databasePool.query(
-    `SELECT id, action, resource, resource_id, result, reason, created_at
-       FROM audit_logs
-      WHERE actor_user_id = $1
-      ORDER BY created_at DESC
-      LIMIT $2`,
-    [context.userId, limit],
-  );
+  // `limit` mantém compatibilidade com consumidores antigos (ex.: resumo em
+  // Configurações); a paginação nova usa `pageSize`, com 20 por omissão.
+  const pageSize = Math.min(Math.max(Number(req.query.pageSize) || Number(req.query.limit) || 20, 1), 100);
+  const page = Math.max(Number(req.query.page) || 1, 1);
+  const offset = (page - 1) * pageSize;
+  const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 120) : '';
+  const searchPattern = search ? `%${search.replace(/[%_]/g, '\\$&')}%` : null;
+  const [result, totalResult] = await Promise.all([
+    databasePool.query(
+      `SELECT id, action, resource, resource_id, result, reason, created_at
+         FROM audit_logs
+        WHERE actor_user_id = $1
+          AND ($2::text IS NULL OR action ILIKE $2 OR resource ILIKE $2 OR resource_id ILIKE $2 OR reason ILIKE $2)
+        ORDER BY created_at DESC
+        LIMIT $3 OFFSET $4`,
+      [context.userId, searchPattern, pageSize, offset],
+    ),
+    databasePool.query(
+      `SELECT count(*)::int AS total
+         FROM audit_logs
+        WHERE actor_user_id = $1
+          AND ($2::text IS NULL OR action ILIKE $2 OR resource ILIKE $2 OR resource_id ILIKE $2 OR reason ILIKE $2)`,
+      [context.userId, searchPattern],
+    ),
+  ]);
+  const total = Number(totalResult.rows[0]?.total ?? 0);
   res.setHeader('Cache-Control', 'no-store');
   res.json({
     source: 'audit_logs',
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(Math.ceil(total / pageSize), 1),
     events: result.rows.map((row) => ({
       id: String(row.id),
       action: String(row.action),
@@ -4153,6 +4883,78 @@ app.post('/api/auth/change-password', requireSession, async (req, res) => {
   res.json({ success: true, message: 'Palavra-passe atualizada com sucesso.' });
 });
 
+app.patch('/api/account/profile', requireSession, async (req, res) => {
+  if (!databasePool) {
+    return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária.', code: 'DATABASE_REQUIRED' });
+  }
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  const phone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
+  const neighborhood = typeof req.body?.neighborhood === 'string' ? req.body.neighborhood.trim() : '';
+  const avatarUrl = typeof req.body?.avatarUrl === 'string' ? req.body.avatarUrl.trim() : '';
+  if (name.length < 2 || name.length > 120) {
+    return res.status(400).json({ error: 'O nome deve ter entre 2 e 120 caracteres.', code: 'USER_NAME_INVALID' });
+  }
+  if (!neighborhood) {
+    return res.status(400).json({ error: 'A localização é obrigatória.', code: 'USER_LOCATION_REQUIRED' });
+  }
+  if (avatarUrl && !/^https?:\/\//i.test(avatarUrl) && !/^data:image\/(png|jpeg|webp|gif);base64,/i.test(avatarUrl)) {
+    return res.status(400).json({ error: 'A fotografia deve ser uma imagem válida.', code: 'USER_AVATAR_INVALID' });
+  }
+  if (avatarUrl.length > 2_000_000) {
+    return res.status(413).json({ error: 'A fotografia é demasiado grande.', code: 'USER_AVATAR_TOO_LARGE' });
+  }
+  await databasePool.query(
+    `UPDATE users SET name=$1, phone=$2, neighborhood=$3, avatar_url=$4, updated_at=NOW() WHERE id=$5`,
+    [name, phone, neighborhood, avatarUrl || null, context.userId],
+  );
+  const updated = await identityAccess.findById(context.userId);
+  if (!updated) return res.status(404).json({ error: 'Conta não encontrada.', code: 'USER_NOT_FOUND' });
+  res.json({ success: true, user: updated });
+});
+
+// Guia de boas-vindas: o estado vive na conta (e não só no browser) para o guia
+// abrir uma única vez por utilizador, mesmo que inicie sessão noutro dispositivo.
+const ONBOARDING_AUDIENCES: readonly string[] = ['citizen', 'business', 'team', 'admin'];
+const ONBOARDING_STATUSES: readonly string[] = ['in_progress', 'completed', 'skipped'];
+
+app.get('/api/account/onboarding', requireSession, async (req, res) => {
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  // Sem PostgreSQL o cliente continua a usar o estado local do browser.
+  if (!databasePool) return res.json({ onboarding: {} });
+  const result = await databasePool.query('SELECT onboarding_state FROM users WHERE id=$1', [context.userId]);
+  res.json({ onboarding: result.rows[0]?.onboarding_state ?? {} });
+});
+
+app.put('/api/account/onboarding', requireSession, async (req, res) => {
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  const audience = typeof req.body?.audience === 'string' ? req.body.audience : '';
+  const status = typeof req.body?.status === 'string' ? req.body.status : '';
+  if (!ONBOARDING_AUDIENCES.includes(audience) || !ONBOARDING_STATUSES.includes(status)) {
+    return res.status(400).json({ error: 'Estado do guia inválido.', code: 'INVALID_ONBOARDING_STATE' });
+  }
+  if (!databasePool) {
+    return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária.', code: 'DATABASE_REQUIRED' });
+  }
+  const step = Number.isInteger(req.body?.step) ? Math.max(0, Math.min(50, Number(req.body.step))) : 0;
+  const result = await databasePool.query(
+    `UPDATE users
+        SET onboarding_state = COALESCE(onboarding_state, '{}'::jsonb) || jsonb_build_object(
+              $2::text,
+              jsonb_build_object('status', $3::text, 'step', $4::int, 'updatedAt', now()::text)
+            ),
+            updated_at = NOW()
+      WHERE id = $1
+      RETURNING onboarding_state`,
+    [context.userId, audience, status, step],
+  );
+  if (result.rowCount === 0) return res.status(404).json({ error: 'Conta não encontrada.', code: 'USER_NOT_FOUND' });
+  res.json({ success: true, onboarding: result.rows[0]?.onboarding_state ?? {} });
+});
+
 app.post('/api/account/deactivate', requireSession, async (req, res) => {
   const requestId = requestIdFrom(req);
   const context = await sessionContext(req);
@@ -4196,21 +4998,70 @@ app.post('/api/account/delete', requireSession, async (req, res) => {
 });
 
 app.post('/api/auth/request-password-reset', async (req, res) => {
+  const requestId = requestIdFrom(req);
   const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Indique um e-mail válido.' });
+  // Limite por conta/e-mail antes de gerar token ou enviar email: evita
+  // bombardeamento de caixas e enumeração por tentativa repetida.
+  if (!await consumeAccountRateLimit('password-reset', email, PASSWORD_RESET_RATE_LIMIT_WINDOW_MS, PASSWORD_RESET_MAX_ATTEMPTS)) {
+    return res.status(429).json({
+      success: false,
+      error: 'Demasiados pedidos de recuperação. Tente novamente mais tarde.',
+      code: 'PASSWORD_RESET_RATE_LIMITED',
+    });
+  }
   const token = await identityAccess.requestPasswordReset(email);
-  const response: { success: boolean; message: string; resetToken?: string } = {
+  if (!token) {
+    // Resposta idêntica para conta inexistente: não revela quais emails estão
+    // registados e não há nada para entregar.
+    return res.json({
+      success: true,
+      message: 'Se existir uma conta com este e-mail, receberá instruções para recuperar a palavra-passe.',
+    });
+  }
+  let delivery: Awaited<ReturnType<typeof emailDelivery.sendPasswordReset>>;
+  try {
+    const recipient = await identityAccess.findByEmail(email);
+    delivery = await emailDelivery.sendPasswordReset({
+      recipientEmail: email,
+      recipientName: recipient?.name || email,
+      token,
+      expiresInMinutes: 15,
+    });
+  } catch (error) {
+    console.error('[Guigui.com] envio do reset de palavra-passe falhou:', error);
+    recordAudit({ action: 'password_reset_delivery_failed', resource: 'user', requestId, success: false, metadata: { reason: 'delivery_exception' } });
+    return res.status(503).json({
+      success: false,
+      error: 'Não foi possível enviar o email de recuperação. Tente novamente mais tarde.',
+      code: 'PASSWORD_RESET_DELIVERY_FAILED',
+    });
+  }
+  if (delivery.state !== 'accepted') {
+    recordAudit({ action: 'password_reset_delivery_failed', resource: 'user', requestId, success: false, metadata: { mode: delivery.mode, state: delivery.state } });
+    return res.status(503).json({
+      success: false,
+      error: 'Não foi possível enviar o email de recuperação. Tente novamente mais tarde.',
+      code: 'PASSWORD_RESET_DELIVERY_FAILED',
+    });
+  }
+  recordAudit({ action: 'password_reset_requested', resource: 'user', requestId, success: true, metadata: { deliveryMode: delivery.mode } });
+  res.json({
     success: true,
     message: 'Se existir uma conta com este e-mail, receberá instruções para recuperar a palavra-passe.',
-  };
-  if (token && !isProduction) response.resetToken = token;
-  res.json(response);
+  });
 });
 
 app.post('/api/auth/reset-password', async (req, res) => {
   const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
   const newPassword = typeof req.body?.newPassword === 'string' ? req.body.newPassword : '';
   if (!token || newPassword.length < 8) return res.status(400).json({ error: 'O código e a nova palavra-passe são obrigatórios. Use pelo menos 8 carateres.' });
+  // O token identifica o pedido de uma conta; o balde é indexado pelo hash do
+  // token para não guardar o segredo em claro na tabela de rate-limit.
+  const tokenKey = createHash('sha256').update(token).digest('hex');
+  if (!await consumeAccountRateLimit('password-reset-token', tokenKey, PASSWORD_RESET_RATE_LIMIT_WINDOW_MS, PASSWORD_RESET_MAX_ATTEMPTS)) {
+    return res.status(429).json({ error: 'Demasiadas tentativas de reposição. Tente novamente mais tarde.', code: 'PASSWORD_RESET_RATE_LIMITED' });
+  }
   if (!await identityAccess.resetPassword(token, newPassword)) return res.status(400).json({ error: 'O código expirou ou já foi utilizado.' });
   res.json({ success: true, message: 'Palavra-passe redefinida com sucesso.' });
 });
@@ -5723,6 +6574,17 @@ app.post('/api/tickets/purchase', async (req, res) => {
           if (existing) Object.assign(existing, transaction);
           else paymentTransactions.push(transaction);
           persistPayments();
+          // A central financeira lê a base de dados, não o ficheiro local. A
+          // primeira gravação de uma cobrança confirmada acontece antes da
+          // emissão dos bilhetes; nesse caso o serviço adia-a até existir a
+          // ligação pedido → evento → empresa.
+          await persistPostgresPayment({
+            ...transaction,
+            ticketIds: transaction.ticketIds,
+            eventId: transaction.ticketDraft?.eventId,
+            companyId: transaction.businessId,
+            buyerUserId: transaction.ticketDraft?.buyerUserId,
+          });
         },
         async recordFulfillment(transaction) {
           recordMonetizationFulfillment(transaction);
@@ -5828,7 +6690,7 @@ app.post('/api/tickets/lookup', async (req, res) => {
   if (phone.length < 8 || recoveryCode.length < 4 || recoveryCode.length > 64) {
     return res.status(400).json({ success: false, code: 'INVALID_LOOKUP_INPUT', message: 'Introduza um telemóvel e o código do bilhete.', requestId });
   }
-  if (!allowTicketLookup(phone)) {
+  if (!await allowTicketLookup(phone)) {
     recordAudit({ action: 'ticket_lookup_rate_limited', resource: 'ticket', actorRole: 'citizen', requestId, success: false });
     return res.status(429).json({ success: false, code: 'LOOKUP_RATE_LIMITED', message: 'Demasiadas tentativas. Tente novamente mais tarde.', requestId });
   }
@@ -6416,6 +7278,11 @@ async function issueTicketForConfirmedTransaction(transaction: any, requestId: s
   transaction.ticketCodes = issued.map((ticket) => ticket.ticketCode);
   transaction.qrToken = primary.qrToken;
   transaction.qrTokens = issued.map((ticket) => ticket.qrToken);
+  // A reemissão também tem de existir na base de dados: sem isto o pagamento
+  // ficaria sem pedidos e não seria rastreável até ao evento.
+  if (databaseConfigured) {
+    await persistPostgresTickets(issued, draft.buyerUserId);
+  }
   persistTickets();
   persistPayments();
   recordAudit({ action: 'ticket_issued_after_payment_webhook', resource: 'ticket', resourceId: primary.id, actorRole: 'system', requestId, success: true, metadata: { paymentId: transaction.id, providerRef: transaction.providerRef, quantity: issued.length } });
@@ -6548,6 +7415,105 @@ app.post('/api/payments/create', async (req, res) => {
       provider,
     } = req.body;
 
+    // A rota deixou de ser pública: sem sessão não há pagamento nem fulfillment.
+    const paymentSession = await sessionContext(req);
+    if (!paymentSession) {
+      recordAudit({ action: 'payment_authentication_required', resource: 'payment', actorRole: 'citizen', requestId, success: false });
+      return res.status(401).json({ error: 'Inicie sessão para criar um pagamento.', code: 'AUTHENTICATION_REQUIRED', requestId });
+    }
+    const paymentAccount = await identityAccess.findById(paymentSession.userId) || findDemoUserById(paymentSession.userId);
+    if (!paymentAccount) {
+      return res.status(401).json({ error: 'A conta da sessão não está disponível.', code: 'AUTHENTICATION_REQUIRED', requestId });
+    }
+
+    const requestedUseCase = String(useCase || 'subscription_initial');
+    const requestedBusinessId = typeof businessId === 'string' && businessId.trim() ? businessId.trim() : undefined;
+    const accountBusinessId = typeof (paymentAccount as { businessId?: unknown }).businessId === 'string'
+      ? String((paymentAccount as { businessId: string }).businessId)
+      : undefined;
+    let effectiveBusinessId = requestedBusinessId;
+
+    // Bilhetes: evento e categoria são resolvidos no servidor. O preço cobrado
+    // é o total calculado pelo domínio, nunca o valor enviado pelo cliente.
+    let validatedTicket: {
+      offer: NonNullable<Awaited<ReturnType<typeof getTicketOffer>>>;
+      feeSnapshot: ReturnType<typeof buildTicketFeeSnapshot>;
+      quantity: number;
+    } | undefined;
+    if (requestedUseCase === 'event_tickets') {
+      const eventId = typeof req.body.eventId === 'string' ? req.body.eventId.trim() : '';
+      const ticketTypeId = typeof req.body.ticketTypeId === 'string' ? req.body.ticketTypeId.trim() : '';
+      const quantity = Number(req.body.quantity ?? 1);
+      if (!eventId || !ticketTypeId || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > 100) {
+        return res.status(400).json({ error: 'Indique o evento, a categoria e uma quantidade válida de bilhetes.', code: 'TICKET_SELECTION_REQUIRED', requestId });
+      }
+      const offer = await getTicketOffer(eventId, ticketTypeId);
+      if (!offer) {
+        return res.status(404).json({ error: 'O evento ou tipo de bilhete já não está disponível.', code: 'TICKET_OFFER_NOT_FOUND', requestId });
+      }
+      if (requestedBusinessId && offer.businessId && requestedBusinessId !== offer.businessId) {
+        return res.status(403).json({ error: 'O evento não pertence à empresa indicada.', code: 'BUSINESS_ACCESS_DENIED', requestId });
+      }
+
+      let ticketCatalog = normaliseMonetizationCatalog(monetizationCatalogStore);
+      try {
+        const databaseTicketPolicy = await getLegacyTicketFeePolicy();
+        if (databaseTicketPolicy) {
+          ticketCatalog = {
+            ...ticketCatalog,
+            ticketFeePolicy: {
+              ...ticketCatalog.ticketFeePolicy,
+              ...databaseTicketPolicy,
+              feePayer: databaseTicketPolicy.feePayer as typeof ticketCatalog.ticketFeePolicy.feePayer,
+              billingModel: databaseTicketPolicy.billingModel as typeof ticketCatalog.ticketFeePolicy.billingModel,
+            },
+          };
+        }
+      } catch (error) {
+        console.error('[Guigui.com] Falha ao carregar a política de taxas de bilheteira:', error);
+      }
+      const quoteResult = quoteTicketPurchase({ offer, quantity, catalog: ticketCatalog });
+      if ('reason' in quoteResult) {
+        return res.status(409).json({
+          error: quoteResult.reason === 'sales_closed' ? 'As vendas deste tipo de bilhete estão encerradas.' : 'Não há bilhetes suficientes disponíveis.',
+          code: 'TICKET_INVENTORY_UNAVAILABLE',
+          requestId,
+        });
+      }
+      if (req.body.ticketTypeName !== undefined && req.body.ticketTypeName !== offer.ticketTypeName) {
+        return res.status(409).json({ error: 'A categoria selecionada foi alterada. Actualize o checkout.', code: 'TICKET_TYPE_MISMATCH', requestId });
+      }
+      if (req.body.eventTitle !== undefined && req.body.eventTitle !== offer.eventTitle) {
+        return res.status(409).json({ error: 'O evento selecionado foi alterado. Actualize o checkout.', code: 'EVENT_TITLE_MISMATCH', requestId });
+      }
+      const submittedUnitPrice = req.body.pricePerTicketXOF ?? req.body.priceXOF;
+      if (submittedUnitPrice !== undefined
+        && (!Number.isSafeInteger(Number(submittedUnitPrice)) || Number(submittedUnitPrice) !== offer.unitPriceXOF)) {
+        return res.status(409).json({ error: 'O preço do bilhete foi alterado. Actualize o checkout.', code: 'TICKET_PRICE_MISMATCH', requestId });
+      }
+      const expectedAmountXOF = quoteResult.quote.buyerTotalXOF;
+      if (!Number.isSafeInteger(Number(amountXOF)) || Number(amountXOF) !== expectedAmountXOF) {
+        recordAudit({ action: 'payment_price_mismatch', resource: 'payment', requestId, success: false, metadata: { useCase: requestedUseCase, eventId, ticketTypeId, expectedAmountXOF } });
+        return res.status(409).json({ error: 'O total do checkout não corresponde à política de taxas actual.', code: 'TICKET_TOTAL_MISMATCH', expectedAmountXOF, requestId });
+      }
+      effectiveBusinessId = offer.businessId || requestedBusinessId;
+      validatedTicket = {
+        offer,
+        feeSnapshot: buildTicketFeeSnapshot(ticketCatalog, quoteResult.quote.feeBreakdown, new Date()),
+        quantity,
+      };
+    } else {
+      // Fora dos bilhetes, a empresa indicada tem de pertencer à sessão. O
+      // Super Admin mantém acesso de gestão, mas nunca por conta de terceiros.
+      if (requestedBusinessId
+        && paymentSession.role !== 'admin'
+        && requestedBusinessId !== accountBusinessId) {
+        recordAudit({ action: 'payment_business_forbidden', resource: 'payment', requestId, success: false, metadata: { requestedBusinessId } });
+        return res.status(403).json({ error: 'Não possui acesso a esta empresa.', code: 'BUSINESS_ACCESS_DENIED', requestId });
+      }
+      if (paymentSession.role !== 'admin') effectiveBusinessId = requestedBusinessId || accountBusinessId;
+    }
+
     const commercialValidation = await resolveCommercialPayment(req.body as Record<string, unknown>);
     if (!commercialValidation.ok) {
       recordAudit({ action: 'commercial_payment_rejected', resource: 'payment', actorRole: 'citizen', requestId: requestIdFrom(req), success: false, metadata: { code: commercialValidation.code, expectedAmountXOF: commercialValidation.expectedAmountXOF } });
@@ -6559,8 +7525,9 @@ app.post('/api/payments/create', async (req, res) => {
     if (idempotencyKey && idempotencyKey.length > 160) {
       return res.status(400).json({ error: 'Chave de idempotência inválida.', code: 'INVALID_IDEMPOTENCY_KEY', requestId });
     }
-    if (idempotencyKey) {
-      const previous = paymentIdempotency.get(idempotencyKey);
+    const scopedIdempotencyKey = idempotencyKey ? `${paymentSession.userId}:${idempotencyKey}` : undefined;
+    if (scopedIdempotencyKey) {
+      const previous = paymentIdempotency.get(scopedIdempotencyKey);
       if (previous) return res.status(200).json(previous.response);
     }
 
@@ -6582,27 +7549,35 @@ app.post('/api/payments/create', async (req, res) => {
 
     const txnId = `TXN-${Date.now()}-${randomBytes(3).toString('hex').toUpperCase()}`;
     const paymentAdapter = paymentAdapters[normalizedPayment.provider];
+    const chargedAmountXOF = validatedTicket?.feeSnapshot.buyerTotalXOF ?? normalizedPayment.amountXOF;
     const paymentIntent = await paymentAdapter.createIntent({
       transactionId: txnId,
-      amountXOF: normalizedPayment.amountXOF,
+      amountXOF: chargedAmountXOF,
       payerName: normalizedPayment.payerName,
       payerPhone: normalizedPayment.payerPhone,
       description: useCaseLabel || 'Pagamento Guigui.com',
       provider: normalizedPayment.provider,
-      metadata: { useCase: String(useCase || 'subscription_initial'), businessId: String(businessId || '') },
+      metadata: { useCase: requestedUseCase, businessId: String(effectiveBusinessId || '') },
     });
-    const paymentStatus = paymentIntent.state === 'confirmed' ? 'confirmed_api' : paymentIntent.state === 'failed' ? 'failed' : 'pending_provider';
+    const requiresLiveSettlement = requestedUseCase === 'event_tickets'
+      || requestedUseCase === 'subscription_initial'
+      || requestedUseCase === 'subscription_renewal'
+      || requestedUseCase === 'subscription_upgrade';
+    const canFulfill = paymentIntent.state === 'confirmed'
+      && (!requiresLiveSettlement || paymentAdapter.mode === 'live');
+    const effectiveIntentState = paymentIntent.state === 'confirmed' && !canFulfill ? 'pending' : paymentIntent.state;
+    const paymentStatus = effectiveIntentState === 'confirmed' ? 'confirmed_api' : effectiveIntentState === 'failed' ? 'failed' : 'pending_provider';
     const paymentTimestamp = new Date().toISOString().replace('T', ' ').substring(0, 16);
 
     const newTxn = {
       id: txnId,
-      useCase: useCase || 'subscription_initial',
+      useCase: requestedUseCase,
       useCaseLabel: useCaseLabel || 'Pagamento Guigui.com',
-      businessId,
+      businessId: effectiveBusinessId,
       businessName,
       payerName: normalizedPayment.payerName,
       payerPhone: normalizedPayment.payerPhone,
-      amountXOF: normalizedPayment.amountXOF,
+      amountXOF: chargedAmountXOF,
       provider: normalizedPayment.provider,
       providerRef: paymentIntent.providerRef,
       status: paymentStatus,
@@ -6611,29 +7586,43 @@ app.post('/api/payments/create', async (req, res) => {
       checkoutUrl: paymentIntent.checkoutUrl,
       paymentInstructions: paymentIntent.instructions,
       ...(commercialValidation.code ? { productId: commercialValidation.productId, productCode: commercialValidation.code, quantity: commercialValidation.quantity } : {}),
-      ...(useCase === 'subscription_initial' || useCase === 'subscription_renewal' || useCase === 'subscription_upgrade' ? {
+      ...(requestedUseCase === 'subscription_initial' || requestedUseCase === 'subscription_renewal' || requestedUseCase === 'subscription_upgrade' ? {
         subscriptionInterval: req.body.subscriptionInterval === 'annual' ? 'annual' : 'monthly',
       } : {}),
       ticketId: undefined as string | undefined,
+      ticketIds: undefined as string[] | undefined,
       ticketCode: undefined as string | undefined,
       qrToken: undefined as string | undefined,
-      ...(useCase === 'event_tickets' ? {
+      ...(validatedTicket ? {
         ticketDraft: {
-          eventId: String(req.body.eventId || 'evt-1'),
-          eventTitle: String(req.body.eventTitle || 'Evento Cultural Guigui'),
-          ticketTypeName: String(req.body.ticketTypeName || 'Entrada Geral'),
-          eventDate: req.body.eventDate,
-          eventTime: req.body.eventTime,
+          eventId: validatedTicket.offer.eventId,
+          eventTitle: validatedTicket.offer.eventTitle,
+          ticketTypeId: validatedTicket.offer.ticketTypeId,
+          ticketTypeName: validatedTicket.offer.ticketTypeName,
+          unitPriceXOF: validatedTicket.offer.unitPriceXOF,
+          buyerUserId: paymentSession.userId,
+          eventDate: validatedTicket.offer.eventDate,
+          eventTime: validatedTicket.offer.eventTime,
+          quantity: validatedTicket.quantity,
+          feeSnapshot: validatedTicket.feeSnapshot,
         },
       } : {}),
       createdAt: paymentTimestamp,
-      ...(paymentIntent.state === 'confirmed' ? { confirmedAt: paymentTimestamp, confirmedBy: `${paymentAdapter.provider} (${paymentAdapter.mode})` } : {}),
+      ...(canFulfill ? { confirmedAt: paymentTimestamp, confirmedBy: `${paymentAdapter.provider} (${paymentAdapter.mode})` } : {}),
     };
 
-    if (paymentIntent.state === 'confirmed') applySubscriptionPaymentMetadata(newTxn, new Date());
-    if (paymentIntent.state === 'confirmed') recordMonetizationFulfillment(newTxn);
+    if (canFulfill) applySubscriptionPaymentMetadata(newTxn, new Date());
+    if (canFulfill) recordMonetizationFulfillment(newTxn);
     paymentTransactions.unshift(newTxn);
-    await persistPostgresPayment(newTxn, idempotencyKey);
+    // O pagamento pendente de bilhetes tem de ficar atribuído ao evento e ao
+    // comprador na base; sem isto a transacção não é conciliável nem aparece
+    // no Centro de Controlo do evento enquanto aguarda confirmação.
+    await persistPostgresPayment({
+      ...newTxn,
+      eventId: newTxn.ticketDraft?.eventId,
+      companyId: newTxn.businessId,
+      buyerUserId: newTxn.ticketDraft?.buyerUserId,
+    }, scopedIdempotencyKey);
     persistPayments();
     recordAudit({
       action: 'payment_created',
@@ -6645,38 +7634,43 @@ app.post('/api/payments/create', async (req, res) => {
       metadata: { provider: newTxn.provider, amountXOF: newTxn.amountXOF, useCase: newTxn.useCase },
     });
 
-    if (useCase === 'event_tickets' && paymentIntent.state !== 'confirmed') {
+    if (requestedUseCase === 'event_tickets' && !canFulfill) {
       const pendingResponse = {
         success: false,
         simulated: paymentAdapter.mode !== 'live',
         settlement: paymentAdapter.mode === 'live' ? 'provider' : 'simulated',
-        paymentPending: paymentIntent.state === 'pending',
+        paymentPending: effectiveIntentState === 'pending',
         transaction: newTxn,
-        message: paymentIntent.instructions || 'Pagamento pendente. O bilhete será emitido depois da confirmação.',
+        message: paymentAdapter.mode !== 'live'
+          ? 'Modo simulado: nenhum bilhete foi emitido e nenhuma operadora foi contactada.'
+          : paymentIntent.instructions || 'Pagamento pendente. O bilhete será emitido depois da confirmação.',
         requestId,
       };
-      if (idempotencyKey) paymentIdempotency.set(idempotencyKey, { createdAt: Date.now(), response: pendingResponse });
-      return res.status(paymentIntent.state === 'pending' ? 202 : 402).json(pendingResponse);
+      if (scopedIdempotencyKey) paymentIdempotency.set(scopedIdempotencyKey, { createdAt: Date.now(), response: pendingResponse });
+      return res.status(effectiveIntentState === 'pending' ? 202 : 402).json(pendingResponse);
     }
 
-    // Só se cria um bilhete quando a intenção de pagamento foi confirmada.
-    if (useCase === 'event_tickets' && paymentIntent.state === 'confirmed') {
+    // Só se cria um bilhete quando a intenção de pagamento foi confirmada e
+    // liquidada por um adaptador live.
+    if (validatedTicket && canFulfill) {
       const { ticketCode, qrToken, pinCode } = generateTicketIdentifiers();
       const newTicket: TicketForValidation = {
         id: `TKT-${Date.now()}`,
         ticketCode,
-        ...(typeof businessId === 'string' && businessId.trim() ? { businessId: businessId.trim() } : {}),
-        eventId: String(req.body.eventId || 'evt-1'),
-        eventTitle: String(req.body.eventTitle || 'Evento Cultural Guigui'),
-        ticketTypeName: String(req.body.ticketTypeName || 'Entrada Geral'),
-        priceXOF: Number(amountXOF),
-        buyerName: payerName,
-        buyerPhone: payerPhone,
+        ticketTypeId: validatedTicket.offer.ticketTypeId,
+        buyerUserId: paymentSession.userId,
+        ...(validatedTicket.offer.businessId ? { businessId: validatedTicket.offer.businessId } : {}),
+        eventId: validatedTicket.offer.eventId,
+        eventTitle: validatedTicket.offer.eventTitle,
+        ticketTypeName: validatedTicket.offer.ticketTypeName,
+        priceXOF: validatedTicket.offer.unitPriceXOF,
+        buyerName: normalizedPayment.payerName,
+        buyerPhone: normalizedPayment.payerPhone,
         qrToken,
         pinCode,
         status: 'valid',
         purchasedAt: new Date().toISOString(),
-        expiresAt: calculateTicketExpiry(req.body.eventDate, req.body.eventTime),
+        expiresAt: calculateTicketExpiry(validatedTicket.offer.eventDate, validatedTicket.offer.eventTime),
         paymentMethod: normalizedPayment.provider,
       };
       if (ticketSigningSecret) {
@@ -6686,10 +7680,15 @@ app.post('/api/payments/create', async (req, res) => {
       ticketsDb.set(pinCode, newTicket);
       ticketsDb.set(ticketCode, newTicket);
       newTxn.ticketId = newTicket.id;
+      newTxn.ticketIds = [newTicket.id];
       newTxn.ticketCode = newTicket.ticketCode;
       newTxn.qrToken = newTicket.qrToken;
       persistTickets();
       persistPayments();
+      if (databaseConfigured) {
+        await persistPostgresTickets([newTicket], paymentSession.userId);
+        await persistPostgresPayment(newTxn, scopedIdempotencyKey);
+      }
       const successResponse = {
         success: true,
         simulated: paymentAdapter.mode !== 'live',
@@ -6699,7 +7698,7 @@ app.post('/api/payments/create', async (req, res) => {
         ticket: newTicket,
         requestId,
       };
-      if (idempotencyKey) paymentIdempotency.set(idempotencyKey, { createdAt: Date.now(), response: successResponse });
+      if (scopedIdempotencyKey) paymentIdempotency.set(scopedIdempotencyKey, { createdAt: Date.now(), response: successResponse });
       return res.json(successResponse);
     }
 
@@ -6707,11 +7706,14 @@ app.post('/api/payments/create', async (req, res) => {
       success: true,
       simulated: paymentAdapter.mode !== 'live',
       settlement: paymentAdapter.mode === 'live' ? 'provider' : 'simulated',
-      ...(paymentAdapter.mode !== 'live' ? { message: 'Pagamento confirmado em modo simulado; nenhuma operadora foi contactada e não houve liquidação real.' } : {}),
+      paymentPending: effectiveIntentState === 'pending',
+      ...(requiresLiveSettlement && paymentAdapter.mode !== 'live'
+        ? { message: 'Modo simulado: nenhuma operadora foi contactada e a assinatura não foi activada.' }
+        : paymentAdapter.mode !== 'live' ? { message: 'Pagamento confirmado em modo simulado; nenhuma operadora foi contactada e não houve liquidação real.' } : {}),
       transaction: newTxn,
       requestId,
     };
-    if (idempotencyKey) paymentIdempotency.set(idempotencyKey, { createdAt: Date.now(), response: successResponse });
+    if (scopedIdempotencyKey) paymentIdempotency.set(scopedIdempotencyKey, { createdAt: Date.now(), response: successResponse });
     res.json(successResponse);
   } catch (err: any) {
     res.status(500).json({ error: 'Erro ao processar transação de pagamento', details: err.message });
@@ -7031,6 +8033,8 @@ async function startServer() {
   }, 30_000);
 
   await startRealtimeListener();
+  // Recolha periódica de métricas reais + avaliação dos limites configurados.
+  startSystemMonitor();
   app.listen(PORT, runtimeConfig.host, () => {
     console.log(`[Guigui.com] Servidor a rodar na porta ${PORT} em http://${runtimeConfig.host}:${PORT}`);
   });

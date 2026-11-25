@@ -1,12 +1,21 @@
 import { expect, test, type Page } from './fixtures';
 import path from 'node:path';
 
-const PASSWORD = 'Guigui@2026!';
+// A conta de empresa é a primeira da seed de demonstração
+// (scripts/seed-demo-dataset.ts): Cantina Sabores de Bandim (seed-co-01).
+const BUSINESS = { email: 'empresa.seed01@guigui.test', password: 'Guigui2026!' } as const;
+const BUSINESS_ID = 'seed-co-01';
+const BUSINESS_LABEL = /Cantina Sabores de Bandim/i;
 const ACCOUNTS = {
   citizen: 'cidadao.teste@guigui.com',
-  business: 'empresa.teste@guigui.com',
+  business: BUSINESS.email,
   admin: 'admin.teste@guigui.com',
 } as const;
+const PASSWORDS: Record<string, string> = {
+  [ACCOUNTS.citizen]: 'Guigui@2026!',
+  [ACCOUNTS.admin]: 'Guigui@2026!',
+  [ACCOUNTS.business]: BUSINESS.password,
+};
 
 test.describe.configure({ mode: 'serial' });
 
@@ -28,7 +37,7 @@ test.beforeAll(async () => {
 });
 
 async function signIn(page: Page, email: string) {
-  const response = await page.request.post('/api/auth/login', { data: { email, password: PASSWORD } });
+  const response = await page.request.post('/api/auth/login', { data: { email, password: PASSWORDS[email] } });
   expect(response.ok(), await response.text()).toBeTruthy();
   const payload = await response.json();
   const setCookie = response.headers()['set-cookie'];
@@ -79,7 +88,7 @@ async function clearBusinessStories(page: Page) {
       await page.request.delete(`/api/stories/${encodeURIComponent(story.id)}`).catch(() => undefined);
     }
   }
-  const highlights = await (await page.request.get('/api/story-highlights?businessId=biz-1')).json().catch(() => ({ highlights: [] }));
+  const highlights = await (await page.request.get(`/api/story-highlights?businessId=${BUSINESS_ID}`)).json().catch(() => ({ highlights: [] }));
   for (const highlight of highlights.highlights || []) {
     if (String(highlight.title).startsWith('PW ')) {
       await page.request.delete(`/api/story-highlights/${encodeURIComponent(highlight.id)}`).catch(() => undefined);
@@ -135,7 +144,7 @@ test('2. empresa cria story de texto com sondagem pelo editor', async ({ page })
   await expect(editor.getByText(/poll · Qual prefere/)).toBeVisible();
   await editor.getByRole('button', { name: 'Publicar story' }).click();
   await expect(editor).toBeHidden({ timeout: 20000 });
-  await expect(page.getByTestId('story-ring').filter({ hasText: 'Coqueiros' }).first()).toBeVisible({ timeout: 15000 });
+  await expect(page.getByTestId('story-ring').filter({ hasText: BUSINESS_LABEL }).first()).toBeVisible({ timeout: 15000 });
   const mine = await (await page.request.get('/api/stories/mine?scope=all')).json();
   const story = mine.stories.find((entry: any) => entry.caption === 'PW texto com sondagem');
   expect(story.elements[0].type).toBe('poll');
@@ -192,7 +201,7 @@ test('5. visualizador navega, curte, reage, vota e responde', async ({ page }) =
   });
   await signIn(page, ACCOUNTS.citizen);
   await page.goto(`/?story=${encodeURIComponent(story.shareToken)}`);
-  const viewer = page.getByRole('dialog', { name: /Story de .*Coqueiros/ }).first();
+  const viewer = page.getByRole('dialog', { name: /Story de .*Cantina/ }).first();
   await expect(viewer).toBeVisible({ timeout: 20000 });
   await viewer.getByRole('button', { name: 'Gostar' }).click();
   await expect(viewer.getByRole('button', { name: 'Remover gosto' })).toBeVisible();
@@ -205,7 +214,7 @@ test('5. visualizador navega, curte, reage, vota e responde', async ({ page }) =
   await viewer.getByRole('button', { name: 'Enviar resposta' }).click();
   await expect(viewer.getByText('Resposta enviada.')).toBeVisible({ timeout: 10000 });
   await viewer.getByRole('button', { name: 'Fechar story' }).click();
-  const relogin = await page.request.post('/api/auth/login', { data: { email: ACCOUNTS.business, password: PASSWORD } });
+  const relogin = await page.request.post('/api/auth/login', { data: { email: ACCOUNTS.business, password: PASSWORDS[ACCOUNTS.business] } });
   expect(relogin.ok()).toBeTruthy();
   const stats = await (await page.request.get(`/api/stories/${story.id}/stats`)).json();
   expect(stats.counts.likes).toBeGreaterThan(0);
@@ -221,7 +230,7 @@ test('6. temporizador pausa enquanto o cidadão escreve', async ({ page }) => {
   // Abrir pelo share token garante que é esta story (e não uma órfã da faixa)
   // que fica em análise — o mesmo motivo que levou o teste 5 a usar o token.
   await page.goto(`/?story=${encodeURIComponent(story.shareToken)}`);
-  const viewer = page.getByRole('dialog', { name: /Story de .*Coqueiros/ }).first();
+  const viewer = page.getByRole('dialog', { name: /Story de .*Cantina/ }).first();
   await expect(viewer).toBeVisible({ timeout: 20000 });
   await viewer.getByLabel('Responder ao story').fill('Estou a escrever');
   await page.waitForTimeout(2600);
@@ -244,7 +253,7 @@ test('7. empresa gere destaques a partir do arquivo', async ({ page }) => {
   await row.locator('input[type="checkbox"]').check();
   await page.getByRole('button', { name: 'Criar', exact: true }).click();
   await expect(page.getByText('PW Produtos').first()).toBeVisible();
-  const highlights = await (await page.request.get('/api/story-highlights?businessId=biz-1')).json();
+  const highlights = await (await page.request.get(`/api/story-highlights?businessId=${BUSINESS_ID}`)).json();
   expect(highlights.highlights.some((entry: any) => entry.title === 'PW Produtos')).toBeTruthy();
   await removeStory(page, story.id);
 });
@@ -280,13 +289,23 @@ test('9. administrador acede à moderação e suspende/restaura', async ({ page 
 test('10. story persiste após recarregar a página', async ({ page }) => {
   await signIn(page, ACCOUNTS.business);
   await clearBusinessStories(page);
-  const story = await createStory(page, { caption: 'PW persistência' });
+  // A faixa de stories é alimentada pelo estado local da aplicação: só a
+  // publicação pelo editor (o caminho real do utilizador) a coloca lá.
   await openStories(page);
-  await expect(page.getByTestId('story-ring').filter({ hasText: 'Coqueiros' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Criar story' })).toBeVisible({ timeout: 15000 });
+  await page.getByRole('button', { name: 'Criar story' }).click();
+  const editor = page.getByRole('dialog', { name: 'Editor de Story' });
+  await expect(editor).toBeVisible();
+  await editor.getByRole('button', { name: 'Texto' }).click();
+  await editor.getByPlaceholder('Escreve uma legenda...').fill('PW persistência');
+  await editor.getByRole('button', { name: 'Publicar story' }).click();
+  await expect(editor).toBeHidden({ timeout: 20000 });
+  await expect(page.getByTestId('story-ring').filter({ hasText: BUSINESS_LABEL }).first()).toBeVisible({ timeout: 15000 });
   await openStories(page);
-  await expect(page.getByTestId('story-ring').filter({ hasText: 'Coqueiros' }).first()).toBeVisible({ timeout: 20000 });
-  const api = await (await page.request.get(`/api/stories/${story.id}`)).json();
-  expect(api.story.caption).toBe('PW persistência');
+  await expect(page.getByTestId('story-ring').filter({ hasText: BUSINESS_LABEL }).first()).toBeVisible({ timeout: 20000 });
+  const mine = await (await page.request.get('/api/stories/mine?scope=all')).json();
+  const story = (mine.stories || []).find((entry: any) => entry.caption === 'PW persistência');
+  expect(story, 'a story publicada deve continuar no servidor depois de recarregar').toBeTruthy();
   await removeStory(page, story.id);
 });
 

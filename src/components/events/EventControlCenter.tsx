@@ -92,12 +92,41 @@ interface EventControlData {
   buyers: ApiBuyer[];
   validations: Array<{ id: string; result: string; reason: string; ticketCode: string; operator: string; createdAt: string | null }>;
   refunds: Array<{ id: string; ticketCode: string; amountXOF: number; status: string; reason: string; createdAt: string | null; processedAt: string | null }>;
+  payouts: Array<{
+    id: string;
+    amountXOF: number;
+    method: string;
+    methodLabel: string;
+    reference: string | null;
+    proofReference: string | null;
+    status: string;
+    statusLabel: string;
+    notes: string | null;
+    createdByName: string | null;
+    confirmedAt: string | null;
+    createdAt: string | null;
+  }>;
+  transactions: Array<{
+    id: string;
+    provider: string;
+    providerReference: string | null;
+    status: string;
+    amountXOF: number;
+    payerName: string;
+    buyerUserId: string | null;
+    createdAt: string | null;
+    confirmedAt: string | null;
+    ticketCodes: string[];
+  }>;
   history: Array<{ action: string; result: string; resourceId: string; reason: string; actor: string; createdAt: string | null }>;
   finance: {
     grossXOF: number;
     commissionXOF: number;
     commissionRate: number;
     companyShareXOF: number;
+    paidOutXOF: number;
+    processingPayoutXOF: number;
+    pendingPayoutXOF: number;
     pendingXOF: number;
     refundedXOF: number;
     paidOrders: number;
@@ -146,6 +175,7 @@ const EXPORT_OPTIONS = [
   { key: 'commissions', label: 'Comissões' },
   { key: 'validations', label: 'Validações' },
   { key: 'refunds', label: 'Reembolsos' },
+  { key: 'payouts', label: 'Repasses' },
   { key: 'history', label: 'Histórico' },
 ];
 
@@ -393,8 +423,10 @@ export const EventControlCenter: React.FC<{
       if (ticketStatus !== 'all') query.set('ticketStatus', ticketStatus);
       if (buyerStatus !== 'all') query.set('orderStatus', buyerStatus);
       if (validationResult !== 'all') query.set('validationResult', validationResult);
-      const activeQuery = (tab === 'buyers' ? buyerQuery : tab === 'validation' ? validationQuery : ticketQuery).trim();
-      if (activeQuery) query.set('q', activeQuery);
+      // Cada pesquisa fica associada à sua lista: mudar de separador não a perde.
+      if (ticketQuery.trim()) query.set('ticketQuery', ticketQuery.trim());
+      if (buyerQuery.trim()) query.set('buyerQuery', buyerQuery.trim());
+      if (validationQuery.trim()) query.set('validationQuery', validationQuery.trim());
       await download(
         `/api/events/${encodeURIComponent(eventId)}/control-center/export?${query.toString()}`,
         `evento-${eventId}.${format}`,
@@ -451,7 +483,7 @@ export const EventControlCenter: React.FC<{
                     {EVENT_STATUS_LABELS[data.event.status] || data.event.status}
                   </span>
                 ) : null}
-                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[9px] font-black uppercase">
+                <span className="rounded-full border border-emerald-600 bg-emerald-900 px-2 py-0.5 text-[9px] font-black uppercase text-white">
                   {viewerRole === 'admin' ? 'Super Admin' : 'Empresa organizadora'}
                 </span>
               </p>
@@ -463,7 +495,7 @@ export const EventControlCenter: React.FC<{
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-xl border border-white/20 p-2 text-white/80 transition hover:bg-white/10"
+                className="rounded-xl border border-emerald-600 bg-emerald-950 p-2 text-white transition hover:bg-emerald-900"
                 aria-label="Fechar centro de controlo"
               >
                 <X className="h-4 w-4" />
@@ -531,6 +563,7 @@ export const EventControlCenter: React.FC<{
                 <StatCard label="Arrecadação bruta" value={formatCurrencyXOF(data.finance.grossXOF, 'pt')} hint={`${data.finance.paidOrders} pedido(s) pagos`} tone="success" onClick={() => setTab('finance')} />
                 <StatCard label="Comissão Guigui.com" value={formatCurrencyXOF(data.finance.commissionXOF, 'pt')} hint={`${data.finance.commissionRate}% aplicado`} onClick={() => setTab('finance')} />
                 <StatCard label="Valor da empresa" value={formatCurrencyXOF(data.finance.companyShareXOF, 'pt')} hint="Líquido dos pedidos pagos" tone="success" onClick={() => setTab('finance')} />
+                <StatCard label="Pendente de repasse" value={formatCurrencyXOF(data.finance.pendingPayoutXOF, 'pt')} hint="Ainda não transferido" tone={data.finance.pendingPayoutXOF > 0 ? 'warning' : 'success'} onClick={() => setTab('finance')} />
                 <StatCard label="Disponíveis" value={String(data.indicators.available)} hint="Bilhetes por vender" onClick={() => setTab('tickets')} />
                 <StatCard label="Utilizados" value={String(data.indicators.used)} hint={`${data.indicators.checkInsRate}% de check-in`} onClick={() => setTab('validation')} />
                 <StatCard label="Não utilizados" value={String(data.indicators.unused)} hint={`${data.indicators.cancelled} cancelado(s)`} onClick={() => setTab('validation')} />
@@ -872,12 +905,64 @@ export const EventControlCenter: React.FC<{
                 <StatCard label="Receita bruta" value={formatCurrencyXOF(data.finance.grossXOF, 'pt')} hint={`${data.finance.paidOrders} pedido(s) pagos`} tone="success" />
                 <StatCard label="Comissão Guigui.com" value={formatCurrencyXOF(data.finance.commissionXOF, 'pt')} hint={`Taxa ${data.finance.commissionRate}%`} />
                 <StatCard label="Valor da empresa" value={formatCurrencyXOF(data.finance.companyShareXOF, 'pt')} tone="success" />
+                <StatCard label="Já repassado" value={formatCurrencyXOF(data.finance.paidOutXOF, 'pt')} hint="Repasses confirmados" tone="success" />
+                <StatCard label="Em processamento" value={formatCurrencyXOF(data.finance.processingPayoutXOF, 'pt')} tone={data.finance.processingPayoutXOF > 0 ? 'warning' : 'neutral'} />
+                <StatCard label="Pendente de repasse" value={formatCurrencyXOF(data.finance.pendingPayoutXOF, 'pt')} tone={data.finance.pendingPayoutXOF > 0 ? 'warning' : 'success'} />
                 <StatCard label="Pendente" value={formatCurrencyXOF(data.finance.pendingXOF, 'pt')} hint={`${data.finance.pendingOrders} pedido(s)`} tone={data.finance.pendingXOF > 0 ? 'warning' : 'neutral'} />
                 <StatCard label="Reembolsado" value={formatCurrencyXOF(data.finance.refundedXOF, 'pt')} hint={`${data.finance.refundedOrders} pedido(s)`} tone={data.finance.refundedXOF > 0 ? 'danger' : 'neutral'} />
                 <StatCard label="Reembolsos pedidos" value={formatCurrencyXOF(data.finance.refundsRequestedXOF, 'pt')} hint="A aguardar processamento" />
                 <StatCard label="Pagamentos confirmados" value={String(data.finance.confirmedPayments)} hint="Transações pagas" />
                 <StatCard label="Estado financeiro" value={FINANCE_STATE_LABELS[data.finance.state] || data.finance.state} />
               </div>
+
+              <p className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] px-3 py-2 text-[10px] leading-relaxed text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                Fonte de verdade: <strong>pedidos pagos</strong> — a comissão vem de <code>orders.fee_amount_xof</code> e o valor da empresa de
+                <code>orders.net_amount_xof</code>, os mesmos campos usados no financeiro global e no da empresa. As transações de pagamento
+                confirmam a cobrança, mas não substituem estes valores.
+              </p>
+
+              <Card className="border-[var(--color-border-subtle)] p-4 dark:border-slate-700">
+                <h3 className="text-[11px] font-black text-slate-900 dark:text-white">Histórico de repasses</h3>
+                <ul className="mt-2 divide-y divide-[var(--color-border-subtle)] text-[10.5px] dark:divide-slate-800">
+                  {data.payouts.map((payout) => (
+                    <li key={payout.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                      <span className="min-w-0">
+                        <strong>{formatCurrencyXOF(payout.amountXOF, 'pt')}</strong> · {payout.methodLabel}
+                        <span className="block truncate text-[9.5px] text-slate-500">
+                          {payout.reference || 'Sem referência'} · {payout.proofReference || 'Sem comprovativo'}
+                        </span>
+                      </span>
+                      <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${statusTone(payout.status === 'confirmed' ? 'paid' : payout.status === 'failed' || payout.status === 'cancelled' ? 'cancelled' : 'pending')}`}>
+                        {payout.statusLabel}
+                      </span>
+                    </li>
+                  ))}
+                  {data.payouts.length === 0 ? <li className="py-2 text-slate-500">Ainda não existem repasses registados para este evento.</li> : null}
+                </ul>
+              </Card>
+
+              <Card className="border-[var(--color-border-subtle)] p-4 dark:border-slate-700">
+                <h3 className="text-[11px] font-black text-slate-900 dark:text-white">Pagamentos confirmados</h3>
+                <div className="mt-2 overflow-x-auto">
+                  <table className="min-w-full text-left text-[10.5px]">
+                    <thead className="text-[9px] uppercase text-slate-500">
+                      <tr><th className="py-1 pr-2">Transação</th><th className="py-1 pr-2">Provedor</th><th className="py-1 pr-2">Valor</th><th className="py-1 pr-2">Bilhetes</th><th className="py-1 pr-2">Confirmado</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--color-border-subtle)] dark:divide-slate-800">
+                      {data.transactions.map((transaction) => (
+                        <tr key={transaction.id}>
+                          <td className="py-1.5 pr-2 font-mono text-[9.5px]">{transaction.providerReference || transaction.id}</td>
+                          <td className="py-1.5 pr-2">{transaction.provider}</td>
+                          <td className="py-1.5 pr-2 font-bold">{formatCurrencyXOF(transaction.amountXOF, 'pt')}</td>
+                          <td className="py-1.5 pr-2 text-[9px]">{transaction.ticketCodes.slice(0, 3).join(', ') || '—'}{transaction.ticketCodes.length > 3 ? ` +${transaction.ticketCodes.length - 3}` : ''}</td>
+                          <td className="py-1.5 pr-2 text-[9px]">{formatDateTime(transaction.confirmedAt)}</td>
+                        </tr>
+                      ))}
+                      {data.transactions.length === 0 ? <tr><td colSpan={5} className="py-2 text-slate-500">Sem transações ligadas a este evento. Compras anteriores à migração podem não estar associadas.</td></tr> : null}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
 
               <Card className="border-[var(--color-border-subtle)] p-4 dark:border-slate-700">
                 <h3 className="text-[11px] font-black text-slate-900 dark:text-white">Reembolsos e estornos</h3>
@@ -904,10 +989,13 @@ export const EventControlCenter: React.FC<{
           {data && tab === 'reports' ? (
             <div className="space-y-3">
               <Card className="border-[var(--color-border-subtle)] p-4 dark:border-slate-700">
-                <h3 className="text-[12px] font-black text-slate-900 dark:text-white">Relatório completo do evento</h3>
-                <p className="mt-1 text-[11px] text-slate-500">
-                  Selecione as secções e gere um único ficheiro com todos os dados do evento.
+                <h3 className="text-[12px] font-black text-slate-900 dark:text-white">Relatório do evento</h3>
+                <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-300">
+                  Selecione exatamente as secções que pretende descarregar. O ficheiro conterá apenas essas secções.
                 </p>
+                {sections.length === 0 ? (
+                  <p className="mt-2 text-[10px] font-bold text-amber-700 dark:text-amber-300">Selecione pelo menos uma secção para exportar.</p>
+                ) : null}
                 <div className="mt-3 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-5">
                   {EXPORT_OPTIONS.map((option) => (
                     <label key={option.key} className="flex items-center gap-2 rounded-xl border border-[var(--color-border-subtle)] px-2.5 py-2 text-[11px] font-bold text-slate-700 dark:border-slate-700 dark:text-slate-200">
@@ -925,13 +1013,13 @@ export const EventControlCenter: React.FC<{
                   ))}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Button type="button" size="sm" onClick={() => void handleExport('pdf')} loading={exporting === 'pdf'}>
+                  <Button type="button" size="sm" onClick={() => void handleExport('pdf')} loading={exporting === 'pdf'} disabled={sections.length === 0}>
                     <FileText className="mr-1 h-3.5 w-3.5" /> Descarregar PDF
                   </Button>
-                  <Button type="button" size="sm" variant="outline" onClick={() => void handleExport('xlsx')} loading={exporting === 'xlsx'}>
+                  <Button type="button" size="sm" variant="outline" onClick={() => void handleExport('xlsx')} loading={exporting === 'xlsx'} disabled={sections.length === 0}>
                     <FileSpreadsheet className="mr-1 h-3.5 w-3.5" /> Descarregar Excel
                   </Button>
-                  <Button type="button" size="sm" variant="outline" onClick={() => void handleExport('csv')} loading={exporting === 'csv'}>
+                  <Button type="button" size="sm" variant="outline" onClick={() => void handleExport('csv')} loading={exporting === 'csv'} disabled={sections.length === 0}>
                     <Download className="mr-1 h-3.5 w-3.5" /> Descarregar CSV
                   </Button>
                 </div>

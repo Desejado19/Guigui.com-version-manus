@@ -21,6 +21,8 @@ import {
 import type { Business, Language, NotificationPreferences } from '../../types';
 import { NotificationPreferencesPanel } from '../NotificationPreferencesPanel';
 import { ChangePasswordCard } from '../security/ChangePasswordCard';
+import { AdminPagination } from '../admin/AdminPagination';
+import { DEFAULT_PAGE_SIZE } from '../../hooks/usePaginatedList';
 
 type SettingsSection = 'conta' | 'preferencias' | 'configuracoes' | 'seguranca';
 type ThemeMode = 'light' | 'dark' | 'auto';
@@ -541,12 +543,17 @@ function SecuritySection({ accountEmail }: { accountEmail?: string }) {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  // A atividade de segurança é paginada no servidor: 20 registos por página,
+  // com contagem e navegação, em vez de uma lista truncada a 8 registos.
+  const [eventPage, setEventPage] = useState(1);
+  const [eventPageSize, setEventPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [eventTotal, setEventTotal] = useState(0);
   const loadSecurity = useCallback(async () => {
     setLoading(true);
     try {
       const [sessionsResponse, eventsResponse] = await Promise.all([
         fetch('/api/auth/sessions', { headers: { Accept: 'application/json' } }),
-        fetch('/api/security/events?limit=8', { headers: { Accept: 'application/json' } }),
+        fetch(`/api/security/events?page=${eventPage}&pageSize=${eventPageSize}`, { headers: { Accept: 'application/json' } }),
       ]);
       if (sessionsResponse.ok) {
         const payload = await sessionsResponse.json() as { sessions?: StaffSession[] };
@@ -555,18 +562,21 @@ function SecuritySection({ accountEmail }: { accountEmail?: string }) {
         setSessions([]);
       }
       if (eventsResponse.ok) {
-        const payload = await eventsResponse.json() as { events?: SecurityEvent[] };
+        const payload = await eventsResponse.json() as { events?: SecurityEvent[]; total?: number };
         setEvents(payload.events ?? []);
+        setEventTotal(Number(payload.total) || 0);
       } else {
         setEvents([]);
+        setEventTotal(0);
       }
     } catch {
       setSessions([]);
       setEvents([]);
+      setEventTotal(0);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [eventPage, eventPageSize]);
 
   useEffect(() => {
     void loadSecurity();
@@ -694,6 +704,16 @@ function SecuritySection({ accountEmail }: { accountEmail?: string }) {
             <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
               Sem eventos de segurança disponíveis para esta conta.
             </p>
+          )}
+          {!loading && events && events.length > 0 && (
+            <AdminPagination
+              className="mt-2"
+              currentPage={eventPage}
+              pageSize={eventPageSize}
+              totalItems={eventTotal}
+              onPageChange={setEventPage}
+              onPageSizeChange={(size) => { setEventPageSize(size); setEventPage(1); }}
+            />
           )}
         </div>
       </div>

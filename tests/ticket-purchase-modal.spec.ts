@@ -130,7 +130,7 @@ test('rejects manual transfer at both new-payment API boundaries', async ({ page
   expect(purchaseResponse.status()).toBe(400);
   expect(await purchaseResponse.json()).toMatchObject({ code: 'VALIDATION_ERROR' });
 
-  const paymentResponse = await page.request.post('/api/payments/create', {
+  const paymentResponse = await request.post('/api/payments/create', {
     data: {
       useCase: 'subscription_initial',
       payerName: 'Comprador Teste',

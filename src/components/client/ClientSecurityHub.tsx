@@ -17,7 +17,6 @@ import {
 import type { Business, Language, UserProfile } from '../../types';
 import { SubmoduleNavbar } from '../navigation/SubmoduleNavbar';
 import { AdminPagination } from '../admin/AdminPagination';
-import { usePaginatedList } from '../../hooks/usePaginatedList';
 
 /**
  * Centro de segurança da conta empresarial.
@@ -129,6 +128,9 @@ export const ClientSecurityHub: React.FC<ClientSecurityHubProps> = ({ business, 
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [eventsSource, setEventsSource] = useState<string>('');
   const [historyQuery, setHistoryQuery] = useState('');
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(20);
+  const [historyTotal, setHistoryTotal] = useState(0);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -156,22 +158,27 @@ export const ClientSecurityHub: React.FC<ClientSecurityHubProps> = ({ business, 
     }
   }, []);
 
-  const loadEvents = useCallback(async () => {
+  const loadEvents = useCallback(async (page = 1, search = '', pageSize = 20) => {
     setEventsLoading(true);
     setEventsError(null);
     try {
-      const response = await fetch('/api/security/events?limit=120', { credentials: 'include', cache: 'no-store' });
+      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+      if (search.trim()) params.set('search', search.trim());
+      const response = await fetch(`/api/security/events?${params.toString()}`, { credentials: 'include', cache: 'no-store' });
       if (response.status === 401) {
         setEventsError('A sessão expirou. Inicie sessão novamente.');
         setEvents([]);
+        setHistoryTotal(0);
         return;
       }
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const payload = await response.json() as { events?: SecurityEvent[]; source?: string };
+      const payload = await response.json() as { events?: SecurityEvent[]; source?: string; total?: number };
       setEvents(payload.events || []);
       setEventsSource(payload.source || '');
+      setHistoryTotal(Number(payload.total ?? 0));
     } catch {
       setEventsError('Não foi possível carregar o histórico de segurança.');
+      setHistoryTotal(0);
     } finally {
       setEventsLoading(false);
     }
@@ -179,8 +186,15 @@ export const ClientSecurityHub: React.FC<ClientSecurityHubProps> = ({ business, 
 
   useEffect(() => {
     void loadSessions();
-    void loadEvents();
-  }, [loadSessions, loadEvents]);
+  }, [loadSessions]);
+
+  // Pesquisa e paginação são resolvidas no servidor (20 registos por omissão).
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadEvents(historyPage, historyQuery, historyPageSize);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [historyPage, historyQuery, historyPageSize, loadEvents]);
 
   const changePassword = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -210,7 +224,7 @@ export const ClientSecurityHub: React.FC<ClientSecurityHubProps> = ({ business, 
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      void loadEvents();
+      void loadEvents(historyPage, historyQuery, historyPageSize);
     } catch {
       setPasswordNotice({ tone: 'error', text: 'Falha de rede ao alterar a palavra-passe.' });
     } finally {
@@ -232,7 +246,7 @@ export const ClientSecurityHub: React.FC<ClientSecurityHubProps> = ({ business, 
         return;
       }
       setSessions((previous) => previous.filter((session) => session.id !== sessionId));
-      void loadEvents();
+      void loadEvents(historyPage, historyQuery, historyPageSize);
     } catch {
       setSessionsError('Falha de rede ao encerrar a sessão.');
     } finally {
@@ -304,25 +318,12 @@ export const ClientSecurityHub: React.FC<ClientSecurityHubProps> = ({ business, 
     return items;
   }, [events, sessions, currentLang]);
 
-  const filteredEvents = useMemo(() => {
-    const needle = historyQuery.trim().toLowerCase();
-    if (!needle) return events;
-    return events.filter((event) => [event.action, eventLabel(event.action), event.resource, event.resourceId, event.reason]
-      .filter(Boolean)
-      .some((value) => String(value).toLowerCase().includes(needle)));
-  }, [events, historyQuery]);
-
-  const historyPagination = usePaginatedList(filteredEvents, {
-    initialPageSize: 20,
-    pageSizeOptions: [20, 50],
-    persist: false,
-    resetKey: historyQuery,
-  });
+  const filteredEvents = events;
 
   const sectionCounts = {
     protecao: undefined,
     sessoes: sessions.length,
-    historico: events.length,
+    historico: historyTotal,
     alertas: alerts.filter((alert) => alert.tone === 'warning').length,
   } as Record<string, number | undefined>;
 
@@ -507,8 +508,8 @@ export const ClientSecurityHub: React.FC<ClientSecurityHubProps> = ({ business, 
               </p>
             </div>
             <div className="flex gap-2">
-              <input type="search" value={historyQuery} onChange={(event) => setHistoryQuery(event.target.value)} placeholder="Pesquisar acção ou recurso" className="min-h-9 w-56 rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-1.5 text-[11px] font-bold text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
-              <button type="button" onClick={() => void loadEvents()} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[var(--color-border-default)] px-3 py-1.5 text-[10px] font-black text-slate-700 dark:border-slate-600 dark:text-slate-200">
+              <input type="search" value={historyQuery} onChange={(event) => { setHistoryQuery(event.target.value); setHistoryPage(1); }} placeholder="Pesquisar acção ou recurso" className="min-h-9 w-56 rounded-xl border border-[var(--color-border-default)] bg-white px-3 py-1.5 text-[11px] font-bold text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
+              <button type="button" onClick={() => void loadEvents(historyPage, historyQuery, historyPageSize)} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[var(--color-border-default)] px-3 py-1.5 text-[10px] font-black text-slate-700 dark:border-slate-600 dark:text-slate-200">
                 <RefreshCw className={`h-3.5 w-3.5 ${eventsLoading ? 'animate-spin' : ''}`} /> Actualizar
               </button>
             </div>
@@ -533,7 +534,7 @@ export const ClientSecurityHub: React.FC<ClientSecurityHubProps> = ({ business, 
                     </tr>
                   </thead>
                   <tbody>
-                    {historyPagination.pageItems.map((event) => (
+                    {filteredEvents.map((event) => (
                       <tr key={event.id} className="border-t border-slate-100 dark:border-slate-700">
                         <td className="p-2 font-bold text-slate-600 dark:text-slate-300">{formatDateTime(event.createdAt, currentLang)}</td>
                         <td className="p-2 font-black text-slate-900 dark:text-white">{eventLabel(event.action)}</td>
@@ -551,12 +552,12 @@ export const ClientSecurityHub: React.FC<ClientSecurityHubProps> = ({ business, 
               <AdminPagination
                 className="mt-3"
                 currentLang={currentLang}
-                currentPage={historyPagination.page}
-                pageSize={historyPagination.pageSize}
-                totalItems={historyPagination.totalItems}
-                onPageChange={historyPagination.setPage}
-                onPageSizeChange={historyPagination.setPageSize}
-                pageSizeOptions={historyPagination.pageSizeOptions}
+                currentPage={historyPage}
+                pageSize={historyPageSize}
+                totalItems={historyTotal}
+                onPageChange={setHistoryPage}
+                onPageSizeChange={(size) => { setHistoryPageSize(size); setHistoryPage(1); }}
+                pageSizeOptions={[20, 50]}
               />
             </>
           )}

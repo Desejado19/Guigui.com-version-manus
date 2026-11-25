@@ -58,6 +58,25 @@ async function signIn(page: Page, email = ADMIN_EMAIL, password = ADMIN_PASSWORD
   const response = await page.request.post('/api/auth/login', { data: { email, password } });
   const payload = await response.json().catch(() => ({}));
   expect(response.ok(), `login falhou: ${JSON.stringify(payload)}`).toBeTruthy();
+  // O idioma guardado no servidor sobrepõe-se ao localStorage ao abrir a app.
+  // A suite usa rótulos em português, por isso remove essa preferência antiga.
+  // O idioma guardado no servidor sobrepõe-se ao localStorage ao abrir a app.
+  // Esta suite usa rótulos em português; intercepta apenas a leitura/escrita
+  // dessa chave neste browser, sem alterar a preferência partilhada da conta.
+  const languageKey = `user_language_${payload.user.id}`;
+  await page.route(`**/api/app-state/${languageKey}`, (route) => {
+    if (route.request().method() === 'GET') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ value: { language: 'pt' } }),
+      });
+    }
+    if (route.request().method() === 'POST') {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
+    }
+    return route.continue();
+  });
   await page.addInitScript((account) => {
     window.localStorage.setItem('guigui_current_user', JSON.stringify(account));
     window.localStorage.setItem('guigui_current_lang', JSON.stringify('pt'));
@@ -81,6 +100,11 @@ async function openFinance(page: Page) {
 
 async function openSection(page: Page, button: RegExp) {
   await page.getByRole('button', { name: button }).click();
+}
+
+function transactionCountLabel(count: number, page = 1) {
+  const totalPages = Math.max(1, Math.ceil(count / 20));
+  return `${count} registo(s) · página ${page} de ${totalPages}`;
 }
 
 async function createTransaction(overrides: {
@@ -146,14 +170,29 @@ test('navegação, indicadores, transações, filtros, paginação, detalhe e ex
   await expect(page.getByText('4 registo(s) · página 1 de 1')).toBeVisible();
   await page.getByRole('button', { name: 'LIMPAR FILTROS' }).click();
   await page.getByRole('combobox', { name: /^estado$/i }).selectOption('pending');
-  await expect(page.getByText('2 registo(s) · página 1 de 1')).toBeVisible();
+  // A base de desenvolvimento acumula transacções de execuções anteriores.
+  // O filtro da UI compara o estado exato ("pending"), não o grupo
+  // pending+created usado noutros indicadores.
+  const pendingCount = (await db.query(
+    `SELECT count(*)::int AS n FROM payment_transactions
+      WHERE status = 'pending'
+        AND (use_case IS NULL OR use_case NOT IN ('event_tickets','event_refund'))`,
+  )).rows[0].n;
+  await expect(page.getByText(transactionCountLabel(pendingCount), { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: /Empresas organizadoras/ }).click();
   await expect(page.getByText(/Bilhetes e vendas das empresas/)).toBeVisible();
   await page.getByRole('button', { name: 'LIMPAR FILTROS' }).click();
-  await expect(page.getByText(/96 registo\(s\)/)).toBeVisible();
-  await page.getByRole('button', { name: '2', exact: true }).click();
-  await expect(page.getByText(/página 2 de 5/)).toBeVisible();
+  const businessCount = (await db.query(
+    `SELECT count(*)::int AS n FROM payment_transactions
+      WHERE use_case IN ('event_tickets','event_refund')`,
+  )).rows[0].n;
+  const businessPages = Math.max(1, Math.ceil(businessCount / 20));
+  await expect(page.getByText(transactionCountLabel(businessCount), { exact: true })).toBeVisible();
+  if (businessPages > 1) {
+    await page.getByRole('button', { name: '2', exact: true }).click();
+    await expect(page.getByText(transactionCountLabel(businessCount, 2), { exact: true })).toBeVisible();
+  }
 
   await page.getByRole('button', { name: /Plataforma Guigui.com/ }).click();
   await expect(page.getByText('TXN-2026-9011')).toBeVisible();
@@ -437,7 +476,9 @@ test('integridade dos totais e permissões de empresa', async ({ page, request }
      WHERE use_case IS NULL OR use_case NOT IN ('event_tickets','event_refund')
   `);
   const companyDb = await db.query(`
-    SELECT COALESCE(SUM(gross_amount_xof) FILTER (WHERE status='paid'),0)::int AS revenue
+    SELECT COUNT(*)::int AS count,
+           COUNT(*) FILTER (WHERE status='paid')::int AS paid_count,
+           COALESCE(SUM(gross_amount_xof) FILTER (WHERE status='paid'),0)::int AS revenue
       FROM payment_transactions
      WHERE use_case IN ('event_tickets','event_refund')
   `);
@@ -445,7 +486,12 @@ test('integridade dos totais e permissões de empresa', async ({ page, request }
   expect(summary.platform.transactionCount).toBe(platformDb.rows[0].count);
   expect(summary.platform.volumeXOF).toBe(platformDb.rows[0].volume);
   expect(summary.platform.confirmedCount).toBe(platformDb.rows[0].confirmed);
+  // Contrato legado de `summary.company`: pagamentos de bilhetes registados.
+  expect(summary.company.transactionCount).toBe(companyDb.rows[0].count);
+  expect(summary.company.paidCount).toBe(companyDb.rows[0].paid_count);
   expect(summary.company.revenueXOF).toBe(companyDb.rows[0].revenue);
+  // A contabilidade actual usa os pedidos pagos, exposta em ticketFinance.
+  expect(summary.ticketFinance.totals.grossXOF).toBe(ordersDb.rows[0].paid);
   expect(summary.scopeAudit.ordersPaidXOF).toBe(ordersDb.rows[0].paid);
   expect(summary.scopeAudit.unlinkedOrderAmountXOF).toBe(Math.max(ordersDb.rows[0].paid - companyDb.rows[0].revenue, 0));
 

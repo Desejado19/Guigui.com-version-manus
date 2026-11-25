@@ -69,7 +69,8 @@ interface ClientReportsHubProps {
   posts?: BusinessPost[];
   marketingCampaigns?: MarketingCampaign[];
   teamAudit?: BusinessTeamAuditEntry[];
-  onOpenExport?: () => void;
+  /** Exportação de dados integrada no módulo Relatórios (sem módulo autónomo). */
+  exportContent?: React.ReactNode;
 }
 
 interface Indicator {
@@ -155,7 +156,7 @@ export const ClientReportsHub: React.FC<ClientReportsHubProps> = ({
   posts = [],
   marketingCampaigns = [],
   teamAudit = [],
-  onOpenExport,
+  exportContent,
 }) => {
   const t = (key: string) => getTranslation(currentLang, key);
   const engagement = usePostEngagementContext();
@@ -176,6 +177,7 @@ export const ClientReportsHub: React.FC<ClientReportsHubProps> = ({
   const [format, setFormat] = useState<ExportHistoryFormat>('csv');
   const [exportNotice, setExportNotice] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
 
   /**
    * Estado dos bilhetes vindos de `/api/tickets/sold`. A API limita a resposta
@@ -678,9 +680,9 @@ export const ClientReportsHub: React.FC<ClientReportsHubProps> = ({
             <button type="button" onClick={exportReport} disabled={filteredRows.length === 0} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-1.5 text-[10px] font-black text-white transition hover:bg-emerald-800 disabled:opacity-60">
               <Download className="h-3.5 w-3.5" /> Exportar relatório
             </button>
-            {onOpenExport && (
-              <button type="button" onClick={onOpenExport} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[var(--color-border-default)] px-3 py-1.5 text-[10px] font-black text-slate-700 dark:border-slate-600 dark:text-slate-200">
-                <FileSpreadsheet className="h-3.5 w-3.5" /> Abrir Exportação
+            {exportContent && (
+              <button type="button" onClick={() => setExportOpen((open) => !open)} aria-expanded={exportOpen} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[var(--color-border-default)] px-3 py-1.5 text-[10px] font-black text-slate-700 dark:border-slate-600 dark:text-slate-200">
+                <FileSpreadsheet className="h-3.5 w-3.5" /> {exportOpen ? 'Ocultar exportação de dados' : 'Exportação de dados'}
               </button>
             )}
           </div>
@@ -756,6 +758,16 @@ export const ClientReportsHub: React.FC<ClientReportsHubProps> = ({
       )}
       {category === 'comercial' && (
         <p className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-500"><TrendingUp className="h-3.5 w-3.5" /> {t('business.periodoRelatorio')}: {periodLabel(preset)}</p>
+      )}
+
+      {exportContent && exportOpen && (
+        <section className="space-y-2 border-t border-[var(--color-border-subtle)] pt-4 dark:border-slate-700" aria-label="Exportação de dados da empresa">
+          <h3 className="text-sm font-black text-slate-900 dark:text-white">Exportação de dados</h3>
+          <p className="text-[10px] leading-relaxed text-slate-500 dark:text-slate-400">
+            Escolha os conjuntos de dados, o período e o formato. Esta área faz parte de Relatórios e respeita os mesmos dados da empresa.
+          </p>
+          {exportContent}
+        </section>
       )}
     </div>
   );

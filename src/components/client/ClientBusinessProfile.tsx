@@ -499,7 +499,7 @@ export const ClientBusinessProfile: React.FC<ClientBusinessProfileProps> = ({
             </div>
           </div>
 
-          <div className="space-y-3 rounded-2xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-slate-50/70 p-4">
+          <div className="space-y-3 rounded-2xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-slate-50 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h4 className="text-xs font-black text-slate-900">Galeria de fotos</h4>

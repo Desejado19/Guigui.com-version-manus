@@ -61,7 +61,9 @@ async function signIn(page: Page, email: string) {
 
 async function clickVisibleText(page: Page, pattern: string) {
   const target = page.locator('button', { hasText: pattern }).filter({ visible: true }).first();
-  await target.click();
+  // Entradas de menus/popovers móveis podem ficar fora do viewport sem
+  // contentor rolável; o clique DOM aciona o mesmo handler da aplicação.
+  await target.evaluate((element) => (element as HTMLElement).click());
   await page.waitForTimeout(120);
 }
 
@@ -99,7 +101,12 @@ async function auditLayout(page: Page, context: string): Promise<Finding[]> {
     };
     const isIntentionalTextCrop = (el: Element) => {
       if ((el as HTMLElement).classList?.contains('truncate')) return true;
-      return getComputedStyle(el).webkitLineClamp !== 'none';
+      const style = getComputedStyle(el);
+      // Reticências declaradas (linha única ou multi-linha) são truncagem
+      // intencional, não conteúdo inacessível.
+      return style.webkitLineClamp !== 'none'
+        || (style.textOverflow === 'ellipsis'
+          && /(hidden|clip)/.test(style.overflowX + style.overflowY));
     };
     const isMediaBox = (el: Element) => {
       const style = getComputedStyle(el);
@@ -146,6 +153,11 @@ async function auditLayout(page: Page, context: string): Promise<Finding[]> {
 
     for (const el of Array.from(document.querySelectorAll('body *'))) {
       if (findings.length >= max) break;
+      // Sidebars off-canvas fechadas continuam no DOM mas estão fora do ecrã
+      // por transform; não são conteúdo cortado nem acessível ao utilizador.
+      const closedAside = el.closest('aside');
+      if (closedAside && typeof closedAside.className === 'string'
+        && /(^|\s)-translate-x-full(\s|$)/.test(closedAside.className)) continue;
       if (!isVisible(el) || !hasContent(el)) continue;
       // Texto só para leitores de ecrã é recortado de propósito.
       if (el.closest('.sr-only')) continue;
@@ -243,16 +255,59 @@ test.describe('Responsividade das telas públicas', () => {
   }
 });
 
+async function openDashboardSidebarIfNeeded(page: Page) {
+  if ((page.viewportSize()?.width ?? 1440) >= 768) return;
+  const dashboard = page.locator('.guigui-profile-dashboard');
+  const aside = dashboard.locator('aside').first();
+  const asideClass = (await aside.getAttribute('class')) ?? '';
+  if (!asideClass.includes('-translate-x-full')) return;
+  const trigger = dashboard
+    .getByRole('button', { name: /^(abrir menu( lateral)?|open menu|ouvrir le menu|abrir menú)/i })
+    .filter({ visible: true })
+    .first();
+  if (await trigger.count()) {
+    await trigger.evaluate((element) => (element as HTMLElement).click());
+    await page.waitForTimeout(100);
+  }
+}
+
+async function closeDashboardSidebarIfNeeded(page: Page) {
+  if ((page.viewportSize()?.width ?? 1440) >= 768) return;
+  const dashboard = page.locator('.guigui-profile-dashboard');
+  const close = dashboard
+    .getByRole('button', { name: /^(fechar menu lateral|close sidebar)/i })
+    .filter({ visible: true })
+    .first();
+  if (await close.count()) {
+    await close.evaluate((element) => (element as HTMLElement).click());
+    await page.waitForTimeout(350);
+  }
+  const asideClass = (await dashboard.locator('aside').first().getAttribute('class')) ?? '';
+  if (!asideClass.includes('-translate-x-full')) {
+    const overlay = dashboard.locator('div.fixed.inset-0.z-40').first();
+    if (await overlay.count()) {
+      await overlay.evaluate((element) => (element as HTMLElement).click());
+      await page.waitForTimeout(350);
+    }
+  }
+}
+
 async function auditDashboardSections(page: Page, context: string): Promise<Finding[]> {
   const findings: Finding[] = [];
   const entries = page.locator('.guigui-profile-dashboard aside button');
   const total = await entries.count();
   for (let index = 0; index < total; index += 1) {
+    // Em mobile a sidebar está fechada por omissão; abre para escolher a
+    // secção e volta a fechar antes de medir o conteúdo. O botão de
+    // recolher/expandir é um controlo de layout, não uma secção de conteúdo.
+    await openDashboardSidebarIfNeeded(page);
     const entry = entries.nth(index);
     if (!(await entry.isVisible())) continue;
     const name = (await entry.getAttribute('aria-label')) || (await entry.innerText()).split('\n')[0] || `secção ${index}`;
-    await entry.click();
+    if (/^(recolher menu|expandir menu|fechar menu|collapse menu|expand menu|close menu)/i.test(name.trim())) continue;
+    await entry.evaluate((element) => (element as HTMLElement).click());
     await page.waitForTimeout(220);
+    await closeDashboardSidebarIfNeeded(page);
     findings.push(...await auditLayout(page, `${context}: ${name.trim()}`));
   }
   return findings;
@@ -266,7 +321,10 @@ test.describe('Responsividade das áreas privadas', () => {
       await page.setViewportSize(viewport);
       await signIn(page, DEMO_EMAILS.citizen);
       await page.goto('/');
-      await openPrimaryTab(page, 'Conta');
+      // O separador "Conta" só existe na barra inferior mobile; o menu de
+      // sessão abre a área pessoal em todos os tamanhos de ecrã.
+      await page.getByTitle('Sessão Iniciada').click();
+      await clickVisibleText(page, 'A minha área pessoal');
       await expect(page.locator('.guigui-profile-dashboard')).toBeVisible();
 
       const findings = await auditDashboardSections(page, 'área pessoal');

@@ -153,7 +153,7 @@ import { hasModuleAccess } from '../config/teamAccess';
 import { usePageEntryScroll } from '../utils/navigationBehavior';
 import { usePaginatedList } from '../hooks/usePaginatedList';
 import { Badge, Button, Card, EmptyState, IconButton, Panel, PanelHeader, StatCard } from './ui';
-import { GlassBottomNav } from './navigation/GlassBottomNav';
+import { BottomNav } from './navigation/BottomNav';
 import { ChartFrame } from './charts/ChartFrame';
 import { ChartTooltip } from './charts/ChartTooltip';
 import { chartColors } from './charts/chartTheme';
@@ -195,12 +195,22 @@ export type BusinessDashboardTab =
   | 'security'
   | 'reports'
   | 'settings'
-  | 'export'
   | 'reviews'
   | 'order_history'
   | 'redemptions'
   | 'marketing_campaigns'
   | 'marketing_calendar';
+
+// O módulo Marketing foi retirado do painel da empresa. Estes separadores
+// continuam a existir apenas para compatibilidade de tipos/estado antigo e
+// são sempre redirecionados para a Visão Geral.
+const RETIRED_MARKETING_TABS = new Set<BusinessDashboardTab>([
+  'marketing',
+  'marketing_campaigns',
+  'marketing_calendar',
+  'posts',
+  'promotions',
+]);
 
 const MARKETING_TABS = [
   { id: 'overview', label: 'Visão geral', icon: LayoutDashboard },
@@ -447,7 +457,6 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
   const businessBottomNavActive = (() => {
     const tab = String(activeTab);
     if (['overview', 'my_business', 'communications', 'settings'].includes(tab)) return tab;
-    if (['marketing', 'posts', 'promotions', 'marketing_campaigns', 'marketing_calendar'].includes(tab)) return 'marketing';
     return '';
   })();
   const [internalSidebarCollapsed, setInternalSidebarCollapsed] = useState<boolean>(() => {
@@ -473,8 +482,13 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
   }, [activeTab, teamMembers, currentUser.id, business.id]);
 
   React.useEffect(() => {
-    if (activeTab === 'marketing_campaigns') setMarketingSection('campaigns');
-    if (activeTab === 'marketing_calendar') setMarketingSection('calendar');
+    if (RETIRED_MARKETING_TABS.has(activeTab)) setActiveTab('overview');
+  }, [activeTab]);
+
+  // O módulo autónomo Exportação foi integrado em Relatórios. Estados
+  // guardados de versões anteriores passam a abrir esse módulo.
+  React.useEffect(() => {
+    if (String(activeTab) === 'export') setActiveTab('reports');
   }, [activeTab]);
 
   useEffect(() => {
@@ -509,7 +523,6 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
       items: [
         { label: t('businessNavEvents'), tab: 'events', icon: Calendar, help: t('businessNavEventsHelp') },
         { label: t('businessNavReviews'), tab: 'reviews', icon: Star, help: t('businessNavReviewsHelp') },
-        { label: 'Marketing', tab: 'marketing', icon: Megaphone, help: t('business.GerencieSuasCampanhas') },
       ],
     },
     {
@@ -529,7 +542,6 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
         { label: t('support'), tab: 'support', icon: LifeBuoy, help: t('businessNavSupportHelp') },
         { label: t('businessNavReports'), tab: 'reports', icon: BarChart3, help: t('businessNavReportsHelp') },
         { label: t('businessNavSecurity'), tab: 'security', icon: ShieldCheck, help: t('businessNavSecurityHelp') },
-        { label: t('businessNavExport'), tab: 'export', icon: Download, help: t('businessNavExportHelp') },
         { label: t('businessNavAccountSettings'), tab: 'settings', icon: KeyRound, help: t('businessNavAccountSettingsHelp') },
       ],
     },
@@ -538,10 +550,11 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
   const visibleBusinessNavigationGroups = businessNavigationGroups
     .map((group) => ({ ...group, items: group.items.filter((item) => canTab(item.tab)) }))
     .filter((group) => group.items.length > 0);
-  const activeTabAllowed = canTab(activeTab);
+  const activeTabRetired = RETIRED_MARKETING_TABS.has(activeTab);
+  const activeTabAllowed = canTab(activeTab) && !activeTabRetired;
   const currentBusinessSection = businessNavigationGroups.flatMap((group) => group.items).find((item) => item.tab === activeTab)?.label
     || BUSINESS_NAVIGATION[0].items[0].label;
-  const isMarketingTab = activeTab === 'marketing' || activeTab === 'marketing_campaigns' || activeTab === 'posts' || activeTab === 'promotions' || activeTab === 'marketing_calendar';
+  const isMarketingTab = !RETIRED_MARKETING_TABS.has(activeTab) && (activeTab === 'marketing' || activeTab === 'marketing_campaigns' || activeTab === 'posts' || activeTab === 'promotions' || activeTab === 'marketing_calendar');
   const businessEvents = events.filter((event) => event.businessId === business.id);
   const marketingContentItems = [
     ...business.posts.map((post) => ({ id: post.id, title: post.title, kind: 'post' as const, typeLabel: t('business.Publicacao'), status: String(post.status) })),
@@ -1837,7 +1850,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
 
   return (
     <div className="guigui-profile-dashboard guigui-light-dashboard w-full min-h-[calc(100vh-72px)] bg-[var(--color-bg-surface)] overflow-x: visible">
-      <GlassBottomNav
+      <BottomNav
         ariaLabel="Navegação principal da empresa"
         testId="business-bottom-nav"
         activeId={businessBottomNavActive}
@@ -1845,7 +1858,6 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
         items={[
           { id: 'overview', label: 'Visão Geral', icon: LayoutDashboard },
           { id: 'my_business', label: 'Perfil', icon: Building2 },
-          { id: 'marketing', label: 'Marketing', icon: Megaphone },
           { id: 'communications', label: 'Mensagens', icon: MessageCircle },
           { id: 'settings', label: 'Definições', icon: Settings },
         ].filter((item) => canTab(item.id as BusinessDashboardTab))}
@@ -2042,7 +2054,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
             </div>
           </div>
 
-          {!activeTabAllowed && (
+          {!activeTabAllowed && !activeTabRetired && (
             <div role="alert" className="rounded-[var(--radius-xl)] border border-rose-200 bg-rose-50 p-5 text-rose-900 shadow-[var(--shadow-xs)] dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
               <h2 className="flex items-center gap-2 text-base font-black"><ShieldCheck className="h-5 w-5" /> Acesso não autorizado</h2>
               <p className="mt-1 text-xs leading-relaxed">
@@ -5138,7 +5150,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
         />
       )}
 
-      {(activeTab === 'marketing' || activeTab === 'marketing_campaigns' || activeTab === 'marketing_calendar') && (
+      {isMarketingTab && (
         <div className="space-y-5">
           {marketingSection === 'overview' && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard icon={Eye} tone="primary" label={t('business.Alcance')} value={business.metrics.views.toLocaleString('pt-PT')} hint="Visualizações do perfil" />
@@ -5655,7 +5667,7 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
                           <p className="mt-2 text-xs leading-relaxed text-[var(--color-text-muted)]">{t('business.IndicadoresSaoDerivados')}</p>
                           <div className="mt-3 flex flex-wrap gap-2">
                             <Button type="button" size="sm" variant="primary" onClick={() => setActiveTab('analytics')}>{t('business.AbrirEstatisticas')}</Button>
-                            <Button type="button" size="sm" variant="ghost" onClick={() => setActiveTab('export')}>Exportar dados</Button>
+                            <Button type="button" size="sm" variant="ghost" onClick={() => setActiveTab('reports')}>Exportar dados</Button>
                           </div>
                         </div>
                       </div>
@@ -5741,7 +5753,27 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
           posts={business.posts}
           marketingCampaigns={marketingCampaigns}
           teamAudit={teamAudit}
-          onOpenExport={() => setActiveTab('export')}
+          exportContent={(
+            <ClientExportHub
+              business={business}
+              currentLang={currentLang}
+              purchaseOrders={purchaseOrders}
+              events={events}
+              teamMembers={teamMembers}
+              teamAudit={teamAudit}
+              conversations={conversations}
+              conversationMessages={conversationMessages}
+              supportRequests={supportRequests}
+              marketingCampaigns={marketingCampaigns}
+              marketingSegments={marketingSegments}
+              marketingAssets={marketingAssets}
+              scheduledItems={scheduledItems}
+              notifications={notifications}
+              currentUser={currentUser}
+              followerCount={followerCount}
+              audienceReach={audienceReach}
+            />
+          )}
         />
       )}
 
@@ -5760,29 +5792,6 @@ const [billingSection, setBillingSection] = usePersistentState<'plans' | 'servic
             if (!onSaveBusinessProfile) throw new Error('A gravação do perfil da empresa não está disponível.');
             await onSaveBusinessProfile(updatedBusiness);
           }}
-        />
-      )}
-
-      {/* Export Hub Tab */}
-      {activeTab === 'export' && (
-        <ClientExportHub
-          business={business}
-          currentLang={currentLang}
-          purchaseOrders={purchaseOrders}
-          events={events}
-          teamMembers={teamMembers}
-          teamAudit={teamAudit}
-          conversations={conversations}
-          conversationMessages={conversationMessages}
-          supportRequests={supportRequests}
-          marketingCampaigns={marketingCampaigns}
-          marketingSegments={marketingSegments}
-          marketingAssets={marketingAssets}
-          scheduledItems={scheduledItems}
-          notifications={notifications}
-          currentUser={currentUser}
-          followerCount={followerCount}
-          audienceReach={audienceReach}
         />
       )}
 

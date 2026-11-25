@@ -2,21 +2,21 @@ import React from 'react';
 import type { LucideProps } from 'lucide-react';
 
 /**
- * Barra de navegação inferior flutuante, com fundo sólido (sem glassmorphism).
+ * Barra de navegação inferior flutuante, com fundo sólido.
  *
  * Componente puramente visual: recebe os itens e o item ativo de quem o usa e
  * devolve apenas o evento de seleção. Nenhuma rota, permissão ou módulo é
  * alterado aqui.
  */
-export interface GlassBottomNavItem {
+export interface BottomNavItem {
   id: string;
   label: string;
   icon: React.ComponentType<LucideProps>;
   badge?: number;
 }
 
-interface GlassBottomNavProps {
-  items: GlassBottomNavItem[];
+interface BottomNavProps {
+  items: BottomNavItem[];
   activeId: string;
   onSelect: (id: string) => void;
   ariaLabel: string;
@@ -24,7 +24,7 @@ interface GlassBottomNavProps {
   testId?: string;
 }
 
-export const GlassBottomNav: React.FC<GlassBottomNavProps> = ({
+export const BottomNav: React.FC<BottomNavProps> = ({
   items,
   activeId,
   onSelect,
@@ -62,7 +62,7 @@ export const GlassBottomNav: React.FC<GlassBottomNavProps> = ({
                 }`}
               />
               <Icon
-                className={`h-[18px] w-[18px] shrink-0 transition-transform duration-300 ease-out sm:h-5 sm:w-5 ${
+                                className={`h-[18px] w-[18px] shrink-0 transition-transform duration-300 ease-out sm:h-5 sm:w-5 ${
                   isActive ? '-translate-y-0.5 scale-110' : 'group-hover:-translate-y-0.5'
                 }`}
                 aria-hidden="true"

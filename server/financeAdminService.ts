@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { databasePool } from './db';
+import { getTicketFinanceOverview } from './financePayoutService';
 
 export type FinanceScope = 'platform' | 'business';
 export type ReconciliationStatus = 'pending' | 'in_review' | 'reconciled' | 'divergence' | 'unconfirmed';
@@ -173,14 +174,17 @@ function mapTransaction(row: any): FinanceTransactionRow {
 const TRANSACTION_SELECT = `
   SELECT t.id, t.order_id, t.provider, t.provider_reference, t.status, t.gross_amount_xof,
          t.payer_name, t.payer_phone, t.use_case, t.provider_mode, t.confirmed_at, t.created_at, t.updated_at,
-         o.event_id, e.title AS event_title, e.company_id, c.name AS company_name,
+         COALESCE(t.event_id, o.event_id) AS event_id,
+         e.title AS event_title,
+         COALESCE(t.company_id, e.company_id) AS company_id,
+         c.name AS company_name,
          r.id AS reconciliation_id, r.status AS reconciliation_status,
          COALESCE((SELECT SUM(rf.amount_xof) FROM refunds rf
                     WHERE rf.transaction_id = t.id AND rf.status = 'processed'), 0) AS refunded_amount_xof
     FROM payment_transactions t
     LEFT JOIN orders o ON o.id = t.order_id
-    LEFT JOIN events e ON e.id = o.event_id
-    LEFT JOIN companies c ON c.id = e.company_id
+    LEFT JOIN events e ON e.id = COALESCE(t.event_id, o.event_id)
+    LEFT JOIN companies c ON c.id = COALESCE(t.company_id, e.company_id)
     LEFT JOIN payment_reconciliations r ON r.transaction_id = t.id
 `;
 
@@ -254,6 +258,7 @@ export async function getFinanceSummary() {
   const f = refunds.rows[0] || {};
   const c = company.rows[0] || {};
   const o = orders.rows[0] || {};
+  const ticketFinance = await getTicketFinanceOverview();
   return {
     platform: {
       transactionCount: asInt(p.transaction_count),
@@ -276,6 +281,8 @@ export async function getFinanceSummary() {
       refundsOpenCount: asInt(f.open_count),
     },
     company: {
+      // Contrato legado: pagamentos de bilhetes registados. A contabilidade
+      // por pedidos pagos está em `ticketFinance.totals` e não é duplicada aqui.
       transactionCount: asInt(c.transaction_count),
       paidCount: asInt(c.paid_count),
       revenueXOF: asInt(c.revenue_xof),
@@ -287,6 +294,7 @@ export async function getFinanceSummary() {
       companyPaymentsPaidXOF: asInt(c.revenue_xof),
       unlinkedOrderAmountXOF: Math.max(asInt(o.paid_xof) - asInt(c.revenue_xof), 0),
     },
+    ticketFinance,
     generatedAt: new Date().toISOString(),
   };
 }

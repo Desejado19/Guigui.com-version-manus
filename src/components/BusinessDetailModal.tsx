@@ -14,12 +14,15 @@ import {
   MessageSquare,
   AlertTriangle,
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   Bell,
   BellOff,
   UserPlus,
   UserCheck,
   FileText,
   Mail,
+  Maximize2,
 } from 'lucide-react';
 import { Business, Language, QualitativeScore, Review, UserProfile } from '../types';
 import { getTranslation } from '../utils/i18n';
@@ -63,6 +66,8 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
   const detailScrollRef = React.useRef<HTMLDivElement>(null);
 
   const [activeTab, setActiveTab] = useState<'info' | 'posts' | 'promotions' | 'reviews'>('info');
+  // Índice da foto aberta em tamanho real (null = visualizador fechado).
+  const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
 
   // Review Form State
   const [selectedQualitative, setSelectedQualitative] = useState<QualitativeScore>('muito_bom');
@@ -92,6 +97,7 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
     setAuthorPhone(currentUser?.phone || '');
     setCommentText('');
     setReviewSubmitted(false);
+    setGalleryIndex(null);
   }, [business?.id, currentUser?.id]);
 
   React.useEffect(() => {
@@ -99,8 +105,32 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
     detailScrollRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [business?.id]);
 
+  // Visualizador da galeria: setas do teclado e Escape sem fechar a ficha.
+  React.useEffect(() => {
+    if (galleryIndex === null) return;
+    const count = business?.gallery.filter((image) => image.trim()).length ?? 0;
+    if (count === 0) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setGalleryIndex(null);
+      }
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        setGalleryIndex((index) => (index === null ? index : (index + 1) % count));
+      }
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        setGalleryIndex((index) => (index === null ? index : (index - 1 + count) % count));
+      }
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [galleryIndex, business]);
+
   if (!business) return null;
 
+  const galleryImages = business.gallery.filter((image) => image.trim());
   const activePromotions = business.promotions.filter((promotion) => promotion.isActive);
   const initials = business.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || '?';
   const hasCoverImage = Boolean(business.coverImage.trim()) && failedCoverSource !== business.coverImage;
@@ -400,10 +430,19 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                       Galeria
                     </h3>
                     <div className="grid grid-cols-3 gap-2">
-                      {business.gallery.filter((image) => image.trim()).map((img, idx) => (
-                        <div key={idx} className="h-28 rounded-xl overflow-hidden bg-slate-100 border border-[var(--color-border-subtle)]">
-                          <img src={img} alt={`Foto ${idx + 1} de ${business.name}`} className="w-full h-full object-cover" />
-                        </div>
+                      {galleryImages.map((img, idx) => (
+                        <button
+                          type="button"
+                          key={img}
+                          onClick={() => setGalleryIndex(idx)}
+                          aria-label={`Ampliar foto ${idx + 1} de ${galleryImages.length} de ${business.name}`}
+                          className="group relative h-28 overflow-hidden rounded-xl border border-[var(--color-border-subtle)] bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+                        >
+                          <img src={img} alt={`Foto ${idx + 1} de ${business.name}`} className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.03]" />
+                          <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-slate-950/0 text-white opacity-0 transition group-hover:bg-slate-950/35 group-hover:opacity-100 group-focus-visible:bg-slate-950/35 group-focus-visible:opacity-100">
+                            <Maximize2 className="h-5 w-5" />
+                          </span>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -839,6 +878,64 @@ export const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
           )}
         </div>
       </div>
+
+      {galleryIndex !== null && galleryImages[galleryIndex] && (
+        <div
+          className="fixed inset-0 z-[80] flex flex-col bg-slate-950/95 p-3 sm:p-5"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Galeria de fotos de ${business.name}`}
+          onClick={(event) => { if (event.target === event.currentTarget) setGalleryIndex(null); }}
+        >
+          <div className="flex items-center justify-between gap-3 text-white">
+            <p className="text-xs font-bold tracking-wide text-white/80">
+              {galleryIndex + 1} / {galleryImages.length}
+            </p>
+            <button
+              type="button"
+              onClick={() => setGalleryIndex(null)}
+              aria-label="Fechar galeria"
+              title="Fechar galeria"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="flex min-h-0 flex-1 items-center justify-center gap-2 sm:gap-4">
+            <button
+              type="button"
+              onClick={() => setGalleryIndex((galleryIndex - 1 + galleryImages.length) % galleryImages.length)}
+              disabled={galleryImages.length < 2}
+              aria-label="Foto anterior"
+              title="Foto anterior"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+            <img
+              src={galleryImages[galleryIndex]}
+              alt={`Foto ${galleryIndex + 1} de ${galleryImages.length} de ${business.name}`}
+              onClick={(event) => event.stopPropagation()}
+              className="max-h-full max-w-full rounded-xl object-contain shadow-2xl"
+            />
+            <button
+              type="button"
+              onClick={() => setGalleryIndex((galleryIndex + 1) % galleryImages.length)}
+              disabled={galleryImages.length < 2}
+              aria-label="Foto seguinte"
+              title="Foto seguinte"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
+          </div>
+
+          <p className="pb-1 text-center text-[11px] text-white/60">
+            Use as setas do teclado ou os botões para navegar. Escape fecha.
+          </p>
+        </div>
+      )}
     </div>
   );
 };

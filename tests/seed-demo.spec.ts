@@ -20,7 +20,7 @@ test('seed: directorio mostra empresas seed activas', async ({ page }) => {
   if (await clearBtn.count()) await clearBtn.click();
   await page.waitForTimeout(2000);
   // O directorio renderiza (empresa pre-existente) e a API serve as seed.
-  await expect(page.locator('text=Restaurante Coqueiros').first()).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('text=Cantina Sabores de Bandim').first()).toBeVisible({ timeout: 15000 });
   const api = await page.request.get('/api/businesses');
   const body = await api.json();
   const seedActive = (body.businesses || []).filter((b: { id: string; status: string }) => b.id.startsWith('seed-co-') && b.status === 'active');

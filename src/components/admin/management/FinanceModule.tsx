@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, ArrowRight, BellRing, CheckCircle2, Clock, FileText, Receipt, RotateCcw, Scale, Smartphone } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Banknote, BellRing, CheckCircle2, Clock, FileText, Receipt, RotateCcw, Scale, Smartphone, Ticket, Wallet } from 'lucide-react';
 import { ManagementActionButton, ManagementPage, ModuleNav, type ModuleNavItem } from './ManagementUi';
 import { FinanceLoading, FinanceMessage } from './FinanceShared';
 import { financeFetch, formatFinanceAge, formatXOF, type FinanceSummary, type OperationalAlertsResponse } from './financeApi';
 
-export type FinanceSection = 'transactions' | 'reconciliation' | 'operators' | 'pending' | 'refunds' | 'statements';
+export type FinanceSection = 'transactions' | 'payouts' | 'reconciliation' | 'operators' | 'pending' | 'refunds' | 'statements';
 
 interface FinanceModuleProps {
   onOpenSection: (section: FinanceSection) => void;
@@ -12,6 +12,7 @@ interface FinanceModuleProps {
 
 const SECTIONS: ModuleNavItem[] = [
   { key: 'transactions', label: 'Transações', icon: <Receipt className="h-4 w-4" /> },
+  { key: 'payouts', label: 'Repasses às empresas', icon: <Banknote className="h-4 w-4" /> },
   { key: 'reconciliation', label: 'Reconciliação', icon: <Scale className="h-4 w-4" /> },
   { key: 'operators', label: 'Operadoras', icon: <Smartphone className="h-4 w-4" /> },
   { key: 'pending', label: 'Pagamentos pendentes', icon: <Clock className="h-4 w-4" /> },
@@ -77,7 +78,7 @@ const OperationalAlertsPanel: React.FC<{
                 </div>
                 <ul className="mt-2 space-y-1.5">
                   {alert.items.slice(0, 3).map((item) => (
-                    <li key={item.id} className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-white bg-white/80 px-2.5 py-1.5 text-[9.5px]">
+                    <li key={item.id} className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-white bg-white px-2.5 py-1.5 text-[9.5px]">
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-black text-slate-800">
                           {item.payerName} <span className="font-mono text-[8.5px] font-bold text-slate-500">{item.transactionId}</span>
@@ -135,6 +136,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onOpenSection }) =
   }, []);
 
   const platform = summary?.platform;
+  const tickets = summary?.ticketFinance?.totals;
   const kpis = [
     { label: 'Volume financeiro registado', value: formatXOF(platform?.volumeXOF), hint: `${platform?.transactionCount ?? 0} transações de plataforma`, tone: 'border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] text-[var(--color-green-800)]' },
     { label: 'Pagamentos confirmados', value: String(platform?.confirmedCount ?? '—'), hint: `${formatXOF(platform?.confirmedXOF)} · apenas reais`, tone: 'border-[var(--tone-success-border)] bg-[var(--tone-success-bg)] text-[var(--tone-success-text)]' },
@@ -142,6 +144,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onOpenSection }) =
     { label: 'Total reconciliado', value: formatXOF(platform?.reconciledXOF), hint: `${platform?.reconciledCount ?? 0} pagamentos`, tone: 'border-[var(--tone-info-border)] bg-[var(--tone-info-bg)] text-[var(--tone-info-text)]' },
     { label: 'Reembolsos efetuados', value: formatXOF(platform?.refundsProcessedXOF), hint: `${platform?.refundsProcessedCount ?? 0} processos concluídos`, tone: 'border-[var(--tone-info-border)] bg-[var(--tone-info-bg)] text-[var(--tone-info-text)]' },
     { label: 'Número de transações', value: String(platform?.transactionCount ?? '—'), hint: 'Receita de bilhetes excluída', tone: 'border-[var(--color-border-default)] bg-white text-slate-900' },
+  ];
+  const ticketKpis = [
+    { label: 'Recebido em bilhetes', value: formatXOF(tickets?.grossXOF), hint: `${tickets?.paidOrders ?? 0} pedidos pagos`, icon: <Ticket className="h-4 w-4" /> },
+    { label: 'Receita própria Guigui.com', value: formatXOF(tickets?.commissionXOF), hint: 'Comissões dos pedidos pagos', icon: <Wallet className="h-4 w-4" /> },
+    { label: 'Valor líquido das empresas', value: formatXOF(tickets?.netXOF), hint: `${tickets?.companiesWithRevenue ?? 0} empresa(s) com receita`, icon: <Banknote className="h-4 w-4" /> },
+    { label: 'Já repassado', value: formatXOF(tickets?.paidOutXOF), hint: 'Repasses confirmados com referência', icon: <CheckCircle2 className="h-4 w-4" /> },
+    { label: 'Em processamento', value: formatXOF(tickets?.processingXOF), hint: 'Aguardam confirmação bancária/operadora', icon: <Clock className="h-4 w-4" /> },
+    { label: 'Pendente de repasse', value: formatXOF(tickets?.pendingPayoutXOF), hint: 'Líquido ainda não transferido', icon: <AlertTriangle className="h-4 w-4" /> },
   ];
 
   return (
@@ -175,7 +185,38 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onOpenSection }) =
             ))}
           </div>
 
-
+          <section aria-labelledby="finance-ticket-central" className="rounded-2xl border border-[var(--color-border-default)] bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 id="finance-ticket-central" className="text-[12px] font-black text-slate-900">Central financeira de bilhetes</h3>
+                <p className="mt-0.5 text-[10.5px] leading-relaxed text-slate-600">
+                  Recebimentos, comissões e valores devidos às empresas, calculados a partir dos pedidos pagos. A receita de bilhetes é separada da receita própria da plataforma.
+                </p>
+              </div>
+              <ManagementActionButton onClick={() => onOpenSection('payouts')}>
+                Gerir repasses <ArrowRight className="h-3.5 w-3.5" />
+              </ManagementActionButton>
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              {ticketKpis.map((kpi) => (
+                <div key={kpi.label} className="rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 p-3">
+                  <div className="flex items-center gap-1.5 text-[8.5px] font-black uppercase tracking-[0.13em] text-slate-500">{kpi.icon}{kpi.label}</div>
+                  <div className="mt-1.5 text-[17px] font-black tabular-nums text-[var(--color-green-900)]">{kpi.value}</div>
+                  <div className="mt-0.5 text-[9px] font-medium text-slate-500">{kpi.hint}</div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[9.5px] font-bold text-slate-600">
+              <span>Pedidos pendentes: {tickets?.pendingOrders ?? 0} · {formatXOF(tickets?.pendingOrdersXOF)}</span>
+              <span>Falhados: {tickets?.failedOrders ?? 0} · {formatXOF(tickets?.failedOrdersXOF)}</span>
+              <span>Reembolsados: {tickets?.refundedOrders ?? 0} · {formatXOF(tickets?.refundedOrdersXOF)}</span>
+            </div>
+            {tickets && tickets.unlinkedTransactionsCount > 0 && (
+              <p role="alert" className="mt-3 rounded-xl border border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] px-3 py-2 text-[10px] font-bold text-[var(--tone-warning-text)]">
+                {tickets.unlinkedTransactionsCount} transação(ões) de bilhetes confirmadas sem evento associado, num total de {formatXOF(tickets.unlinkedTransactionsXOF)}. São anteriores à correção de rastreabilidade e não entram nos totais por evento.
+              </p>
+            )}
+          </section>
 
         </>
       )}

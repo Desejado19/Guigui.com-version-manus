@@ -1,3 +1,8 @@
+export { renderPasswordResetEmail } from './passwordReset';
+export type {
+  PasswordResetEmailData,
+  RenderedPasswordResetEmail,
+} from './passwordReset';
 export { renderTeamInvitationEmail } from './teamInvitation';
 export type {
   RenderedTeamInvitationEmail,

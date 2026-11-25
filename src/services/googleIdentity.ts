@@ -45,7 +45,7 @@ export function googleLoginErrorMessage(reason: string | null): string {
     case 'mfa_required':
       return 'Esta conta exige verificação MFA. Entre com o e-mail e a palavra-passe para introduzir o código.';
     case 'google_link_required':
-      return 'Já existe uma conta com este e-mail. Entre com a palavra-passe (a mesma conta) para ligar o Google e depois use "Continuar com a Google".';
+      return 'Não foi possível ligar esta conta Google ao e-mail indicado. Tente novamente ou contacte o suporte.';
     case 'google_link_conflict':
       return 'Este e-mail já está ligado a outra conta Google. Contacte o suporte.';
     case 'deactivated':

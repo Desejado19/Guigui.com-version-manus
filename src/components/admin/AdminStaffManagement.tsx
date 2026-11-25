@@ -475,7 +475,7 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-50/80 border-b border-[var(--color-border-default)] dark:border-slate-700 text-slate-500 font-extrabold uppercase text-[10px]">
+              <tr className="bg-slate-50 border-b border-[var(--color-border-default)] dark:border-slate-700 text-slate-500 font-extrabold uppercase text-[10px]">
                 <th className="py-3.5 px-4">Administrador / Funcionário</th>
                 <th className="py-3.5 px-4">Departamento</th>
                 <th className="py-3.5 px-4">Nível de Acesso</th>
@@ -495,7 +495,7 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
                 </tr>
               ) : (
                 paginatedStaff.pageItems.map((staff) => (
-                  <tr key={staff.id} className="hover:bg-slate-50/80 transition">
+                  <tr key={staff.id} className="hover:bg-slate-50 transition">
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
                         <img
@@ -776,7 +776,7 @@ export const AdminStaffManagement: React.FC<AdminStaffManagementProps> = ({
                   ].map((perm) => (
                     <label
                       key={perm.key}
-                      className="flex items-center gap-2 p-2 bg-white dark:bg-slate-900 rounded-xl border border-[var(--color-border-default)]/80 cursor-pointer hover:bg-slate-100/60"
+                      className="flex items-center gap-2 p-2 bg-white dark:bg-slate-900 rounded-xl border border-[var(--color-border-default)]/80 cursor-pointer hover:bg-slate-100"
                     >
                       <input
                         type="checkbox"

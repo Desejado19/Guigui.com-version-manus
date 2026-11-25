@@ -342,15 +342,15 @@ export function getTeamTourSteps(access?: TeamModuleAccess | null): TourStep[] {
       },
     });
   }
-  if (can('content') || can('stories') || can('marketing') || can('reviews')) {
+  if (can('content') || can('stories') || can('reviews')) {
     steps.push({
       id: 'content',
       icon: 'package',
       copy: {
-        pt: { title: 'Conteúdo e marketing', description: 'Publique no feed, nas stories e nas campanhas conforme a sua permissão.' },
-        en: { title: 'Content and marketing', description: 'Publish to the feed, stories and campaigns according to your permission.' },
-        fr: { title: 'Contenu et marketing', description: 'Publiez dans le fil, les stories et les campagnes selon votre permission.' },
-        es: { title: 'Contenido y marketing', description: 'Publique en el feed, las historias y las campañas según su permiso.' },
+        pt: { title: 'Conteúdo', description: 'Publique no feed e nas stories conforme a sua permissão.' },
+        en: { title: 'Content', description: 'Publish to the feed and stories according to your permission.' },
+        fr: { title: 'Contenu', description: 'Publiez dans le fil et les stories selon votre permission.' },
+        es: { title: 'Contenido', description: 'Publique en el feed y las historias según su permiso.' },
       },
     });
   }
@@ -458,8 +458,11 @@ export function resetTourState(userId: string): void {
   }
 }
 
-/** O guia abre sozinho apenas antes de o utilizador o concluir ou saltar. */
+/**
+ * O guia abre sozinho apenas na primeira vez que a conta é usada neste browser.
+ * Assim que é apresentado fica registado (ver WelcomeTour), pelo que voltar a
+ * iniciar sessão não o reabre; o botão "Guia" permite revê-lo manualmente.
+ */
 export function shouldAutoOpenTour(userId: string | null | undefined): boolean {
-  const state = readTourState(userId);
-  return !state || state.status === 'pending' || state.status === 'in_progress';
+  return readTourState(userId) === null;
 }

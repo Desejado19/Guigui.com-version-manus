@@ -26,10 +26,14 @@ import {
   getTourSteps,
   readTourState,
   resetTourState,
-  shouldAutoOpenTour,
   writeTourState,
   type TourIconKey,
 } from './tourSteps';
+import {
+  getAccountOnboardingState,
+  saveAccountOnboardingState,
+  type AccountOnboardingState,
+} from '../../services/onboardingState';
 
 const ICONS: Record<TourIconKey, React.ComponentType<{ className?: string }>> = {
   layout: LayoutDashboard,
@@ -85,21 +89,50 @@ export const WelcomeTour: React.FC<WelcomeTourProps> = ({ role, userId, currentL
   const [open, setOpen] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
 
-  // Estado inicial: só abre sozinho se a conta ainda não concluiu nem saltou.
+  // Estado inicial: abre sozinho uma única vez por utilizador. O estado da conta
+  // é a fonte de verdade (vale para outros browsers e dispositivos) e o
+  // localStorage é a cache local, que também já cobre contas antigas.
   useEffect(() => {
-    if (!stateId) {
+    if (!stateId || !userId) {
       setOpen(false);
       return;
     }
-    const stored = readTourState(stateId);
-    setStepIndex(stored?.step && stored.step < steps.length ? stored.step : 0);
-    setOpen(shouldAutoOpenTour(stateId));
-  }, [stateId, steps.length]);
+    let cancelled = false;
+    const local = readTourState(stateId);
+    setOpen(false);
+    const reveal = (account: AccountOnboardingState | null) => {
+      if (cancelled) return;
+      const remote = account?.[audience];
+      const seenElsewhere = Boolean(remote && remote.status !== 'pending');
+      // Já visto (neste browser ou noutro): nunca reabre sozinho. Aproveita-se
+      // para alinhar os dois lados e não voltar a perguntar ao servidor em vão.
+      if (local || seenElsewhere) {
+        const step = local?.step ?? remote?.step ?? 0;
+        setStepIndex(step > 0 && step < steps.length ? step : 0);
+        if (local && !seenElsewhere && account) {
+          void saveAccountOnboardingState(audience, local.status, local.step);
+        }
+        if (!local && remote) {
+          writeTourState(stateId, { status: remote.status, step: remote.step ?? 0 });
+        }
+        return;
+      }
+      // Primeira apresentação: fica marcada de imediato na conta e no browser,
+      // para um refresh, logout ou novo login não voltarem a abri-lo.
+      writeTourState(stateId, { status: 'in_progress', step: 0 });
+      void saveAccountOnboardingState(audience, 'in_progress', 0);
+      setStepIndex(0);
+      setOpen(true);
+    };
+    void getAccountOnboardingState().then(reveal);
+    return () => { cancelled = true; };
+  }, [stateId, userId, audience, steps.length]);
 
   const persist = useCallback((status: 'in_progress' | 'completed' | 'skipped', index: number) => {
     if (!stateId) return;
     writeTourState(stateId, { status, step: index });
-  }, [stateId]);
+    void saveAccountOnboardingState(audience, status, index);
+  }, [audience, stateId]);
 
   const goTo = useCallback((index: number) => {
     const clamped = Math.max(0, Math.min(steps.length - 1, index));

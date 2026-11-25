@@ -1,4 +1,4 @@
-import { expect, request as apiRequest, test, type APIRequestContext, type Page } from './fixtures';
+import { expect, patchApiContext, request as apiRequest, test, type APIRequestContext, type Page } from './fixtures';
 
 /**
  * JORNADA COMPLETA DO UTILIZADOR — óptica de quem usa a plataforma.
@@ -16,13 +16,23 @@ import { expect, request as apiRequest, test, type APIRequestContext, type Page 
  */
 
 const DEMO_PASSWORD = 'Guigui@2026!';
+// A empresa de demonstração é a primeira da seed (scripts/seed-demo-dataset.ts):
+// Cantina Sabores de Bandim (seed-co-01) — já não a antiga Restaurante Coqueiros.
+const BUSINESS_ACCOUNT = { email: 'empresa.seed01@guigui.test', password: 'Guigui2026!' } as const;
+const BUSINESS_ID = 'seed-co-01';
+const BUSINESS_NAME = 'Cantina Sabores de Bandim';
 const ACCOUNTS = {
   citizen: 'cidadao.teste@guigui.com',
-  business: 'empresa.teste@guigui.com',
+  business: BUSINESS_ACCOUNT.email,
   admin: 'admin.teste@guigui.com',
 } as const;
 
 type Role = keyof typeof ACCOUNTS;
+const PASSWORDS: Record<Role, string> = {
+  citizen: DEMO_PASSWORD,
+  business: BUSINESS_ACCOUNT.password,
+  admin: DEMO_PASSWORD,
+};
 const ENTRY_LABELS: Record<Role, string> = {
   citizen: 'A minha área pessoal',
   business: 'Área da Minha Empresa',
@@ -32,7 +42,7 @@ const ENTRY_LABELS: Record<Role, string> = {
 async function signIn(page: Page, role: Role, { retries = 3, baseDelayMs = 4000 } = {}) {
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     const login = await page.request.post('/api/auth/login', {
-      data: { email: ACCOUNTS[role], password: DEMO_PASSWORD },
+      data: { email: ACCOUNTS[role], password: PASSWORDS[role] },
     });
     const payload = await login.json().catch(() => ({}));
     if (login.ok()) {
@@ -93,15 +103,15 @@ test.describe('jornada do visitante: descobrir e contactar empresas', () => {
     await page.getByRole('button', { name: /Feed Bissau/i }).first().click();
     await expect(page.getByRole('heading', { name: /Encontre tudo o que precisa/i })).toBeVisible({ timeout: 20_000 });
 
-    // Pesquisar "Coqueiros" deve encontrar "Restaurante Coqueiros" e abrir a
+    // Pesquisar "Cantina" deve encontrar "Cantina Sabores de Bandim" e abrir a
     // ficha (BusinessDetailModal) — o comportamento real da pesquisa unificada.
     const search = page.getByPlaceholder(/Procurar restaurantes/i).first();
-    await search.fill('Coqueiros');
+    await search.fill('Cantina');
     await search.press('Enter');
 
     const modal = page.locator('div.fixed.inset-0.z-50').first();
     await expect(modal).toBeVisible({ timeout: 15_000 });
-    await expect(modal).toContainText(/Restaurante Coqueiros/i);
+    await expect(modal).toContainText(new RegExp(BUSINESS_NAME, 'i'));
     // A ficha expõe canais de contacto directo: telefone e mensagem interna.
     await expect(modal.locator('a[href^="tel:"]').first()).toBeVisible({ timeout: 10_000 });
     await expect(modal.getByRole('button', { name: /Mensagem dentro do sistema/i })).toBeVisible({ timeout: 10_000 });
@@ -132,7 +142,7 @@ test.describe('jornada do visitante: descobrir e contactar empresas', () => {
     await allCategories.click();
     await page.getByRole('option', { name: 'Todas as Categorias' }).click();
     await page.waitForTimeout(1500);
-    await expect(page.getByText('Restaurante Coqueiros').first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(BUSINESS_NAME).first()).toBeVisible({ timeout: 15_000 });
   });
 
   test('ficha de empresa mostra contacto WhatsApp e fecha com Escape', async ({ page }) => {
@@ -141,11 +151,11 @@ test.describe('jornada do visitante: descobrir e contactar empresas', () => {
     await openCleanDirectory(page);
 
     // A ficha só mostra o botão de WhatsApp quando a empresa tem número
-    // configurado; a Cantina seed tem (Restaurante Coqueiros não tem).
-    await page.getByText('Cantina Sabores de Bandim').first().click();
+    // configurado; a Cantina da seed tem.
+    await page.getByText(BUSINESS_NAME).first().click();
     const modal = page.locator('div.fixed.inset-0.z-50').first();
     await expect(modal).toBeVisible({ timeout: 15_000 });
-    await expect(modal).toContainText(/Cantina Sabores de Bandim/i);
+    await expect(modal).toContainText(new RegExp(BUSINESS_NAME, 'i'));
     await expect(modal.locator('a[href*="wa.me"]').first()).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: 'test-results/journey-ficha-directorio.png', fullPage: false });
 
@@ -201,8 +211,8 @@ test.describe('jornada do cidadão', () => {
 
   test('mensagem enviada a uma empresa chega à caixa de entrada dela', async ({}, testInfo) => {
     const baseURL = testInfo.project.use.baseURL as string;
-    const citizenContext: APIRequestContext = await apiRequest.newContext({ baseURL });
-    const businessContext: APIRequestContext = await apiRequest.newContext({ baseURL });
+    const citizenContext: APIRequestContext = patchApiContext(await apiRequest.newContext({ baseURL }));
+    const businessContext: APIRequestContext = patchApiContext(await apiRequest.newContext({ baseURL }));
     try {
       const citizenLogin = await citizenContext.post('/api/auth/login', {
         data: { email: ACCOUNTS.citizen, password: DEMO_PASSWORD },
@@ -211,12 +221,12 @@ test.describe('jornada do cidadão', () => {
 
       const subject = `Jornada utilizador ${Date.now()}`;
       const created = await citizenContext.post('/api/conversations', {
-        data: { businessId: 'biz-1', subject, text: 'Olá! Tenho interesse em saber mais sobre os vossos serviços.' },
+        data: { businessId: BUSINESS_ID, subject, text: 'Olá! Tenho interesse em saber mais sobre os vossos serviços.' },
       });
       expect(created.ok(), `criar conversa falhou: ${await created.text()}`).toBeTruthy();
 
       const businessLogin = await businessContext.post('/api/auth/login', {
-        data: { email: ACCOUNTS.business, password: DEMO_PASSWORD },
+        data: { email: ACCOUNTS.business, password: PASSWORDS.business },
       });
       expect(businessLogin.ok(), await businessLogin.text()).toBeTruthy();
 
@@ -227,7 +237,7 @@ test.describe('jornada do cidadão', () => {
       const conversation = (body.conversations as Array<{ id: string; subject: string; business_id: string }>)
         .find((item) => item.subject === subject);
       expect(conversation, `conversa "${subject}" não apareceu na caixa de entrada da empresa`).toBeTruthy();
-      expect(conversation?.business_id).toBe('biz-1');
+      expect(conversation?.business_id).toBe(BUSINESS_ID);
       const messages = (body.messages as Array<{ conversation_id: string; text: string }>)
         .filter((message) => message.conversation_id === conversation?.id);
       expect(messages.length, 'a conversa criada não tem mensagens registadas').toBeGreaterThan(0);
@@ -248,7 +258,7 @@ test.describe('jornada do comerciante e da administração', () => {
 
     const dashboard = page.locator('.guigui-profile-dashboard');
     await expect(dashboard).toContainText(/GUIGUI\.COM \/ COMERCIANTE/i);
-    await expect(dashboard).toContainText(/Restaurante Coqueiros - Bissau Velho/i);
+    await expect(dashboard).toContainText(new RegExp(BUSINESS_NAME, 'i'));
     await page.screenshot({ path: 'test-results/journey-empresa-painel.png', fullPage: false });
   });
 

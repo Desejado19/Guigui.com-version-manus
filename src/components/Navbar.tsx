@@ -43,6 +43,7 @@ import {
 import { AppNotification, UserProfile, Language, UserRole, EventReminder } from '../types';
 import { NotificationBell } from './NotificationBell';
 import { getTranslation } from '../utils/i18n';
+import { useInstitutionalPublic } from '../hooks/useInstitutionalPublic';
 import type { BusinessDashboardTab } from './BusinessDashboard';
 import { Button } from './ui';
 
@@ -183,6 +184,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, [roleMenuOpen]);
 
   const t = (key: string) => getTranslation(currentLang, key);
+  // Contactos e canais oficiais vêm da última publicação institucional.
+  const { data: institutional } = useInstitutionalPublic();
+  const supportContact =
+    institutional?.contacts.find((contact) => contact.purpose === 'support') || institutional?.contacts[0];
+  const officialChannels = institutional?.socialLinks ?? [];
 
   const triggerSearch = (queryToSearch?: string) => {
     const q = (queryToSearch !== undefined ? queryToSearch : searchQuery).trim();
@@ -463,9 +469,51 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="space-y-3">
             <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
               <div className="text-sm font-black text-slate-900 dark:text-white">Contacto oficial</div>
-              <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">WhatsApp: +245 955 000 000</div>
-              <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">Email: apoio@guigui.com</div>
+              {supportContact ? (
+                <div className="mt-2 space-y-1 text-sm text-slate-600 dark:text-slate-300">
+                  {supportContact.email ? (
+                    <div>Email: <a className="font-bold hover:underline" href={`mailto:${supportContact.email}`}>{supportContact.email}</a></div>
+                  ) : null}
+                  {supportContact.phone ? (
+                    <div>Telefone: <a className="font-bold hover:underline" href={`tel:${supportContact.phone.replace(/\s+/g, '')}`}>{supportContact.phone}</a></div>
+                  ) : null}
+                  {supportContact.whatsapp ? (
+                    <div>
+                      WhatsApp:{' '}
+                      <a
+                        className="font-bold hover:underline"
+                        href={`https://wa.me/${supportContact.whatsapp.replace(/[^0-9]/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {supportContact.whatsapp}
+                      </a>
+                    </div>
+                  ) : null}
+                  {supportContact.hours ? <div className="text-[11px] text-slate-500">{supportContact.hours}</div> : null}
+                </div>
+              ) : (
+                <div className="mt-2 text-sm text-slate-500">Os contactos oficiais ainda não foram publicados.</div>
+              )}
             </div>
+            {officialChannels.length > 0 ? (
+              <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                <div className="text-sm font-black text-slate-900 dark:text-white">Canais oficiais</div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {officialChannels.map((channel) => (
+                    <a
+                      key={channel.id}
+                      href={channel.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-lg border border-[var(--color-border-subtle)] px-2 py-1 text-[11px] font-bold text-slate-700 transition hover:border-emerald-500 hover:text-emerald-700 dark:border-slate-700 dark:text-slate-200"
+                    >
+                      {channel.label || channel.network}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             {renderToggleRow('Receber ajuda por WhatsApp', 'pushAlerts', 'Ativa respostas rápidas e notificações de suporte')}
             {renderToggleRow('Resumo periódico do estado da conta', 'emailAlerts', 'Recebe relatório semanal')}
           </div>
@@ -1101,10 +1149,54 @@ export const Navbar: React.FC<NavbarProps> = ({
  
             {/* Drawer Content List */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-2.5 space-y-2 text-xs">
+
+              {/* Contactos e canais oficiais da última publicação institucional */}
+              {supportContact || officialChannels.length > 0 ? (
+                <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    Contactos oficiais
+                  </div>
+                  {supportContact ? (
+                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                      {supportContact.email ? (
+                        <a className="hover:underline" href={`mailto:${supportContact.email}`}>{supportContact.email}</a>
+                      ) : null}
+                      {supportContact.phone ? (
+                        <a className="hover:underline" href={`tel:${supportContact.phone.replace(/\s+/g, '')}`}>{supportContact.phone}</a>
+                      ) : null}
+                      {supportContact.whatsapp ? (
+                        <a
+                          className="hover:underline"
+                          href={`https://wa.me/${supportContact.whatsapp.replace(/[^0-9]/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          WhatsApp
+                        </a>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {officialChannels.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {officialChannels.map((channel) => (
+                        <a
+                          key={channel.id}
+                          href={channel.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-lg border border-[var(--color-border-subtle)] bg-white px-2 py-0.5 text-[10px] font-bold text-slate-700 transition hover:border-emerald-500 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                        >
+                          {channel.label || channel.network}
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
                
               {/* User Profile Card inside Drawer */}
               {currentUser ? (
-                <div className="p-3 bg-emerald-50/70 dark:bg-emerald-950 border border-emerald-200/80 dark:border-emerald-800/40 rounded-2xl flex items-center justify-between">
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-950 border border-emerald-200/80 dark:border-emerald-800/40 rounded-2xl flex items-center justify-between">
                   <div className="flex items-center gap-2.5 overflow-hidden">
                     <img
                       src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80'}
@@ -1203,7 +1295,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                                    company: 'overview',
                                    billing: 'billing',
                                    events: 'events',
-                                   promotions: 'promotions',
                                    notifications: 'notifications',
                                    security: 'settings',
                                  };
@@ -1251,7 +1342,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                        <div className="w-8 h-8 rounded-xl bg-gray-500/10 text-gray-600 dark:text-gray-400 flex items-center justify-center shrink-0"><ShieldCheck className="w-4 h-4" /></div>
                        <div className="flex-1 min-w-0"><div className="text-[13px] font-black leading-snug tracking-[-0.02em]">Sobre o Guigui</div><div className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">Quem somos e como funciona</div></div>
                      </button>
-                     <a href="https://wa.me/245955000000?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20com%20a%20plataforma%20Guigui.com" target="_blank" rel="noopener noreferrer" className="w-full rounded-[16px] bg-emerald-50/80 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/80 flex items-center gap-2.5 font-bold transition hover:bg-emerald-100 px-2.5 py-2">
+                     <a href="https://wa.me/245955000000?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20com%20a%20plataforma%20Guigui.com" target="_blank" rel="noopener noreferrer" className="w-full rounded-[16px] bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/80 flex items-center gap-2.5 font-bold transition hover:bg-emerald-100 px-2.5 py-2">
                        <MessageCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                        <div className="text-left"><div className="text-[13px] font-black leading-snug tracking-[-0.02em]">WhatsApp Oficial de Apoio</div><div className="text-[11px] opacity-80">+245 955 000 000 (Bissau)</div></div>
                      </a>
@@ -1274,7 +1365,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {/* Drawer Footer */}
-            <div className="px-3 py-2 border-t border-[var(--color-border-subtle)] dark:border-slate-700 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900 text-center text-[9px] text-slate-300 font-medium leading-none">
+            <div className="px-3 py-2 border-t border-[var(--color-border-subtle)] dark:border-slate-700 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-center text-[9px] text-slate-300 font-medium leading-none">
               Guigui.com v2.4 ⬢ Feito com paixão em Bissau
             </div>
           </div>

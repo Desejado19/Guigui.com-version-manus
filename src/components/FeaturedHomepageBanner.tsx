@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ExternalLink, Megaphone } from 'lucide-react';
 import type { AdCampaign, Business } from '../types';
 
 interface FeaturedHomepageBannerProps {
@@ -15,6 +15,30 @@ type HomepageSlide =
   | { type: 'campaign'; id: string; campaign: AdCampaign };
 
 const SLIDE_INTERVAL_MS = 7000;
+
+/**
+ * Divide o título em duas partes para o realce laranja da última expressão.
+ * Títulos com uma ou duas palavras ficam inteiros a branco: dividi-los tornaria
+ * o texto difícil de ler e quebraria pesquisas por texto exacto.
+ */
+function splitTitle(value: string): { lead: string; accent: string } {
+  const words = value.trim().split(/\s+/).filter(Boolean);
+  if (words.length < 3) return { lead: value, accent: '' };
+  return {
+    lead: words.slice(0, -2).join(' '),
+    accent: words.slice(-2).join(' '),
+  };
+}
+
+const SlideTitle: React.FC<{ value: string }> = ({ value }) => {
+  const { lead, accent } = splitTitle(value);
+  return (
+    <h2 className="guigui-sponsored-title">
+      {lead}
+      {accent ? <> <span className="guigui-sponsored-accent">{accent}</span></> : null}
+    </h2>
+  );
+};
 
 export const FeaturedHomepageBanner: React.FC<FeaturedHomepageBannerProps> = ({
   businesses,
@@ -61,62 +85,72 @@ export const FeaturedHomepageBanner: React.FC<FeaturedHomepageBannerProps> = ({
     setActiveSlideIndex((index) => (index + offset + slides.length) % slides.length);
   };
 
+  const image = activeSlide.type === 'business'
+    ? activeSlide.business.coverImage
+    : activeSlide.campaign.imageUrl;
+
   return (
     <section className="guigui-sponsored-banner" aria-label="Destaques da página inicial" aria-live="polite">
       {activeSlide.type === 'business' ? (
-        <div className="grid grid-cols-1 items-stretch sm:grid-cols-[1.35fr_1fr]">
-          <div className="guigui-sponsored-copy">
+        <div className="guigui-sponsored-slide">
+          {image ? <img src={image} alt="" aria-hidden="true" className="guigui-sponsored-bg" /> : null}
+          <div className="guigui-sponsored-scrim" aria-hidden="true" />
+          <div className="guigui-sponsored-content">
             <span className="guigui-sponsored-label">Empresa em destaque</span>
-            <h2>{activeSlide.business.name}</h2>
-            {activeSlide.business.description && <p>{activeSlide.business.description}</p>}
+            <SlideTitle value={activeSlide.business.name} />
+            {activeSlide.business.description && (
+              <p className="guigui-sponsored-description">{activeSlide.business.description}</p>
+            )}
             <button
               type="button"
               onClick={() => onBusinessSelect(activeSlide.business)}
-              className="guigui-sponsored-link inline-flex items-center gap-1"
+              className="guigui-sponsored-cta"
               aria-label={`Ver perfil público de ${activeSlide.business.name}`}
             >
-              Ver perfil público <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
+              Ver perfil público <ExternalLink aria-hidden="true" className="h-4 w-4" />
             </button>
           </div>
-          {activeSlide.business.coverImage && (
-            <div className="guigui-sponsored-media">
-              <img src={activeSlide.business.coverImage} alt="" className="guigui-sponsored-image" />
-            </div>
-          )}
         </div>
       ) : (
-                  <a
-            href={activeSlide.campaign.linkUrl || '#'}
-            target={activeSlide.campaign.linkUrl && !activeSlide.campaign.linkUrl.startsWith('#') ? '_blank' : undefined}
-            rel="noreferrer"
-            onClick={(event) => onCampaignClick(activeSlide.campaign.id, event)}
-            className="grid grid-cols-1 items-stretch sm:grid-cols-[1.35fr_1fr]"
-          >
-          <div className="guigui-sponsored-copy">
+        <a
+          href={activeSlide.campaign.linkUrl || '#'}
+          target={activeSlide.campaign.linkUrl && !activeSlide.campaign.linkUrl.startsWith('#') ? '_blank' : undefined}
+          rel="noreferrer"
+          onClick={(event) => onCampaignClick(activeSlide.campaign.id, event)}
+          className="guigui-sponsored-slide"
+        >
+          {image ? <img src={image} alt="" aria-hidden="true" className="guigui-sponsored-bg" /> : null}
+          <div className="guigui-sponsored-scrim" aria-hidden="true" />
+          <div className="guigui-sponsored-content">
             <span className="guigui-sponsored-label">
+              <Megaphone aria-hidden="true" className="h-3.5 w-3.5 text-[#F58220]" />
               Publicidade — {activeSlide.campaign.audience === 'all' ? 'Comunidade Guigui' : activeSlide.campaign.audience || 'Comunidade Guigui'}
             </span>
-            <h2>{activeSlide.campaign.title}</h2>
-            {activeSlide.campaign.description && <p>{activeSlide.campaign.description}</p>}
-            <span className="guigui-sponsored-link">Saber mais →</span>
+            <SlideTitle value={activeSlide.campaign.title} />
+            {activeSlide.campaign.description && (
+              <p className="guigui-sponsored-description">{activeSlide.campaign.description}</p>
+            )}
+            <span className="guigui-sponsored-cta">
+              Saber mais <ArrowRight aria-hidden="true" className="h-4 w-4" />
+            </span>
           </div>
-          {activeSlide.campaign.imageUrl && (
-            <div className="guigui-sponsored-media">
-              <img src={activeSlide.campaign.imageUrl} alt="" className="guigui-sponsored-image" />
-            </div>
-          )}
         </a>
       )}
 
       {slides.length > 1 && (
         <div className="guigui-sponsored-pager">
-          <button type="button" aria-label="Destaque anterior" onClick={() => goToSlide(-1)} className="guigui-sponsored-nav">
-            <ArrowLeft aria-hidden="true" strokeWidth={1.1} className="h-3.5 w-3.5" />
-          </button>
-          <span className="guigui-sponsored-counter">{activeSlideIndex + 1} / {slides.length}</span>
-          <button type="button" aria-label="Próximo destaque" onClick={() => goToSlide(1)} className="guigui-sponsored-nav">
-            <ArrowRight aria-hidden="true" strokeWidth={1.1} className="h-3.5 w-3.5" />
-          </button>
+          <div className="guigui-sponsored-progress" aria-hidden="true">
+            <span style={{ width: `${((activeSlideIndex + 1) / slides.length) * 100}%` }} />
+          </div>
+          <div className="guigui-sponsored-controls">
+            <button type="button" aria-label="Destaque anterior" onClick={() => goToSlide(-1)} className="guigui-sponsored-nav">
+              <ArrowLeft aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+            </button>
+            <span className="guigui-sponsored-counter">{activeSlideIndex + 1}/{slides.length}</span>
+            <button type="button" aria-label="Próximo destaque" onClick={() => goToSlide(1)} className="guigui-sponsored-nav">
+              <ArrowRight aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       )}
     </section>

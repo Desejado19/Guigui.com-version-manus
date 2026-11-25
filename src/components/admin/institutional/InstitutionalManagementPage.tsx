@@ -40,6 +40,7 @@ import {
   loadInstitutionalAdmin,
   loadInstitutionalAudit,
   publishInstitutional,
+  unpublishInstitutional,
   restoreRelease,
   saveAbout,
   saveProfile,
@@ -499,6 +500,21 @@ export const InstitutionalManagementPage: React.FC<{ onBack?: () => void }> = ({
     }
   }
 
+  const unpublish = async () => {
+    if (!data) return
+    if (!window.confirm('Retirar o site institucional do ar? O histórico de versões é preservado e pode voltar a publicar.')) return
+    setBusy(true)
+    try {
+      await unpublishInstitutional()
+      notify('Site institucional despublicado. Os contactos e canais deixam de aparecer no site.')
+      await load()
+    } catch (unpublishError) {
+      notify(unpublishError instanceof Error ? unpublishError.message : 'Despublicação falhou.', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const restore = async (id: number) => {
     if (!window.confirm(`Restaurar a versão #${id} para o rascunho atual?`)) return
     setBusy(true)
@@ -610,6 +626,12 @@ export const InstitutionalManagementPage: React.FC<{ onBack?: () => void }> = ({
                 </dd>
               </div>
               <div>
+                <dt className="text-[9px] font-black uppercase tracking-wide text-slate-500">Estado no site</dt>
+                <dd className={`font-bold ${meta?.published === false ? 'text-[var(--tone-danger-text)]' : 'text-[var(--tone-success-text)]'}`}>
+                  {meta?.published === false ? 'Despublicado' : 'Publicado'}
+                </dd>
+              </div>
+              <div>
                 <dt className="text-[9px] font-black uppercase tracking-wide text-slate-500">Alterações por publicar</dt>
                 <dd className="font-bold text-slate-800 dark:text-slate-100">
                   {meta?.isDirty ? 'Existem alterações no rascunho' : 'Rascunho igual ao publicado'}
@@ -640,6 +662,15 @@ export const InstitutionalManagementPage: React.FC<{ onBack?: () => void }> = ({
               </Button>
               <Button type="button" size="sm" variant="outline" onClick={() => setShowPreview((value) => !value)}>
                 {showPreview ? 'Ocultar pré-visualização' : 'Pré-visualizar rascunho'}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={busy || meta?.published === false}
+                onClick={() => void unpublish()}
+              >
+                Despublicar site
               </Button>
             </div>
           </div>

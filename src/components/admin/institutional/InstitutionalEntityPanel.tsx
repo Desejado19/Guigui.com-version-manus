@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, Eye, EyeOff, Plus, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Eye, EyeOff, History, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { Button } from '../../ui/Button'
 import { InstitutionalField } from './InstitutionalField'
 import {
@@ -9,10 +9,13 @@ import {
   ENTITY_UI,
   createEntity,
   deleteEntity,
+  loadDocumentVersions,
   reorderEntities,
+  restoreDocumentVersion,
   updateEntity,
   type EntityKind,
   type EntityRow,
+  type InstitutionalDocumentVersion,
 } from './institutionalApi'
 
 /** Campo usado como título de cada registo na lista. */
@@ -56,6 +59,10 @@ export const InstitutionalEntityPanel: React.FC<{
   const [visible, setVisible] = useState(true)
   const [busy, setBusy] = useState(false)
   const [query, setQuery] = useState('')
+  // Histórico de versões (só para documentos legais).
+  const [versionsFor, setVersionsFor] = useState<EntityRow | null>(null)
+  const [versions, setVersions] = useState<InstitutionalDocumentVersion[]>([])
+  const [versionsLoading, setVersionsLoading] = useState(false)
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
@@ -139,6 +146,48 @@ export const InstitutionalEntityPanel: React.FC<{
       await onChanged()
     } catch (error) {
       onFeedback(error instanceof Error ? error.message : 'Não foi possível alterar a visibilidade.', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const openVersions = async (row: EntityRow) => {
+    if (versionsFor?.id === row.id) {
+      setVersionsFor(null)
+      setVersions([])
+      return
+    }
+    setVersionsFor(row)
+    setVersions([])
+    setVersionsLoading(true)
+    try {
+      const payload = await loadDocumentVersions(Number(row.id))
+      setVersions(payload.versions)
+    } catch (error) {
+      onFeedback(error instanceof Error ? error.message : 'Não foi possível carregar o histórico.', 'error')
+    } finally {
+      setVersionsLoading(false)
+    }
+  }
+
+  const restoreVersion = async (version: InstitutionalDocumentVersion) => {
+    if (!versionsFor) return
+    if (
+      !window.confirm(
+        `Restaurar a versão ${version.version} de "${String(versionsFor[titleField] ?? 'documento')}"? O conteúdo atual é substituído, mas continua no histórico.`,
+      )
+    ) {
+      return
+    }
+    setBusy(true)
+    try {
+      const result = await restoreDocumentVersion(Number(versionsFor.id), version.id)
+      onFeedback(`Versão ${result.restoredFrom.version} restaurada para o rascunho. Publique para a tornar pública.`)
+      const payload = await loadDocumentVersions(Number(versionsFor.id))
+      setVersions(payload.versions)
+      await onChanged()
+    } catch (error) {
+      onFeedback(error instanceof Error ? error.message : 'Não foi possível restaurar a versão.', 'error')
     } finally {
       setBusy(false)
     }
@@ -262,6 +311,11 @@ export const InstitutionalEntityPanel: React.FC<{
                 </td>
                 <td className="p-2.5 text-right">
                   <div className="flex justify-end gap-1.5">
+                    {kind === 'documents' ? (
+                      <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void openVersions(row)}>
+                        <History className="mr-1 h-3 w-3" /> Versões
+                      </Button>
+                    ) : null}
                     <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => openEdit(row)}>
                       Editar
                     </Button>
@@ -281,6 +335,61 @@ export const InstitutionalEntityPanel: React.FC<{
           </tbody>
         </table>
       </div>
+      {versionsFor ? (
+        <div className="rounded-2xl border border-[var(--color-green-900)]/30 bg-[var(--color-bg-surface)] p-4 dark:border-slate-600 dark:bg-slate-900">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-[12px] font-black text-slate-900 dark:text-white">
+              Histórico de versões · {String(versionsFor[titleField] ?? 'documento')}
+            </h3>
+            <button
+              type="button"
+              onClick={() => {
+                setVersionsFor(null)
+                setVersions([])
+              }}
+              className="text-[10px] font-black uppercase tracking-wide text-slate-500 hover:text-slate-800 dark:text-slate-300"
+            >
+              Fechar
+            </button>
+          </div>
+          {versionsLoading ? (
+            <p className="mt-2 text-[11px] font-bold text-slate-500">A carregar histórico…</p>
+          ) : versions.length === 0 ? (
+            <p className="mt-2 text-[11px] text-slate-500">Ainda não existem versões guardadas para este documento.</p>
+          ) : (
+            <ul className="mt-2 divide-y divide-[var(--color-border-subtle)] dark:divide-slate-800">
+              {versions.map((version) => (
+                <li key={version.id} className="flex flex-wrap items-start justify-between gap-2 py-2 text-[11px]">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-black text-slate-800 dark:text-slate-100">
+                      Versão {version.version} · {version.status || 'draft'}
+                    </p>
+                    <p className="text-[10px] text-slate-500">
+                      {new Date(version.createdAt).toLocaleString('pt-PT')} · {version.changedBy || 'Sistema'}
+                    </p>
+                    <p className="mt-1 line-clamp-2 whitespace-pre-line text-[10.5px] text-slate-600 dark:text-slate-300">
+                      {version.content ? version.content.slice(0, 180) : 'Sem texto guardado.'}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => void restoreVersion(version)}
+                  >
+                    <RotateCcw className="mr-1 h-3 w-3" /> Restaurar
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-2 text-[10px] text-slate-500">
+            Restaurar altera apenas o rascunho atual; a versão restaurada entra no histórico e a publicação continua a ser manual.
+          </p>
+        </div>
+      ) : null}
+
       <p className="text-[10px] font-bold text-slate-500">
         {rows.length} registo(s) · os itens ocultos continuam guardados mas não aparecem na página pública.
       </p>

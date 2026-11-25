@@ -25,6 +25,7 @@ import {
   removeStoryFromHighlight,
   replyToStory,
   reportStory,
+  shareStory,
   resolveStoryReport,
   setStoryLike,
   setStoryReaction,
@@ -221,6 +222,10 @@ export function createStoryRouter(dependencies: StoryRouteDependencies): Router 
 
   router.post('/stories/:id/reply', requireSession, handle(async (request, response) => {
     response.json(await replyToStory(await actorFrom(request), text(request.params.id), text(request.body?.text)));
+  }));
+
+  router.post('/stories/:id/share', requireSession, handle(async (request, response) => {
+    response.json(await shareStory(await actorFrom(request), text(request.params.id)));
   }));
 
   router.post('/stories/:id/poll-vote', requireSession, handle(async (request, response) => {

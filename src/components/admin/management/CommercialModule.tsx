@@ -8,6 +8,7 @@ import {
   ReceiptText,
   SlidersHorizontal,
   Ticket,
+  TriangleAlert,
 } from 'lucide-react';
 import { ManagementPage, ModuleNav, type ModuleNavItem } from './ManagementUi';
 import { CommercialLoading, CommercialMessage } from './CommercialShared';
@@ -56,7 +57,10 @@ export const CommercialModule: React.FC<CommercialModuleProps> = ({ onOpenSectio
     { label: 'Assinaturas expiradas', value: String(summary?.expiredSubscriptions ?? '—'), hint: `${summary?.suspendedSubscriptions ?? 0} suspensas`, tone: 'border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)]' },
     { label: 'Planos ativos', value: String(summary?.activePlans ?? '—'), hint: 'Catálogo comercial', tone: 'border-[var(--tone-info-border)] bg-[var(--tone-info-bg)] text-[var(--tone-info-text)]' },
     { label: 'Produtos ativos', value: String(summary?.activeProducts ?? '—'), hint: 'Extras e pacotes', tone: 'border-[var(--tone-info-border)] bg-[var(--tone-info-bg)] text-[var(--tone-info-text)]' },
+    { label: 'A expirar em 30 dias', value: String(summary?.expiringSubscriptions ?? 0), hint: 'Renovações a acompanhar', tone: 'border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)]' },
+    { label: 'Assinaturas em alerta', value: String(summary?.usageAlertSubscriptions ?? 0), hint: 'Uso acima de 90% do limite', tone: 'border-[var(--tone-danger-border)] bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)]' },
   ];
+  const usageAlerts = overview?.usageAlerts || [];
 
   return (
     <ManagementPage
@@ -96,7 +100,7 @@ export const CommercialModule: React.FC<CommercialModuleProps> = ({ onOpenSectio
         <CommercialLoading />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-8">
             {kpis.map((kpi) => (
               <div key={kpi.label} className={`rounded-2xl border p-3.5 shadow-sm ${kpi.tone}`}>
                 <div className="text-[9px] font-black uppercase tracking-[0.15em] opacity-70">{kpi.label}</div>
@@ -105,6 +109,23 @@ export const CommercialModule: React.FC<CommercialModuleProps> = ({ onOpenSectio
               </div>
             ))}
           </div>
+
+          {usageAlerts.length > 0 && (
+            <div className="rounded-2xl border border-[var(--tone-warning-border)] bg-white p-4 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-slate-800"><TriangleAlert className="h-3.5 w-3.5 text-[var(--tone-warning-text)]" /> Alertas de utilização</div>
+                <button type="button" onClick={() => onOpenSection('subscriptions')} className="text-[10px] font-black text-[var(--color-green-800)] underline decoration-dotted">Ver assinaturas</button>
+              </div>
+              <div className="mt-2 divide-y divide-[var(--color-border-subtle)] text-[10.5px]">
+                {usageAlerts.map((alert) => (
+                  <div key={`${alert.subscriptionId}-${alert.code}`} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                    <div className="min-w-0"><strong className="text-slate-900">{alert.companyName}</strong><span className="text-slate-500"> · {alert.code} · {alert.message}</span></div>
+                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-black ${alert.severity === 'critical' ? 'bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)]' : 'bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)]'}`}>{alert.percent}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
     </ManagementPage>

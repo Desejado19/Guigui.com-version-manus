@@ -14,6 +14,9 @@ import {
   X,
   Image as ImageIcon,
   Video,
+  Wallet,
+  Banknote,
+  TrendingUp,
 } from 'lucide-react';
 import { Business, EventItem, Language, PurchaseOrder } from '../../types';
 import { getTranslation } from '../../utils/i18n';
@@ -26,6 +29,38 @@ const readLocalMedia = (file: File): Promise<string> => new Promise((resolve, re
   reader.onerror = () => reject(new Error('Não foi possível ler o ficheiro multimédia.'));
   reader.readAsDataURL(file);
 });
+
+interface BusinessFinanceSnapshot {
+  totals: {
+    grossXOF: number;
+    commissionXOF: number;
+    netXOF: number;
+    paidOutXOF: number;
+    processingXOF: number;
+    pendingPayoutXOF: number;
+    paidOrders: number;
+  };
+  events: Array<{
+    eventId: string;
+    eventTitle: string;
+    grossXOF: number;
+    commissionXOF: number;
+    netXOF: number;
+    paidOutXOF: number;
+    pendingPayoutXOF: number;
+  }>;
+  payouts: Array<{
+    id: string;
+    eventTitle: string | null;
+    amountXOF: number;
+    statusLabel: string;
+    methodLabel: string;
+    reference: string | null;
+    createdAt: string | null;
+  }>;
+}
+
+const formatXof = (value: number) => `${Number(value || 0).toLocaleString('pt-PT')} XOF`;
 
 interface ClientEventsManagementProps {
   business: Business;
@@ -72,6 +107,20 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
   const [isExportingAllBuyers, setIsExportingAllBuyers] = useState(false);
   const [allBuyersNotice, setAllBuyersNotice] = useState<string | null>(null);
+  const [finance, setFinance] = useState<BusinessFinanceSnapshot | null>(null);
+  const [financeError, setFinanceError] = useState('');
+
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch('/api/business/finance', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || 'Não foi possível carregar o financeiro da empresa.');
+        if (!cancelled) { setFinance(payload as BusinessFinanceSnapshot); setFinanceError(''); }
+      })
+      .catch((reason: Error) => { if (!cancelled) setFinanceError(reason.message); });
+    return () => { cancelled = true; };
+  }, [business.id]);
 
   React.useEffect(() => {
     if (showCreateModal) {
@@ -216,6 +265,68 @@ export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
           </div>
         )}
       </div>
+
+      {/* Financeiro da empresa: valores reais dos pedidos pagos, sem acesso aos fundos centralizados. */}
+      {finance ? (
+        <section aria-labelledby="business-finance-title" className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-3.5 shadow-[var(--shadow-xs)] sm:p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h3 id="business-finance-title" className="flex items-center gap-1.5 text-[12px] font-black text-[var(--color-text-strong)]">
+                <Wallet className="h-4 w-4 text-emerald-700" /> Financeiro dos seus eventos
+              </h3>
+              <p className="mt-0.5 text-[10.5px] text-slate-500">
+                Receita, comissão Guigui.com, valores recebidos e pendentes. A empresa consulta; não altera transações, comissões nem repasses.
+              </p>
+            </div>
+            <span className="rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] px-2.5 py-1 text-[9px] font-black text-slate-600">
+              {finance.totals.paidOrders} pedido(s) pago(s)
+            </span>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-6">
+            {[
+              { label: 'Receita bruta', value: finance.totals.grossXOF, icon: TrendingUp },
+              { label: 'Comissão Guigui.com', value: finance.totals.commissionXOF, icon: Wallet },
+              { label: 'Valor líquido', value: finance.totals.netXOF, icon: Banknote },
+              { label: 'Já recebido', value: finance.totals.paidOutXOF, icon: CheckCircle2 },
+              { label: 'Em processamento', value: finance.totals.processingXOF, icon: Clock },
+              { label: 'Pendente de repasse', value: finance.totals.pendingPayoutXOF, icon: AlertCircle },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-2.5">
+                  <div className="flex items-center gap-1 text-[8.5px] font-black uppercase tracking-[0.12em] text-slate-500"><Icon className="h-3 w-3" />{item.label}</div>
+                  <div className="mt-1 text-[13px] font-black tabular-nums text-slate-900">{formatXof(item.value)}</div>
+                </div>
+              );
+            })}
+          </div>
+          {finance.payouts.length > 0 && (
+            <div className="mt-3 overflow-x-auto">
+              <table className="min-w-full text-left text-[10px]" aria-label="Histórico de repasses da empresa">
+                <thead className="text-[8.5px] uppercase text-slate-500">
+                  <tr><th className="py-1 pr-2">Repasse</th><th className="py-1 pr-2">Evento</th><th className="py-1 pr-2">Valor</th><th className="py-1 pr-2">Método</th><th className="py-1 pr-2">Referência</th><th className="py-1 pr-2">Estado</th></tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--color-border-subtle)]">
+                  {finance.payouts.slice(0, 8).map((payout) => (
+                    <tr key={payout.id}>
+                      <td className="py-1.5 pr-2 font-mono text-[9px]">{payout.id}</td>
+                      <td className="py-1.5 pr-2">{payout.eventTitle || '—'}</td>
+                      <td className="py-1.5 pr-2 font-bold">{formatXof(payout.amountXOF)}</td>
+                      <td className="py-1.5 pr-2">{payout.methodLabel}</td>
+                      <td className="py-1.5 pr-2">{payout.reference || '—'}</td>
+                      <td className="py-1.5 pr-2">{payout.statusLabel}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : financeError ? (
+        <p className="rounded-xl border border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] px-3 py-2 text-[10px] font-bold text-[var(--tone-warning-text)]">
+          {financeError}
+        </p>
+      ) : null}
 
       {/* Events List */}
       {myEvents.length === 0 ? (

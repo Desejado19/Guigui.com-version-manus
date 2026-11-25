@@ -29,6 +29,20 @@ interface TransactionDetailResponse {
   actions: Array<{ id: string; action: string; reason: string | null; proof_reference: string | null; actor_name: string | null; created_at: string }>;
   refunds: Array<{ id: string; amount_xof: number; reason: string; status: string; kind: string; provider_reference: string | null; created_at: string }>;
   events: Array<{ id: string; provider: string; event_reference: string; signature_valid: boolean; received_at: string }>;
+  orders: Array<{
+    id: string;
+    status: string;
+    gross_amount_xof: number;
+    fee_amount_xof: number;
+    net_amount_xof: number;
+    event_id: string | null;
+    event_title: string | null;
+    company_id: string | null;
+    company_name: string | null;
+    ticket_count: number;
+    ticket_codes: string | null;
+    ticket_types: string | null;
+  }>;
 }
 
 const SORT_KEYS = new Set(['createdAt', 'amount', 'payer', 'status']);
@@ -303,12 +317,31 @@ export const FinanceTransactionsPage: React.FC<Props> = ({ onBack }) => {
                 ['Confirmada em', formatFinanceDateTime(detail.transaction.confirmedAt)],
                 ['Atualizada em', formatFinanceDateTime(detail.transaction.updatedAt)],
               ].map(([label, value]) => (
-                <div key={String(label)} className="rounded-xl border border-[var(--color-border-subtle)] bg-slate-50/60 p-2.5">
+                <div key={String(label)} className="rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 p-2.5">
                   <div className="text-[8.5px] font-black uppercase tracking-[0.13em] text-slate-400">{label}</div>
                   <div className="mt-0.5 break-words text-[10.5px] font-semibold text-slate-800">{value || '—'}</div>
                 </div>
               ))}
             </div>
+            <section>
+              <h4 className="text-[11px] font-black text-slate-900">Rastreabilidade — pedidos e bilhetes ({detail.orders?.length || 0})</h4>
+              {!detail.orders?.length ? <p className="mt-1 text-[10px] text-slate-500">Sem pedidos ligados. Uma transação histórica sem pedido é apresentada como divergência e não entra nos valores por evento.</p> : (
+                <div className="mt-1.5 space-y-1.5">
+                  {detail.orders.map((order) => (
+                    <div key={order.id} className="rounded-lg border border-[var(--color-border-subtle)] bg-white p-2 text-[10px]">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <strong className="font-mono text-slate-800">{order.id}</strong>
+                        <span className="font-black text-slate-900">{formatXOF(order.gross_amount_xof)}</span>
+                      </div>
+                      <div className="mt-0.5 text-slate-600">{order.company_name || 'Sem empresa'} · {order.event_title || 'Sem evento'} · {order.status}</div>
+                      <div className="mt-0.5 text-[9px] text-slate-500">
+                        Comissão {formatXOF(order.fee_amount_xof)} · líquido empresa {formatXOF(order.net_amount_xof)} · {order.ticket_count} bilhete(s){order.ticket_types ? ` · ${order.ticket_types}` : ''}{order.ticket_codes ? ` · ${order.ticket_codes}` : ''}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
             <section>
               <h4 className="text-[11px] font-black text-slate-900">Ações manuais ({detail.actions.length})</h4>
               {detail.actions.length === 0 ? <p className="mt-1 text-[10px] text-slate-500">Sem ações manuais registadas.</p> : (

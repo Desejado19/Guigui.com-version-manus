@@ -47,6 +47,7 @@ import {
 } from './infrastructure/jsonIdentityRepository';
 import { createMfaRepository } from './infrastructure/mfaRepository';
 import { createPostgresIdentityRepository } from './infrastructure/postgresIdentityRepository';
+import { createPostgresCredentialRepository } from './infrastructure/postgresCredentialRepository';
 import { createSessionRepository, SESSION_COOKIE_NAME } from './infrastructure/sessionRepository';
 import type {
   BusinessInvitationAccess,
@@ -126,11 +127,7 @@ function asPublicIdentity(account: IdentityAccount | null): PublicIdentity | nul
       : Promise.resolve(false);
   };
   const credentials: IdentityCredentialRepository = options.databaseConfigured
-    ? {
-      changeDemoPassword,
-      createPasswordReset: jsonCredentials.createPasswordReset,
-      resetPassword: jsonCredentials.resetPassword,
-    }
+    ? createPostgresCredentialRepository(changeDemoPassword)
     : { ...jsonCredentials, changeDemoPassword };
   const invitations = createJsonTeamInvitationRepository();
   const invitationAccounts: IdentityAccountRepository = jsonAccounts;

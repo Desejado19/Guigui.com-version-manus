@@ -3,13 +3,11 @@ import {
   Building2,
   Calendar,
   CreditCard,
-  Download,
   FileText,
   History,
   KeyRound,
   LayoutDashboard,
   LifeBuoy,
-  Megaphone,
   ShieldCheck,
   Star,
   Ticket,
@@ -46,7 +44,7 @@ export const BUSINESS_MODULE_GROUPS: Array<{ id: string; label: string; moduleId
   {
     id: 'gestao',
     label: 'Gestão da empresa',
-    moduleIds: ['my_business', 'content', 'events', 'reviews', 'marketing'],
+    moduleIds: ['my_business', 'content', 'events', 'reviews'],
   },
   {
     id: 'vendas',
@@ -57,7 +55,7 @@ export const BUSINESS_MODULE_GROUPS: Array<{ id: string; label: string; moduleId
   {
     id: 'assistencia',
     label: 'Assistência e segurança',
-    moduleIds: ['support', 'reports', 'security', 'export', 'settings'],
+    moduleIds: ['support', 'reports', 'security', 'settings'],
   },
 ];
 
@@ -119,21 +117,6 @@ export const BUSINESS_MODULES: BusinessModuleDefinition[] = [
       { id: 'reviews_todas', label: 'Todas' },
       { id: 'reviews_sem_resposta', label: 'Não respondidas' },
       { id: 'reviews_respondidas', label: 'Respondidas' },
-    ],
-  },
-  {
-    id: 'marketing',
-    tab: 'marketing',
-    label: 'Marketing',
-    help: 'Campanhas e promoções',
-    description: 'Campanhas, promoções, público-alvo e calendário de publicação.',
-    icon: Megaphone,
-    group: 'gestao',
-    submodules: [
-      { id: 'campanhas', label: 'Campanhas' },
-      { id: 'promocoes', label: 'Promoções' },
-      { id: 'publico', label: 'Público-alvo' },
-      { id: 'calendario', label: 'Calendário' },
     ],
   },
   {
@@ -270,16 +253,6 @@ export const BUSINESS_MODULES: BusinessModuleDefinition[] = [
     icon: KeyRound,
     group: 'assistencia',
     submodules: [{ id: 'conta', label: 'Conta' }],
-  },
-  {
-    id: 'export',
-    tab: 'export',
-    label: 'Exportação',
-    help: 'Exportar dados',
-    description: 'Exportação de vendas, clientes, bilhetes e relatórios em CSV, Excel e PDF.',
-    icon: Download,
-    group: 'assistencia',
-    submodules: [{ id: 'dados', label: 'Dados' }],
   },
 ];
 

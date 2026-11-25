@@ -50,7 +50,6 @@ export const BUSINESS_ACCESS_MODULES: Array<{ id: string; label: string; actions
   { id: 'content', label: 'Conteúdo', actions: ['view', 'create', 'edit', 'delete', 'publish'] },
   { id: 'events', label: 'Eventos', actions: ['view', 'create', 'edit', 'delete', 'publish'] },
   { id: 'reviews', label: 'Avaliações', actions: ['view', 'edit', 'reject'] },
-  { id: 'marketing', label: 'Marketing', actions: ['view', 'create', 'edit', 'delete', 'publish'] },
   { id: 'tickets', label: 'Bilhetes', actions: ['view', 'create', 'edit', 'delete', 'approve', 'reject'] },
   { id: 'order_history', label: 'Histórico de pedidos', actions: ['view', 'edit', 'export'] },
   { id: 'redemptions', label: 'Levantamentos e entregas', actions: ['view', 'approve', 'reject'] },
@@ -60,7 +59,7 @@ export const BUSINESS_ACCESS_MODULES: Array<{ id: string; label: string; actions
   { id: 'team', label: 'Equipa e permissões', actions: ['view', 'create', 'edit', 'delete', 'manage'] },
   { id: 'security', label: 'Segurança', actions: ['view', 'manage'] },
   { id: 'reports', label: 'Relatórios', actions: ['view', 'export'] },
-  { id: 'export', label: 'Exportação', actions: ['view', 'export'] },
+  { id: 'export', label: 'Exportação de relatórios', actions: ['view', 'export'] },
   { id: 'support', label: 'Suporte', actions: ['view', 'create', 'edit'] },
 ];
 
@@ -81,7 +80,6 @@ export const ADMIN_ACCESS_MODULES: Array<{ id: string; label: string; actions: T
   { id: 'admin_staff', label: 'Equipa', actions: ['view', 'create', 'edit', 'delete', 'manage'] },
   { id: 'categories', label: 'Categorias e Etiquetas', actions: ['view', 'create', 'edit', 'delete'] },
   { id: 'architecture', label: 'Sistema', actions: ['view', 'manage'] },
-  { id: 'capabilities', label: 'Configurações Globais', actions: ['view', 'edit', 'manage'] },
   { id: 'audit_logs', label: 'Auditoria', actions: ['view', 'export'] },
   { id: 'quality_audit', label: 'Auditoria e Qualidade', actions: ['view', 'edit'] },
 ];
@@ -115,7 +113,7 @@ export const BUSINESS_ACCESS_PRESETS: TeamAccessPreset[] = [
     id: 'manager',
     label: 'Gestor',
     description: 'Todos os módulos operacionais, sem gestão de equipa nem exportação financeira.',
-    access: business(['overview', 'my_business', 'stories', 'content', 'events', 'reviews', 'marketing', 'tickets', 'order_history', 'redemptions', 'clients', 'reports', 'support']),
+    access: business(['overview', 'my_business', 'stories', 'content', 'events', 'reviews', 'tickets', 'order_history', 'redemptions', 'clients', 'reports', 'support']),
   },
   {
     id: 'finance',
@@ -125,9 +123,9 @@ export const BUSINESS_ACCESS_PRESETS: TeamAccessPreset[] = [
   },
   {
     id: 'marketing',
-    label: 'Marketing',
-    description: 'Stories, conteúdo, campanhas, avaliações e relatórios de marketing.',
-    access: business(['overview', 'stories', 'content', 'marketing', 'reviews', 'reports']),
+    label: 'Conteúdos e comunicação',
+    description: 'Stories, conteúdo, avaliações e relatórios de desempenho.',
+    access: business(['overview', 'stories', 'content', 'reviews', 'reports']),
   },
   {
     id: 'events',

@@ -148,6 +148,25 @@ describe('email delivery adapter', () => {
     expect(rejectedDelivery).toMatchObject({ mode: 'development', state: 'rejected' });
   });
 
+  it('sends the password reset code without putting the token in the dedupe key', async () => {
+    const { dispatched, composition } = fakeDispatcher();
+    const adapter = createEmailDeliveryAdapter({ compose: () => composition });
+    const token = 'a'.repeat(64);
+
+    const delivery = await adapter.sendPasswordReset({
+      recipientEmail: 'owner@example.com',
+      recipientName: 'Owner',
+      token,
+      expiresInMinutes: 15,
+    });
+
+    expect(delivery).toEqual({ mode: 'development', state: 'accepted', reference: 'email-1' });
+    expect(dispatched[0]).toMatchObject({ kind: 'password_reset', to: { email: 'owner@example.com' } });
+    expect(dispatched[0].html).toContain(token);
+    expect(dispatched[0].dedupeKey).toMatch(/^password-reset:[0-9a-f]{24}$/);
+    expect(dispatched[0].dedupeKey).not.toContain(token);
+  });
+
   it('maps an already delivered outcome to accepted (the port never claims delivery)', async () => {
     const delivered = fakeDispatcher({ state: 'delivered' });
     const adapter = createEmailDeliveryAdapter({ compose: () => delivered.composition });

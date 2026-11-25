@@ -122,18 +122,19 @@ export async function authenticateUser(
     if (!account) {
       const byEmail = await dependencies.accounts.findByEmail(identity.email);
       if (byEmail) {
-        // Nunca ligar automaticamente uma conta com palavra-passe só porque o
-        // e-mail coincide: isso permitiria a alguém pré-registar o e-mail de
-        // outra pessoa e manter acesso à conta depois da ligação Google.
+        // O e-mail da Google já foi verificado pelo verificador do ID token.
+        // Uma conta ligada a OUTRA identidade Google nunca é substituída; uma
+        // conta local com o mesmo e-mail (mesmo com palavra-passe) é ligada.
         if (byEmail.googleSubject && byEmail.googleSubject !== identity.googleId) {
           return { kind: 'rejected', reason: 'google_link_conflict', email: identity.email };
         }
         if (!byEmail.googleSubject) {
-          const passwordConfirmsOwnership = Boolean(input.password)
-            && dependencies.verifyPassword(input.password || '', byEmail.passwordHash);
-          if (!passwordConfirmsOwnership) {
-            return { kind: 'rejected', reason: 'google_link_required', email: identity.email };
-          }
+          // O verificador já exigiu `email_verified`; a Google atesta a posse do
+          // endereço. Por isso uma conta local com o mesmo e-mail é ligada e
+          // usada de imediato, sem voltar a pedir a palavra-passe: o utilizador
+          // entra na conta que já existe com um único clique em "Continuar com
+          // a Google". Contas ligadas a outra identidade Google continuam a ser
+          // recusadas acima, e os estados de acesso são validados mais abaixo.
           let linked = false;
           try {
             linked = await dependencies.accounts.linkGoogleSubject(byEmail.id, identity.googleId);

@@ -11,7 +11,6 @@ import {
   Server,
   ShieldAlert,
   ShieldCheck,
-  SlidersHorizontal,
   Tag,
   Ticket,
   UserCheck,
@@ -50,7 +49,6 @@ export type AdminModuleId =
   | 'admin_staff'
   | 'categories'
   | 'architecture'
-  | 'capabilities'
   | 'audit_logs'
   | 'quality_audit';
 
@@ -227,17 +225,18 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
       'Estado dos serviços, base de dados, filas, integrações e incidentes registados.',
     icon: Server,
     group: 'Administração',
-    submodules: [],
-  },
-  {
-    id: 'capabilities',
-    label: 'Configurações Globais',
-    help: 'Regras da plataforma',
-    description:
-      'Identidade da plataforma, regras de negócio, pagamentos, comissões e políticas.',
-    icon: SlidersHorizontal,
-    group: 'Administração',
-    submodules: [],
+    submodules: [
+      { id: 'overview', label: 'Visão Geral', description: 'Saúde global da plataforma.' },
+      { id: 'infrastructure', label: 'Infraestrutura', description: 'Componentes e serviços reais.' },
+      { id: 'resources', label: 'Recursos & Capacidade', description: 'CPU, memória, disco e armazenamento.' },
+      { id: 'database', label: 'Base de Dados', description: 'PostgreSQL, tabelas, locks e backups.' },
+      { id: 'apis', label: 'APIs & Integrações', description: 'Rotas e integrações externas.' },
+      { id: 'incidents', label: 'Incidentes & Alertas', description: 'Deteção, gestão e resolução.' },
+      { id: 'logs', label: 'Logs & Diagnóstico', description: 'Pesquisa e correlação técnica.' },
+      { id: 'availability', label: 'Disponibilidade', description: 'Uptime, incidentes e SLO.' },
+      { id: 'security', label: 'Segurança & Auditoria', description: 'Eventos de autenticação e autorização.' },
+      { id: 'settings', label: 'Configurações', description: 'Intervalos, limites, retenção e SLO.' },
+    ],
   },
   {
     id: 'audit_logs',

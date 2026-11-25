@@ -8,11 +8,13 @@ import {
   type EmailDispatcher,
   type EmailProviderMode,
 } from '../email';
+import { renderPasswordResetEmail } from '../email/templates/passwordReset';
 import { renderTeamInvitationEmail } from '../email/templates/teamInvitation';
 import { renderTicketPurchaseEmail } from '../email/templates/ticketPurchase';
 import type {
   EmailDeliveryPort,
   IntegrationDeliveryResult,
+  PasswordResetEmailInput,
   TeamInvitationEmailInput,
   TicketPurchaseEmailInput,
 } from './ports';
@@ -113,6 +115,31 @@ export function createEmailDeliveryAdapter(
         text: rendered.text,
         attachments: rendered.attachments,
         dedupeKey: `ticket-purchase:${input.transactionId}`,
+      });
+      return receipt(outcome, active.config.mode);
+    },
+
+    async sendPasswordReset(input: PasswordResetEmailInput) {
+      const active = resolveComposition();
+      if (!active) return simulated.sendPasswordReset(input);
+
+      const rendered = renderPasswordResetEmail({
+        recipientName: input.recipientName,
+        token: input.token,
+        expiresInMinutes: input.expiresInMinutes,
+        appUrl: active.config.appUrl,
+      });
+      // O token em claro não entra na chave de deduplicação nem no histórico.
+      const tokenFingerprint = createHash('sha256').update(input.token).digest('hex').slice(0, 24);
+      const outcome = await active.dispatcher.dispatch({
+        to: { email: input.recipientEmail, name: input.recipientName },
+        kind: 'password_reset',
+        locale: 'pt',
+        subject: rendered.subject,
+        html: rendered.html,
+        text: rendered.text,
+        attachments: rendered.attachments,
+        dedupeKey: `password-reset:${tokenFingerprint}`,
       });
       return receipt(outcome, active.config.mode);
     },

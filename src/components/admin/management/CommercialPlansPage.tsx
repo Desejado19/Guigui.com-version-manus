@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { foldForSearch, matchesSearch } from '../../../../shared/textNormalization';
-import { Copy, Edit2, History, Layers3, Plus, Power, Users } from 'lucide-react';
+import { Copy, Edit2, GitCompareArrows, History, Layers3, Plus, Power, Users } from 'lucide-react';
 import {
   ManagementActionButton,
   ManagementFilter,
@@ -88,6 +88,8 @@ export const CommercialPlansPage: React.FC<{ onBack: () => void }> = ({ onBack }
   const [history, setHistory] = useState<Array<{ id: string; version: number; changedBy: string; reason: string; catalogVersion: number; createdAt: string | null }>>([]);
   const [subscribersPlan, setSubscribersPlan] = useState<CommercialPlanWithConfig | null>(null);
   const [subscribers, setSubscribers] = useState<CommercialSubscription[]>([]);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [onlyDifferences, setOnlyDifferences] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -244,6 +246,25 @@ export const CommercialPlansPage: React.FC<{ onBack: () => void }> = ({ onBack }
     }
   };
 
+  const comparisonPlans = useMemo(() => plans.filter((plan) => plan.isActive), [plans]);
+  const comparisonRows = useMemo(() => {
+    const label = (featureId: string, plan: CommercialPlanWithConfig) => {
+      const config = plan.configs.find((item) => item.featureId === featureId);
+      if (!config || !config.enabled) return '—';
+      if (config.limitKind === 'unlimited') return 'Ilimitado';
+      if (config.limitKind === 'negotiated') return 'Negociado';
+      if (config.limitKind === 'number') return String(config.numericValue ?? 0);
+      if (config.limitKind === 'text') return config.textValue || 'Incluído';
+      return 'Incluído';
+    };
+    const rows = features.filter((feature) => feature.isActive).map((feature) => ({
+      feature,
+      cells: comparisonPlans.map((plan) => ({ planId: plan.id, value: label(feature.id, plan) })),
+    }));
+    if (!onlyDifferences) return rows;
+    return rows.filter((row) => new Set(row.cells.map((cell) => cell.value)).size > 1);
+  }, [features, comparisonPlans, onlyDifferences]);
+
   const updateConfig = (featureId: string, patch: Partial<PlanFeatureConfig>) => {
     setConfigs((current) => ({
       ...current,
@@ -279,7 +300,7 @@ export const CommercialPlansPage: React.FC<{ onBack: () => void }> = ({ onBack }
       onBack={onBack}
       breadcrumb="Planos"
       kpis={kpis}
-      actions={<ManagementActionButton tone="primary" onClick={() => { setDraft(emptyDraft()); setReason(''); }}><Plus className="h-3.5 w-3.5" /> Novo plano</ManagementActionButton>}
+      actions={<><ManagementActionButton onClick={() => setCompareOpen(true)}><GitCompareArrows className="h-3.5 w-3.5" /> Comparar planos</ManagementActionButton><ManagementActionButton tone="primary" onClick={() => { setDraft(emptyDraft()); setReason(''); }}><Plus className="h-3.5 w-3.5" /> Novo plano</ManagementActionButton></>}
     >
       {error && <CommercialMessage tone="error">{error}</CommercialMessage>}
       {notice && <CommercialMessage tone="success">{notice}</CommercialMessage>}
@@ -382,6 +403,32 @@ export const CommercialPlansPage: React.FC<{ onBack: () => void }> = ({ onBack }
           {history.map((version) => <div key={version.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-[10.5px]"><div><strong>v{version.version}</strong> · {version.reason || 'Alteração do plano'}<div className="text-[9px] text-slate-500">{version.changedBy} · {formatCommercialDate(version.createdAt, true)}</div></div><span className="rounded-full bg-slate-100 px-2 py-0.5 font-black text-slate-600">catálogo v{version.catalogVersion}</span></div>)}
           {history.length === 0 && <p className="py-6 text-center text-[10.5px] text-slate-500">Sem versões registadas.</p>}
         </div>
+      </CommercialModal>
+
+      <CommercialModal open={compareOpen} title="Comparação dinâmica de planos" description="Valores lidos do catálogo atual: funcionalidades, limites e preço de referência por plano ativo. Inclui planos personalizados." onClose={() => setCompareOpen(false)} wide
+        footer={<><label className="mr-auto flex items-center gap-2 text-[10px] font-bold text-slate-700"><input type="checkbox" checked={onlyDifferences} onChange={(event) => setOnlyDifferences(event.target.checked)} className="h-3.5 w-3.5 accent-[#123e3b]" /> Mostrar apenas diferenças</label><ManagementActionButton onClick={() => setCompareOpen(false)}>Fechar</ManagementActionButton></>}
+      >
+        {comparisonPlans.length === 0 ? (
+          <p className="py-6 text-center text-[10.5px] text-slate-500">Não existem planos ativos para comparar.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-[var(--color-border-default)]">
+            <table className="w-full min-w-[640px] text-left text-[10.5px]">
+              <thead className="bg-slate-50 text-[9px] uppercase tracking-wide text-slate-500">
+                <tr><th className="p-2.5">Funcionalidade / limite</th>{comparisonPlans.map((plan) => <th key={plan.id} className="p-2.5">{plan.name}<div className="text-[8.5px] font-medium normal-case text-slate-500">v{plan.version} · {plan.subscribers} assinante(s)</div></th>)}</tr>
+              </thead>
+              <tbody>
+                <tr className="border-t border-[var(--color-border-subtle)] bg-[var(--tone-info-bg)]/40"><td className="p-2.5 font-black text-slate-900">Preço de referência</td>{comparisonPlans.map((plan) => <td key={plan.id} className="p-2.5 font-mono font-black text-[var(--color-green-800)]">{plan.priceXOF > 0 ? formatCommercialXOF(plan.priceXOF) : 'Negociado'}</td>)}</tr>
+                {comparisonRows.map((row) => (
+                  <tr key={row.feature.id} className="border-t border-[var(--color-border-subtle)]">
+                    <td className="p-2.5"><div className="font-bold text-slate-900">{row.feature.name}</div><div className="text-[9px] text-slate-500">{row.feature.category}{row.feature.unit ? ` · ${row.feature.unit}` : ''}</div></td>
+                    {row.cells.map((cell) => <td key={cell.planId} className={`p-2.5 font-mono font-bold ${cell.value === '—' ? 'text-slate-400' : 'text-slate-800'}`}>{cell.value}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="mt-2 text-[9.5px] text-slate-500">O preço efetivo por categoria continua a vir da matriz de preços; a comparação usa o valor de referência do plano como fallback.</p>
       </CommercialModal>
 
       <CommercialModal open={Boolean(subscribersPlan)} title={`Assinantes — ${subscribersPlan?.name || ''}`} onClose={() => setSubscribersPlan(null)} wide>

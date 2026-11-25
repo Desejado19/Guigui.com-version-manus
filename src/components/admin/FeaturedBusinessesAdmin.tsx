@@ -112,7 +112,7 @@ export const FeaturedBusinessesAdmin: React.FC<FeaturedBusinessesAdminProps> = (
       <div>
         <h5 className="mb-2 text-xs font-bold text-slate-700">Ordem publicada</h5>
         {orderedBusinesses.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-white/70 p-3 text-xs text-slate-500">Ainda não há empresas selecionadas.</p>
+          <p className="rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-white p-3 text-xs text-slate-500">Ainda não há empresas selecionadas.</p>
         ) : (
           <ol aria-label="Ordem das empresas em destaque" className="space-y-2">
             {orderedBusinesses.map((business, index) => (

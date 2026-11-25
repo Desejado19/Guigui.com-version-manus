@@ -53,6 +53,11 @@ describe('simulated communication adapters', () => {
       roleLabel: 'Editor',
       invitationUrl: 'https://example.test/invite/secret-token',
     });
+    const passwordReset = await email.sendPasswordReset({
+      recipientEmail: 'owner@example.com',
+      recipientName: 'Owner Name',
+      token: 'b'.repeat(64),
+    });
     const smsDelivery = await sms.send({
       to: '+245955000001',
       text: 'Ticket GUI-42 PIN 1234',
@@ -68,6 +73,11 @@ describe('simulated communication adapters', () => {
       mode: 'simulated',
       state: 'simulated',
       reference: 'SIM-EMAIL-INVITATION-invite-42',
+    });
+    expect(passwordReset).toMatchObject({
+      mode: 'simulated',
+      state: 'simulated',
+      reference: expect.stringMatching(/^SIM-EMAIL-PASSWORD-RESET-[0-9a-f]{24}$/),
     });
     expect(smsDelivery).toEqual({
       mode: 'simulated',

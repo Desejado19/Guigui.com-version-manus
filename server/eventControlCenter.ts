@@ -91,12 +91,41 @@ export interface EventControlCenter {
   buyers: EventBuyerRow[];
   validations: Array<{ id: string; result: string; reason: string; ticketCode: string; operator: string; createdAt: string | null }>;
   refunds: Array<{ id: string; ticketCode: string; amountXOF: number; status: string; reason: string; createdAt: string | null; processedAt: string | null }>;
+  payouts: Array<{
+    id: string;
+    amountXOF: number;
+    method: string;
+    methodLabel: string;
+    reference: string | null;
+    proofReference: string | null;
+    status: string;
+    statusLabel: string;
+    notes: string | null;
+    createdByName: string | null;
+    confirmedAt: string | null;
+    createdAt: string | null;
+  }>;
+  transactions: Array<{
+    id: string;
+    provider: string;
+    providerReference: string | null;
+    status: string;
+    amountXOF: number;
+    payerName: string;
+    buyerUserId: string | null;
+    createdAt: string | null;
+    confirmedAt: string | null;
+    ticketCodes: string[];
+  }>;
   history: Array<{ action: string; result: string; resourceId: string; reason: string; actor: string; createdAt: string | null }>;
   finance: {
     grossXOF: number;
     commissionXOF: number;
     commissionRate: number;
     companyShareXOF: number;
+    paidOutXOF: number;
+    processingPayoutXOF: number;
+    pendingPayoutXOF: number;
     pendingXOF: number;
     refundedXOF: number;
     paidOrders: number;
@@ -155,8 +184,23 @@ export async function loadEventControlCenter(
   }
   if (!access.found) return null;
 
-  const [eventResult, typeResult, ticketResult, orderResult, paymentResult, validationResult, refundResult, historyResult] =
-    await Promise.all([
+  const [
+    eventResult,
+    typeResult,
+    ticketResult,
+    buyerResult,
+    orderResult,
+    paymentResult,
+    validationResult,
+    refundResult,
+    refundSummaryResult,
+    historyResult,
+    indicatorResult,
+    salesByDayResult,
+    salesByTypeResult,
+    payoutResult,
+    transactionResult,
+  ] = await Promise.all([
       pool.query(
         `SELECT e.id, e.company_id, e.title, e.status, e.starts_at, e.ends_at, e.data, e.created_at, e.updated_at,
                 c.name AS company_name
@@ -192,6 +236,43 @@ export async function loadEventControlCenter(
           LIMIT $2`,
         [eventId, ticketLimit + 1],
       ),
+      // Totais por comprador sobre o evento completo: não usam a lista
+      // detalhada limitada a TICKET_LIMIT.
+      pool.query(
+        `WITH per_type AS (
+           SELECT o.id AS order_id, o.status AS order_status,
+                  COALESCE(tt.name, 'Entrada Geral') AS type_name,
+                  MAX(COALESCE(NULLIF(t.buyer_name, ''), NULLIF(t.holder_name, ''))) AS buyer_name,
+                  MAX(COALESCE(NULLIF(t.buyer_phone, ''), NULLIF(t.holder_phone, ''))) AS buyer_phone,
+                  COUNT(*)::int AS type_count,
+                  COUNT(*) FILTER (WHERE t.status = 'used')::int AS used_count,
+                  COALESCE(SUM(CASE WHEN t.status IN ('valid','used') THEN COALESCE(tt.price_xof, 0) ELSE 0 END), 0)::bigint AS type_revenue,
+                  MIN(t.created_at) AS purchased_at
+             FROM tickets t
+             JOIN orders o ON o.id = t.order_id
+             LEFT JOIN ticket_types tt ON tt.id = t.ticket_type_id
+            WHERE t.event_id = $1
+            GROUP BY o.id, o.status, COALESCE(tt.name, 'Entrada Geral')
+         ),
+         statuses AS (
+           SELECT order_id, string_agg(DISTINCT status, '/' ORDER BY status) AS ticket_status
+             FROM tickets WHERE event_id = $1 GROUP BY order_id
+         )
+         SELECT p.order_id, p.order_status,
+                COALESCE(MAX(p.buyer_name), 'Comprador não identificado') AS name,
+                COALESCE(MAX(p.buyer_phone), '') AS phone,
+                SUM(p.type_count)::int AS quantity,
+                string_agg(p.type_name || ' x' || p.type_count, ' + ' ORDER BY p.type_name) AS ticket_types,
+                SUM(p.type_revenue)::bigint AS total_xof,
+                MAX(s.ticket_status) AS ticket_status,
+                SUM(p.used_count)::int AS validated_count,
+                MIN(p.purchased_at) AS purchased_at
+           FROM per_type p
+           LEFT JOIN statuses s ON s.order_id = p.order_id
+          GROUP BY p.order_id, p.order_status
+          ORDER BY MIN(p.purchased_at) DESC`,
+        [eventId],
+      ),
       pool.query(
         `SELECT status, COUNT(*)::int AS orders, COALESCE(SUM(gross_amount_xof),0)::bigint AS gross,
                 COALESCE(SUM(fee_amount_xof),0)::bigint AS fee, COALESCE(SUM(net_amount_xof),0)::bigint AS net
@@ -226,6 +307,13 @@ export async function loadEventControlCenter(
         [eventId],
       ),
       pool.query(
+        `SELECT COALESCE(SUM(r.amount_xof) FILTER (WHERE r.status = 'requested'), 0)::bigint AS requested
+           FROM ticket_refunds r
+           JOIN tickets t ON t.id = r.ticket_id
+          WHERE t.event_id = $1`,
+        [eventId],
+      ),
+      pool.query(
         `SELECT a.action, a.result, COALESCE(a.resource_id,'') AS resource_id, COALESCE(a.reason,'') AS reason,
                 a.created_at, COALESCE(u.email, '') AS actor
            FROM audit_logs a
@@ -233,6 +321,59 @@ export async function loadEventControlCenter(
           WHERE a.resource = 'event' AND a.resource_id = $1
           ORDER BY a.created_at DESC
           LIMIT 100`,
+        [eventId],
+      ),
+      // Totais do evento completo: não dependem da lista detalhada limitada.
+      pool.query(
+        `SELECT t.status, COUNT(*)::int AS tickets
+           FROM tickets t
+          WHERE t.event_id = $1
+          GROUP BY t.status`,
+        [eventId],
+      ),
+      pool.query(
+        `SELECT to_char(date_trunc('day', t.created_at), 'YYYY-MM-DD') AS day,
+                COUNT(*)::int AS tickets,
+                COALESCE(SUM(COALESCE(tt.price_xof, 0)), 0)::bigint AS revenue
+           FROM tickets t
+           LEFT JOIN ticket_types tt ON tt.id = t.ticket_type_id
+          WHERE t.event_id = $1 AND t.status IN ('valid', 'used')
+          GROUP BY 1
+          ORDER BY 1 ASC`,
+        [eventId],
+      ),
+      pool.query(
+        `SELECT COALESCE(tt.name, 'Entrada Geral') AS name,
+                COUNT(*)::int AS tickets,
+                COALESCE(SUM(COALESCE(tt.price_xof, 0)), 0)::bigint AS revenue
+           FROM tickets t
+           LEFT JOIN ticket_types tt ON tt.id = t.ticket_type_id
+          WHERE t.event_id = $1 AND t.status IN ('valid', 'used')
+          GROUP BY COALESCE(tt.name, 'Entrada Geral')
+          ORDER BY COUNT(*) DESC, name ASC`,
+        [eventId],
+      ),
+      pool.query(
+        `SELECT p.id, p.amount_xof, p.method, p.reference, p.proof_reference, p.status, p.notes,
+                p.confirmed_at, p.created_at, u.name AS created_by_name
+           FROM event_payouts p
+           LEFT JOIN users u ON u.id = p.created_by
+          WHERE p.event_id = $1
+          ORDER BY p.created_at DESC
+          LIMIT 200`,
+        [eventId],
+      ),
+      pool.query(
+        `SELECT t.id, t.provider, t.provider_reference, t.status, t.gross_amount_xof,
+                t.payer_name, t.buyer_user_id, t.created_at, t.confirmed_at,
+                COALESCE(array_agg(DISTINCT tk.ticket_code) FILTER (WHERE tk.ticket_code IS NOT NULL), '{}') AS ticket_codes
+           FROM payment_transactions t
+           LEFT JOIN payment_transaction_orders pto ON pto.transaction_id = t.id
+           LEFT JOIN tickets tk ON tk.order_id = pto.order_id
+          WHERE t.event_id = $1 OR pto.order_id IN (SELECT id FROM orders WHERE event_id = $1)
+          GROUP BY t.id
+          ORDER BY t.created_at DESC
+          LIMIT 500`,
         [eventId],
       ),
     ]);
@@ -272,44 +413,20 @@ export async function loadEventControlCenter(
     refundStatus: row.refund_status === null || row.refund_status === undefined ? null : str(row.refund_status),
   }));
 
-  // Compradores: uma linha por pedido, com os bilhetes que lhe pertencem.
-  const buyersByOrder = new Map<string, EventBuyerRow & { types: Map<string, number> }>();
-  for (const ticket of tickets) {
-    const key = ticket.orderId || ticket.id;
-    const current = buyersByOrder.get(key) ?? {
-      orderId: ticket.orderId,
-      name: ticket.buyerName || ticket.holderName || 'Comprador não identificado',
-      phone: ticket.buyerPhone || ticket.holderPhone || '',
-      quantity: 0,
-      ticketTypes: '',
-      totalXOF: 0,
-      orderStatus: ticket.orderStatus,
-      ticketStatus: '',
-      validatedCount: 0,
-      purchasedAt: ticket.purchasedAt,
-      types: new Map<string, number>(),
-    };
-    current.quantity += 1;
-    if (ticket.status === 'valid' || ticket.status === 'used') current.totalXOF += ticket.priceXOF;
-    if (ticket.status === 'used') current.validatedCount += 1;
-    current.types.set(ticket.ticketTypeName, (current.types.get(ticket.ticketTypeName) ?? 0) + 1);
-    buyersByOrder.set(key, current);
-  }
-  const buyers: EventBuyerRow[] = Array.from(buyersByOrder.values()).map((buyer) => {
-    const statuses = new Set(tickets.filter((ticket) => ticket.orderId === buyer.orderId).map((ticket) => ticket.status));
-    return {
-      orderId: buyer.orderId,
-      name: buyer.name,
-      phone: buyer.phone,
-      quantity: buyer.quantity,
-      ticketTypes: Array.from(buyer.types.entries()).map(([type, count]) => `${type} x${count}`).join(' + '),
-      totalXOF: buyer.totalXOF,
-      orderStatus: buyer.orderStatus,
-      ticketStatus: Array.from(statuses).join('/'),
-      validatedCount: buyer.validatedCount,
-      purchasedAt: buyer.purchasedAt,
-    };
-  });
+  // Compradores: uma linha por pedido, com os totais agregados em SQL sobre
+  // todo o evento (a lista `tickets` pode estar truncada).
+  const buyers: EventBuyerRow[] = buyerResult.rows.map((row) => ({
+    orderId: str(row.order_id),
+    name: str(row.name) || 'Comprador não identificado',
+    phone: str(row.phone),
+    quantity: num(row.quantity),
+    ticketTypes: str(row.ticket_types),
+    totalXOF: num(row.total_xof),
+    orderStatus: str(row.order_status),
+    ticketStatus: str(row.ticket_status),
+    validatedCount: num(row.validated_count),
+    purchasedAt: iso(row.purchased_at),
+  }));
 
   const orderTotals = orderResult.rows.reduce<{
     grossXOF: number;
@@ -353,6 +470,27 @@ export async function loadEventControlCenter(
     },
   );
 
+  const payouts = payoutResult.rows.map((row) => ({
+    id: str(row.id),
+    amountXOF: num(row.amount_xof),
+    method: str(row.method),
+    methodLabel:
+      ({ manual_transfer: 'Transferência manual', orange_money: 'Orange Money', telecel: 'Telecel', bank_transfer: 'Transferência bancária' } as Record<string, string>)[str(row.method)]
+      || str(row.method),
+    reference: row.reference === null || row.reference === undefined ? null : str(row.reference),
+    proofReference: row.proof_reference === null || row.proof_reference === undefined ? null : str(row.proof_reference),
+    status: str(row.status),
+    statusLabel:
+      ({ pending: 'Pendente', processing: 'Em processamento', confirmed: 'Confirmado', failed: 'Falhado', cancelled: 'Cancelado' } as Record<string, string>)[str(row.status)]
+      || str(row.status),
+    notes: row.notes === null || row.notes === undefined ? null : str(row.notes),
+    createdByName: row.created_by_name === null || row.created_by_name === undefined ? null : str(row.created_by_name),
+    confirmedAt: iso(row.confirmed_at),
+    createdAt: iso(row.created_at),
+  }));
+  const paidOutXOF = payouts.filter((payout) => payout.status === 'confirmed').reduce((sum, payout) => sum + payout.amountXOF, 0);
+  const processingPayoutXOF = payouts.filter((payout) => payout.status === 'processing').reduce((sum, payout) => sum + payout.amountXOF, 0);
+
   const refunds = refundResult.rows.map((row) => ({
     id: str(row.id),
     ticketCode: str(row.ticket_code),
@@ -365,11 +503,12 @@ export async function loadEventControlCenter(
 
   const finance: EventControlCenter['finance'] = {
     ...orderTotals,
+    paidOutXOF,
+    processingPayoutXOF,
+    pendingPayoutXOF: Math.max(0, orderTotals.companyShareXOF - paidOutXOF - processingPayoutXOF),
     commissionRate: orderTotals.grossXOF > 0 ? Number(((orderTotals.commissionXOF / orderTotals.grossXOF) * 100).toFixed(2)) : 0,
     confirmedPayments: num(paymentResult.rows[0]?.paid),
-    refundsRequestedXOF: refunds
-      .filter((refund) => refund.status === 'requested')
-      .reduce((sum, refund) => sum + refund.amountXOF, 0),
+    refundsRequestedXOF: num(refundSummaryResult.rows[0]?.requested),
     state:
       orderTotals.grossXOF === 0 && orderTotals.pendingXOF === 0
         ? 'no_sales'
@@ -380,32 +519,29 @@ export async function loadEventControlCenter(
             : 'confirmed',
   };
 
-  const used = tickets.filter((ticket) => ticket.status === 'used').length;
-  const unused = tickets.filter((ticket) => ticket.status === 'valid').length;
-  const cancelled = tickets.filter((ticket) => ticket.status === 'cancelled').length;
+  // Indicadores e séries vêm de agregações SQL sobre o evento completo. A lista
+  // detalhada (`tickets`) pode estar limitada a 2.000 linhas e nunca é usada
+  // para calcular totais.
+  const countsByStatus = new Map<string, number>(
+    indicatorResult.rows.map((row) => [str(row.status), num(row.tickets)]),
+  );
+  const used = countsByStatus.get('used') ?? 0;
+  const unused = countsByStatus.get('valid') ?? 0;
+  const cancelled = countsByStatus.get('cancelled') ?? 0;
   const sold = used + unused;
   const capacity = ticketTypes.reduce((sum, type) => sum + type.quantity, 0);
-  const revenueXOF = tickets
-    .filter((ticket) => ticket.status === 'valid' || ticket.status === 'used')
-    .reduce((sum, ticket) => sum + ticket.priceXOF, 0);
+  const revenueXOF = salesByTypeResult.rows.reduce((sum, row) => sum + num(row.revenue), 0);
 
-  // Série diária e por tipo, calculada a partir dos bilhetes pagos.
-  const dayMap = new Map<string, { tickets: number; revenueXOF: number }>();
-  const typeMap = new Map<string, { tickets: number; revenueXOF: number }>();
-  for (const ticket of tickets) {
-    if (ticket.status !== 'valid' && ticket.status !== 'used') continue;
-    const day = ticket.purchasedAt ? ticket.purchasedAt.slice(0, 10) : '';
-    if (day) {
-      const current = dayMap.get(day) ?? { tickets: 0, revenueXOF: 0 };
-      current.tickets += 1;
-      current.revenueXOF += ticket.priceXOF;
-      dayMap.set(day, current);
-    }
-    const type = typeMap.get(ticket.ticketTypeName) ?? { tickets: 0, revenueXOF: 0 };
-    type.tickets += 1;
-    type.revenueXOF += ticket.priceXOF;
-    typeMap.set(ticket.ticketTypeName, type);
-  }
+  const salesByDay = salesByDayResult.rows.map((row) => ({
+    day: str(row.day),
+    tickets: num(row.tickets),
+    revenueXOF: num(row.revenue),
+  }));
+  const salesByType = salesByTypeResult.rows.map((row) => ({
+    name: str(row.name),
+    tickets: num(row.tickets),
+    revenueXOF: num(row.revenue),
+  }));
 
   const validations = validationResult.rows.map((row) => ({
     id: str(row.id),
@@ -441,6 +577,19 @@ export async function loadEventControlCenter(
     buyers,
     validations,
     refunds,
+    payouts,
+    transactions: transactionResult.rows.map((row) => ({
+      id: str(row.id),
+      provider: str(row.provider),
+      providerReference: row.provider_reference === null || row.provider_reference === undefined ? null : str(row.provider_reference),
+      status: str(row.status),
+      amountXOF: num(row.gross_amount_xof),
+      payerName: str(row.payer_name),
+      buyerUserId: row.buyer_user_id === null || row.buyer_user_id === undefined ? null : str(row.buyer_user_id),
+      createdAt: iso(row.created_at),
+      confirmedAt: iso(row.confirmed_at),
+      ticketCodes: Array.isArray(row.ticket_codes) ? (row.ticket_codes as unknown[]).map(str) : [],
+    })),
     history: historyResult.rows.map((row) => ({
       action: str(row.action),
       result: str(row.result),
@@ -460,10 +609,8 @@ export async function loadEventControlCenter(
       revenueXOF,
       checkInsRate: sold > 0 ? Number(((used / sold) * 100).toFixed(1)) : 0,
     },
-    salesByDay: Array.from(dayMap.entries())
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([day, value]) => ({ day, ...value })),
-    salesByType: Array.from(typeMap.entries()).map(([name, value]) => ({ name, ...value })),
+    salesByDay,
+    salesByType,
     recentPurchases: tickets.slice(0, 10).map((ticket) => ({
       ticketCode: ticket.ticketCode,
       buyer: ticket.buyerName || ticket.holderName || '—',
@@ -498,6 +645,7 @@ export const EXPORT_SECTIONS = [
   'commissions',
   'validations',
   'refunds',
+  'payouts',
   'history',
 ] as const;
 
@@ -513,6 +661,7 @@ export const EXPORT_SECTION_LABELS: Record<ExportSection, string> = {
   commissions: 'Comissões',
   validations: 'Validações',
   refunds: 'Reembolsos',
+  payouts: 'Repasses',
   history: 'Histórico',
 };
 
@@ -532,13 +681,18 @@ const summaryRows = (data: EventControlCenter): Array<[string, string]> => [
   ['Receita bruta', money(data.finance.grossXOF)],
   ['Comissão Guigui.com', money(data.finance.commissionXOF)],
   ['Valor da empresa', money(data.finance.companyShareXOF)],
+  ['Já repassado à empresa', money(data.finance.paidOutXOF)],
+  ['Repasses em processamento', money(data.finance.processingPayoutXOF)],
+  ['Pendente de repasse', money(data.finance.pendingPayoutXOF)],
   ['Pendente', money(data.finance.pendingXOF)],
   ['Reembolsado', money(data.finance.refundedXOF)],
   ['Estado financeiro', data.finance.state],
 ];
 
 export interface EventExportFilter {
-  query?: string;
+  ticketQuery?: string;
+  buyerQuery?: string;
+  validationQuery?: string;
   ticketStatus?: string;
   orderStatus?: string;
   validationResult?: string;
@@ -553,7 +707,9 @@ const matchesQuery = (query: string, values: Array<string | number | null | unde
  * apenas as listas (bilhetes, compradores, validações) são filtradas.
  */
 export function filterEventData(data: EventControlCenter, filter: EventExportFilter): EventControlCenter {
-  const query = (filter.query ?? '').trim().toLowerCase();
+  const ticketQuery = (filter.ticketQuery ?? '').trim().toLowerCase();
+  const buyerQuery = (filter.buyerQuery ?? '').trim().toLowerCase();
+  const validationQuery = (filter.validationQuery ?? '').trim().toLowerCase();
   const ticketStatus = filter.ticketStatus && filter.ticketStatus !== 'all' ? filter.ticketStatus : '';
   const orderStatus = filter.orderStatus && filter.orderStatus !== 'all' ? filter.orderStatus : '';
   const validationResult =
@@ -561,8 +717,8 @@ export function filterEventData(data: EventControlCenter, filter: EventExportFil
 
   const tickets = data.tickets.filter((ticket) => {
     if (ticketStatus && ticket.status !== ticketStatus) return false;
-    if (!query) return true;
-    return matchesQuery(query, [
+    if (!ticketQuery) return true;
+    return matchesQuery(ticketQuery, [
       ticket.ticketCode,
       ticket.buyerName,
       ticket.holderName,
@@ -574,22 +730,83 @@ export function filterEventData(data: EventControlCenter, filter: EventExportFil
 
   const buyers = data.buyers.filter((buyer) => {
     if (orderStatus && buyer.orderStatus !== orderStatus) return false;
-    if (!query) return true;
-    return matchesQuery(query, [buyer.name, buyer.phone, buyer.orderId, buyer.ticketTypes]);
+    if (!buyerQuery) return true;
+    return matchesQuery(buyerQuery, [buyer.name, buyer.phone, buyer.orderId, buyer.ticketTypes]);
   });
 
   const validations = data.validations.filter((validation) => {
     if (validationResult && validation.result !== validationResult) return false;
-    if (!query) return true;
-    return matchesQuery(query, [validation.ticketCode, validation.operator, validation.reason]);
+    if (!validationQuery) return true;
+    return matchesQuery(validationQuery, [validation.ticketCode, validation.operator, validation.reason]);
   });
 
   return { ...data, tickets, buyers, validations };
 }
 
+const TICKET_STATUS_LABELS: Record<string, string> = {
+  valid: 'Por usar',
+  used: 'Utilizado',
+  cancelled: 'Cancelado',
+  expired: 'Expirado',
+  pending: 'Pendente',
+};
+
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  paid: 'Pago',
+  pending: 'Pendente',
+  created: 'Criado',
+  failed: 'Falhado',
+  cancelled: 'Cancelado',
+  refunded: 'Reembolsado',
+};
+
+const VALIDATION_RESULT_LABELS: Record<string, string> = {
+  accepted: 'Aceite',
+  rejected: 'Rejeitada',
+  duplicate: 'Duplicado',
+};
+
+/** Linhas que documentam, no próprio relatório, o âmbito aplicado. */
+const filterRows = (data: EventControlCenter, filter: EventExportFilter): Array<[string, string]> => {
+  const label = (value: string | undefined, labels: Record<string, string>) =>
+    !value || value === 'all' ? 'Todos' : labels[value] || value;
+  return [
+    ['Pesquisa de bilhetes', (filter.ticketQuery ?? '').trim() || 'Sem pesquisa'],
+    ['Pesquisa de compradores', (filter.buyerQuery ?? '').trim() || 'Sem pesquisa'],
+    ['Pesquisa de validações', (filter.validationQuery ?? '').trim() || 'Sem pesquisa'],
+    ['Estado do bilhete', label(filter.ticketStatus, TICKET_STATUS_LABELS)],
+    ['Estado do pedido', label(filter.orderStatus, ORDER_STATUS_LABELS)],
+    ['Resultado da validação', label(filter.validationResult, VALIDATION_RESULT_LABELS)],
+    ['Bilhetes no relatório', String(data.tickets.length)],
+    ['Compradores no relatório', String(data.buyers.length)],
+  ];
+};
+
 /** Tabelas por secção: cabeçalho + linhas, usadas por CSV/PDF/XLSX. */
-export function buildExportTables(data: EventControlCenter, sections: ExportSection[]) {
-  const tables: Array<{ section: ExportSection; title: string; headers: string[]; rows: Array<Array<string | number>> }> = [];
+export function buildExportTables(
+  data: EventControlCenter,
+  sections: ExportSection[],
+  filter?: EventExportFilter,
+) {
+  const tables: Array<{ section: ExportSection | 'filters'; title: string; headers: string[]; rows: Array<Array<string | number>> }> = [];
+  // A folha de filtros só entra quando existe pelo menos um filtro ativo;
+  // uma exportação de secções selecionadas não deve ganhar dados extra.
+  const hasActiveFilter = !!filter && Boolean(
+    filter.ticketQuery?.trim()
+      || filter.buyerQuery?.trim()
+      || filter.validationQuery?.trim()
+      || (filter.ticketStatus && filter.ticketStatus !== 'all')
+      || (filter.orderStatus && filter.orderStatus !== 'all')
+      || (filter.validationResult && filter.validationResult !== 'all'),
+  );
+  if (filter && hasActiveFilter) {
+    tables.push({
+      section: 'filters',
+      title: 'Filtros aplicados',
+      headers: ['Critério', 'Valor'],
+      rows: filterRows(data, filter),
+    });
+  }
   for (const section of sections) {
     if (section === 'summary') {
       tables.push({
@@ -622,9 +839,23 @@ export function buildExportTables(data: EventControlCenter, sections: ExportSect
     } else if (section === 'tickets') {
       tables.push({
         section,
-        title: EXPORT_SECTION_LABELS[section],
+        title: `${EXPORT_SECTION_LABELS[section]} (por tipo)`,
         headers: ['Tipo', 'Preço (XOF)', 'Capacidade', 'Vendidos', 'Disponíveis'],
         rows: data.ticketTypes.map((type) => [type.name, type.priceXOF, type.quantity, type.sold, type.available]),
+      });
+      tables.push({
+        section,
+        title: `${EXPORT_SECTION_LABELS[section]} (detalhe filtrado)`,
+        headers: ['Bilhete', 'Comprador', 'Telefone', 'Tipo', 'Valor (XOF)', 'Estado', 'Compra'],
+        rows: data.tickets.map((ticket) => [
+          ticket.ticketCode,
+          ticket.buyerName || ticket.holderName || '—',
+          ticket.buyerPhone || ticket.holderPhone || '—',
+          ticket.ticketTypeName,
+          ticket.priceXOF,
+          TICKET_STATUS_LABELS[ticket.status] || ticket.status,
+          ticket.purchasedAt ?? '',
+        ]),
       });
     } else if (section === 'sales') {
       tables.push({
@@ -660,6 +891,10 @@ export function buildExportTables(data: EventControlCenter, sections: ExportSect
           ['Receita bruta (pedidos pagos)', money(data.finance.grossXOF)],
           ['Comissão Guigui.com', money(data.finance.commissionXOF)],
           ['Valor atribuído à empresa', money(data.finance.companyShareXOF)],
+          ['Já repassado', money(data.finance.paidOutXOF)],
+          ['Em processamento', money(data.finance.processingPayoutXOF)],
+          ['Pendente de repasse', money(data.finance.pendingPayoutXOF)],
+          ['Fonte da comissão', 'Pedidos pagos (orders.fee_amount_xof); o valor da empresa usa orders.net_amount_xof'],
           ['Pendente', money(data.finance.pendingXOF)],
           ['Reembolsado', money(data.finance.refundedXOF)],
           ['Pedidos pagos', data.finance.paidOrders],
@@ -668,6 +903,22 @@ export function buildExportTables(data: EventControlCenter, sections: ExportSect
           ['Pagamentos confirmados', data.finance.confirmedPayments],
           ['Estado financeiro', data.finance.state],
         ],
+      });
+      tables.push({
+        section,
+        title: 'Pagamentos confirmados do evento',
+        headers: ['Transação', 'Provedor', 'Referência', 'Valor (XOF)', 'Comprador', 'Estado', 'Bilhetes', 'Criada em', 'Confirmada em'],
+        rows: data.transactions.map((transaction) => [
+          transaction.id,
+          transaction.provider,
+          transaction.providerReference || '—',
+          transaction.amountXOF,
+          transaction.payerName || '—',
+          transaction.status,
+          transaction.ticketCodes.join(', '),
+          transaction.createdAt ?? '',
+          transaction.confirmedAt ?? '',
+        ]),
       });
     } else if (section === 'commissions') {
       tables.push({
@@ -709,6 +960,23 @@ export function buildExportTables(data: EventControlCenter, sections: ExportSect
           refund.processedAt ?? '',
         ]),
       });
+    } else if (section === 'payouts') {
+      tables.push({
+        section,
+        title: EXPORT_SECTION_LABELS[section],
+        headers: ['Repasse', 'Valor (XOF)', 'Método', 'Estado', 'Referência', 'Comprovativo', 'Responsável', 'Criado em', 'Confirmado em'],
+        rows: data.payouts.map((payout) => [
+          payout.id,
+          payout.amountXOF,
+          payout.methodLabel,
+          payout.statusLabel,
+          payout.reference || '—',
+          payout.proofReference || '—',
+          payout.createdByName || '—',
+          payout.createdAt ?? '',
+          payout.confirmedAt ?? '',
+        ]),
+      });
     } else if (section === 'history') {
       tables.push({
         section,
@@ -728,8 +996,8 @@ export function buildExportTables(data: EventControlCenter, sections: ExportSect
   return tables;
 }
 
-export function buildEventCsv(data: EventControlCenter, sections: ExportSection[]): string {
-  const tables = buildExportTables(data, sections);
+export function buildEventCsv(data: EventControlCenter, sections: ExportSection[], filter?: EventExportFilter): string {
+  const tables = buildExportTables(data, sections, filter);
   const cell = (value: string | number) => `"${String(value ?? '').replace(/"/g, '""')}"`;
   const blocks = tables.map((table) =>
     [cell(table.title), table.headers.map(cell).join(';'), ...table.rows.map((row) => row.map(cell).join(';'))].join('\r\n'),
@@ -737,8 +1005,12 @@ export function buildEventCsv(data: EventControlCenter, sections: ExportSection[
   return `\uFEFF${blocks.join('\r\n\r\n')}`;
 }
 
-export async function buildEventXlsx(data: EventControlCenter, sections: ExportSection[]): Promise<Buffer> {
-  const tables = buildExportTables(data, sections);
+export async function buildEventXlsx(
+  data: EventControlCenter,
+  sections: ExportSection[],
+  filter?: EventExportFilter,
+): Promise<Buffer> {
+  const tables = buildExportTables(data, sections, filter);
   const sheets = tables.map((table) => ({
     name: table.title.slice(0, 31),
     data: [
@@ -754,11 +1026,15 @@ const PAGE_WIDTH = 842;
 const PAGE_HEIGHT = 595;
 const MARGIN = 36;
 
-export async function buildEventPdf(data: EventControlCenter, sections: ExportSection[]): Promise<Buffer> {
+export async function buildEventPdf(
+  data: EventControlCenter,
+  sections: ExportSection[],
+  filter?: EventExportFilter,
+): Promise<Buffer> {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const tables = buildExportTables(data, sections);
+  const tables = buildExportTables(data, sections, filter);
 
   let page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
   let y = PAGE_HEIGHT - MARGIN;
@@ -785,14 +1061,18 @@ export async function buildEventPdf(data: EventControlCenter, sections: ExportSe
   page.drawText(data.event.title.slice(0, 110), { x: MARGIN, y: PAGE_HEIGHT - 58, size: 10, font, color: rgb(0.85, 0.95, 0.92) });
   y = PAGE_HEIGHT - 90;
 
-  // Cartões de indicadores reais do evento.
-  const kpis: Array<[string, string]> = [
-    ['Bilhetes vendidos', `${data.indicators.sold} / ${data.indicators.capacity}`],
-    ['Receita bruta', money(data.finance.grossXOF)],
-    ['Comissão Guigui.com', money(data.finance.commissionXOF)],
-    ['Valor da empresa', money(data.finance.companyShareXOF)],
-  ];
-  const kpiWidth = (PAGE_WIDTH - MARGIN * 2 - 18) / 4;
+  // Cartões de indicadores apenas quando o utilizador escolheu o resumo ou o
+  // financeiro; nas restantes seleções o PDF contém só as secções pedidas.
+  const kpis: Array<[string, string]> = [];
+  if (sections.includes('summary')) {
+    kpis.push(
+      ['Bilhetes vendidos', `${data.indicators.sold} / ${data.indicators.capacity}`],
+      ['Receita bruta', money(data.finance.grossXOF)],
+      ['Comissão Guigui.com', money(data.finance.commissionXOF)],
+      ['Valor da empresa', money(data.finance.companyShareXOF)],
+    );
+  }
+  const kpiWidth = kpis.length > 0 ? (PAGE_WIDTH - MARGIN * 2 - 18) / kpis.length : 0;
   kpis.forEach(([label, value], index) => {
     const x = MARGIN + index * (kpiWidth + 6);
     page.drawRectangle({
@@ -807,7 +1087,7 @@ export async function buildEventPdf(data: EventControlCenter, sections: ExportSe
     page.drawText(label.toUpperCase().slice(0, 30), { x: x + 7, y: y - 14, size: 6.5, font: bold, color: rgb(0.36, 0.44, 0.42) });
     page.drawText(value.slice(0, 28), { x: x + 7, y: y - 30, size: 10, font: bold, color: rgb(0.04, 0.23, 0.2) });
   });
-  y -= 56;
+    if (kpis.length > 0) y -= 56;
 
   const tableWidth = PAGE_WIDTH - MARGIN * 2;
   const fit = (value: string, width: number, size: number, useBold: boolean) => {
@@ -893,5 +1173,5 @@ export function normaliseSections(input: unknown): ExportSection[] {
   const selected = list
     .map((value) => String(value ?? '').trim().toLowerCase())
     .filter((value): value is ExportSection => (EXPORT_SECTIONS as readonly string[]).includes(value));
-  return selected.length > 0 ? Array.from(new Set(selected)) : [...EXPORT_SECTIONS];
+  return Array.from(new Set(selected));
 }

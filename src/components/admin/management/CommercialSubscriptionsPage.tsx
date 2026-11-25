@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Ban, CalendarClock, Eye, RotateCcw, ShieldCheck } from 'lucide-react';
+import { ArrowUpDown, Ban, CalendarClock, Eye, Gauge, RotateCcw, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import {
   ManagementActionButton,
   ManagementFilter,
@@ -28,7 +28,12 @@ import {
   type CommercialPlan,
   type CommercialSubscription,
   type SubscriptionDetail,
+  type SubscriptionEntitlements,
 } from './commercialApi';
+
+const limitText = (value: number | 'unlimited' | 'negotiated' | null) => (
+  value === 'unlimited' ? 'Ilimitado' : value === 'negotiated' ? 'Negociado' : value === null ? '—' : String(value)
+);
 
 export const CommercialSubscriptionsPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [items, setItems] = useState<CommercialSubscription[]>([]);
@@ -54,6 +59,11 @@ export const CommercialSubscriptionsPage: React.FC<{ onBack: () => void }> = ({ 
   const [renewOpen, setRenewOpen] = useState(false);
   const [renewForm, setRenewForm] = useState({ endsAt: '', billingPeriod: 'monthly', contractedPriceXOF: '', paymentTransactionId: '', provider: '', paymentType: '', reason: '' });
   const [statusForm, setStatusForm] = useState<{ status: string; notes: string; reason: string } | null>(null);
+  const [entitlements, setEntitlements] = useState<SubscriptionEntitlements | null>(null);
+  const [planChangeOpen, setPlanChangeOpen] = useState(false);
+  const [planChangeForm, setPlanChangeForm] = useState({ planId: '', billingPeriod: 'monthly', contractedPriceXOF: '', reason: '', resetExceptions: false });
+  const [exceptionsOpen, setExceptionsOpen] = useState(false);
+  const [exceptionsForm, setExceptionsForm] = useState<{ priceXOF: string; billingPeriod: string; limits: Record<string, string>; features: Record<string, string>; notes: string; reason: string } | null>(null);
 
   useEffect(() => {
     void commercialRequest<CommercialOverview>('/api/admin/commercial/overview').then((data) => {
@@ -100,10 +110,105 @@ export const CommercialSubscriptionsPage: React.FC<{ onBack: () => void }> = ({ 
 
   const openDetail = async (id: string) => {
     setDetail(null);
+    setEntitlements(null);
     try {
-      setDetail(await commercialRequest<SubscriptionDetail>(`/api/admin/commercial/subscriptions/${encodeURIComponent(id)}`));
+      const [record, usage] = await Promise.all([
+        commercialRequest<SubscriptionDetail>(`/api/admin/commercial/subscriptions/${encodeURIComponent(id)}`),
+        commercialRequest<SubscriptionEntitlements>(`/api/admin/commercial/subscriptions/${encodeURIComponent(id)}/entitlements`).catch(() => null),
+      ]);
+      setDetail(record);
+      setEntitlements(usage);
     } catch (detailError) {
       setError((detailError as Error).message);
+    }
+  };
+
+  const openPlanChange = () => {
+    if (!detail) return;
+    setPlanChangeForm({
+      planId: '',
+      billingPeriod: detail.subscription.billingPeriod || 'monthly',
+      contractedPriceXOF: '',
+      reason: '',
+      resetExceptions: false,
+    });
+    setPlanChangeOpen(true);
+  };
+
+  const changePlan = async () => {
+    if (!detail || !planChangeForm.planId) return;
+    setBusy(true);
+    try {
+      const result = await commercialRequest<{ changeType: string; planName: string }>(
+        `/api/admin/commercial/subscriptions/${detail.subscription.id}/plan-change`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            ...planChangeForm,
+            contractedPriceXOF: planChangeForm.contractedPriceXOF === '' ? undefined : Number(planChangeForm.contractedPriceXOF),
+            reason: planChangeForm.reason || `Mudança para ${planChangeForm.planId}`,
+          }),
+        },
+      );
+      setPlanChangeOpen(false);
+      setNotice(`Plano alterado para ${result.planName} (${result.changeType}). Nova fotografia contratual guardada e auditada.`);
+      await openDetail(detail.subscription.id);
+      await load();
+    } catch (planError) {
+      setError((planError as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openExceptions = () => {
+    if (!detail) return;
+    const rows = entitlements?.entitlements || [];
+    const limits: Record<string, string> = {};
+    const features: Record<string, string> = {};
+    for (const row of rows) {
+      if (['number', 'unlimited', 'negotiated'].includes(row.limitKind)) {
+        const value = detail.exceptions.limits[row.code];
+        limits[row.code] = value === undefined ? '' : String(value);
+      } else if (row.valueType === 'flag' || row.limitKind === 'flag') {
+        const value = detail.exceptions.features[row.code];
+        features[row.code] = value === undefined ? 'inherit' : value ? 'true' : 'false';
+      }
+    }
+    setExceptionsForm({
+      priceXOF: detail.exceptions.priceXOF === null ? '' : String(detail.exceptions.priceXOF),
+      billingPeriod: detail.exceptions.billingPeriod || '',
+      limits,
+      features,
+      notes: detail.exceptions.notes,
+      reason: '',
+    });
+    setExceptionsOpen(true);
+  };
+
+  const saveExceptions = async () => {
+    if (!detail || !exceptionsForm) return;
+    setBusy(true);
+    try {
+      await commercialRequest(`/api/admin/commercial/subscriptions/${detail.subscription.id}/exceptions`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          priceXOF: exceptionsForm.priceXOF === '' ? null : Number(exceptionsForm.priceXOF),
+          billingPeriod: exceptionsForm.billingPeriod || null,
+          limits: Object.fromEntries(Object.entries(exceptionsForm.limits).map(([code, value]) => [code, value === '' ? null : /^\d+$/.test(value) ? Number(value) : value])),
+          features: Object.fromEntries(Object.entries(exceptionsForm.features).map(([code, value]) => [code, value === 'inherit' ? null : value === 'true'])),
+          notes: exceptionsForm.notes,
+          reason: exceptionsForm.reason || 'Exceções comerciais negociadas',
+        }),
+      });
+      setExceptionsOpen(false);
+      setNotice('Exceções comerciais guardadas. A fotografia contratual e o histórico foram preservados.');
+      await openDetail(detail.subscription.id);
+      await load();
+    } catch (exceptionError) {
+      setError((exceptionError as Error).message);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -210,7 +315,7 @@ export const CommercialSubscriptionsPage: React.FC<{ onBack: () => void }> = ({ 
       )}
 
       <CommercialModal open={Boolean(detail)} title={`Assinatura — ${detail?.subscription.companyName || ''}`} description={detail?.subscription.id} onClose={() => setDetail(null)} wide
-        footer={detail ? <><ManagementActionButton onClick={() => setDetail(null)}>Fechar</ManagementActionButton><ManagementActionButton tone="warning" onClick={() => setStatusForm({ status: 'suspended', notes: detail.subscription.notes || '', reason: '' })}><Ban className="h-3 w-3" /> Suspender</ManagementActionButton><ManagementActionButton onClick={() => setStatusForm({ status: 'active', notes: detail.subscription.notes || '', reason: '' })}><RotateCcw className="h-3 w-3" /> Reativar</ManagementActionButton><ManagementActionButton tone="primary" onClick={openRenew}><CalendarClock className="h-3 w-3" /> Registar renovação</ManagementActionButton></> : undefined}
+        footer={detail ? <><ManagementActionButton onClick={() => setDetail(null)}>Fechar</ManagementActionButton><ManagementActionButton tone="warning" onClick={() => setStatusForm({ status: 'suspended', notes: detail.subscription.notes || '', reason: '' })}><Ban className="h-3 w-3" /> Suspender</ManagementActionButton><ManagementActionButton onClick={() => setStatusForm({ status: 'active', notes: detail.subscription.notes || '', reason: '' })}><RotateCcw className="h-3 w-3" /> Reativar</ManagementActionButton><ManagementActionButton onClick={openPlanChange}><ArrowUpDown className="h-3 w-3" /> Mudar plano</ManagementActionButton><ManagementActionButton onClick={openExceptions}><SlidersHorizontal className="h-3 w-3" /> Exceções</ManagementActionButton><ManagementActionButton tone="primary" onClick={openRenew}><CalendarClock className="h-3 w-3" /> Registar renovação</ManagementActionButton></> : undefined}
       >
         {detail && (
           <div className="space-y-4 text-[10.5px]">
@@ -224,7 +329,59 @@ export const CommercialSubscriptionsPage: React.FC<{ onBack: () => void }> = ({ 
               <div className="mt-2 grid grid-cols-2 gap-2 text-[10px]">
                 {Object.entries(detail.snapshot.limitsSnapshot || {}).map(([key, value]) => <div key={key} className="rounded-lg bg-white p-2"><span className="block font-black text-slate-500">{key}</span>{value === null ? 'Ilimitado/negociado' : String(value)}</div>)}
               </div>
-              <p className="mt-2 text-[9.5px] text-slate-600">Esta fotografia não muda quando o catálogo é alterado. Só uma renovação confirmada aplica a configuração comercial atual.</p>
+              <p className="mt-2 text-[9.5px] text-slate-600">Esta fotografia não muda quando o catálogo é alterado. Só uma renovação ou mudança de plano confirmada aplica a configuração comercial atual.</p>
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="text-[11px] font-black text-slate-900"><Gauge className="mr-1 inline h-3.5 w-3.5" /> Entitlements e utilização do período</h4>
+                {entitlements && <span className="text-[9px] font-bold text-slate-500">período {entitlements.period.key} · uso medido {entitlements.period.startsAt.slice(0, 10)} → {(entitlements.period.endsAt || 'hoje').slice(0, 10)}</span>}
+              </div>
+              {entitlements ? (
+                <>
+                  <div className="mt-1 overflow-x-auto rounded-xl border border-[var(--color-border-default)]">
+                    <table className="w-full min-w-[520px] text-left text-[10px]">
+                      <thead className="bg-slate-50 text-[9px] uppercase tracking-wide text-slate-500"><tr><th className="p-1.5">Funcionalidade</th><th className="p-1.5">Limite</th><th className="p-1.5">Uso</th><th className="p-1.5">Restante</th><th className="p-1.5">Origem</th></tr></thead>
+                      <tbody>
+                        {entitlements.entitlements.filter((row) => row.enabled || row.used > 0).map((row) => (
+                          <tr key={row.code} className="border-t border-[var(--color-border-subtle)]">
+                            <td className="p-1.5"><div className="font-bold text-slate-900">{row.name}</div><div className="text-[9px] text-slate-500">{row.code}{row.unit ? ` · ${row.unit}` : ''}</div></td>
+                            <td className="p-1.5 font-mono">{row.enabled ? limitText(row.limit) : 'Não incluído'}</td>
+                            <td className="p-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono">{row.used}</span>
+                                {row.percent !== null && <span className={`rounded-full px-1.5 py-0.5 text-[8.5px] font-black ${row.percent >= 100 ? 'bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)]' : row.percent >= 90 ? 'bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)]' : 'bg-slate-100 text-slate-600'}`}>{row.percent}%</span>}
+                              </div>
+                            </td>
+                            <td className="p-1.5 font-mono">{limitText(row.remaining)}</td>
+                            <td className="p-1.5"><span className={`rounded-full px-1.5 py-0.5 text-[8.5px] font-black ${row.source === 'exception' ? 'bg-[var(--tone-info-bg)] text-[var(--tone-info-text)]' : 'bg-slate-100 text-slate-600'}`}>{row.source === 'exception' ? 'Exceção' : 'Contrato'}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-[9.5px] text-slate-600">
+                    <span className="rounded-full bg-white px-2 py-0.5 font-bold">Extras de publicações: {entitlements.extras.posts.available} disponíveis ({entitlements.extras.posts.used} usados)</span>
+                    <span className="rounded-full bg-white px-2 py-0.5 font-bold">Extras de promoções: {entitlements.extras.promotions.available} disponíveis ({entitlements.extras.promotions.used} usados)</span>
+                  </div>
+                  {entitlements.exceptions.priceXOF !== null || entitlements.exceptions.billingPeriod || Object.keys(entitlements.exceptions.limits).length > 0 || Object.keys(entitlements.exceptions.features).length > 0 ? (
+                    <p className="mt-2 rounded-lg border border-[var(--tone-info-border)] bg-[var(--tone-info-bg)]/60 p-2 text-[9.5px] text-slate-700">
+                      <strong>Exceções ativas:</strong>{' '}
+                      {entitlements.exceptions.priceXOF !== null && `preço ${formatCommercialXOF(entitlements.exceptions.priceXOF)} · `}
+                      {entitlements.exceptions.billingPeriod && `periodicidade ${entitlements.exceptions.billingPeriod} · `}
+                      {Object.entries(entitlements.exceptions.limits).map(([code, value]) => `${code}: ${limitText(value)}`).join(' · ')}
+                      {Object.keys(entitlements.exceptions.limits).length > 0 && Object.keys(entitlements.exceptions.features).length > 0 ? ' · ' : ''}
+                      {Object.entries(entitlements.exceptions.features).map(([code, value]) => `${code}: ${value ? 'ativa' : 'inativa'}`).join(' · ')}
+                    </p>
+                  ) : null}
+                  {entitlements.alerts.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {entitlements.alerts.slice(0, 4).map((alert) => (
+                        <div key={alert.code} className={`rounded-lg px-2 py-1 text-[9.5px] font-bold ${alert.severity === 'critical' ? 'bg-[var(--tone-danger-bg)] text-[var(--tone-danger-text)]' : alert.severity === 'warning' ? 'bg-[var(--tone-warning-bg)] text-[var(--tone-warning-text)]' : 'bg-[var(--tone-info-bg)] text-[var(--tone-info-text)]'}`}>{alert.message}</div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : <p className="mt-2 text-[10px] text-slate-500">A carregar utilização…</p>}
             </div>
             <div>
               <h4 className="text-[11px] font-black text-slate-900">Pagamentos de subscrição</h4>
@@ -266,6 +423,75 @@ export const CommercialSubscriptionsPage: React.FC<{ onBack: () => void }> = ({ 
           <CommercialField label="Notas"><textarea className={`${commercialInputClass} min-h-16`} value={statusForm.notes} onChange={(event) => setStatusForm({ ...statusForm, notes: event.target.value })} /></CommercialField>
           <CommercialField label="Motivo" hint="Obrigatório para cancelamento."><input className={commercialInputClass} value={statusForm.reason} onChange={(event) => setStatusForm({ ...statusForm, reason: event.target.value })} /></CommercialField>
         </div>}
+      </CommercialModal>
+
+      <CommercialModal open={planChangeOpen} title="Mudar plano" description="A mudança cria uma nova fotografia contratual com o plano, preço e versão atuais. Upgrade e downgrade são determinados pelo preço mensal de referência da matriz da categoria." onClose={() => setPlanChangeOpen(false)}
+        footer={<><ManagementActionButton onClick={() => setPlanChangeOpen(false)}>Cancelar</ManagementActionButton><ManagementActionButton tone="primary" disabled={busy || !planChangeForm.planId} onClick={() => void changePlan()}>{busy ? 'A guardar…' : 'Confirmar mudança'}</ManagementActionButton></>}
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <CommercialField label="Plano de destino" className="sm:col-span-2">
+            <select className={commercialInputClass} value={planChangeForm.planId} onChange={(event) => setPlanChangeForm({ ...planChangeForm, planId: event.target.value })}>
+              <option value="">Selecionar plano ativo…</option>
+              {plans.filter((plan) => plan.isActive && plan.id !== detail?.subscription.planId).map((plan) => (
+                <option key={plan.id} value={plan.id}>{plan.name} — referência {formatCommercialXOF(plan.priceXOF)} · v{plan.version}</option>
+              ))}
+            </select>
+          </CommercialField>
+          <CommercialField label="Periodicidade"><select className={commercialInputClass} value={planChangeForm.billingPeriod} onChange={(event) => setPlanChangeForm({ ...planChangeForm, billingPeriod: event.target.value })}><option value="monthly">Mensal</option><option value="annual">Anual</option></select></CommercialField>
+          <CommercialField label="Preço contratado (XOF)" hint="Vazio usa a matriz da categoria ou o valor de referência do plano."><input type="number" min={0} className={commercialInputClass} value={planChangeForm.contractedPriceXOF} onChange={(event) => setPlanChangeForm({ ...planChangeForm, contractedPriceXOF: event.target.value })} placeholder="Automático" /></CommercialField>
+          <CommercialField label="Motivo" className="sm:col-span-2"><input className={commercialInputClass} value={planChangeForm.reason} onChange={(event) => setPlanChangeForm({ ...planChangeForm, reason: event.target.value })} placeholder="Registado na auditoria" /></CommercialField>
+          <label className="flex items-center gap-2 text-[10px] font-bold text-slate-700 sm:col-span-2"><input type="checkbox" checked={planChangeForm.resetExceptions} onChange={(event) => setPlanChangeForm({ ...planChangeForm, resetExceptions: event.target.checked })} className="h-3.5 w-3.5 accent-[#123e3b]" /> Limpar exceções comerciais negociadas para o novo plano</label>
+          <p className="sm:col-span-2 rounded-lg bg-slate-50 p-2 text-[9.5px] font-bold text-slate-600">A regra <strong>allow_plan_change</strong> é aplicada no servidor: se estiver desativada, a mudança é recusada e auditada.</p>
+        </div>
+      </CommercialModal>
+
+      <CommercialModal open={exceptionsOpen} title="Exceções comerciais" description="Ajustes negociados apenas para esta assinatura. Não alteram a fotografia contratual nem o catálogo; são validados no servidor e auditados." onClose={() => setExceptionsOpen(false)} wide
+        footer={<><ManagementActionButton onClick={() => setExceptionsOpen(false)}>Cancelar</ManagementActionButton><ManagementActionButton tone="primary" disabled={busy} onClick={() => void saveExceptions()}>{busy ? 'A guardar…' : 'Guardar exceções'}</ManagementActionButton></>}
+      >
+        {exceptionsForm && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <CommercialField label="Preço excecional (XOF)" hint="Vazio remove a exceção de preço; a fotografia contratual mantém-se."><input type="number" min={0} className={commercialInputClass} value={exceptionsForm.priceXOF} onChange={(event) => setExceptionsForm({ ...exceptionsForm, priceXOF: event.target.value })} placeholder="Herdar contrato" /></CommercialField>
+              <CommercialField label="Periodicidade"><select className={commercialInputClass} value={exceptionsForm.billingPeriod} onChange={(event) => setExceptionsForm({ ...exceptionsForm, billingPeriod: event.target.value })}><option value="">Herdar contrato</option><option value="monthly">Mensal</option><option value="annual">Anual</option></select></CommercialField>
+            </div>
+            {Object.keys(exceptionsForm.limits).length > 0 && (
+              <div className="overflow-x-auto rounded-xl border border-[var(--color-border-default)]">
+                <table className="w-full min-w-[420px] text-left text-[10.5px]">
+                  <thead className="bg-slate-50 text-[9px] uppercase tracking-wide text-slate-500"><tr><th className="p-2">Limite</th><th className="p-2">Valor negociado</th></tr></thead>
+                  <tbody>
+                    {Object.keys(exceptionsForm.limits).map((code) => (
+                      <tr key={code} className="border-t border-[var(--color-border-subtle)]">
+                        <td className="p-2 font-bold text-slate-800">{code}</td>
+                        <td className="p-2">
+                          <input className={commercialInputClass} aria-label={`Limite negociado de ${code}`} value={exceptionsForm.limits[code]} onChange={(event) => setExceptionsForm({ ...exceptionsForm, limits: { ...exceptionsForm.limits, [code]: event.target.value } })} placeholder="Herdar contrato (ou unlimited / negotiated)" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {Object.keys(exceptionsForm.features).length > 0 && (
+              <div className="overflow-x-auto rounded-xl border border-[var(--color-border-default)]">
+                <table className="w-full min-w-[420px] text-left text-[10.5px]">
+                  <thead className="bg-slate-50 text-[9px] uppercase tracking-wide text-slate-500"><tr><th className="p-2">Funcionalidade</th><th className="p-2">Estado negociado</th></tr></thead>
+                  <tbody>
+                    {Object.keys(exceptionsForm.features).map((code) => (
+                      <tr key={code} className="border-t border-[var(--color-border-subtle)]">
+                        <td className="p-2 font-bold text-slate-800">{code}</td>
+                        <td className="p-2">
+                          <select className={commercialInputClass} aria-label={`Estado negociado de ${code}`} value={exceptionsForm.features[code]} onChange={(event) => setExceptionsForm({ ...exceptionsForm, features: { ...exceptionsForm.features, [code]: event.target.value } })}><option value="inherit">Herdar contrato</option><option value="true">Ativa</option><option value="false">Inativa</option></select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <CommercialField label="Notas da negociação"><textarea className={`${commercialInputClass} min-h-16`} value={exceptionsForm.notes} onChange={(event) => setExceptionsForm({ ...exceptionsForm, notes: event.target.value })} /></CommercialField>
+            <CommercialField label="Motivo" hint="Obrigatório para auditoria."><input className={commercialInputClass} value={exceptionsForm.reason} onChange={(event) => setExceptionsForm({ ...exceptionsForm, reason: event.target.value })} /></CommercialField>
+          </div>
+        )}
       </CommercialModal>
 
       <p className="text-[9.5px] text-slate-500"><ShieldCheck className="mr-1 inline h-3 w-3" /> A receita de subscrições só conta pagamentos reais confirmados; sandbox e simulações são excluídos.</p>

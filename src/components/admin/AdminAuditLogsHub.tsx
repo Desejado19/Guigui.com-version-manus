@@ -383,7 +383,7 @@ export const AdminAuditLogsHub: React.FC<AdminAuditLogsHubProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-50/80 border-b border-[var(--color-border-default)] dark:border-slate-700 text-slate-500 font-extrabold uppercase text-[10px]">
+              <tr className="bg-slate-50 border-b border-[var(--color-border-default)] dark:border-slate-700 text-slate-500 font-extrabold uppercase text-[10px]">
                 <th className="py-3.5 px-4">Data / Hora (Bissau)</th>
                 <th className="py-3.5 px-4">Autor da Operação</th>
                 <th className="py-3.5 px-4">Ação Realizada</th>
@@ -407,7 +407,7 @@ export const AdminAuditLogsHub: React.FC<AdminAuditLogsHubProps> = ({
                     <React.Fragment key={log.id}>
                       <tr
                         onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                        className={`hover:bg-slate-50/80 transition cursor-pointer ${
+                        className={`hover:bg-slate-50 transition cursor-pointer ${
                           isExpanded ? 'bg-slate-50 dark:bg-slate-800' : ''
                         }`}
                       >
@@ -463,7 +463,7 @@ export const AdminAuditLogsHub: React.FC<AdminAuditLogsHubProps> = ({
 
                       {/* Expanded Detail Row */}
                       {isExpanded && (
-                        <tr className="bg-slate-50/70 border-b border-[var(--color-border-default)] dark:border-slate-700">
+                        <tr className="bg-slate-50 border-b border-[var(--color-border-default)] dark:border-slate-700">
                           <td colSpan={7} className="p-4">
                             <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-[var(--color-border-default)] dark:border-slate-700 space-y-3 shadow-2xs">
                               <div className="flex items-center justify-between text-xs border-b border-[var(--color-border-subtle)] pb-2">

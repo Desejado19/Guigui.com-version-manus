@@ -141,7 +141,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative w-10 h-10 rounded-2xl bg-[var(--color-bg-surface)]/90 bg-[var(--color-bg-surface)]/90 hover:bg-[var(--color-bg-subtle)] hover:bg-[var(--color-bg-subtle)] border border-[var(--color-border-subtle)] border-[var(--color-border-subtle)] flex items-center justify-center text-[var(--color-text-strong)] dark:text-[var(--color-text-muted)] transition shadow-xs active:scale-95"
+        className="relative w-10 h-10 rounded-2xl bg-[var(--color-bg-surface)] hover:bg-[var(--color-bg-subtle)] border border-[var(--color-border-subtle)] flex items-center justify-center text-[var(--color-text-strong)] dark:text-[var(--color-text-muted)] transition shadow-xs active:scale-95"
         title={t('notificationsCenter')}
         aria-label={t('notifications')}
       >
@@ -161,7 +161,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
           } mt-2 w-84 sm:w-96 bg-[var(--color-bg-surface)] dark:bg-slate-800 bg-[var(--color-bg-surface)] dark:bg-slate-800 border border-[var(--color-border-subtle)] border-[var(--color-border-subtle)] rounded-3xl shadow-2xl z-50 text-xs overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150`}
         >
           {/* Header */}
-          <div className="p-4 bg-[var(--color-bg-subtle)]/80 bg-[var(--color-bg-subtle)]/80 border-b border-[var(--color-border-subtle)] border-[var(--color-border-subtle)] flex items-center justify-between">
+          <div className="p-4 bg-[var(--color-bg-subtle)] border-b border-[var(--color-border-subtle)] flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-xl bg-[var(--color-emerald-600)] text-white flex items-center justify-center shadow-xs font-black">
                 <Bell className="w-4 h-4" />
@@ -194,7 +194,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="w-7 h-7 rounded-full bg-[var(--color-bg-subtle)]/70 text-[var(--color-text-muted)] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] flex items-center justify-center transition"
+                className="w-7 h-7 rounded-full bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] flex items-center justify-center transition"
                 aria-label={`${t('close')} notificações`}
                 title={`${t('close')} notificações`}
               >
@@ -204,7 +204,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
           </div>
 
           {/* Filter Pills */}
-          <div className="flex items-center gap-1.5 p-2 bg-[var(--color-bg-subtle)]/70 bg-[var(--color-bg-subtle)]/50 border-b border-[var(--color-border-subtle)]/60 text-[11px] font-bold">
+          <div className="flex items-center gap-1.5 p-2 bg-[var(--color-bg-subtle)] border-b border-[var(--color-border-subtle)] text-[11px] font-bold">
             <button
               type="button"
               onClick={() => setActiveFilter('all')}
@@ -346,7 +346,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
 
           {/* Footer */}
           {displayedList.length > 0 && (
-            <div className="p-2.5 bg-[var(--color-bg-subtle)]/80 border-t border-[var(--color-border-subtle)] border-[var(--color-border-subtle)] flex items-center justify-between text-[11px]">
+            <div className="p-2.5 bg-[var(--color-bg-subtle)] border-t border-[var(--color-border-subtle)] flex items-center justify-between text-[11px]">
               <span className="text-[var(--color-text-muted)] font-medium">
                 {displayedList.length} avisos
               </span>

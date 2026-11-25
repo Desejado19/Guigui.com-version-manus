@@ -8,6 +8,15 @@ export type CommercialSection =
   | 'rules'
   | 'audit';
 
+export interface CommercialUsageAlert {
+  subscriptionId: string;
+  companyName: string;
+  code: string;
+  percent: number;
+  severity: 'info' | 'warning' | 'critical' | string;
+  message: string;
+}
+
 export interface CommercialSummary {
   revenueXOF: number;
   paymentCount: number;
@@ -18,6 +27,8 @@ export interface CommercialSummary {
   cancelledSubscriptions: number;
   activePlans: number;
   activeProducts: number;
+  expiringSubscriptions?: number;
+  usageAlertSubscriptions?: number;
   catalogVersion: number;
 }
 
@@ -122,6 +133,7 @@ export interface TicketFees {
   version: number;
   updatedAt: string | null;
   generatedRevenueXOF: number;
+  netTicketVolumeXOF: number;
   grossTicketVolumeXOF: number;
   ticketCount: number;
   history: Array<{
@@ -176,6 +188,7 @@ export interface CommercialOverview {
   rules: CommercialRules | null;
   versions: Array<{ id: string; version: number; reason: string; changedBy: string; createdAt: string | null }>;
   recentAudit: CommercialAuditItem[];
+  usageAlerts?: CommercialUsageAlert[];
   generatedAt: string;
 }
 
@@ -205,8 +218,46 @@ export interface CommercialSubscription {
   updatedAt: string | null;
 }
 
+export interface SubscriptionExceptions {
+  priceXOF: number | null;
+  billingPeriod: 'monthly' | 'annual' | null;
+  limits: Record<string, number | 'unlimited' | 'negotiated'>;
+  features: Record<string, boolean>;
+  notes: string;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export interface SubscriptionEntitlement {
+  code: string;
+  name: string;
+  category: string;
+  unit: string | null;
+  valueType: string;
+  enabled: boolean;
+  limitKind: string;
+  limit: number | 'unlimited' | 'negotiated' | null;
+  baseLimit: number | 'unlimited' | 'negotiated' | null;
+  source: 'snapshot' | 'exception';
+  used: number;
+  remaining: number | 'unlimited' | 'negotiated' | null;
+  percent: number | null;
+  allowed: boolean;
+}
+
+export interface SubscriptionEntitlements {
+  subscription: CommercialSubscription;
+  period: { startsAt: string; endsAt: string | null; key: string };
+  exceptions: SubscriptionExceptions;
+  entitlements: SubscriptionEntitlement[];
+  extras: { posts: { purchased: number; used: number; available: number }; promotions: { purchased: number; used: number; available: number } };
+  alerts: Array<{ code: string; percent: number; severity: string; message: string }>;
+  usage: { postsUsed: number; promotionsUsed: number; eventsUsed: number; imagesUsed: number; campaignsUsed: number };
+}
+
 export interface SubscriptionDetail {
   subscription: CommercialSubscription;
+  exceptions: SubscriptionExceptions;
   snapshot: {
     featureSnapshot: Record<string, unknown>;
     limitsSnapshot: Record<string, number | null>;
@@ -282,6 +333,8 @@ export const commercialAuditLabel: Record<string, string> = {
   deactivated: 'Desativado',
   renewed: 'Renovado',
   status_changed: 'Estado alterado',
+  plan_changed: 'Plano alterado',
+  exceptions_updated: 'Exceções comerciais',
 };
 
 export const commercialEntityLabel: Record<string, string> = {

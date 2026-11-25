@@ -211,7 +211,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           <div className="absolute inset-0 bg-gradient-to-t from-[rgba(6,24,20,0.92)] via-[rgba(6,24,20,0.45)] to-[rgba(6,24,20,0.15)]" />
 
           <div className="absolute inset-x-0 bottom-0 space-y-3 p-5 sm:p-8">
-            <span className="inline-flex items-center rounded-full border border-white/60 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white">
+            <span className="inline-flex items-center rounded-full border border-emerald-500 bg-emerald-950 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white">
               {event.category}
             </span>
             <h1 className="max-w-3xl text-3xl font-black leading-[1.05] tracking-[-0.02em] text-white sm:text-5xl">
@@ -236,7 +236,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 onClick={() => onToggleReminder(event)}
                 aria-label={hasReminder ? 'Lembrete ativo' : 'Ativar lembrete'}
                 title={hasReminder ? 'Lembrete ativo' : 'Ativar lembrete'}
-                className={`flex h-10 w-10 items-center justify-center rounded-full transition ${ hasReminder ? 'bg-[var(--color-gold-400)] text-[var(--color-green-950)]' : 'bg-white/20 text-white hover:bg-white/30' }`}
+                className={`flex h-10 w-10 items-center justify-center rounded-full transition ${ hasReminder ? 'bg-[var(--color-gold-400)] text-[var(--color-green-950)]' : 'bg-emerald-900 text-white hover:bg-white/30' }`}
               >
                 {hasReminder ? <BellRing className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
               </button>
@@ -245,7 +245,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               type="button"
               onClick={onClose}
               aria-label="Fechar detalhe do evento"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white transition hover:bg-white/30"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-900 text-white transition hover:bg-emerald-800"
             >
               <X className="h-5 w-5" />
             </button>
