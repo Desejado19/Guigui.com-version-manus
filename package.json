@@ -51,6 +51,8 @@
     "db:seed-demo": "tsx scripts/seed-demo-dataset.ts",
     "db:seed:synthetic": "tsx scripts/generate-postgres-synthetic-seed.ts",
     "db:seed:full": "tsx scripts/seed-full-demo.ts",
+    "db:seed:showcase": "tsx scripts/seed-showcase-businesses.ts",
+    "db:seed:africa": "tsx scripts/seed-africa-expansion.ts",
     "test:tickets": "tsx scripts/audit-ticket-validation.ts && tsx scripts/audit-ticket-flow.ts",
     "pretest:e2e": "npm run db:seed-demo",
     "test:e2e": "playwright test",
