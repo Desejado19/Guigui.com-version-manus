@@ -27,10 +27,6 @@ function hash(value: string): string {
   return createHash('sha256').update(value).digest('hex').slice(0, 32);
 }
 
-function iso(date: Date): string {
-  return date.toISOString();
-}
-
 function daysFromNow(days: number, hour = 10): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
@@ -39,6 +35,7 @@ function daysFromNow(days: number, hour = 10): string {
 }
 
 function pick<T>(arr: T[], index: number): T {
+  if (arr.length === 0) throw new Error('[seed-full] pick() recebeu uma lista vazia.');
   return arr[index % arr.length];
 }
 
@@ -80,7 +77,7 @@ async function main(): Promise<void> {
   const report: Record<string, number> = {};
   try {
     const meta = await client.query(
-      "select current_database() db, inet_server_addr() host, current_setting('server_version') ver",
+      "select current_database() db, current_setting('server_version') ver",
     );
     const { db, ver } = meta.rows[0];
     console.log(`[seed-full] base=${db} versão=${ver}`);
@@ -91,50 +88,45 @@ async function main(): Promise<void> {
     // Referências existentes
     // ---------------------------------------------------------------------
     const admin = (await client.query(
-      "select id, name, email from users where role='admin' order by id limit 1",
+      "select id, name from users where role='admin' order by id limit 1",
     )).rows[0];
     if (!admin) throw new Error('Sem utilizador admin; abortar.');
 
     const citizens = (await client.query(
-      "select id, name, email, phone, neighborhood from users where role='user' order by id",
+      "select id, name, email, phone from users where role='user' order by id",
     )).rows;
     const companies = (await client.query(
-      'select id, owner_user_id, name, category_id, status, data from companies order by id',
+      'select id, owner_user_id, name, status, data from companies order by id',
     )).rows;
     const activeCompanies = companies.filter((c) => c.status === 'active');
     const ownedActive = activeCompanies.filter((c) => c.owner_user_id);
 
     const paymentTx = (await client.query(
-      `select id, order_id, provider, provider_reference, status, gross_amount_xof, net_amount_xof,
-              created_at, payer_name
+      `select id, provider_reference, gross_amount_xof, created_at
          from payment_transactions
         where status='paid' and gross_amount_xof > 0 and id not like 'demo-%'
         order by created_at desc limit 40`,
     )).rows;
 
     const events = (await client.query(
-      `select e.id, e.company_id, e.title, e.starts_at, c.owner_user_id
+      `select e.id, e.company_id, c.owner_user_id
          from events e left join companies c on c.id=e.company_id
         where e.company_id is not null and e.id not like 'demo-%'
         order by e.starts_at desc limit 60`,
     )).rows;
 
     const ticketTypes = (await client.query(
-      `select tt.id, tt.event_id, tt.name, tt.price_xof, tt.quantity, e.company_id
+      `select tt.id, tt.event_id
          from ticket_types tt join events e on e.id=tt.event_id
         where e.company_id is not null and e.id not like 'demo-%'
         order by tt.id limit 40`,
     )).rows;
 
     const tickets = (await client.query(
-      `select t.id, t.order_id, t.event_id, t.ticket_type_id, t.status, e.company_id
+      `select t.id, t.event_id, t.status, e.company_id
          from tickets t join events e on e.id=t.event_id
         where e.company_id is not null and e.id not like 'demo-%'
         order by t.id limit 40`,
-    )).rows;
-
-    const supportTickets = (await client.query(
-      'select id, requester_user_id, assigned_user_id, category, status, business_id from support_tickets order by id',
     )).rows;
 
     const storyMedia = (await client.query(
@@ -144,7 +136,7 @@ async function main(): Promise<void> {
     console.log(
       `[seed-full] refs: clientes=${citizens.length} empresas=${companies.length} activas=${activeCompanies.length} ` +
       `eventos=${events.length} tiposBilhete=${ticketTypes.length} bilhetes=${tickets.length} ` +
-      `pagamentos=${paymentTx.length} suporte=${supportTickets.length}`,
+      `pagamentos=${paymentTx.length}`,
     );
 
     // ---------------------------------------------------------------------
@@ -383,7 +375,7 @@ async function main(): Promise<void> {
       const statuses = ['open', 'in_progress', 'resolved'];
       const rows: unknown[][] = [];
       citizens.slice(0, 10).forEach((u, i) => {
-        const co = pick(activeCompanies, i);
+        const co = activeCompanies.length > 0 ? pick(activeCompanies, i) : null;
         rows.push([
           `${SEED}-support-${pad(i + 1)}`, u.id, admin.id, pick(categories, i),
           `Pedido de suporte ${i + 1} — ${u.name}`,
@@ -397,7 +389,7 @@ async function main(): Promise<void> {
     }
     {
       const allTickets = (await client.query(
-        'select id, requester_user_id, status from support_tickets order by id',
+        "select id, requester_user_id from support_tickets where id like 'demo-%' order by id",
       )).rows;
       const rows: unknown[][] = [];
       allTickets.forEach((t, i) => {
@@ -429,7 +421,7 @@ async function main(): Promise<void> {
       const rows: unknown[][] = [];
       ownedActive.slice(0, 12).forEach((co, i) => {
         const id = `${SEED}-story-${pad(i + 1)}`;
-        const media = storyMedia[i % Math.max(storyMedia.length, 1)];
+        const media = storyMedia.length > 0 ? pick(storyMedia, i) : null;
         const type = pick(types, i);
         rows.push([
           id, co.owner_user_id, 'business', co.id, co.name, co.data?.logo ?? null, type,
@@ -521,29 +513,7 @@ async function main(): Promise<void> {
     }
 
     // ---------------------------------------------------------------------
-    // 12. Itens de moderação
-    // ---------------------------------------------------------------------
-    {
-      const types = ['post', 'comment', 'review', 'event', 'business'];
-      const statuses = ['pending', 'approved', 'rejected'];
-      const rows: unknown[][] = [];
-      activeCompanies.slice(0, 12).forEach((co, i) => {
-        const status = pick(statuses, i);
-        rows.push([
-          `${SEED}-moditem-${pad(i + 1)}`, co.id, pick(types, i), `demo-content-${pad(i + 1)}`, status,
-          status === 'pending' ? null : 'Decisão de demonstração da moderação.',
-          status === 'pending' ? null : admin.id,
-          daysFromNow(-15 + i, 10), status === 'pending' ? null : daysFromNow(-3, 16),
-          JSON.stringify({ demo: true }),
-        ]);
-      });
-      report.moderation_items = await bulkInsert(client, 'moderation_items',
-        ['id', 'company_id', 'content_type', 'content_id', 'status', 'decision_reason', 'reviewed_by',
-          'created_at', 'reviewed_at', 'item_data'], rows, '(id)');
-    }
-
-    // ---------------------------------------------------------------------
-    // 13. Notificações
+    // 12. Notificações
     // ---------------------------------------------------------------------
     {
       const categories = ['ticket', 'payment', 'moderation', 'support', 'marketing', 'system'];
@@ -573,13 +543,13 @@ async function main(): Promise<void> {
     }
 
     // ---------------------------------------------------------------------
-    // 14. Conversas e mensagens
+    // 13. Conversas e mensagens
     // ---------------------------------------------------------------------
-    if (citizens.length > 0 && activeCompanies.length > 0) {
+    if (citizens.length > 0 && ownedActive.length > 0) {
       const convRows: unknown[][] = [];
       const msgRows: unknown[][] = [];
       for (let i = 0; i < 15; i += 1) {
-        const co = activeCompanies[i % activeCompanies.length];
+        const co = ownedActive[i % ownedActive.length];
         const u = citizens[(i * 2 + 1) % citizens.length];
         const convId = `${SEED}-conv-${pad(i + 1)}`;
         convRows.push([
@@ -587,7 +557,7 @@ async function main(): Promise<void> {
           'Mensagem de demonstração da conversa entre cliente e empresa.',
           i % 2 === 0, i % 2 === 1, daysFromNow(-8 + i, 10), daysFromNow(-8 + i, 12),
         ]);
-        const owner = co.owner_user_id ?? u.id;
+        const owner = co.owner_user_id;
         msgRows.push([
           `${SEED}-msg-${pad(i + 1)}-1`, convId, u.id, 'user',
           'Olá, gostaria de saber mais sobre os vossos serviços.', true, false, daysFromNow(-8 + i, 10),
@@ -610,7 +580,7 @@ async function main(): Promise<void> {
     }
 
     // ---------------------------------------------------------------------
-    // 15. Entregas de email (simuladas, claramente marcadas)
+    // 14. Entregas de email (simuladas, claramente marcadas)
     // ---------------------------------------------------------------------
     if (citizens.length > 0) {
       const kinds = ['ticket_purchase', 'password_reset', 'marketing', 'support_reply'];
@@ -637,7 +607,7 @@ async function main(): Promise<void> {
     }
 
     // ---------------------------------------------------------------------
-    // 16. Agendamentos de marketing
+    // 15. Agendamentos de marketing
     // ---------------------------------------------------------------------
     {
       const rows: unknown[][] = [];
@@ -664,10 +634,13 @@ async function main(): Promise<void> {
     }
 
     // ---------------------------------------------------------------------
-    // 17. Ciclo de vida de eventos e bilhetes (estados variados)
+    // 16. Ciclo de vida de eventos e bilhetes (estados variados)
     // ---------------------------------------------------------------------
     if (activeCompanies.length > 0 && citizens.length >= 6) {
       const co = ownedActive[0] ?? activeCompanies[0];
+      if (!co) throw new Error('[seed-full] sem empresa activa para o ciclo de vida.');
+      // O guard acima garante seis clientes; buyers fica sempre completo.
+      const buyers = citizens.slice(0, 6);
       const signingSecret = process.env.TICKET_SIGNING_SECRET?.trim() || 'guigui-ticket-development-secret';
       const place = 'Praça dos Heróis Nacionais, Bissau';
       const definitions = [
@@ -706,6 +679,13 @@ async function main(): Promise<void> {
       const eventRows: unknown[][] = [];
       const typeRows: unknown[][] = [];
       const typesByEvent = new Map<string, Array<{ id: string; name: string; price: number; quantity: number }>>();
+      const typesFor = (eventId: string) => {
+        const types = typesByEvent.get(eventId);
+        if (!types || types.length === 0) {
+          throw new Error(`[seed-full] sem tipos de bilhete para ${eventId}.`);
+        }
+        return types;
+      };
 
       definitions.forEach((ev, i) => {
         const isPublished = ev.status === 'published';
@@ -753,12 +733,12 @@ async function main(): Promise<void> {
       const event1 = definitions[0];
       const event2 = definitions[1];
       const lifecycle = [
-        { n: 1, ev: event1, buyer: citizens[0], status: 'paid', ticket: 'valid', pay: 'paid' },
-        { n: 2, ev: event2, buyer: citizens[1], status: 'paid', ticket: 'used', pay: 'paid' },
-        { n: 3, ev: event1, buyer: citizens[2], status: 'pending', ticket: null, pay: 'pending' },
-        { n: 4, ev: event1, buyer: citizens[3], status: 'cancelled', ticket: 'cancelled', pay: 'cancelled' },
-        { n: 5, ev: event2, buyer: citizens[4], status: 'refunded', ticket: 'expired', pay: 'refunded' },
-        { n: 6, ev: event1, buyer: citizens[5], status: 'failed', ticket: null, pay: 'failed' },
+        { n: 1, ev: event1, buyer: buyers[0], status: 'paid', ticket: 'valid', pay: 'paid' },
+        { n: 2, ev: event2, buyer: buyers[1], status: 'paid', ticket: 'used', pay: 'paid' },
+        { n: 3, ev: event1, buyer: buyers[2], status: 'pending', ticket: null, pay: 'pending' },
+        { n: 4, ev: event1, buyer: buyers[3], status: 'cancelled', ticket: 'cancelled', pay: 'cancelled' },
+        { n: 5, ev: event2, buyer: buyers[4], status: 'refunded', ticket: 'expired', pay: 'refunded' },
+        { n: 6, ev: event1, buyer: buyers[5], status: 'failed', ticket: null, pay: 'failed' },
       ] as const;
 
       const orderRows: unknown[][] = [];
@@ -768,7 +748,7 @@ async function main(): Promise<void> {
       const validationRows: unknown[][] = [];
 
       for (const item of lifecycle) {
-        const general = typesByEvent.get(item.ev.id)![0];
+        const general = typesFor(item.ev.id)[0];
         const orderId = `${SEED}-ord-${pad(item.n)}`;
         const created = daysFromNow(-40 + item.n * 2, 10);
         const phone = item.buyer.phone || `+245 955 10 ${String(item.n).padStart(2, '0')} 00`;
@@ -843,7 +823,7 @@ async function main(): Promise<void> {
       // bilhetes `pending` antigos, por isso usa-se a tabela real de reservas.
       report.ticket_reservations = (report.ticket_reservations ?? 0) + await bulkInsert(client, 'ticket_reservations',
         ['id', 'event_id', 'ticket_type_id', 'quantity', 'expires_at', 'status', 'created_at', 'updated_at'],
-        [[`${SEED}-liferes-001`, event1.id, typesByEvent.get(event1.id)![0].id, 1,
+        [[`${SEED}-liferes-001`, event1.id, typesFor(event1.id)[0].id, 1,
           daysFromNow(2, 23), 'pending', daysFromNow(0, 9), daysFromNow(0, 9)]], '(id)');
       report.ticket_validations = (report.ticket_validations ?? 0) + await bulkInsert(client, 'ticket_validations',
         ['id', 'ticket_id', 'operator_user_id', 'company_id', 'device_id', 'result', 'reason', 'created_at'],

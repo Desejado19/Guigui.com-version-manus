@@ -964,34 +964,56 @@ html.dark .guigui-navbar .guigui-brand-mark svg path { fill: var(--color-green-1
 .guigui-hero-copy { max-width: 650px; margin: 0 auto 26px; color: var(--color-green-100); font-size: 15px; line-height: 1.65; }
 .guigui-home-hero { padding-top: clamp(30px, 5vw, 58px); padding-bottom: 34px; }
 .guigui-home-hero .guigui-hero-title { font-size: clamp(30px, 4.5vw, 52px); }
-/* Destaque da página inicial: fotografia a preencher o cartão inteiro e o
-   texto sobreposto à esquerda. O gradiente verde-escuro garante contraste em
-   qualquer imagem e repete a identidade da marca; sem fotografia, fica o
-   mesmo fundo sólido. */
-/* Destaques: a fotografia aparece inteira e sem véu — o texto vive numa faixa
-   sólida por baixo dela, pelo que nenhum pixel da imagem fica tapado. A caixa
-   da imagem tem proporção fixa (3:1) para todos os slides manterem o mesmo
-   tamanho e o carrossel não saltar de altura ao rodar. */
-.guigui-sponsored-banner { position: relative; overflow: hidden; border: 1px solid rgba(11, 59, 55, .18); border-radius: 22px; background: #0B3B37; box-shadow: 0 26px 50px -34px rgba(11, 59, 55, .75); isolation: isolate; }
-.guigui-sponsored-slide { position: relative; display: flex; flex-direction: column; width: 100%; overflow: hidden; color: inherit; text-decoration: none; }
-.guigui-sponsored-media { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 3 / 1; max-height: 420px; overflow: hidden; background: #0B3B37; }
-.guigui-sponsored-bg { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; }
-.guigui-sponsored-content { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: clamp(20px, 3vw, 40px); row-gap: 10px; padding: clamp(20px, 2.4vw, 30px) clamp(22px, 3vw, 40px) clamp(54px, 5vw, 64px); }
-.guigui-sponsored-label { grid-column: 1; display: inline-flex; width: fit-content; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,.32); border-radius: 999px; background: #062a20; padding: 8px 16px; color: #fff; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
-.guigui-sponsored-title { grid-column: 1; display: -webkit-box; margin: 0; padding-bottom: .14em; overflow: hidden; color: #fff; font-family: var(--font-family); font-size: clamp(26px, 2.6vw, 36px); font-weight: 800; line-height: 1.1; letter-spacing: -.025em; text-shadow: none; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+/* Destaques: fotografia full-bleed com overlay para o texto continuar legível.
+   A caixa mantém 2:1 no desktop e passa a 4:5 no telemóvel; a imagem usa
+   object-fit: cover, pelo que funciona com qualquer formato e proporção. */
+/* Banner de destaque: 1600 × 600 px (8:3), fotografia ampla de fundo,
+   conteúdo alinhado à esquerda e paginação discreta. */
+.guigui-sponsored-banner { position: relative; width: 100%; max-width: 1600px; margin-inline: auto; overflow: hidden; border: 1px solid rgba(255, 255, 255, .12); border-radius: 24px; background: #0F0F0F; box-shadow: 0 26px 50px -34px rgba(0, 0, 0, .55); isolation: isolate; aspect-ratio: 8 / 3; min-height: 280px; }
+.guigui-sponsored-slide { position: absolute; inset: 0; display: block; overflow: hidden; color: inherit; text-decoration: none; }
+.guigui-sponsored-media { position: absolute; inset: 0; overflow: hidden; background: #0F0F0F; }
+.guigui-sponsored-bg { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+.guigui-sponsored-shade { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: none; }
+.guigui-sponsored-content { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; padding: clamp(18px, 2.8vw, 36px) clamp(20px, 3.6vw, 52px) clamp(52px, 4.4vw, 64px); }
+.guigui-sponsored-main { display: flex; width: 100%; flex-direction: column; align-items: flex-start; gap: clamp(16px, 1.6vw, 22px); }
+.guigui-sponsored-copy { display: flex; min-width: 0; max-width: min(640px, 52%); flex-direction: column; gap: 12px; }
+.guigui-sponsored-label { display: inline-flex; width: fit-content; align-items: center; gap: 8px; border: 1px solid rgba(255, 255, 255, .4); border-radius: 999px; background: rgba(255, 255, 255, .25); padding: clamp(8px, .7vw, 12px) clamp(12px, 1.1vw, 20px); color: #fff; font-size: clamp(10px, .95vw, 15px); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; backdrop-filter: blur(10px); text-shadow: 0 1px 6px rgba(0, 0, 0, .45); }
+.guigui-sponsored-title { display: -webkit-box; margin: 0; padding-bottom: .12em; overflow: hidden; color: #fff; font-family: var(--font-family); font-size: clamp(30px, 4.6vw, 70px); font-weight: 800; line-height: 1.02; letter-spacing: -.03em; text-shadow: 0 2px 12px rgba(0, 0, 0, .55), 0 1px 3px rgba(0, 0, 0, .6); -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .guigui-sponsored-accent { color: #F58220; }
-.guigui-sponsored-description { grid-column: 1; display: -webkit-box; max-width: 640px; margin: 0; overflow: hidden; color: rgba(255, 255, 255, .9); font-size: 15px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.guigui-sponsored-cta { grid-column: 2; grid-row: 1 / span 3; align-self: center; display: inline-flex; width: fit-content; align-items: center; gap: 8px; border: 0; border-radius: 999px; background: #F58220; padding: 13px 26px; color: #2B1200; font-size: 14px; font-weight: 700; line-height: 1; cursor: pointer; box-shadow: 0 14px 26px -16px rgba(245, 130, 32, .95); transition: background-color .2s ease, transform .2s ease; }
+.guigui-sponsored-location { display: flex; align-items: center; gap: 8px; margin: 0; color: rgba(255, 255, 255, .95); font-size: clamp(14px, 1.25vw, 20px); font-weight: 600; }
+.guigui-sponsored-location svg { flex-shrink: 0; color: #F58220; }
+.guigui-sponsored-description { display: -webkit-box; max-width: 50ch; margin: 0; overflow: hidden; color: rgba(255, 255, 255, .95); font-size: clamp(14px, 1.2vw, 19px); line-height: 1.55; text-shadow: 0 1px 6px rgba(0, 0, 0, .5); -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.guigui-sponsored-cta { flex-shrink: 0; align-self: flex-start; display: inline-flex; width: fit-content; min-height: 52px; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 999px; background: #F58220; padding: 15px 30px; color: #2B1200; font-size: clamp(14px, 1.1vw, 18px); font-weight: 700; line-height: 1; text-decoration: none; white-space: nowrap; cursor: pointer; box-shadow: 0 14px 26px -16px rgba(245, 130, 32, .95); transition: background-color .2s ease, transform .2s ease; }
 .guigui-sponsored-slide:hover .guigui-sponsored-cta { background: #E6730F; }
 .guigui-sponsored-cta:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
-.guigui-sponsored-pager { position: absolute; right: clamp(18px, 3vw, 36px); bottom: clamp(16px, 2vw, 22px); z-index: 2; display: flex; align-items: center; gap: 14px; }
-.guigui-sponsored-progress { width: clamp(90px, 20vw, 230px); height: 2px; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, .3); }
+.guigui-sponsored-pager { position: absolute; right: clamp(16px, 2.4vw, 28px); bottom: clamp(14px, 1.8vw, 20px); z-index: 3; display: flex; align-items: center; gap: 10px; opacity: .85; transition: opacity .2s ease; }
+.guigui-sponsored-banner:hover .guigui-sponsored-pager, .guigui-sponsored-pager:focus-within { opacity: 1; }
+.guigui-sponsored-progress { width: clamp(56px, 9vw, 110px); height: 2px; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, .22); }
 .guigui-sponsored-progress > span { display: block; height: 100%; border-radius: inherit; background: #F58220; transition: width .45s ease; }
-.guigui-sponsored-controls { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255, 255, 255, .24); border-radius: 999px; background: #062a20; padding: 4px 7px; }
-.guigui-sponsored-nav { display: inline-flex; height: 28px; width: 28px; align-items: center; justify-content: center; border: 1px solid rgba(255, 255, 255, .28); border-radius: 999px; background: #062a20; color: #fff; cursor: pointer; transition: background-color .2s ease; }
-.guigui-sponsored-nav:hover { background: #14574A; }
+.guigui-sponsored-controls { display: inline-flex; align-items: center; gap: 2px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 999px; background: rgba(15, 15, 15, .28); padding: 2px 5px; backdrop-filter: blur(6px); }
+.guigui-sponsored-nav { display: inline-flex; height: 28px; width: 28px; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: transparent; color: rgba(255, 255, 255, .78); cursor: pointer; transition: background-color .2s ease, color .2s ease; }
+.guigui-sponsored-nav:hover { background: rgba(255, 255, 255, .14); color: #fff; }
 .guigui-sponsored-nav:focus-visible { outline: 2px solid #F58220; outline-offset: 2px; }
-.guigui-sponsored-counter { min-width: 30px; text-align: center; color: #fff; font-size: 13px; font-weight: 700; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+.guigui-sponsored-counter { min-width: 24px; text-align: center; color: rgba(255, 255, 255, .78); font-size: 11px; font-weight: 600; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+@media (max-width: 1024px) {
+  .guigui-sponsored-banner { aspect-ratio: 16 / 9; }
+  .guigui-sponsored-content { padding-bottom: 60px; }
+  .guigui-sponsored-copy { max-width: min(560px, 62%); }
+  .guigui-sponsored-title { font-size: clamp(30px, 5.2vw, 50px); }
+}
+@media (max-width: 820px) {
+  .guigui-sponsored-banner { aspect-ratio: 4 / 3; min-height: 380px; border-radius: 20px; }
+  .guigui-sponsored-content { padding: 18px 18px 66px; }
+  .guigui-sponsored-label { padding: 7px 12px; font-size: 10px; letter-spacing: .05em; }
+  .guigui-sponsored-main { align-items: stretch; gap: 14px; }
+  .guigui-sponsored-copy { max-width: 100%; gap: 9px; }
+  .guigui-sponsored-title { font-size: clamp(28px, 9vw, 44px); line-height: 1.04; }
+  .guigui-sponsored-location { font-size: 13px; }
+  .guigui-sponsored-description { max-width: 100%; font-size: 13px; line-height: 1.5; -webkit-line-clamp: 3; }
+  .guigui-sponsored-cta { width: 100%; align-self: stretch; padding: 13px 18px; }
+  .guigui-sponsored-pager { left: 18px; right: 18px; bottom: 16px; justify-content: space-between; gap: 10px; }
+  .guigui-sponsored-progress { flex: 1; width: auto; }
+}
 .guigui-search {
   display: flex;
   align-items: center;
@@ -1191,15 +1213,8 @@ html:not(.dark) .guigui-app-shell .text-emerald-600, html:not(.dark) .guigui-app
   .guigui-search-button { padding: 10px 12px; }
   .guigui-category-grid { display: flex; overflow-x: auto; margin: 0 -2px; padding-bottom: 4px; }
   .guigui-category-card { min-width: 82px; }
-  /* Em ecrã estreito a fotografia mantém-se inteira e o texto passa para
-     baixo dela, a toda a largura. */
-  .guigui-sponsored-media { aspect-ratio: 16 / 9; max-height: 260px; }
-  .guigui-sponsored-content { grid-template-columns: minmax(0, 1fr); row-gap: 10px; padding: 20px 20px 72px; }
   .guigui-sponsored-title { font-size: clamp(24px, 6.4vw, 30px); }
   .guigui-sponsored-description { font-size: 13.5px; -webkit-line-clamp: 2; }
-  .guigui-sponsored-cta { grid-column: 1; grid-row: auto; justify-self: start; }
-  .guigui-sponsored-pager { right: 20px; bottom: 16px; left: 20px; justify-content: space-between; gap: 10px; }
-  .guigui-sponsored-progress { flex: 1; width: auto; }
   /* Cartões do diretório em ecrã estreito: uma coluna, para a fotografia,
      as etiquetas e as acções manterem a mesma estrutura do cartão largo. */
   .guigui-business-body { padding: 14px 14px 16px; }

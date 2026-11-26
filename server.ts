@@ -149,6 +149,7 @@ import { buildOfflineManifest, syncOfflineValidations, type OfflineValidationRec
 import { listPostgresPayments, persistPostgresPayment, recordPostgresPaymentEvent } from './server/postgresPaymentService';
 import { persistPostgresAudit } from './server/postgresAuditService';
 import { findPostgresModeration, listPostgresModeration, persistPostgresModeration, persistPostgresModerationReview } from './server/postgresModerationService';
+import { decideModerationSubmission, getModerationSubmission, listModerationSubmissions, ModerationSubmissionError, resubmitModerationSubmission, type DecisionAction } from './server/postgresModerationSubmissionService';
 import { canAccessSupportTicket, createPostgresConversation, createPostgresConversationMessage, createPostgresSupportReply, getConversationParticipants, getSupportTicketParticipants, listPostgresConversations, listPostgresNotifications, listPostgresSupportTickets, markPostgresConversationRead, markPostgresNotificationRead, persistPostgresNotification, persistPostgresSupportTicket, updatePostgresSupportStatus } from './server/postgresCommunicationService';
 import { markPostgresMonetizationRefunded, persistPostgresMonetization } from './server/postgresMonetizationService';
 import { persistPostgresCatalog } from './server/postgresCatalogService';
@@ -2035,7 +2036,11 @@ app.get('/api/admin/stats', requireRole('admin'), async (_req, res) => {
                    COALESCE(sum(fee_amount_xof) FILTER (WHERE status = 'paid'),0)::bigint AS commission
               FROM orders GROUP BY month ORDER BY month`),
       group(`SELECT status AS key, count(*)::int AS n FROM support_tickets GROUP BY status`),
-      group(`SELECT status AS key, count(*)::int AS n FROM moderation_items GROUP BY status`),
+      // Fila de moderação do dashboard: o modelo único de submissões. Os quatro
+      // estados ativos contam como "pending" para o contador de trabalho em curso.
+      group(`SELECT CASE WHEN status IN ('pending','in_review','changes_requested','resubmitted') THEN 'pending' ELSE status END AS key,
+                    count(*)::int AS n
+               FROM moderation_submissions GROUP BY 1`),
     ]);
     const sum = (obj: Record<string, number>) => Object.values(obj).reduce((a, b) => a + b, 0);
     const currentMonth = new Date().toISOString().slice(0, 7);
@@ -5955,6 +5960,141 @@ app.get('/api/moderation/logs', requireRole('admin'), async (req, res) => {
     }
   }
   res.json(moderationLogs);
+});
+
+// ----------------------------------------------------------------------------
+// Moderação centralizada — modelo único de submissões (`moderation_submissions`).
+// A fila do dashboard admin, o painel da empresa e o detalhe com histórico
+// leem todos daqui. O endpoint /api/admin/moderation-logs fica apenas com o
+// histórico legado de classificações de IA.
+// ----------------------------------------------------------------------------
+const DECISION_ACTIONS: DecisionAction[] = ['approve', 'reject', 'request_changes', 'in_review'];
+
+function submissionErrorResponse(error: unknown, res: any, fallback: string) {
+  if (error instanceof ModerationSubmissionError) {
+    return res.status(error.status).json({ error: error.message, code: error.code });
+  }
+  console.error('[Guigui.com] moderation submission error:', error);
+  return res.status(500).json({ error: fallback, code: 'MODERATION_SUBMISSION_FAILED' });
+}
+
+// A fila global contém conteúdo de todas as empresas: exclusiva da administração.
+app.get('/api/moderation/submissions', requireRole('admin'), async (req, res) => {
+  if (!databasePool) {
+    return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária para a fila de moderação.', code: 'DATABASE_REQUIRED' });
+  }
+  const query = req.query as Record<string, string | undefined>;
+  const limit = query.limit ? Number(query.limit) : undefined;
+  try {
+    const result = await listModerationSubmissions({
+      status: query.status,
+      type: query.type,
+      companyId: query.companyId,
+      ownerUserId: query.ownerUserId,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      search: query.search,
+      limit: Number.isFinite(limit) ? limit : undefined,
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('[Guigui.com] /api/moderation/submissions error:', error);
+    res.status(500).json({ error: 'Não foi possível carregar a fila de moderação.', code: 'MODERATION_QUEUE_FAILED' });
+  }
+});
+
+// Declarado antes de /:id para "mine" não ser interpretado como um identificador.
+app.get('/api/moderation/submissions/mine', requireSession, async (req, res) => {
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  if (!databasePool) return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária.', code: 'DATABASE_REQUIRED' });
+  const stored = await identityAccess.findById(context.userId) || undefined;
+  try {
+    const result = await listModerationSubmissions({
+      ownerUserId: context.userId,
+      companyId: context.role === 'admin' ? undefined : stored?.businessId,
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('[Guigui.com] /api/moderation/submissions/mine error:', error);
+    res.status(500).json({ error: 'Não foi possível carregar as suas submissões.', code: 'MODERATION_SUBMISSIONS_FAILED' });
+  }
+});
+
+app.get('/api/moderation/submissions/:id', requireSession, async (req, res) => {
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  try {
+    const submission = await getModerationSubmission(req.params.id);
+    if (!submission) return res.status(404).json({ error: 'Submissão não encontrada.', code: 'SUBMISSION_NOT_FOUND' });
+    if (context.role !== 'admin') {
+      const stored = await identityAccess.findById(context.userId) || undefined;
+      const ownsSubmission = submission.submittedBy === context.userId;
+      const sameCompany = Boolean(stored?.businessId && submission.companyId === stored.businessId);
+      if (!ownsSubmission && !sameCompany) {
+        return res.status(403).json({ error: 'Não possui permissão para consultar esta submissão.', code: 'PERMISSION_DENIED' });
+      }
+    }
+    res.json({ submission });
+  } catch (error) {
+    console.error('[Guigui.com] /api/moderation/submissions/:id error:', error);
+    res.status(500).json({ error: 'Não foi possível carregar a submissão.', code: 'MODERATION_SUBMISSION_FAILED' });
+  }
+});
+
+app.post('/api/moderation/submissions/:id/decision', requireRole('admin'), async (req, res) => {
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  const action = req.body?.action as DecisionAction | undefined;
+  if (!action || !DECISION_ACTIONS.includes(action)) {
+    return res.status(400).json({ error: 'Ação de decisão inválida.', code: 'INVALID_DECISION_ACTION' });
+  }
+  const requestId = requestIdFrom(req);
+  const stored = await identityAccess.findById(context.userId) || undefined;
+  try {
+    const submission = await decideModerationSubmission({
+      id: req.params.id,
+      action,
+      actorUserId: context.userId,
+      actorName: stored?.name || `admin:${context.userId}`,
+      reason: typeof req.body?.reason === 'string' ? req.body.reason : '',
+    });
+    recordAudit({
+      action: `moderation_submission_${action}`,
+      resource: 'moderation_submission',
+      resourceId: submission.id,
+      actorRole: 'admin',
+      actorId: context.userId,
+      actorName: stored?.name || `admin:${context.userId}`,
+      requestId,
+      success: true,
+      metadata: { status: submission.status, type: submission.type },
+    });
+    res.json({ submission });
+  } catch (error) {
+    submissionErrorResponse(error, res, 'Não foi possível registar a decisão.');
+  }
+});
+
+app.post('/api/moderation/submissions/:id/resubmit', requireSession, async (req, res) => {
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  const stored = await identityAccess.findById(context.userId) || undefined;
+  try {
+    const submission = await resubmitModerationSubmission({
+      id: req.params.id,
+      actorUserId: context.userId,
+      actorName: stored?.name || `user:${context.userId}`,
+      companyId: stored?.businessId,
+      title: typeof req.body?.title === 'string' ? req.body.title : undefined,
+      summary: typeof req.body?.summary === 'string' ? req.body.summary : undefined,
+      payload: req.body?.payload && typeof req.body.payload === 'object' ? req.body.payload : undefined,
+      changesNote: typeof req.body?.changesNote === 'string' ? req.body.changesNote : '',
+    });
+    res.json({ submission });
+  } catch (error) {
+    submissionErrorResponse(error, res, 'Não foi possível reenviar a submissão.');
+  }
 });
 
 // ============================================================================

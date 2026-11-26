@@ -72,6 +72,7 @@ import { AdminPermissionsMatrix } from './admin/AdminPermissionsMatrix';
 import { AdminReportsHub } from './admin/AdminReportsHub';
 import { SystemModule } from './admin/system/SystemModule';
 import { AdminSupportHub } from './admin/AdminSupportHub';
+import { CentralModerationPanel } from './admin/CentralModerationPanel';
 import { SubscriptionPlansAdmin } from './admin/SubscriptionPlansAdmin';
 import { CommercialModule } from './admin/management/CommercialModule';
 import { CommercialPlansPage } from './admin/management/CommercialPlansPage';
@@ -111,8 +112,6 @@ import { MonetizationAdmin } from './admin/MonetizationAdmin';
 import { INITIAL_ADMIN_STAFF } from '../data/adminStaffData';
 import { INITIAL_AUDIT_LOGS } from '../data/auditLogsData';
 import { downloadCSV, downloadExcel, downloadPDFReport } from '../utils/exportHelpers';
-import { filterModerationLogs, getModerationWorkflowColumn, transitionModerationLog } from '../utils/moderationWorkflow';
-import { persistModerationDecision } from '../utils/moderationPersistence';
 import {
   Business,
   EventItem,
@@ -122,7 +121,6 @@ import {
   BusinessModelConfig,
   SubscriptionTier,
   BusinessCategory,
-  ModerationLogItem,
   ModerationSettings,
   PaymentTransaction,
   Promotion,
@@ -142,7 +140,6 @@ import {
 } from '../types';
 import { getLanguageShortLabel, getNextLanguage, getTranslation } from '../utils/i18n';
 import { DEFAULT_MODERATION_SETTINGS } from '../utils/moderation';
-import { isEventPast } from '../utils/expiry';
 import { NotificationPreferencesPanel } from './NotificationPreferencesPanel';
 import type { NotificationEventInput } from '../services/notificationService';
 import { usePersistentState } from '../utils/persistentState';
@@ -764,100 +761,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Section 9 Content Moderation Settings & State
   const [modSettings, setModSettings] = useState<ModerationSettings>(DEFAULT_MODERATION_SETTINGS);
-  const [modFilter, setModFilter] = useState<'all' | 'pending' | 'amarelo' | 'vermelho' | 'approved' | 'rejected'>('all');
-  const [modTypeFilter, setModTypeFilter] = useState<'all' | ModerationLogItem['type']>('all');
-  const [modBusinessFilter, setModBusinessFilter] = useState('all');
-  const [modSearchQuery, setModSearchQuery] = useState('');
-  const [modDateFrom, setModDateFrom] = useState('');
-  const [modDateTo, setModDateTo] = useState('');
-  const [selectedModerationDetailId, setSelectedModerationDetailId] = useState<string | null>(null);
 
-  const [moderationLogsList, setModerationLogsList] = useState<ModerationLogItem[]>([
-    {
-      id: 'mod-101',
-      businessName: 'Bar Restaurant Coqueiros',
-      authorName: 'Mamadu Djaló',
-      authorPhone: '+245 955 12 34 56',
-      type: 'post',
-      contentSnippet: 'Kuri pa nos mancebo fasi bo reserva djunto na Restaurant Coqueiros este sábado no Bissau Velho!',
-      imageUrl: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&q=80&w=800',
-      result: {
-        status: 'amarelo',
-        reason: 'Conteúdo em idioma não configurado: Classificado como Amarelo por precaução automática de IA (Secção 9.3).',
-        confidence: 88,
-        detectedCategories: ['idioma não configurado (Precaução 9.3)', 'Divulgação Comercial'],
-        suggestedAction: 'flag_for_human_review',
-        isCriouloLanguage: true,
-      },
-      status: 'pending_human',
-      createdAt: '2026-08-04 17:45',
-      auditTrail: [
-        {
-          timestamp: '2026-08-04 17:45',
-          action: 'auto_classified',
-          actor: 'Sistema IA Gemini',
-          notes: 'Classificado como Amarelo devido a vocabulário em idioma não configurado.',
-        },
-      ],
-    },
-    {
-      id: 'mod-102',
-      businessName: 'Farmácia & Saúde Bissau',
-      authorName: 'Dr. Aliu Embaló',
-      authorPhone: '+245 966 88 77 66',
-      type: 'promotion',
-      contentSnippet: 'Garantido 100% cura definitiva de ansiedade com novo chá natural importado!',
-      imageUrl: '',
-      result: {
-        status: 'vermelho',
-        reason: 'Termos publicitários abusivos e enganosos detetados ("cura definitiva", "garantido 100%").',
-        confidence: 96,
-        detectedCategories: ['Alegação Médica Abusiva / Promessa Falsa'],
-        suggestedAction: 'reject',
-        isCriouloLanguage: false,
-      },
-      status: 'rejected',
-      createdAt: '2026-08-04 16:30',
-      auditTrail: [
-        {
-          timestamp: '2026-08-04 16:30',
-          action: 'auto_classified',
-          actor: 'Sistema IA Gemini',
-          notes: 'Conteúdo rejeitado na submissão por violação das regras de alegações de saúde.',
-        },
-      ],
-    },
-    {
-      id: 'mod-103',
-      businessName: 'Clínica Médica Santa Luzia',
-      authorName: 'Dra. Fatumata Seidi',
-      authorPhone: '+245 955 99 00 11',
-      type: 'post',
-      contentSnippet: 'Consultas de cirurgia geral e pediatria disponíveis sem marcação prévia na zona de Santa Luzia.',
-      imageUrl: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&q=80&w=800',
-      result: {
-        status: 'verde',
-        reason: 'Conteúdo institucional de saúde sem violações detetadas.',
-        confidence: 98,
-        detectedCategories: ['Conteúdo Conforme'],
-        suggestedAction: 'approve',
-        isCriouloLanguage: false,
-      },
-      status: 'approved',
-      createdAt: '2026-08-04 15:10',
-      auditTrail: [
-        {
-          timestamp: '2026-08-04 15:10',
-          action: 'auto_classified',
-          actor: 'Sistema IA Gemini',
-          notes: 'Aprovado e publicado automaticamente.',
-        },
-      ],
-    },
-  ]);
-
-  // Carrega auditoria e moderação directamente da base de dados (PostgreSQL).
-  // Sem BD disponível, ou em falha de rede, mantêm-se as listas locais de demonstração.
+  // Carrega a auditoria directamente da base de dados (PostgreSQL).
+  // Sem BD disponível, ou em falha de rede, mantém-se a lista local.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -866,34 +772,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         if (!response.ok) return;
         const data = await response.json() as { logs?: AuditLogEntry[] };
         if (!cancelled && Array.isArray(data.logs) && data.logs.length > 0) setLogsList(data.logs);
-      } catch { /* manter lista local */ }
-    })();
-    void (async () => {
-      try {
-        const response = await fetch('/api/admin/moderation-logs', { credentials: 'include' });
-        if (!response.ok) return;
-        const data = await response.json() as ModerationLogItem[];
-        if (cancelled || !Array.isArray(data) || data.length === 0) return;
-        // Registos vindos da BD podem vir incompletos (item_data antigo sem
-        // result.status/confidence ou auditTrail). Normalizar à entrada evita
-        // que um único registo malformado derrube o painel inteiro via
-        // error boundary (crash em item.result.status.toUpperCase()).
-        const normalized: ModerationLogItem[] = data.map((item) => ({
-          ...item,
-          businessName: item.businessName ?? 'Sem empresa',
-          authorName: item.authorName ?? 'Desconhecido',
-          createdAt: item.createdAt ?? new Date().toISOString(),
-          auditTrail: Array.isArray(item.auditTrail) ? item.auditTrail : [],
-          result: {
-            status: item.result?.status ?? (item.status === 'approved' ? 'verde' : item.status === 'rejected' || item.status === 'appealed' ? 'vermelho' : 'amarelo'),
-            reason: item.result?.reason ?? 'Sem motivo de análise registado.',
-            confidence: typeof item.result?.confidence === 'number' ? item.result.confidence : 0,
-            suggestedAction: item.result?.suggestedAction ?? 'flag_for_human_review',
-            detectedCategories: item.result?.detectedCategories,
-            isCriouloLanguage: item.result?.isCriouloLanguage,
-          },
-        }));
-        setModerationLogsList(normalized);
       } catch { /* manter lista local */ }
     })();
     return () => { cancelled = true; };
@@ -1465,187 +1343,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     ]);
   };
 
-  const handleApproveModerationLog = async (id: string) => {
-    const eventItem = eventReviewItems.find((entry) => entry.id === id);
-    if (eventItem?.eventId) {
-      if (!onEventModerationDecision) {
-        alert('A aprovação de eventos não está disponível nesta sessão.');
-        return;
-      }
-      try {
-        await onEventModerationDecision(eventItem.eventId, 'approve');
-        setSelectedModerationDetailId(null);
-      } catch (error) {
-        alert(error instanceof Error ? error.message : 'Falha ao aprovar o evento.');
-      }
-      return;
-    }
-    const item = moderationLogsList.find((entry) => entry.id === id);
-    const business = item?.businessName ? businessesList.find((entry) => entry.name === item.businessName) : undefined;
-    const previous = moderationLogsList;
-    setModerationLogsList((prev) =>
-      prev.map((entry) => {
-        if (entry.id === id) {
-          return transitionModerationLog(entry, 'approved', 'Admin Guigui');
-        }
-        return entry;
-      })
-    );
-    try {
-      // O evento de sistema só é emitido depois de o servidor confirmar a decisão.
-      await persistModerationDecision(id, 'approve');
-      if (item && business) {
-        onSystemEvent?.({
-          eventType: item.type === 'business_profile' ? 'BUSINESS_APPROVED' : 'POST_APPROVED',
-          businessId: business.id,
-          businessName: business.name,
-          entityType: item.type === 'business_profile' ? 'business' : 'post',
-          entityId: item.id,
-        });
-      }
-    } catch (error) {
-      setModerationLogsList(previous);
-      alert(error instanceof Error ? error.message : 'Falha ao persistir a decisão de moderação.');
-    }
-  };
-
-  const handleRejectModerationLog = async (id: string) => {
-    const reason = prompt('Indique o motivo da rejeição a enviar ao autor:', 'Violação de regras de concorrência ou conteúdo inadequado');
-    if (!reason) return;
-
-    const eventItem = eventReviewItems.find((entry) => entry.id === id);
-    if (eventItem?.eventId) {
-      if (!onEventModerationDecision) {
-        alert('A rejeição de eventos não está disponível nesta sessão.');
-        return;
-      }
-      try {
-        await onEventModerationDecision(eventItem.eventId, 'reject', reason);
-        setSelectedModerationDetailId(null);
-      } catch (error) {
-        alert(error instanceof Error ? error.message : 'Falha ao rejeitar o evento.');
-      }
-      return;
-    }
-
-    const item = moderationLogsList.find((entry) => entry.id === id);
-    const business = item?.businessName ? businessesList.find((entry) => entry.name === item.businessName) : undefined;
-    const previous = moderationLogsList;
-    setModerationLogsList((prev) =>
-      prev.map((entry) => {
-        if (entry.id === id) {
-          return transitionModerationLog(entry, 'rejected', 'Admin Guigui', reason);
-        }
-        return entry;
-      })
-    );
-    try {
-      // O evento de sistema só é emitido depois de o servidor confirmar a decisão.
-      await persistModerationDecision(id, 'reject', reason);
-      if (item && business) {
-        onSystemEvent?.({
-          eventType: item.type === 'business_profile' ? 'BUSINESS_REJECTED' : 'POST_REJECTED',
-          businessId: business.id,
-          businessName: business.name,
-          entityType: item.type === 'business_profile' ? 'business' : 'post',
-          entityId: item.id,
-          message: reason,
-        });
-      }
-    } catch (error) {
-      setModerationLogsList(previous);
-      alert(error instanceof Error ? error.message : 'Falha ao persistir a decisão de moderação.');
-    }
-  };
-
-  const handleSimulateAppeal = async (id: string) => {
-    const appealText = prompt('Introduza a mensagem de contestação/recurso do autor (SIMULAÇÃO administrativa):', 'Possuo alvará comercial e pretendo esclarecer a oferta.');
-    if (!appealText) return;
-
-    const previous = moderationLogsList;
-    setModerationLogsList((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 16);
-          return {
-            ...item,
-            status: 'appealed',
-            appealReason: `[SIMULAÇÃO] ${appealText}`,
-            auditTrail: [
-              ...item.auditTrail,
-              {
-                timestamp: nowStr,
-                action: 'appeal_simulated',
-                actor: 'Administração (simulação)',
-                notes: `Recurso SIMULADO pela administração: "${appealText}"`,
-              },
-            ],
-          };
-        }
-        return item;
-      })
-    );
-    try {
-      await persistModerationDecision(id, 'simulate-appeal', appealText);
-    } catch (error) {
-      setModerationLogsList(previous);
-      alert(error instanceof Error ? error.message : 'Falha ao registar o recurso simulado.');
-    }
-  };
-
-  // Eventos submetidos por empresas ficam em rascunho até decisão da administração.
-  // Entram na mesma fila de revisão dos restantes conteúdos.
-  const eventReviewItems = useMemo<ModerationLogItem[]>(() => events
-    .filter((event) => event.status === 'draft' && !isEventPast(event))
-    .map((event) => {
-      const business = businessesList.find((entry) => entry.id === event.businessId);
-      const createdAt = `${event.date || ''} ${event.time || ''}`.trim();
-      return {
-        id: `event:${event.id}`,
-        eventId: event.id,
-        businessName: business?.name || event.organizerName || 'Empresa',
-        authorName: event.organizerName || business?.name || 'Empresa',
-        type: 'event',
-        contentSnippet: [event.title, event.description].filter(Boolean).join(' — '),
-        imageUrl: event.coverImage,
-        result: {
-          status: 'amarelo',
-          reason: 'Evento submetido pela empresa e a aguardar aprovação da administração.',
-          confidence: 0,
-          detectedCategories: ['Submissão de evento'],
-          suggestedAction: 'flag_for_human_review',
-          isCriouloLanguage: false,
-        },
-        status: 'pending_human',
-        createdAt: createdAt || '—',
-        auditTrail: [{
-          timestamp: createdAt || '—',
-          action: 'auto_classified',
-          actor: event.organizerName || 'Empresa',
-          notes: 'Evento submetido para revisão da administração.',
-        }],
-      };
-    }), [events, businessesList]);
-
-  const reviewItems = [...eventReviewItems, ...moderationLogsList];
-  const moderationBusinessOptions: string[] = Array.from(new Set<string>(reviewItems.map((item) => item.businessName || '').filter(Boolean))).sort((a, b) => a.localeCompare(b));
-  const filteredModerationItems = filterModerationLogs(reviewItems, {
-    workflow: modFilter === 'pending' || modFilter === 'approved' || modFilter === 'rejected' || modFilter === 'amarelo' || modFilter === 'vermelho' ? modFilter : 'all',
-    type: modTypeFilter,
-    businessName: modBusinessFilter,
-    searchQuery: modSearchQuery,
-    dateFrom: modDateFrom,
-    dateTo: modDateTo,
-  });
-  const moderationTypeLabel = (type: ModerationLogItem['type']) => ({
-    post: 'Publicação',
-    review: 'Avaliação',
-    promotion: 'Promoção',
-    business_profile: 'Perfil empresarial',
-    event: 'Evento',
-  }[type] || type);
-
-
   const flattenedNavigation = useMemo(
     () => adminNavigationGroups.flatMap((group) => group.items),
     [adminNavigationGroups]
@@ -2147,7 +1844,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
                 <span className="text-[11px] font-bold text-slate-200">
-                  {reviewItems.filter((m) => m.status === 'pending_human').length} Itens em Fila de Revisão
+                  {pendingModerationCount} Itens em Fila de Revisão
                 </span>
               </div>
             </div>
@@ -2270,274 +1967,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
           </>)}
 
-          {moderationSection === 'queue' && (<>
-          {/* Pipeline Filters */}
-          <Card className="bg-[var(--color-bg-surface)] p-4 rounded-2xl border border-[var(--color-border-subtle)] shadow-sm space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-blue-600" />
-                <h4 className="text-xs font-black uppercase tracking-wide text-slate-900">Filtros do pipeline</h4>
-              </div>
-              <span className="text-[10px] font-bold text-slate-500">{filteredModerationItems.length} de {reviewItems.length} itens visíveis</span>
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5 font-bold">
-              {[
-                { id: 'pending' as const, label: 'Em revisão', count: reviewItems.filter((m) => getModerationWorkflowColumn(m.status) === 'pending').length },
-                { id: 'approved' as const, label: 'Aprovados', count: reviewItems.filter((m) => getModerationWorkflowColumn(m.status) === 'approved').length },
-                { id: 'rejected' as const, label: 'Rejeitados / Recursos', count: reviewItems.filter((m) => getModerationWorkflowColumn(m.status) === 'rejected').length },
-                { id: 'amarelo' as const, label: 'Classificação Amarela', count: reviewItems.filter((m) => m.result.status === 'amarelo').length },
-                { id: 'vermelho' as const, label: 'Classificação Vermelha', count: reviewItems.filter((m) => m.result.status === 'vermelho').length },
-              ].map((filter) => (
-                <Button type="button" key={filter.id} size="sm" variant={modFilter === filter.id ? 'primary' : 'secondary'} onClick={() => setModFilter(filter.id)} className="px-3 py-1.5 rounded-xl text-xs">
-                  {filter.label} ({filter.count})
-                </Button>
-              ))}
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
-              <label className="text-[10px] font-black uppercase tracking-wide text-slate-500 lg:col-span-2">
-                Pesquisar conteúdo, autor ou empresa
-                <div className="mt-1 flex items-center gap-2 rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-2.5 py-2">
-                  <Search className="h-3.5 w-3.5 text-slate-500" />
-                  <input value={modSearchQuery} onChange={(event) => setModSearchQuery(event.target.value)} placeholder="Ex.: promoção, Mamadu, Coqueiros" className="w-full bg-transparent text-xs font-semibold text-slate-900 outline-none" />
-                </div>
-              </label>
-              <label className="text-[10px] font-black uppercase tracking-wide text-slate-500">
-                Tipo
-                <select value={modTypeFilter} onChange={(event) => setModTypeFilter(event.target.value as typeof modTypeFilter)} className="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-2.5 py-2 text-xs font-bold text-slate-900">
-                  <option value="all">Todos os tipos</option>
-                  <option value="promotion">Promoções</option>
-                  <option value="event">Eventos</option>
-                  <option value="business_profile">Perfis empresariais</option>
-                </select>
-              </label>
-              <label className="text-[10px] font-black uppercase tracking-wide text-slate-500">
-                Empresa
-                <select value={modBusinessFilter} onChange={(event) => setModBusinessFilter(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-2.5 py-2 text-xs font-bold text-slate-900">
-                  <option value="">Selecione uma empresa</option>
-                  {moderationBusinessOptions.map((businessName) => <option value={businessName} key={businessName}>{businessName}</option>)}
-                </select>
-              </label>
-              <Button type="button" variant="secondary" size="sm" onClick={() => { setModFilter('all'); setModTypeFilter('all'); setModBusinessFilter('all'); setModSearchQuery(''); setModDateFrom(''); setModDateTo(''); }} className="self-end rounded-xl border border-[var(--color-border-default)] bg-slate-50 px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-100">
-                Limpar filtros
-              </Button>
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <label className="text-[10px] font-black uppercase tracking-wide text-slate-500">Data inicial<input type="date" value={modDateFrom} onChange={(event) => setModDateFrom(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-2.5 py-2 text-xs font-bold text-slate-900" /></label>
-              <label className="text-[10px] font-black uppercase tracking-wide text-slate-500">Data final<input type="date" value={modDateTo} onChange={(event) => setModDateTo(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-2.5 py-2 text-xs font-bold text-slate-900" /></label>
-            </div>
-          </Card>
-
-          {filteredModerationItems.length === 0 ? (
-            <EmptyState
-              title="Nenhum item corresponde aos filtros seleccionados."
-              description="Altere o estado, a empresa, o tipo, o período ou a pesquisa."
-              icon={<CheckCircle2 className="w-8 h-8 text-emerald-500" />}
-            />
-          ) : (
-            <div className="space-y-2">
-              {filteredModerationItems.map((item) => {
-                const statusLabel = item.status === 'approved'
-                  ? 'Aprovado'
-                  : item.status === 'rejected'
-                    ? 'Rejeitado'
-                    : item.status === 'appealed'
-                      ? 'Em recurso'
-                      : 'Em revisão';
-                const statusClass = item.status === 'approved'
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                  : item.status === 'rejected' || item.status === 'appealed'
-                    ? 'border-red-200 bg-red-50 text-red-800'
-                    : 'border-amber-300 bg-amber-50 text-amber-900';
-                return (
-                  <Card key={item.id} className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 text-xs shadow-sm">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                      <div className="flex min-w-0 flex-1 items-center gap-3">
-                        {item.imageUrl ? (
-                          <img src={item.imageUrl} alt="" className="h-12 w-12 shrink-0 rounded-xl border border-[var(--color-border-subtle)] object-cover" />
-                        ) : (
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border-subtle)] bg-slate-50">
-                            <Calendar className="h-5 w-5 text-slate-500" />
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="font-black text-slate-900">{item.businessName || 'Sem empresa'}</span>
-                            <span className="rounded-lg border border-[var(--color-border-subtle)] bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-700">
-                              {moderationTypeLabel(item.type)}
-                            </span>
-                            <span className={"rounded-full border px-2 py-0.5 text-[10px] font-black " + statusClass}>
-                              {statusLabel}
-                            </span>
-                          </div>
-                          <p className="mt-1 line-clamp-1 text-[11px] font-medium text-slate-700">{item.contentSnippet || 'Sem conteúdo.'}</p>
-                          <p className="mt-0.5 text-[10px] text-slate-500">
-                            {item.authorName}{item.authorPhone ? ` (${item.authorPhone})` : ''} · {item.createdAt}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-                        <Button type="button" variant="secondary" size="sm"
-                          onClick={() => setSelectedModerationDetailId(item.id)}
-                          className="flex items-center gap-1.5 rounded-xl border border-[var(--color-border-default)] bg-slate-50 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
-                        >
-                          <Eye className="h-4 w-4" />
-                          <span>Detalhe</span>
-                        </Button>
-                        {item.status !== 'approved' && (
-                          <Button type="button" variant="primary" size="sm"
-                            onClick={() => void handleApproveModerationLog(item.id)}
-                            className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white hover:bg-emerald-700"
-                          >
-                            <Check className="h-4 w-4" />
-                            <span>Aprovar</span>
-                          </Button>
-                        )}
-                        {item.status !== 'rejected' && item.status !== 'appealed' && (
-                          <Button type="button" variant="danger" size="sm"
-                            onClick={() => void handleRejectModerationLog(item.id)}
-                            className="flex items-center gap-1.5 rounded-xl bg-red-100 px-3 py-2 text-xs font-extrabold text-red-900 hover:bg-red-200"
-                          >
-                            <X className="h-4 w-4" />
-                            <span>Rejeitar</span>
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
+          {moderationSection === 'queue' && (
+            <CentralModerationPanel />
           )}
-
-          {selectedModerationDetailId && (() => {
-            const item = reviewItems.find((entry) => entry.id === selectedModerationDetailId);
-            if (!item) return null;
-            const event = item.eventId ? events.find((entry) => entry.id === item.eventId) : undefined;
-            return (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
-                <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[var(--color-bg-surface)] p-5 text-xs shadow-2xl">
-                  <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
-                    <div>
-                      <h3 className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
-                        <Eye className="h-4 w-4 text-blue-600" />
-                        <span>Detalhe do conteúdo</span>
-                      </h3>
-                      <p className="mt-0.5 text-[10px] text-slate-500">{item.id}</p>
-                    </div>
-                    <button type="button"
-                      onClick={() => setSelectedModerationDetailId(null)}
-                      className="guigui-close-button"
-                      aria-label="Fechar detalhe"
-                      title="Fechar"
-                    >
-                      <X className="h-4 w-4" aria-hidden="true" />
-                    </button>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {[
-                      ['Empresa', item.businessName || '—'],
-                      ['Autor', item.authorName],
-                      ['Tipo', moderationTypeLabel(item.type)],
-                      ['Data', item.createdAt],
-                    ].map(([label, value]) => (
-                      <div key={label} className="rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 p-2.5">
-                        <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">{label}</div>
-                        <div className="mt-0.5 font-bold text-slate-800">{value}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {event ? (
-                    <div className="mt-3 space-y-3">
-                      {event.coverImage && <img src={event.coverImage} alt="" className="h-40 w-full rounded-xl border border-[var(--color-border-subtle)] object-cover" />}
-                      <div>
-                        <h4 className="text-base font-black text-slate-900">{event.title}</h4>
-                        <p className="mt-1 whitespace-pre-line leading-relaxed text-slate-700">{event.description || 'Sem descrição registada.'}</p>
-                      </div>
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        {[
-                          ['Data e hora', `${event.date || '—'} ${event.time || ''}`],
-                          ['Local', `${event.location || '—'}${event.neighborhood ? ` · ${event.neighborhood}` : ''}`],
-                          ['Categoria', event.category || '—'],
-                          ['Organizador', event.organizerName || item.businessName || '—'],
-                        ].map(([label, value]) => (
-                          <div key={label}>
-                            <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">{label}</div>
-                            <div className="mt-0.5 font-medium text-slate-700">{value}</div>
-                          </div>
-                        ))}
-                      </div>
-                      <div>
-                        <h4 className="mb-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Tipos de bilhete</h4>
-                        <table className="w-full border-collapse text-left text-[10.5px]">
-                          <thead><tr className="bg-slate-50 text-[9px] uppercase text-slate-500"><th className="p-2">Tipo</th><th className="p-2">Preço</th><th className="p-2">Vendidos</th><th className="p-2">Disponíveis</th></tr></thead>
-                          <tbody>
-                            {(event.ticketTypes || []).map((type) => (
-                              <tr key={type.id} className="border-b border-slate-100">
-                                <td className="p-2 font-bold">{type.name}</td>
-                                <td className="p-2">{type.priceXOF.toLocaleString('pt-PT')} XOF</td>
-                                <td className="p-2">{type.soldQuantity}</td>
-                                <td className="p-2">{type.availableQuantity}</td>
-                              </tr>
-                            ))}
-                            {(event.ticketTypes || []).length === 0 && <tr><td colSpan={4} className="p-3 text-center text-slate-500">Sem tipos de bilhete registados.</td></tr>}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-3 space-y-2">
-                      <p className="rounded-xl border border-[var(--color-border-subtle)] bg-slate-50 p-3 font-medium leading-relaxed text-slate-900">
-                        "{item.contentSnippet}"
-                      </p>
-                      <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-900">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                        <div>
-                          <strong className="font-extrabold">Motivo da análise:</strong> {item.result.reason}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mt-3 border-t border-slate-100 pt-3">
-                    <h4 className="mb-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Trilho de auditoria</h4>
-                    <div className="space-y-1.5">
-                      {item.auditTrail.map((log, index) => (
-                        <div key={index} className="flex items-start gap-2 rounded-lg bg-slate-50 p-2 text-[10.5px]">
-                          <span className="min-w-[100px] text-slate-500">{log.timestamp}</span>
-                          <span className="rounded bg-slate-200 px-1.5 py-0.5 font-bold text-slate-700">{log.actor}</span>
-                          <span className="flex-1 text-slate-600">{log.notes}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3">
-                    {item.status !== 'approved' && (
-                      <Button type="button" variant="primary" size="sm"
-                        onClick={() => { void handleApproveModerationLog(item.id).finally(() => setSelectedModerationDetailId(null)); }}
-                        className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white hover:bg-emerald-700"
-                      >
-                        <Check className="h-4 w-4" />
-                        <span>Aprovar</span>
-                      </Button>
-                    )}
-                    {item.status !== 'rejected' && item.status !== 'appealed' && (
-                      <Button type="button" variant="danger" size="sm"
-                        onClick={() => { void handleRejectModerationLog(item.id).finally(() => setSelectedModerationDetailId(null)); }}
-                        className="flex items-center gap-1.5 rounded-xl bg-red-100 px-4 py-2 text-xs font-extrabold text-red-900 hover:bg-red-200"
-                      >
-                        <X className="h-4 w-4" />
-                        <span>Rejeitar</span>
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-          </>)}
         </div>
       )}
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, ExternalLink, Megaphone } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ExternalLink, MapPin, Megaphone } from 'lucide-react';
 import type { AdCampaign, Business } from '../types';
 
 interface FeaturedHomepageBannerProps {
@@ -98,20 +98,31 @@ export const FeaturedHomepageBanner: React.FC<FeaturedHomepageBannerProps> = ({
               <img src={image} alt="" aria-hidden="true" className="guigui-sponsored-bg" />
             </div>
           ) : null}
+          <div className="guigui-sponsored-shade" aria-hidden="true" />
           <div className="guigui-sponsored-content">
             <span className="guigui-sponsored-label">Empresa em destaque</span>
-            <SlideTitle value={activeSlide.business.name} />
-            {activeSlide.business.description && (
-              <p className="guigui-sponsored-description">{activeSlide.business.description}</p>
-            )}
-            <button
-              type="button"
-              onClick={() => onBusinessSelect(activeSlide.business)}
-              className="guigui-sponsored-cta"
-              aria-label={`Ver perfil público de ${activeSlide.business.name}`}
-            >
-              Ver perfil público <ExternalLink aria-hidden="true" className="h-4 w-4" />
-            </button>
+            <div className="guigui-sponsored-main">
+              <div className="guigui-sponsored-copy">
+                <SlideTitle value={activeSlide.business.name} />
+                {(activeSlide.business.neighborhood || activeSlide.business.address) && (
+                  <p className="guigui-sponsored-location">
+                    <MapPin aria-hidden="true" className="h-4 w-4" />
+                    <span>{activeSlide.business.neighborhood || activeSlide.business.address}, Guiné-Bissau</span>
+                  </p>
+                )}
+                {activeSlide.business.description && (
+                  <p className="guigui-sponsored-description">{activeSlide.business.description}</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => onBusinessSelect(activeSlide.business)}
+                className="guigui-sponsored-cta"
+                aria-label={`Ver perfil público de ${activeSlide.business.name}`}
+              >
+                Ver perfil público <ExternalLink aria-hidden="true" className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
       ) : (
@@ -127,18 +138,23 @@ export const FeaturedHomepageBanner: React.FC<FeaturedHomepageBannerProps> = ({
               <img src={image} alt="" aria-hidden="true" className="guigui-sponsored-bg" />
             </div>
           ) : null}
+          <div className="guigui-sponsored-shade" aria-hidden="true" />
           <div className="guigui-sponsored-content">
             <span className="guigui-sponsored-label">
               <Megaphone aria-hidden="true" className="h-3.5 w-3.5 text-[#F58220]" />
               Publicidade — {activeSlide.campaign.audience === 'all' ? 'Comunidade Guigui' : activeSlide.campaign.audience || 'Comunidade Guigui'}
             </span>
-            <SlideTitle value={activeSlide.campaign.title} />
-            {activeSlide.campaign.description && (
-              <p className="guigui-sponsored-description">{activeSlide.campaign.description}</p>
-            )}
-            <span className="guigui-sponsored-cta">
-              Saber mais <ArrowRight aria-hidden="true" className="h-4 w-4" />
-            </span>
+            <div className="guigui-sponsored-main">
+              <div className="guigui-sponsored-copy">
+                <SlideTitle value={activeSlide.campaign.title} />
+                {activeSlide.campaign.description && (
+                  <p className="guigui-sponsored-description">{activeSlide.campaign.description}</p>
+                )}
+              </div>
+              <span className="guigui-sponsored-cta">
+                Saber mais <ArrowRight aria-hidden="true" className="h-4 w-4" />
+              </span>
+            </div>
           </div>
         </a>
       )}
