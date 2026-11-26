@@ -156,7 +156,7 @@ import { markPostgresMonetizationRefunded, persistPostgresMonetization } from '.
 import { persistPostgresCatalog } from './server/postgresCatalogService';
 import { createPostgresReview, flagPostgresReview, isReviewAllowed, listPostgresReviews, moderatePostgresReview, replyPostgresReview } from './server/postgresReviewService';
 import { normaliseReviewComment, validateReviewInput } from './src/utils/reviews';
-import { assignPostgresBusinessOwner, decidePostgresBusiness, deletePostgresBusiness, getAppState, getPostgresBusiness, InvalidFeaturedBusinessOrderError, listPendingPostgresBusinesses, listPostgresBusinesses, listPostgresEvents, persistPostgresBusiness, persistPostgresEvent, setAppState, setPostgresBusinessFeaturedOrder, updatePostgresBusinessProfile } from './server/postgresBusinessService';
+import { assignPostgresBusinessOwner, decidePostgresBusiness, deletePostgresBusiness, getAppState, getPostgresBusiness, InvalidFeaturedBusinessOrderError, listPendingPostgresBusinesses, listPostgresBusinesses, listPostgresEvents, persistPostgresBusiness, persistPostgresEvent, setAppState, setPostgresBusinessFeaturedOrder, updatePostgresBusinessProfile, updatePostgresBusinessStatus } from './server/postgresBusinessService';
 
 import {
   addPostComment,
@@ -3354,6 +3354,62 @@ app.post('/api/admin/businesses/:id/decision', requireRole('admin'), async (req,
   } catch (error) {
     recordAudit({ action: 'business_decision_failed', resource: 'company', resourceId: req.params.id, actorRole: 'admin', actorName: context.userId, requestId, success: false, metadata: { decision, reason, error: error instanceof Error ? error.message : 'unknown' } });
     res.status(500).json({ error: 'Não foi possível persistir a decisão administrativa.', code: 'BUSINESS_DECISION_FAILED' });
+  }
+});
+
+// Suspender/reactivar é uma acção operacional distinta da decisão de
+// aprovação: só se suspende uma empresa activa e só se reactiva uma suspensa,
+// para que o estado "pending" continue a ter de passar por /decision.
+app.patch('/api/admin/businesses/:id/status', requireRole('admin'), async (req, res) => {
+  const requestId = requestIdFrom(req);
+  const context = await sessionContext(req);
+  if (!context) return res.status(401).json({ error: 'Sessão autenticada necessária.', code: 'AUTHENTICATION_REQUIRED' });
+  if (!databaseConfigured) return res.status(503).json({ error: 'A base de dados PostgreSQL é necessária para alterar o estado da empresa.', code: 'DATABASE_REQUIRED' });
+  const status = req.body?.status;
+  if (status !== 'active' && status !== 'suspended') {
+    return res.status(400).json({ error: 'O estado deve ser active ou suspended.', code: 'INVALID_BUSINESS_STATUS' });
+  }
+  try {
+    const current = await getPostgresBusiness(req.params.id);
+    if (!current) return res.status(404).json({ error: 'Empresa não encontrada.', code: 'BUSINESS_NOT_FOUND' });
+    const previousStatus = String(current.status ?? '');
+    const allowed = status === 'suspended' ? previousStatus === 'active' : previousStatus === 'suspended';
+    if (!allowed) {
+      return res.status(409).json({
+        error: status === 'suspended'
+          ? 'Só é possível suspender uma empresa activa.'
+          : 'Só é possível reactivar uma empresa suspensa.',
+        code: 'BUSINESS_STATUS_TRANSITION_NOT_ALLOWED',
+        currentStatus: previousStatus,
+      });
+    }
+    const business = await updatePostgresBusinessStatus(req.params.id, status);
+    if (!business) return res.status(404).json({ error: 'Empresa não encontrada.', code: 'BUSINESS_NOT_FOUND' });
+    recordAudit({
+      action: status === 'suspended' ? 'business_suspended' : 'business_reactivated',
+      resource: 'company',
+      resourceId: req.params.id,
+      // requireRole('admin') já garantiu o papel; SessionRole inclui 'user',
+      // que não faz parte de GuiguiRole.
+      actorRole: 'admin',
+      actorId: context.userId,
+      requestId,
+      success: true,
+      metadata: { previousStatus, status },
+    });
+    res.json({ success: true, business });
+  } catch (error) {
+    recordAudit({
+      action: 'business_status_failed',
+      resource: 'company',
+      resourceId: req.params.id,
+      actorRole: 'admin',
+      actorId: context.userId,
+      requestId,
+      success: false,
+      metadata: { status, error: error instanceof Error ? error.message : 'unknown' },
+    });
+    res.status(500).json({ error: 'Não foi possível alterar o estado da empresa.', code: 'BUSINESS_STATUS_UPDATE_FAILED' });
   }
 });
 
