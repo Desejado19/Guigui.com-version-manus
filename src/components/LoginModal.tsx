@@ -2,10 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile, UserRole, SubscriptionTier, CategoryGroupId, SubscriptionPlan, BusinessModelConfig, Language } from '../types';
 import type { Business } from '../types';
 import {
-  ShieldCheck,
   Building2,
   User,
-  Key,
   Mail,
   Lock,
   ArrowRight,
@@ -337,22 +335,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       onLogin(payload.user as UserProfile);
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : t('requestFailed'));
-    }
-  };
-
-  const handleDemoLogin = async (account: UserProfile) => {
-    setError(null);
-    try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: account.email, password: 'Guigui@2026!' }),
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload.user) throw new Error(payload.error || t('auth.demoFailed'));
-      onLogin(payload.user as UserProfile);
-    } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : t('auth.demoFailed'));
     }
   };
 
@@ -898,44 +880,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 </button>
               </p>
 
-              <div className="space-y-3 rounded-2xl border border-[#C2DFD4] bg-[#EEF7F4] p-4 dark:border-[var(--color-green-800)] dark:bg-[var(--color-bg-surface-dark)]">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-[#0B3B37] dark:text-[#F0B65B]">
-                    <Key className="h-3.5 w-3.5 text-[#0B3B37]" />
-                    Contas de demonstração
-                  </h3>
-                  <code className="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-700 shadow-sm dark:bg-[var(--color-bg-subtle)] dark:text-[#DCEAE6]">Guigui@2026!</code>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void handleDemoLogin(DEMO_ACCOUNTS[0])}
-                    className="flex flex-col items-center justify-center gap-1 rounded-xl border border-[var(--color-border-subtle)] bg-white px-2 py-2 text-[11px] font-bold text-[#0B3B37] transition hover:border-[#0B3B37] hover:text-[#0B3B37] sm:flex-row sm:gap-2 sm:text-xs"
-                  >
-                    <User className="h-4 w-4" />
-                    Cidadão
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleDemoLogin(DEMO_ACCOUNTS[1])}
-                    className="flex flex-col items-center justify-center gap-1 rounded-xl border border-[var(--color-border-subtle)] bg-white px-2 py-2 text-[11px] font-bold text-[#0B3B37] transition hover:border-[#176158] hover:text-[#176158] sm:flex-row sm:gap-2 sm:text-xs"
-                  >
-                    <Building2 className="h-4 w-4" />
-                    Empresa
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleDemoLogin(DEMO_ACCOUNTS[2])}
-                    className="flex flex-col items-center justify-center gap-1 rounded-xl border border-[var(--color-border-subtle)] bg-white px-2 py-2 text-[11px] font-bold text-[#0B3B37] transition hover:border-[#C9852A] hover:text-[#A86516] sm:flex-row sm:gap-2 sm:text-xs"
-                  >
-                    <ShieldCheck className="h-4 w-4" />
-                    Admin
-                  </button>
-                </div>
-                <p className="text-[10px] leading-relaxed text-slate-500 dark:text-[#9BCDBB]">
-                  Acesso rápido de teste ao cidadão, empresa e administração com a senha indicada acima.
-                </p>
-              </div>
             </div>
           )}
 
@@ -949,7 +893,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </div>
               <form onSubmit={handleRequestPasswordReset} className="space-y-3">
                 <label className="block text-xs font-bold text-slate-700">E-mail da conta
-                  <input type="email" required value={resetEmail} onChange={(event) => setResetEmail(event.target.value)} placeholder="ex: cidadao.teste@guigui.com" className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input type="email" required value={resetEmail} onChange={(event) => setResetEmail(event.target.value)} placeholder="ex: nome@exemplo.com" className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </label>
                 <button type="submit" className="w-full px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl">Enviar código de recuperação</button>
               </form>
