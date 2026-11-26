@@ -1,0 +1,766 @@
+import React, { useMemo, useState, useEffect } from 'react';
+import {
+  Bell,
+  CalendarDays,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Globe,
+  Heart,
+  LockKeyhole,
+  MapPin,
+  Palette,
+  ShieldCheck,
+  UserX,
+  Ticket,
+  UserRound,
+  WalletCards,
+  X,
+  MessageCircle,
+  LifeBuoy,
+} from 'lucide-react';
+import { AppNotification, Business, Conversation, ConversationMessage, EventReminder, Language, NotificationPreferences, PurchaseOrder, SupportCategory, SupportRequest, UserProfile } from '../types';
+import { CommunicationHub } from './CommunicationHub';
+import { QRCodeDisplay } from './QRCodeDisplay';
+import { MyTicketsPanel } from './MyTicketsPanel';
+import { formatCurrencyXOF, getLanguageShortLabel, getNextLanguage, getTranslation } from '../utils/i18n';
+import { Badge, Button, Card, EmptyState, IconButton, Panel, PanelHeader, StatCard } from './ui';
+import { ChangePasswordCard } from './security/ChangePasswordCard';
+
+interface CitizenDashboardProps {
+  currentUser: UserProfile;
+  currentLang: Language;
+  currentThemeMode?: 'light' | 'dark' | 'auto';
+  onLanguageChange?: (lang: Language) => void;
+  onThemeModeChange?: (mode: 'light' | 'dark' | 'auto') => void;
+  purchaseOrders: PurchaseOrder[];
+  focusOrderId?: string | null;
+  focusConversationId?: string | null;
+  focusSupportId?: string | null;
+  initialSection?: 'overview' | 'support' | 'tickets';
+  initialMessageBusinessId?: string | null;
+  reminders: EventReminder[];
+  notifications: AppNotification[];
+  favoriteBusinesses: Business[];
+  businesses: Business[];
+  conversations: Conversation[];
+  conversationMessages: ConversationMessage[];
+  supportRequests: SupportRequest[];
+  onCreateConversation: (businessId: string, subject: string, text: string) => void;
+  onSendMessage: (conversationId: string, text: string) => void;
+  onCreateSupport: (subject: string, description: string, businessId?: string, category?: SupportCategory) => void;
+  onReplySupport: (requestId: string, text: string) => void;
+  onMarkConversationRead: (conversationId: string) => void;
+  onMarkNotificationAsRead?: (id: string) => void;
+  onOpenNotification?: (notification: AppNotification) => void;
+  notificationPreferences?: NotificationPreferences;
+  onNotificationPreferencesChange?: (next: NotificationPreferences) => void;
+  onProfileChange?: (profile: Partial<UserProfile>) => void | Promise<void>;
+  onDeactivateAccount?: () => Promise<void>;
+  onDeleteAccount?: () => Promise<void>;
+  sidebarCollapsed?: boolean;
+  onSidebarCollapsedChange?: (collapsed: boolean) => void;
+  onExplore: () => void;
+}
+
+type CitizenSection =
+  | 'overview'
+  | 'tickets'
+  | 'purchases'
+  | 'notifications'
+  | 'messages'
+  | 'support'
+  // Módulos agregados: os dois antigos módulos de conta e os dois de definições.
+  | 'account-profile'
+  | 'security-settings'
+  // Identificadores antigos, mantidos apenas para encaminhar links existentes.
+  | 'account-data'
+  | 'personal-settings'
+  | 'privacy-settings'
+  | 'system-settings';
+
+export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
+  currentUser,
+  currentLang,
+  currentThemeMode = 'auto',
+  onLanguageChange,
+  onThemeModeChange,
+  purchaseOrders,
+  focusOrderId,
+  focusConversationId,
+  focusSupportId,
+  initialSection = 'overview',
+  initialMessageBusinessId,
+  reminders,
+  notifications,
+  favoriteBusinesses,
+  businesses,
+  conversations,
+  conversationMessages,
+  supportRequests,
+  onCreateConversation,
+  onSendMessage,
+  onCreateSupport,
+  onReplySupport,
+  onMarkConversationRead,
+  onMarkNotificationAsRead,
+  onOpenNotification,
+  notificationPreferences,
+  onNotificationPreferencesChange,
+  onProfileChange,
+  onDeactivateAccount,
+  onDeleteAccount,
+  sidebarCollapsed: controlledSidebarCollapsed,
+  onSidebarCollapsedChange,
+  onExplore,
+}) => {
+  const t = (key: string, variables?: Record<string, string | number>) => getTranslation(currentLang, key, variables);
+  const formatXOF = (value: number) => formatCurrencyXOF(value, currentLang);
+  const [section, setSection] = useState<CitizenSection>(initialSection);
+  const [accountProfileTab, setAccountProfileTab] = useState<'data' | 'profile'>('data');
+  const [securitySettingsTab, setSecuritySettingsTab] = useState<'privacy' | 'system'>('privacy');
+
+  React.useEffect(() => {
+    if (!focusConversationId && !focusSupportId) setSection(initialSection);
+  }, [focusConversationId, focusSupportId, initialSection, initialMessageBusinessId]);
+
+  // Os quatro módulos antigos passaram a duas páginas agregadas. Qualquer
+  // referência antiga (atalho, estado restaurado) abre a secção correspondente.
+  React.useEffect(() => {
+    if (section === 'account-data') {
+      setAccountProfileTab('data');
+      setSection('account-profile');
+    } else if (section === 'personal-settings') {
+      setAccountProfileTab('profile');
+      setSection('account-profile');
+    } else if (section === 'privacy-settings') {
+      setSecuritySettingsTab('privacy');
+      setSection('security-settings');
+    } else if (section === 'system-settings') {
+      setSecuritySettingsTab('system');
+      setSection('security-settings');
+    }
+  }, [section]);
+    const [selectedTicket, setSelectedTicket] = useState<PurchaseOrder | null>(null);
+
+  // Allow closing the ticket modal via the Escape key for better accessibility
+  useEffect(() => {
+    if (!selectedTicket) return;
+    const onKeydown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedTicket(null);
+    };
+    document.addEventListener('keydown', onKeydown);
+    return () => document.removeEventListener('keydown', onKeydown);
+  }, [selectedTicket]);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [profileForm, setProfileForm] = useState({
+    name: currentUser.name,
+    email: currentUser.email || '',
+    phone: currentUser.phone,
+    neighborhood: currentUser.neighborhood,
+    avatarUrl: currentUser.avatarUrl,
+  });
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [privacySettings, setPrivacySettings] = useState(currentUser.privacySettings || {
+    privateProfile: true,
+    sessionAlerts: true,
+    secureMessages: true,
+    dataPersonalization: true,
+  });
+  const [passwordChanged, setPasswordChanged] = useState(Boolean(currentUser.passwordChangedAt));
+
+  // CSRF token from double-submit cookie pattern
+  const [csrfToken, setCsrfToken] = useState<string>('');
+  useEffect(() => {
+    const cookieHeader = document.cookie || '';
+          const csrfMatch = cookieHeader.match(/(?:^|;\s*)_csrf=([^;]+)/);
+    if (csrfMatch) {
+      setCsrfToken(csrfMatch[1]);
+    }
+  }, []);
+
+  // Helper to get CSRF headers for state-changing requests
+  const getCsrfHeaders = () => {
+    return { 'X-CSRF-Token': csrfToken };
+  };
+  const [ticketPreference, setTicketPreference] = useState<'digital' | 'both'>(currentUser.ticketPreference || 'digital');
+  const [communicationPreference, setCommunicationPreference] = useState<'email' | 'sms' | 'both'>(currentUser.communicationPreference || 'both');
+
+  React.useEffect(() => {
+    setProfileForm({
+      name: currentUser.name,
+      email: currentUser.email || '',
+      phone: currentUser.phone,
+      neighborhood: currentUser.neighborhood,
+      avatarUrl: currentUser.avatarUrl,
+    });
+    setPrivacySettings(currentUser.privacySettings || {
+      privateProfile: true,
+      sessionAlerts: true,
+      secureMessages: true,
+      dataPersonalization: true,
+    });
+    setTicketPreference(currentUser.ticketPreference || 'digital');
+    setCommunicationPreference(currentUser.communicationPreference || 'both');
+    setPasswordChanged(Boolean(currentUser.passwordChangedAt));
+  }, [currentUser]);
+
+  const updateProfile = (profile: Partial<UserProfile>) => onProfileChange?.(profile);
+
+  React.useEffect(() => {
+    if (focusConversationId || focusSupportId) {
+      setSection('support');
+      return;
+    }
+    if (!focusOrderId) return;
+    const order = purchaseOrders.find((candidate) => candidate.id === focusOrderId);
+    if (order) {
+      setSection(order.itemType === 'ticket' ? 'tickets' : 'purchases');
+      if (order.itemType === 'ticket') setSelectedTicket(order);
+    }
+  }, [focusConversationId, focusOrderId, focusSupportId, purchaseOrders]);
+
+  const ticketOrders = useMemo(() => purchaseOrders.filter((order) => order.itemType === 'ticket'), [purchaseOrders]);
+  const nonTicketOrders = useMemo(() => purchaseOrders.filter((order) => order.itemType !== 'ticket'), [purchaseOrders]);
+  const pendingOrders = purchaseOrders.filter((order) => order.status === 'pending');
+  const unreadNotifications = notifications.filter((notification) => !notification.read).length;
+
+  const copyCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = code;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      textarea.remove();
+    }
+    setCopiedCode(code);
+    window.setTimeout(() => setCopiedCode((current) => current === code ? null : current), 1800);
+  };
+
+  const statusLabel = (status: PurchaseOrder['status']) => status === 'redeemed' ? t('ticketUsed') : status === 'cancelled' ? t('ticketCancelled') : t('ticketPending');
+  const statusClass = (status: PurchaseOrder['status']) => status === 'redeemed'
+    ? 'bg-[var(--color-green-100)] text-[var(--color-green-700)] dark:bg-[var(--color-green-950)/50] dark:text-[var(--color-green-300)]'
+    : status === 'cancelled'
+      ? 'bg-[var(--color-red-100)] text-[var(--color-red-700)] dark:bg-[var(--color-red-950)/50] dark:text-[var(--color-red-300)]'
+      : 'bg-[var(--color-yellow-100)] text-[var(--color-yellow-700)] dark:bg-[var(--color-yellow-950)/50] dark:text-[var(--color-yellow-300)]';
+
+  const settingToggle = (key: keyof typeof privacySettings, label: string, description: string) => (
+    <Panel className="flex cursor-pointer items-center justify-between gap-4">
+      <span><span className="block text-sm font-black text-[var(--color-text-strong)]">{label}</span><span className="mt-1 block text-xs leading-relaxed text-[var(--color-text-muted)]">{description}</span></span>
+      <input type="checkbox" checked={privacySettings[key]} onChange={(event) => { const next = { ...privacySettings, [key]: event.target.checked }; setPrivacySettings(next); updateProfile({ privacySettings: next }); }} className="h-5 w-5 accent-[var(--color-green-600)]" />
+    </Panel>
+  );
+
+  const fieldClass = 'mt-1 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-3 py-2.5 text-sm font-semibold text-[var(--color-text-strong)] outline-none focus:border-[var(--color-green-600)]';
+
+  const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      setProfileError('Selecione uma imagem PNG, JPG ou WebP.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileError('A fotografia deve ter no máximo 5 MB.');
+      return;
+    }
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      const maxSide = 512;
+      const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      const context = canvas.getContext('2d');
+      URL.revokeObjectURL(objectUrl);
+      if (!context) {
+        setProfileError('Não foi possível preparar a fotografia.');
+        return;
+      }
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      setProfileError('');
+      setProfileForm((current) => ({ ...current, avatarUrl: canvas.toDataURL('image/jpeg', 0.86) }));
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      setProfileError('Não foi possível carregar a fotografia.');
+    };
+    image.src = objectUrl;
+  };
+
+  const handleProfileSave = async () => {
+    if (!onProfileChange) return;
+    setProfileError('');
+    setProfileSaving(true);
+    try {
+      await onProfileChange(profileForm);
+      setProfileSaved(true);
+      window.setTimeout(() => setProfileSaved(false), 2500);
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : 'Não foi possível guardar os dados.');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const renderOrderCard = (order: PurchaseOrder, isTicket = false) => (
+    <Card key={order.id} className="p-4" interactive>
+      <div className="flex items-start gap-3">
+        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${isTicket ? 'bg-[var(--color-blue-100)] text-[var(--color-blue-700)]' : 'bg-[var(--color-yellow-100)] text-[var(--color-yellow-700)]'}`}>
+          {isTicket ? <Ticket className="h-5 w-5" aria-hidden="true" /> : <WalletCards className="h-5 w-5" aria-hidden="true" />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="line-clamp-2 text-sm font-black text-[var(--color-text-strong)]">{order.itemTitle}</p>
+          <p className="mt-1 text-[11px] font-semibold text-[var(--color-text-muted)]">{order.businessName} Â· {new Date(order.purchasedAt).toLocaleDateString('pt-PT')}</p>
+          <p className="mt-1 font-mono text-[11px] font-black tracking-wide text-[var(--color-blue-600)] dark:text-blue-300">{order.orderCode}</p>
+        </div>
+        <Badge variant="neutral" className={`shrink-0 border-0 px-2 py-1 text-[9px] uppercase ${statusClass(order.status)}`}>{statusLabel(order.status)}</Badge>
+      </div>
+      {isTicket && order.ticketCredentials && order.ticketCredentials.length > 1 && <div className="mt-3 rounded-xl bg-[var(--color-blue-50)] p-3"><p className="mb-2 text-[10px] font-black uppercase tracking-wide text-[var(--color-blue-600)] dark:text-blue-300">Credenciais individuais ({order.ticketCredentials.length})</p><div className="grid gap-2 sm:grid-cols-2">{order.ticketCredentials.map((credential, index) => <button key={credential.id} type="button" onClick={() => setSelectedTicket({ ...order, orderCode: credential.ticketCode, qrToken: credential.qrToken, ticketPin: credential.pinCode, customerName: credential.holderName || order.customerName, customerPhone: credential.holderPhone || order.customerPhone })} className="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-2.5 py-2 text-left text-[10px] font-black text-[var(--color-text-strong)] hover:border-[var(--color-green-600)]">{index + 1}. {credential.holderName || order.holderName || order.customerName}<span className="mt-0.5 block font-mono text-[9px]">{credential.ticketCode}</span></button>)}</div></div>}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-border-subtle)] pt-3">
+        <span className="text-xs font-black text-[var(--color-text-strong)]">{formatXOF(order.totalPriceXOF)}</span>
+        {isTicket && (
+          <Button type="button" variant="primary" size="sm" onClick={() => setSelectedTicket(order)} className="min-h-10 bg-[var(--color-green-700)] text-[11px] hover:bg-[var(--color-green-800)]">
+            Abrir bilhete <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [internalSidebarCollapsed, setInternalSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.localStorage.getItem('guigui-citizen-sidebar-collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const sidebarCollapsed = controlledSidebarCollapsed ?? internalSidebarCollapsed;
+  const setSidebarCollapsed = (next: boolean | ((current: boolean) => boolean)) => {
+    const value = typeof next === 'function' ? next(sidebarCollapsed) : next;
+    onSidebarCollapsedChange?.(value);
+    if (!onSidebarCollapsedChange) setInternalSidebarCollapsed(value);
+  };
+
+  React.useEffect(() => {
+    try {
+      window.localStorage.setItem('guigui-citizen-sidebar-collapsed', String(sidebarCollapsed));
+    } catch {
+      // Ignore storage write issues in restricted environments.
+    }
+  }, [sidebarCollapsed]);
+
+  const citizenNavigationGroups: Array<{ heading: string; items: Array<{ id: CitizenSection; label: string; icon: React.ElementType; count?: number }> }> = [
+    { heading: 'Menu principal', items: [
+      { id: 'overview', label: 'Visão geral', icon: WalletCards },
+      { id: 'tickets', label: 'Bilhetes e compras', icon: Ticket, count: ticketOrders.length },
+      { id: 'purchases', label: 'Compras', icon: WalletCards, count: nonTicketOrders.length },
+    ] },
+    { heading: 'Comunicação', items: [
+      { id: 'notifications', label: 'Notificações', icon: Bell, count: unreadNotifications },
+      { id: 'support', label: 'Suporte', icon: LifeBuoy },
+    ] },
+    { heading: 'Conta', items: [
+      { id: 'account-profile', label: 'Conta e perfil', icon: UserRound },
+      { id: 'security-settings', label: 'Segurança e definições', icon: ShieldCheck },
+    ] },
+  ];
+
+  const currentCitizenSection = citizenNavigationGroups.flatMap((group) => group.items).find((item) => item.id === section)?.label || 'Minha Conta';
+  const effectivePrivacySettings = currentUser.privacySettings || privacySettings;
+  const privacyStatusLabel = effectivePrivacySettings.privateProfile ? 'Perfil privado activo' : 'Perfil visível';
+  const passwordStatusLabel = currentUser.passwordChangedAt ? `Palavra-passe actualizada em ${new Date(currentUser.passwordChangedAt).toLocaleDateString('pt-PT')}` : 'Palavra-passe protegida';
+  const themeLabel = currentThemeMode === 'dark' ? 'Escuro' : currentThemeMode === 'light' ? 'Claro' : 'Auto';
+  const nextThemeMode: 'light' | 'dark' | 'auto' = currentThemeMode === 'dark' ? 'light' : currentThemeMode === 'light' ? 'auto' : 'dark';
+  const languageLabel = getLanguageShortLabel(currentLang);
+  const nextLanguage: Language = getNextLanguage(currentLang);
+
+  return (
+    <div className="guigui-profile-dashboard w-full min-h-[calc(100vh-72px)] bg-[var(--color-bg-surface)]">
+      <div className="flex min-h-[calc(100vh-72px)] w-full bg-[var(--color-bg-surface)]">
+        <div className={`${mobileSidebarOpen ? 'block' : 'hidden'} fixed inset-0 z-40 bg-[var(--color-bg-surface)]/60 md:hidden`} onClick={() => setMobileSidebarOpen(false)} />
+
+        <aside
+          style={{ width: sidebarCollapsed ? 72 : 248 }}
+          className={`${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed left-0 top-[62px] z-50 h-[calc(100vh-62px)] max-w-[calc(100vw-16px)] shrink-0 border-r border-[#0c3a34] bg-[radial-gradient(135%_85%_at_0%_0%,_#10443d_0%,_#0b332e_45%,_#072420_100%)] text-white shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)] transition-[transform,box-shadow,width] duration-300 ease-out min-[761px]:top-[72px] min-[761px]:h-[calc(100vh-72px)] md:translate-x-0`}
+        >
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="flex items-center justify-between px-3 py-4">
+              <div className={`flex items-center ${sidebarCollapsed ? 'w-full justify-center' : 'gap-2.5'}`}>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#3fae80] text-lg font-black text-[#072420] shadow-[0_12px_22px_-12px_rgba(63,174,128,0.85)]">
+                  G
+                </div>
+                {!sidebarCollapsed && (
+                  <div className="min-w-0">
+                    <div className="text-lg font-black leading-none text-white">Guigui<span className="text-[#e8a23a]">.com</span></div>
+                    <div className="mt-1.5 text-[8.5px] font-black uppercase tracking-[0.2em] text-[var(--color-text-muted-dark)]">{t('personalArea')}</div>
+                  </div>
+                )}
+              </div>
+
+              {!sidebarCollapsed && (
+                <div className="flex items-center gap-1">
+                  <IconButton
+                    label={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 w-8 rounded-full border-0 bg-transparent text-[var(--color-text-muted-dark)] shadow-none hover:bg-[var(--color-green-800)] hover:text-white"
+                    onClick={() => setSidebarCollapsed((value) => !value)}
+                    title={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </IconButton>
+                  <IconButton
+                    label={`${t('close')} menu lateral`}
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 w-8 rounded-full border-0 bg-transparent text-[var(--color-text-muted-dark)] shadow-none hover:bg-[var(--color-green-800)] hover:text-white md:hidden"
+                    onClick={() => setMobileSidebarOpen(false)}
+                  >
+                    <X className="h-4 w-4" />
+                  </IconButton>
+                </div>
+              )}
+              {sidebarCollapsed && (
+                <IconButton
+                  label="Expandir menu"
+                  variant="secondary"
+                  size="sm"
+                  className="absolute right-1 top-3 h-6 w-6 rounded-full border-0 bg-transparent text-[var(--color-text-muted-dark)] shadow-none hover:bg-[var(--color-green-800)] hover:text-white"
+                  onClick={() => setSidebarCollapsed(false)}
+                  title="Expandir menu"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </IconButton>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
+              {!sidebarCollapsed && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSection('account-profile');
+                    setAccountProfileTab('profile');
+                    setMobileSidebarOpen(false);
+                  }}
+                  className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-[#1b4a43] bg-[#0d3a34] p-2.5 text-left transition hover:bg-[var(--color-green-800)]"
+                >
+                  {currentUser.avatarUrl ? (
+                    <img src={currentUser.avatarUrl} alt={currentUser.name} className="h-10 w-10 shrink-0 rounded-full border border-[var(--color-green-800)] object-cover" />
+                  ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-green-800)] text-xs font-black text-[var(--color-green-100)]">
+                      {currentUser.name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[12px] font-black text-white">{currentUser.name}</div>
+                    <div className="mt-0.5 truncate text-[10px] font-semibold text-[var(--color-text-muted-dark)]">{currentUser.email}</div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[var(--color-text-muted-dark)]" />
+                </button>
+              )}
+
+              {citizenNavigationGroups.map((group) => (
+                <div key={group.heading} className={sidebarCollapsed ? 'mb-2 space-y-1.5' : 'mb-3 space-y-1'}>
+                  {!sidebarCollapsed && (
+                    <div className="px-3 pb-1 pt-1.5 text-[8px] font-black uppercase tracking-[0.22em] text-[var(--color-text-muted-dark)]">{group.heading}</div>
+                  )}
+
+                  <div className={sidebarCollapsed ? 'space-y-1.5' : 'space-y-1'}>
+                    {group.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = section === item.id;
+
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            setSection(item.id);
+                            setMobileSidebarOpen(false);
+                          }}
+                          aria-label={item.label}
+                          aria-current={isActive ? 'page' : undefined}
+                          title={item.label}
+                          className={`group relative flex w-full items-center rounded-full text-left transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[var(--color-green-700)]/50 ${
+                            sidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2'
+                          } ${
+                            isActive
+                              ? 'bg-[var(--color-green-700)] text-white shadow-[0_16px_28px_-16px_rgba(23,97,88,0.9)]'
+                              : 'text-[var(--color-green-100)] hover:bg-[var(--color-green-800)]'
+                          }`}
+                        >
+                          <div className={`flex shrink-0 items-center justify-center rounded-full ${sidebarCollapsed ? 'h-8 w-8' : 'h-9 w-9'} ${isActive ? 'bg-black/10 text-white' : 'bg-[#124039] text-[#a9c4be] group-hover:bg-[var(--color-green-800)] group-hover:text-white'}`}>
+                            <Icon className="h-4 w-4" />
+                          </div>
+
+                          {!sidebarCollapsed && (
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-[11.5px] font-black leading-snug">{item.label}</div>
+                            </div>
+                          )}
+
+                          {!sidebarCollapsed && typeof item.count === 'number' && item.count > 0 && (
+                            <span className={`flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-black ${isActive ? 'bg-white/25 text-white' : 'bg-[#f7bcbc] text-[#8a1f1f]'}`}>{item.count}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-auto border-t border-[var(--color-green-800)] px-2 py-2.5">
+              <div className={`flex items-center rounded-2xl border border-[var(--color-green-800)] bg-[#0e3a34] p-2 ${sidebarCollapsed ? 'justify-center' : 'gap-2.5'}`}>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#3fae80]/15 text-[#7fd8b4]">
+                  <CheckCircle2 className="h-4 w-4" />
+                </div>
+                {!sidebarCollapsed && (
+                  <div className="min-w-0">
+                    <div className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--color-text-muted-dark)]">{t('activeAccountLabel')}</div>
+                    <div className="truncate text-[11.5px] font-black text-white">{currentUser.name}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <main
+          style={{ '--citizen-sidebar-width': `${sidebarCollapsed ? 72 : 248}px` } as React.CSSProperties}
+          className="min-w-0 flex-1 overflow-visible bg-[var(--color-bg-surface)] px-4 pb-4 pt-1 sm:px-5 sm:pb-5 sm:pt-2 md:ml-[var(--citizen-sidebar-width)]"
+        >
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <IconButton
+                label="Abrir menu lateral"
+                variant="secondary"
+                size="sm"
+                className="h-9 w-9 rounded-full md:hidden"
+                onClick={() => setMobileSidebarOpen(true)}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
+              </IconButton>
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--color-text-muted)]">{t('citizen.citizenLabel')}</div>
+                <h1 className="mt-1 text-xl font-black text-[var(--color-text-strong)] sm:text-2xl">{currentCitizenSection}</h1>
+              </div>
+            </div>
+          </div>
+
+          <section className="space-y-4" aria-labelledby="citizen-dashboard-title">
+            <div className="relative overflow-hidden rounded-2xl bg-[var(--color-bg-surface-dark)] px-4 py-4 text-white shadow-xl sm:px-6 sm:py-5">
+              <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="relative shrink-0">
+                    <img src={currentUser.avatarUrl} alt={`Fotografia de ${currentUser.name}`} className="h-12 w-12 rounded-xl border-2 border-[#2a655a] object-cover shadow-lg sm:h-16 sm:w-16" />
+                    <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[var(--color-bg-surface-dark)] bg-[var(--color-green-500)] text-white" title={t('activeAccountLabel')}><CheckCircle2 className="h-3 w-3" aria-hidden="true" /></span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--color-blue-200)]">{t('personalArea')}</p>
+                    <h1 id="citizen-dashboard-title" className="truncate text-lg font-black tracking-tight sm:text-xl">Olá, {currentUser.name.split(' ')[0]}</h1>
+                    <p className="mt-1 flex items-center gap-1.5 text-xs text-[var(--color-slate-300)]"><MapPin className="h-3.5 w-3.5 text-[var(--color-amber-300)]" aria-hidden="true" />{currentUser.neighborhood} Â· Conta cidadã</p>
+                  </div>
+                </div>
+                <Button type="button" variant="secondary" size="sm" onClick={onExplore} className="bg-[var(--color-bg-surface)] text-[11px] font-black text-[var(--color-text-strong)] shadow-lg hover:bg-[var(--color-blue-50)]">{t('exploreGuigui')}<ChevronRight className="h-3.5 w-3.5" aria-hidden="true" /></Button>
+              </div>
+            </div>
+
+            {section === 'overview' && (
+        <>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { label: 'Bilhetes', value: ticketOrders.length, icon: Ticket, tone: 'info' as const, hint: 'Bilhetes emitidos' },
+              { label: 'Compras pendentes', value: pendingOrders.length, icon: WalletCards, tone: 'warning' as const, hint: 'Aguardam confirmação' },
+              { label: 'Lembretes', value: reminders.length, icon: CalendarDays, tone: 'accent' as const, hint: 'Eventos guardados' },
+              { label: 'Por ler', value: unreadNotifications, icon: Bell, tone: 'danger' as const, hint: 'Notificações novas' },
+            ].map((stat) => (
+              <StatCard key={stat.label} icon={stat.icon} tone={stat.tone} label={stat.label} value={stat.value} hint={stat.hint} />
+            ))}
+          </div>
+
+          <article className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4" aria-label={t('citizen.systemSettingsModule')}>
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] dark:bg-[var(--color-bg-surface-dark)] dark:text-[var(--color-text-muted-dark)]">
+                <Palette className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-text-muted)]">{t('citizen.personalAreaModule')}</p>
+                <h2 className="mt-1 text-base font-black text-[var(--color-text-strong)]">{t('citizen.systemSettings')}</h2>
+                <p className="mt-1 text-sm font-bold text-[var(--color-text-strong)] dark:text-[var(--color-text-strong-dark)]">{t('citizen.personalSettings')}</p>
+                <p className="mt-1 text-xs font-semibold text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)]">{t('citizen.personalSettingsHint')}</p>
+              </div>
+            </div>
+          </article>
+
+          <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
+            <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4">
+              <div className="mb-5 flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-blue-700)] dark:text-blue-300">Actividade recente</p><h2 className="mt-1 text-base font-black text-[var(--color-text-strong)]">Os meus bilhetes</h2></div><Ticket className="h-5 w-5 text-[var(--color-green-600)]" aria-hidden="true" /></div>
+              <div className="grid gap-3 sm:grid-cols-2">{ticketOrders.slice(0, 4).map((order) => renderOrderCard(order, true))}</div>
+              {ticketOrders.length === 0 && <EmptyState title={t('noTicketsExplore')} description="Os seus bilhetes aparecerão aqui depois de uma compra." icon={<Ticket className="h-6 w-6" aria-hidden="true" />} />}
+            </div>
+            <div className="space-y-5">
+              <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4"><div className="mb-4 flex items-center gap-2"><CalendarDays className="h-5 w-5 text-[var(--color-violet-600)]" aria-hidden="true" /><h2 className="text-base font-black text-[var(--color-text-strong)]">{t('citizen.upcomingReminders')}</h2></div><div className="space-y-3">{reminders.slice(0, 3).map((reminder) => <div key={reminder.id} className="rounded-2xl bg-[var(--color-violet-50)] p-3 dark:bg-[var(--color-violet-950)]/20"><p className="truncate text-xs font-black text-[var(--color-violet-950)] dark:text-[var(--color-violet-100)]">{reminder.eventTitle}</p><p className="mt-1 text-[10px] font-semibold text-[var(--color-violet-700)] dark:text-[var(--color-violet-300)]">{reminder.eventDate} Â· {reminder.eventTime}</p></div>)}{reminders.length === 0 && <EmptyState title="Sem lembretes activos" description="Os eventos que guardar aparecerão neste espaço." icon={<CalendarDays className="h-6 w-6" aria-hidden="true" />} />}</div></Card>
+              <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4"><div className="mb-4 flex items-center gap-2"><Heart className="h-5 w-5 text-[var(--color-rose-600)]" aria-hidden="true" /><h2 className="text-base font-black text-[var(--color-text-strong)]">Empresas seguidas</h2></div>{favoriteBusinesses.length > 0 ? <div className="space-y-2">{favoriteBusinesses.slice(0, 3).map((business) => <p key={business.id} className="truncate rounded-xl bg-[var(--color-rose-50)] px-3 py-2 text-xs font-bold text-[var(--color-rose-950)] dark:bg-[var(--color-rose-950)]/20 dark:text-[var(--color-rose-200)]">{business.name}</p>)}</div> : <EmptyState title={t('citizen.noFollowedBusinesses')} description="As empresas que seguir aparecem aqui e enviam notificações quando publicam novidades." icon={<Heart className="h-6 w-6" aria-hidden="true" />} />}</Card>
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2"><Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4"><div className="flex items-start gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-emerald-100)] text-[var(--color-emerald-700)] dark:bg-[var(--color-emerald-950)]/40 dark:text-[var(--color-emerald-300)]"><ShieldCheck className="h-5 w-5" aria-hidden="true" /></div><div><h2 className="text-base font-black text-[var(--color-text-strong)]">{t('citizen.securityPrivacy')}</h2><p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">{effectivePrivacySettings.privateProfile ? 'O perfil está restrito à sua área autenticada.' : 'O perfil está configurado como visível.'}</p></div></div><div className="mt-4 grid gap-2 sm:grid-cols-2"><div className="flex items-center gap-2 rounded-xl bg-[var(--color-bg-subtle)] p-3 text-[11px] font-bold text-[var(--color-text-strong)] dark:bg-[var(--color-bg-subtle-dark)] dark:text-[var(--color-text-muted-dark)]"><LockKeyhole className="h-4 w-4 text-[var(--color-emerald-600)]" aria-hidden="true" /> {passwordStatusLabel}</div><div className="flex items-center gap-2 rounded-xl bg-[var(--color-bg-subtle)] p-3 text-[11px] font-bold text-[var(--color-text-strong)] dark:bg-[var(--color-bg-subtle-dark)] dark:text-[var(--color-text-muted-dark)]"><UserRound className="h-4 w-4 text-[var(--color-green-600)]" aria-hidden="true" /> {privacyStatusLabel}</div><div className="flex items-center gap-2 rounded-xl bg-[var(--color-bg-subtle)] p-3 text-[11px] font-bold text-[var(--color-text-strong)] dark:bg-[var(--color-bg-subtle-dark)] dark:text-[var(--color-text-muted-dark)]"><MessageCircle className="h-4 w-4 text-[var(--color-violet-600)]" aria-hidden="true" /> {effectivePrivacySettings.secureMessages ? 'Comunicação protegida' : 'Comunicação não protegida'}</div><div className="flex items-center gap-2 rounded-xl bg-[var(--color-bg-subtle)] p-3 text-[11px] font-bold text-[var(--color-text-strong)] dark:bg-[var(--color-bg-subtle-dark)] dark:text-[var(--color-text-muted-dark)]"><Bell className="h-4 w-4 text-[var(--color-green-600)]" aria-hidden="true" /> {effectivePrivacySettings.sessionAlerts ? 'Alertas de sessão activos' : 'Alertas de sessão desactivados'}</div></div></Card><Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4"><div className="mb-4 flex items-center gap-2"><Bell className="h-5 w-5 text-[var(--color-green-600)]" aria-hidden="true" /><h2 className="text-base font-black text-[var(--color-text-strong)]">{t('citizen.recentNotifications')}</h2></div><div className="space-y-2">{notifications.slice(0, 3).map((notification) => <button type="button" key={notification.id} onClick={() => { onMarkNotificationAsRead?.(notification.id); onOpenNotification?.(notification); }} className="flex w-full gap-2 rounded-xl bg-[var(--color-bg-subtle)] p-3 text-left transition hover:bg-[var(--color-bg-subtle-dark)] dark:bg-[var(--color-bg-surface-dark)] dark:hover:bg-[var(--color-bg-surface-dark)]/80"><span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${notification.read ? 'bg-[var(--color-border-subtle)]' : 'bg-[var(--color-amber-500)]'}`} /><span className="line-clamp-2 text-[11px] font-semibold leading-relaxed text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)]">{notification.message || notification.title}</span></button>)}{notifications.length === 0 && <EmptyState title={t('citizen.noRecentNotifications')} description="As notificações da sua conta aparecerão aqui." icon={<Bell className="h-6 w-6" aria-hidden="true" />} />}</div></Card></div>
+        </>
+      )}
+
+      {section === 'tickets' && (
+        <MyTicketsPanel
+          currentLang={currentLang}
+          fallback={ticketOrders.length > 0 ? (
+            <div className="rounded-2xl border border-dashed border-[var(--color-amber-300)] bg-[var(--color-amber-50)]/60 p-4 dark:border-[var(--color-amber-800)] dark:bg-[var(--color-amber-950)]/20">
+              <p className="mb-1 text-[10px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-400">{t('citizen.demoData')}</p>
+              <p className="mb-4 text-xs leading-relaxed text-amber-900 dark:text-amber-200">{t('citizen.demoDataHint')}</p>
+              <div className="grid gap-3 md:grid-cols-2">{ticketOrders.map((order) => renderOrderCard(order, true))}</div>
+            </div>
+          ) : undefined}
+        />
+      )}
+
+      {section === 'account-profile' && (
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-emerald-100)] text-[var(--color-emerald-700)] dark:bg-[var(--color-emerald-950)]/40 dark:text-[var(--color-emerald-300)]"><UserRound className="h-5 w-5" /></div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-emerald-600)]">Conta</p>
+              <h2 className="mt-1 text-base font-black text-[var(--color-text-strong)] sm:text-lg">Conta e perfil</h2>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">Dados da conta e preferências pessoais, reunidos num único módulo.</p>
+            </div>
+          </div>
+          <div role="tablist" aria-label="Secções de Conta e perfil" className="mt-3 flex flex-wrap gap-2">
+            {([
+              { id: 'data' as const, label: 'Dados e conta', icon: UserX },
+              { id: 'profile' as const, label: 'Perfil e preferências', icon: UserRound },
+            ]).map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={accountProfileTab === id}
+                data-testid={`account-profile-tab-${id}`}
+                onClick={() => setAccountProfileTab(id)}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-black transition ${accountProfileTab === id ? 'bg-[var(--color-green-600)] text-white' : 'border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] hover:border-[var(--color-border-strong)]'}`}
+              >
+                <Icon className="h-3.5 w-3.5" /> {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {section === 'security-settings' && (
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-violet-100)] text-[var(--color-violet-700)] dark:bg-[var(--color-violet-950)]/40 dark:text-[var(--color-violet-300)]"><ShieldCheck className="h-5 w-5" /></div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-violet-600)]">Definições</p>
+              <h2 className="mt-1 text-base font-black text-[var(--color-text-strong)] sm:text-lg">Segurança e definições</h2>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">Privacidade, segurança da conta e definições do sistema, reunidas num único módulo.</p>
+            </div>
+          </div>
+          <div role="tablist" aria-label="Secções de Segurança e definições" className="mt-3 flex flex-wrap gap-2">
+            {([
+              { id: 'privacy' as const, label: 'Segurança e privacidade', icon: ShieldCheck },
+              { id: 'system' as const, label: 'Definições do sistema', icon: Palette },
+            ]).map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={securitySettingsTab === id}
+                data-testid={`security-settings-tab-${id}`}
+                onClick={() => setSecuritySettingsTab(id)}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-black transition ${securitySettingsTab === id ? 'bg-[var(--color-green-600)] text-white' : 'border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] hover:border-[var(--color-border-strong)]'}`}
+              >
+                <Icon className="h-3.5 w-3.5" /> {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {section === 'security-settings' && securitySettingsTab === 'system' && <div className="space-y-5">
+        <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4"><div className="flex items-start gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-violet-100)] text-[var(--color-violet-700)] dark:bg-[var(--color-violet-950)]/40 dark:text-[var(--color-violet-300)]"><ShieldCheck className="h-5 w-5" /></div><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-violet-600)]">Funcionamento da plataforma</p><h2 className="mt-1 text-base sm:text-lg font-black text-[var(--color-text-strong)]">{t('citizen.systemSettings')}</h2><p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">{t('citizen.securityChangesSaved')}</p></div></div></Card>
+        <ChangePasswordCard accountEmail={currentUser?.email} accountName={currentUser?.name} />
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4"><div className="mb-4 flex items-center gap-2"><MessageCircle className="h-5 w-5 text-[var(--color-green-600)]" /><h2 className="text-base font-black text-[var(--color-text-strong)]">{t('citizen.communicationPreferences')}</h2></div><div className="flex flex-wrap gap-2">{(['email', 'sms', 'both'] as const).map((option) =>         <button key={option} type="button" onClick={() => { setCommunicationPreference(option); updateProfile({ communicationPreference: option }); }} className={`rounded-xl px-3 py-2 text-xs font-black ${communicationPreference === option ? 'bg-[var(--color-green-600)] text-white' : 'bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] dark:bg-[var(--color-bg-surface-dark)] dark:text-[var(--color-text-muted-dark)]'}`}>{option === 'both' ? 'E-mail e telefone' : option === 'email' ? 'E-mail' : 'Telefone'}</button>)}</div></div>
+      </div>}
+
+      {section === 'security-settings' && securitySettingsTab === 'privacy' && <div className="space-y-5">
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4"><div className="flex items-start gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-emerald-100)] text-[var(--color-emerald-700)] dark:bg-[var(--color-emerald-950)]/40 dark:text-[var(--color-emerald-300)]"><ShieldCheck className="h-5 w-5" /></div><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-emerald-600)]">{t('citizen.accountModule')}</p><h2 className="mt-1 text-base sm:text-lg font-black text-[var(--color-text-strong)]">Privacidade</h2><p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">{t('citizen.accountModuleHint')}</p></div></div></div>
+        <div className="grid gap-3 lg:grid-cols-2">{settingToggle('privateProfile', 'Perfil privado', 'O seu perfil e dados pessoais ficam visíveis apenas na sua área autenticada.')}{settingToggle('sessionAlerts', 'Alertas de segurança', 'Receba avisos quando uma nova sessão ou dispositivo aceder à sua conta.')}{settingToggle('secureMessages', 'Comunicação protegida', 'Mantenha mensagens e pedidos de suporte acessíveis apenas aos participantes autorizados.')}{settingToggle('dataPersonalization', 'Personalização de dados', 'Permita que a plataforma use os seus favoritos e histórico para melhorar a experiência.')}</div>
+        <div className="rounded-2xl border border-[var(--color-emerald-200)] bg-[var(--color-emerald-50)] p-4 text-xs font-semibold leading-relaxed text-[var(--color-emerald-800)] dark:border-[var(--color-emerald-900)] dark:bg-[var(--color-emerald-950)]/30 dark:text-[var(--color-emerald-200)]">{t('citizen.changesAppliedNote')}</div>
+      </div>}
+
+      {section === 'account-profile' && accountProfileTab === 'data' && <div className="space-y-5">
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-rose-100)] text-[var(--color-rose-700)] dark:bg-[var(--color-rose-950)]/40 dark:text-[var(--color-rose-300)]"><UserX className="h-5 w-5" /></div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-rose-600)]">{t('citizen.accountManagement')}</p>
+              <h2 className="mt-1 text-base sm:text-lg font-black text-[var(--color-text-strong)]">Dados e conta</h2>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">Escolha o que fazer com a sua conta e com os seus dados pessoais.</p>
+            </div>
+          </div>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div className="rounded-2xl border border-[var(--color-amber-200)] bg-[var(--color-amber-50)] p-4 dark:border-[var(--color-amber-900)]/60 dark:bg-[var(--color-amber-950)]/20">
+            <h3 className="text-sm font-black text-[var(--color-amber-950)] dark:text-[var(--color-amber-100)]">Desativar temporariamente a conta</h3>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--color-amber-900)]/75 dark:text-[var(--color-amber-200)]/80">{t('citizen.deactivateHint')}</p>
+            <Button type="button" variant="secondary" size="sm" onClick={async () => { if (window.confirm('Desativar a sua conta temporariamente? Poderá reativá-la ao voltar a iniciar sessão.')) await onDeactivateAccount?.(); }} className="mt-3 border-[var(--color-amber-300)] bg-[var(--color-bg-surface)] text-[var(--color-amber-950)] hover:bg-[var(--color-amber-100)] dark:border-[var(--color-amber-800)] dark:bg-[var(--color-amber-950)]/40 dark:text-[var(--color-amber-100)]">Desativar a minha conta</Button>
+          </div>
+          <div className="rounded-2xl border border-[var(--color-rose-200)] bg-[var(--color-rose-50)] p-4 dark:border-[var(--color-rose-900)]/60 dark:bg-[var(--color-rose-950)]/20">
+            <h3 className="text-sm font-black text-[var(--color-rose-950)] dark:text-[var(--color-rose-100)]">Eliminar a conta permanentemente</h3>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--color-rose-900)]/75 dark:text-[var(--color-rose-200)]/80">{t('citizen.deleteAccountHint')}</p>
+            <Button type="button" variant="danger" size="sm" onClick={async () => { if (window.confirm('Eliminar permanentemente a sua conta? Esta ação não pode ser desfeita.')) await onDeleteAccount?.(); }} className="mt-3 bg-[var(--color-rose-600)] hover:bg-[var(--color-rose-700)]">Eliminar a minha conta</Button>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-4 text-xs font-semibold leading-relaxed text-[var(--color-text-muted)] dark:border-[var(--color-border-subtle-dark)] dark:bg-[var(--color-bg-subtle-dark)] dark:text-[var(--color-text-muted-dark)]">{t('citizen.ownerActionsNote')}</div>
+      </div>}
+
+      {section === 'account-profile' && accountProfileTab === 'profile' && <div className="space-y-5">
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4"><div className="flex items-start gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-blue-100)] text-[var(--color-blue-700)] dark:bg-[var(--color-blue-950)]/40 dark:text-[var(--color-blue-300)]"><UserRound className="h-5 w-5" /></div><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-green-600)]">{t('citizen.citizenData')}</p><h2 className="mt-1 text-base sm:text-lg font-black text-[var(--color-text-strong)]">{t('citizen.personalSettings')}</h2><p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">{t('citizen.citizenDataHint')}</p></div></div><div className="mt-5 grid gap-4 sm:grid-cols-2"><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)]">Nome<input value={profileForm.name} onChange={(event) => setProfileForm((current) => ({ ...current, name: event.target.value }))} className={fieldClass} /></label><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)]">Fotografia de perfil<input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarUpload} className={`${fieldClass} file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--color-green-600)] file:px-3 file:py-1.5 file:text-xs file:font-black file:text-white`} /><span className="mt-1 block text-[10px] font-semibold text-[var(--color-text-muted)]">{t('citizen.photoFormats')}</span>{profileForm.avatarUrl && <img src={profileForm.avatarUrl} alt={t('citizen.photoPreview')} className="mt-2 h-16 w-16 rounded-2xl object-cover" />}</label><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)]">E-mail<input type="email" value={profileForm.email} onChange={(event) => setProfileForm((current) => ({ ...current, email: event.target.value }))} className={fieldClass} /></label><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)]">Telefone<input value={profileForm.phone} onChange={(event) => setProfileForm((current) => ({ ...current, phone: event.target.value }))} className={fieldClass} /></label><label className="text-xs font-black text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)] sm:col-span-2">{t('citizen.neighborhood')}<input value={profileForm.neighborhood} onChange={(event) => setProfileForm((current) => ({ ...current, neighborhood: event.target.value }))} className={fieldClass} /></label></div><button type="button" onClick={() => void handleProfileSave()} disabled={profileSaving} className="mt-4 rounded-xl bg-[var(--color-green-600)] px-4 py-2.5 text-xs font-black text-white hover:bg-[var(--color-green-700)] disabled:opacity-60">{profileSaving ? 'A guardar...' : 'Guardar dados pessoais'}</button>{profileSaved && <span className="ml-3 text-xs font-bold text-[var(--color-emerald-600)]">Dados guardados.</span>}{profileError && <p className="mt-2 text-xs font-bold text-[var(--color-rose-600)]">{profileError}</p>}</div>
+        <div className="grid gap-4 lg:grid-cols-2"><div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4"><div className="mb-4 flex items-center gap-2"><Ticket className="h-5 w-5 text-[var(--color-green-600)]" /><h2 className="text-base font-black text-[var(--color-text-strong)]">{t('citizen.ticketPreferences')}</h2></div><div className="flex flex-wrap gap-2">{(['digital', 'both'] as const).map((option) =>         <button key={option} type="button" onClick={() => { setTicketPreference(option); updateProfile({ ticketPreference: option }); }} className={`rounded-xl px-3 py-2 text-xs font-black ${ticketPreference === option ? 'bg-[var(--color-green-600)] text-white' : 'bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] dark:bg-[var(--color-bg-surface-dark)] dark:text-[var(--color-text-muted-dark)]'}`}>{option === 'digital' ? 'Bilhete digital' : 'Digital e comprovativo'}</button>)}</div></div><div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-3.5 sm:p-4"><div className="mb-4 flex items-center gap-2"><Heart className="h-5 w-5 text-[var(--color-rose-600)]" /><h2 className="text-base font-black text-[var(--color-text-strong)]">Favoritos e mensagens</h2></div><p className="text-xs leading-relaxed text-[var(--color-text-muted)]">{favoriteBusinesses.length ? `${favoriteBusinesses.length} empresa(s) seguida(s) na sua conta.` : 'Ainda não segue nenhuma empresa.'} As mensagens comerciais e pedidos de suporte permanecem separados.</p></div></div>
+      </div>}
+
+      {section === 'purchases' && <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4"><div className="mb-5 flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-green-600)]">{t('citizen.accountHistory')}</p><h2 className="mt-1 text-base sm:text-lg font-black text-[var(--color-text-strong)]">Compras e reservas</h2></div><WalletCards className="h-6 w-6 text-[var(--color-green-600)]" /></div><div className="grid gap-3 md:grid-cols-2">{nonTicketOrders.map((order) => renderOrderCard(order))}</div>{nonTicketOrders.length === 0 && <EmptyState title="Sem compras" description="Ainda não há compras de produtos, serviços ou promoções nesta conta." icon={<WalletCards className="h-6 w-6" aria-hidden="true" />} />}</Card>}
+
+      {section === 'notifications' && <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4"><div className="mb-5 flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-rose-600)]">Centro de actividade</p><h2 className="mt-1 text-base sm:text-lg font-black text-[var(--color-text-strong)]">{t('businessNavNotifications')}</h2></div><Bell className="h-6 w-6 text-[var(--color-rose-600)]" /></div><div className="space-y-3">{notifications.map((notification) => <Card key={notification.id} className={`p-4 ${notification.read ? 'border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] dark:border-[var(--color-border-subtle-dark)] dark:bg-[var(--color-bg-subtle-dark)]/40' : 'border-[var(--color-blue-200)] bg-[var(--color-blue-50)] dark:border-[var(--color-blue-900)] dark:bg-[var(--color-blue-950)]/20'}`}><div className="flex items-start gap-3"><span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${notification.read ? 'bg-[var(--color-border-subtle)]' : 'bg-[var(--color-green-600)]'}`} /><div className="min-w-0"><p className="text-sm font-black text-[var(--color-text-strong)]">{notification.title}</p><p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)] dark:text-[var(--color-text-muted-dark)]">{notification.message}</p><p className="mt-2 text-[10px] font-bold text-[var(--color-text-muted)]">{notification.timeAgo || new Date(notification.createdAt).toLocaleString('pt-PT')}</p></div>{(onOpenNotification || (!notification.read && onMarkNotificationAsRead)) && <div className="ml-auto flex shrink-0 flex-col gap-1"><Button type="button" variant="primary" size="sm" onClick={() => { onMarkNotificationAsRead?.(notification.id); onOpenNotification?.(notification); }} className="min-h-7 rounded-lg bg-[var(--color-green-600)] px-2 py-1 text-[10px] hover:bg-[var(--color-green-700)]">Abrir</Button>{!notification.read && <Button type="button" variant="ghost" size="sm" onClick={() => onMarkNotificationAsRead?.(notification.id)} className="min-h-7 rounded-lg px-2 py-1 text-[10px] text-[var(--color-text-muted)]">Marcar lida</Button>}</div>}</div></Card>)}{notifications.length === 0 && <EmptyState title={t('citizen.noNotifications')} description="A sua caixa de notificações está vazia." icon={<Bell className="h-6 w-6" aria-hidden="true" />} />}</div></Card>}
+
+      {section === 'messages' && <CommunicationHub currentLang={currentLang} mode="user" currentUser={currentUser} businesses={businesses} conversations={conversations} messages={conversationMessages} supportRequests={supportRequests} onCreateConversation={onCreateConversation} onSendMessage={onSendMessage} onCreateSupport={onCreateSupport} onReplySupport={onReplySupport} onMarkConversationRead={onMarkConversationRead} initialChannel="messages" focusConversationId={focusConversationId} initialBusinessId={initialMessageBusinessId} channelOnly />}
+      {section === 'support' && <CommunicationHub currentLang={currentLang} mode="user" currentUser={currentUser} businesses={businesses} conversations={conversations} messages={conversationMessages} supportRequests={supportRequests} onCreateConversation={onCreateConversation} onSendMessage={onSendMessage} onCreateSupport={onCreateSupport} onReplySupport={onReplySupport} onMarkConversationRead={onMarkConversationRead} initialChannel="support" focusSupportId={focusSupportId} initialBusinessId={initialMessageBusinessId} channelOnly />}
+
+            {selectedTicket && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--color-bg-surface-dark)]/70 p-3" role="dialog" aria-modal="true" aria-labelledby="ticket-dialog-title" onClick={() => setSelectedTicket(null)}><div className="max-h-[calc(100vh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-[var(--color-bg-surface)] p-3 shadow-2xl dark:bg-[var(--color-bg-surface-dark)]" onClick={(e) => e.stopPropagation()}><div className="sticky top-0 z-10 -mx-3 -mt-3 mb-2 flex items-center justify-between gap-3 rounded-t-3xl border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-3 pb-2 pt-3 dark:border-[var(--color-border-subtle-dark)] dark:bg-[var(--color-bg-surface-dark)]"><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-wider text-[var(--color-emerald-700)]">Bilhete</p><p className="truncate text-xs font-bold text-[var(--color-text-muted)]">{selectedTicket.itemTitle}</p></div><button type="button" onClick={() => setSelectedTicket(null)} className="guigui-close-button flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--color-bg-surface)] text-[var(--color-text-strong)] shadow-md transition hover:bg-[var(--color-bg-subtle)] dark:bg-[var(--color-bg-surface-dark)] dark:text-white dark:hover:bg-[var(--color-bg-surface-dark)]/80" aria-label={`${t('close')} bilhete`} title={`${t('close')} bilhete`}><X className="h-6 w-6" /></button></div><h2 id="ticket-dialog-title" className="sr-only">Comprovativo do bilhete</h2><QRCodeDisplay code={selectedTicket.orderCode} qrToken={selectedTicket.qrToken} title={selectedTicket.itemTitle} subtitle={selectedTicket.businessName} buyerName={selectedTicket.customerName} buyerPhone={selectedTicket.customerPhone} amountXOF={selectedTicket.totalPriceXOF} pinCode={selectedTicket.ticketPin} validUntil={selectedTicket.purchasedAt ? new Date(new Date(selectedTicket.purchasedAt).getTime() + 60 * 60 * 1000).toISOString() : undefined} status={selectedTicket.status === 'cancelled' ? 'cancelled' : selectedTicket.status === 'redeemed' ? 'used' : 'valid'} onCopyCode={() => copyCode(selectedTicket.orderCode)} currentLang={currentLang} />{copiedCode === selectedTicket.orderCode && <p className="pb-2 text-center text-xs font-black text-[var(--color-emerald-700)]">{t('citizen.codeCopied')}</p>}</div></div>}
+    </section>
+          </main>
+        </div>
+      </div>
+    );
+};
+
+
+
+
+
+
+
+

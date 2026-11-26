@@ -1,0 +1,187 @@
+{
+    "root_group": {
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {
+            "feed: 200": {
+                "name": "feed: 200",
+                "path": "::feed: 200",
+                "id": "05b2445f48ec4bcc47f694b8e310ec0c",
+                "passes": 623,
+                "fails": 0
+            },
+            "empresas: 200": {
+                "fails": 0,
+                "name": "empresas: 200",
+                "path": "::empresas: 200",
+                "id": "9ff47ca0b4b4b8555846dee1753d60e9",
+                "passes": 623
+            },
+            "eventos: 200": {
+                "name": "eventos: 200",
+                "path": "::eventos: 200",
+                "id": "45a0558c2a8855751b3998209f8e7764",
+                "passes": 123,
+                "fails": 0
+            },
+            "stories/bootstrap: 200": {
+                "id": "6d6317cdc2a7c74da233efc5792ade60",
+                "passes": 123,
+                "fails": 0,
+                "name": "stories/bootstrap: 200",
+                "path": "::stories/bootstrap: 200"
+            },
+            "interações: 200": {
+                "name": "interações: 200",
+                "path": "::interações: 200",
+                "id": "f677f8c6ac5aa22652c2cfc5c571a359",
+                "passes": 105,
+                "fails": 0
+            },
+            "login: 200": {
+                "passes": 146,
+                "fails": 0,
+                "name": "login: 200",
+                "path": "::login: 200",
+                "id": "d197f3faedc4c064674fc90d1995e47a"
+            },
+            "login: sessão devolvida": {
+                "passes": 146,
+                "fails": 0,
+                "name": "login: sessão devolvida",
+                "path": "::login: sessão devolvida",
+                "id": "1ab992ec418bd894117ffc73b7a15b20"
+            },
+            "sessão: 200": {
+                "fails": 0,
+                "name": "sessão: 200",
+                "path": "::sessão: 200",
+                "id": "2f4d7f4fd79b92f199bbee00c163709c",
+                "passes": 146
+            }
+        }
+    },
+    "metrics": {
+        "data_sent": {
+            "count": 593833,
+            "rate": 9685.3311295281
+        },
+        "http_req_duration": {
+            "med": 307.2971,
+            "max": 5810.2163,
+            "p(90)": 2832.486500000001,
+            "p(95)": 3419.4818,
+            "avg": 746.8415427946396,
+            "min": 1.2339,
+            "thresholds": {
+                "p(95)<1500": true,
+                "p(99)<3000": true
+            }
+        },
+        "http_req_tls_handshaking": {
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0
+        },
+        "data_received": {
+            "count": 1671078454,
+            "rate": 27255050.10737007
+        },
+        "http_req_duration{expected_response:true}": {
+            "avg": 746.8415427946396,
+            "min": 1.2339,
+            "med": 307.2971,
+            "max": 5810.2163,
+            "p(90)": 2832.486500000001,
+            "p(95)": 3419.4818
+        },
+        "iterations": {
+            "count": 997,
+            "rate": 16.260927122843487
+        },
+        "http_req_blocked": {
+            "avg": 0.04097199890620727,
+            "min": 0,
+            "med": 0,
+            "max": 19.7192,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "checks": {
+            "fails": 0,
+            "passes": 2035,
+            "value": 1
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 3657,
+            "thresholds": {
+                "rate<0.02": false
+            },
+            "value": 0
+        },
+        "vus": {
+            "min": 2,
+            "max": 100,
+            "value": 2
+        },
+        "http_req_receiving": {
+            "avg": 11.408061662564924,
+            "min": 0,
+            "med": 0.5055,
+            "max": 103.0804,
+            "p(90)": 51.26932,
+            "p(95)": 59.936539999999994
+        },
+        "http_reqs": {
+            "count": 3657,
+            "rate": 59.64514592601668
+        },
+        "http_req_sending": {
+            "med": 0,
+            "max": 4.1127,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0.022379546076018605,
+            "min": 0
+        },
+        "http_req_connecting": {
+            "avg": 0.03028643697019415,
+            "min": 0,
+            "med": 0,
+            "max": 15.5656,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "iteration_duration": {
+            "p(95)": 6485.37856,
+            "avg": 3740.774863289869,
+            "min": 1008.1097,
+            "med": 3630.5164,
+            "max": 7910.7602,
+            "p(90)": 6044.3777
+        },
+        "http_req_waiting": {
+            "p(95)": 3362.0481,
+            "avg": 735.4111015859985,
+            "min": 1.2339,
+            "med": 303.6281,
+            "max": 5749.5458,
+            "p(90)": 2777.5593400000007
+        },
+        "vus_max": {
+            "min": 100,
+            "max": 100,
+            "value": 100
+        }
+    },
+    "setup_data": {
+        "businessId": "biz-1",
+        "postId": "post-seed-co-18-1"
+    }
+}

@@ -1,0 +1,613 @@
+import React, { useState } from 'react';
+import {
+  Calendar,
+  Plus,
+  Ticket,
+  Clock,
+  MapPin,
+  DollarSign,
+  CheckCircle2,
+  AlertCircle,
+  Eye,
+  Download,
+  Trash2,
+  X,
+  Image as ImageIcon,
+  Video,
+  Wallet,
+  Banknote,
+  TrendingUp,
+} from 'lucide-react';
+import { Business, EventItem, Language, PurchaseOrder } from '../../types';
+import { getTranslation } from '../../utils/i18n';
+import { downloadBuyerListCsv } from '../../utils/buyerListExport';
+import { EventControlCenter } from '../events/EventControlCenter';
+
+const readLocalMedia = (file: File): Promise<string> => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result));
+  reader.onerror = () => reject(new Error('Não foi possível ler o ficheiro multimédia.'));
+  reader.readAsDataURL(file);
+});
+
+interface BusinessFinanceSnapshot {
+  totals: {
+    grossXOF: number;
+    commissionXOF: number;
+    netXOF: number;
+    paidOutXOF: number;
+    processingXOF: number;
+    pendingPayoutXOF: number;
+    paidOrders: number;
+  };
+  events: Array<{
+    eventId: string;
+    eventTitle: string;
+    grossXOF: number;
+    commissionXOF: number;
+    netXOF: number;
+    paidOutXOF: number;
+    pendingPayoutXOF: number;
+  }>;
+  payouts: Array<{
+    id: string;
+    eventTitle: string | null;
+    amountXOF: number;
+    statusLabel: string;
+    methodLabel: string;
+    reference: string | null;
+    createdAt: string | null;
+  }>;
+}
+
+const formatXof = (value: number) => `${Number(value || 0).toLocaleString('pt-PT')} XOF`;
+
+interface ClientEventsManagementProps {
+  business: Business;
+  currentLang?: Language;
+  events?: EventItem[];
+  purchaseOrders?: PurchaseOrder[];
+  onEventSubmitted?: (event: EventItem) => void;
+  onEventCancelled?: (event: EventItem) => void;
+}
+
+export const ClientEventsManagement: React.FC<ClientEventsManagementProps> = ({
+  business,
+  currentLang = 'pt' as Language,
+  events = [],
+  purchaseOrders = [],
+  onEventSubmitted,
+  onEventCancelled,
+}) => {
+  const t = (key: string) => getTranslation(currentLang, key);
+  const createModalRef = React.useRef<HTMLDivElement>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [myEvents, setMyEvents] = useState<EventItem[]>(
+    events.filter((e) => e.businessId === business.id || e.organizer?.toLowerCase().includes(business.name.toLowerCase()))
+  );
+
+  React.useEffect(() => {
+    setMyEvents(events.filter((e) => e.businessId === business.id || e.organizer?.toLowerCase().includes(business.name.toLowerCase())));
+  }, [events, business.id, business.name]);
+
+  // New Event Form State
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('20:00');
+  const [location, setLocation] = useState(business.name + ` (${business.neighborhood})`);
+  const [priceXOF, setPriceXOF] = useState(5000);
+  const [vipPriceXOF, setVipPriceXOF] = useState(15000);
+  const [capacity, setCapacity] = useState(150);
+  const [category, setCategory] = useState<'musica' | 'gastronomia' | 'cultural' | 'workshop'>('gastronomia');
+  const [imageUrl, setImageUrl] = useState(business.coverImage || business.logo);
+  const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
+  const [mediaError, setMediaError] = useState('');
+  const [successMsg, setSuccessMsg] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
+  const [isExportingAllBuyers, setIsExportingAllBuyers] = useState(false);
+  const [allBuyersNotice, setAllBuyersNotice] = useState<string | null>(null);
+  const [finance, setFinance] = useState<BusinessFinanceSnapshot | null>(null);
+  const [financeError, setFinanceError] = useState('');
+
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch('/api/business/finance', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || 'Não foi possível carregar o financeiro da empresa.');
+        if (!cancelled) { setFinance(payload as BusinessFinanceSnapshot); setFinanceError(''); }
+      })
+      .catch((reason: Error) => { if (!cancelled) setFinanceError(reason.message); });
+    return () => { cancelled = true; };
+  }, [business.id]);
+
+  React.useEffect(() => {
+    if (showCreateModal) {
+      createModalRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [showCreateModal]);
+
+  const handleCreateEvent = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newEvent: EventItem = {
+      id: `ev-${Date.now()}`,
+      businessId: business.id,
+      title,
+      description,
+      date,
+      time,
+      location,
+      neighborhood: business.neighborhood || t('business.Todos'),
+      coverImage: imageUrl,
+      mediaType,
+      category,
+      organizerName: business.name,
+      status: 'draft',
+      ticketTypes: [
+        {
+          id: `tt-normal-${Date.now()}`,
+          name: 'Normal',
+          priceXOF,
+          availableQuantity: capacity,
+          soldQuantity: 0,
+        },
+        ...(vipPriceXOF > 0
+          ? [
+              {
+                id: `tt-vip-${Date.now()}`,
+                name: 'VIP / Esplanada',
+                priceXOF: vipPriceXOF,
+                availableQuantity: 20,
+                soldQuantity: 0,
+              },
+            ]
+          : []),
+      ],
+      totalTicketsSold: 0,
+      totalRevenueXOF: 0,
+      scannerDoorCode: String(Math.floor(1000 + Math.random() * 9000)),
+    };
+
+    setMyEvents([newEvent, ...myEvents]);
+    onEventSubmitted?.(newEvent);
+    setShowCreateModal(false);
+    setSuccessMsg(true);
+    setTimeout(() => setSuccessMsg(false), 4000);
+
+    // Reset Form
+    setTitle('');
+    setDescription('');
+    setDate('');
+  };
+
+  /** Lista de compradores de todos os eventos da empresa, sem eventId. */
+  const handleDownloadAllBuyers = async () => {
+    setIsExportingAllBuyers(true);
+    setAllBuyersNotice(null);
+    try {
+      const result = await downloadBuyerListCsv();
+      setAllBuyersNotice(result.message);
+    } finally {
+      setIsExportingAllBuyers(false);
+    }
+  };
+
+  const describeOrderTicketTypes = (order: PurchaseOrder) => {
+    const types = new Map<string, number>();
+    if (order.ticketCredentials?.length) {
+      for (const credential of order.ticketCredentials) {
+        const name = credential.ticketTypeName || order.itemTitle || 'Entrada Geral';
+        types.set(name, (types.get(name) || 0) + 1);
+      }
+    } else if (order.itemTitle) {
+      types.set(order.itemTitle, Math.max(1, order.quantity || 1));
+    }
+    return Array.from(types.entries()).map(([type, count]) => `${type} x${count}`).join(' + ');
+  };
+
+  const handleCancelEvent = (id: string) => {
+    const cancelledEvent = myEvents.find((event) => event.id === id);
+    setMyEvents(myEvents.map((e) => (e.id === id ? { ...e, status: 'cancelled' } : e)));
+    if (cancelledEvent) onEventCancelled?.({ ...cancelledEvent, status: 'cancelled' });
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] space-y-3 p-3.5 sm:p-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 text-xs px-3 py-1 rounded-full font-bold mb-1 border border-amber-200">
+              <Calendar className="w-3.5 h-3.5" />
+              <span>{t('ownEventsTicketing')}</span>
+            </div>
+            <h2 className="text-base sm:text-lg font-black text-[var(--color-text-strong)]">
+              Eventos de {business.name}
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              {t('eventsManagementDescription')}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {myEvents.length > 0 && (
+              <button type="button"
+                onClick={() => void handleDownloadAllBuyers()}
+                disabled={isExportingAllBuyers}
+                className="px-4 py-2.5 bg-[var(--color-bg-subtle)] hover:bg-[var(--color-border-subtle)] text-[var(--color-text-default)] border border-[var(--color-border-default)] font-extrabold text-xs rounded-2xl transition flex items-center gap-2 disabled:opacity-60"
+              >
+                <Download className="w-4 h-4" />
+                <span>{isExportingAllBuyers ? 'A preparar...' : 'Exportar todos os compradores'}</span>
+              </button>
+            )}
+            <button type="button"
+              onClick={() => setShowCreateModal(true)}
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-2xl transition flex items-center gap-2 shadow-xs"
+            >
+              <Plus className="w-4 h-4" />
+              <span>{t('createNewEvent')}</span>
+            </button>
+          </div>
+        </div>
+
+        {allBuyersNotice && (
+          <div className="bg-emerald-50 text-emerald-700 text-xs font-bold p-3 rounded-2xl border border-emerald-300 flex items-center gap-2 animate-fade-in dark:bg-emerald-950/30 dark:text-emerald-200 dark:border-emerald-800">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{allBuyersNotice}</span>
+          </div>
+        )}
+
+        {successMsg && (
+          <div className="bg-emerald-50 text-emerald-700 text-xs font-bold p-3 rounded-2xl border border-emerald-300 flex items-center gap-2 animate-fade-in">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{t('eventSubmittedForApproval')}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Financeiro da empresa: valores reais dos pedidos pagos, sem acesso aos fundos centralizados. */}
+      {finance ? (
+        <section aria-labelledby="business-finance-title" className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-3.5 shadow-[var(--shadow-xs)] sm:p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h3 id="business-finance-title" className="flex items-center gap-1.5 text-[12px] font-black text-[var(--color-text-strong)]">
+                <Wallet className="h-4 w-4 text-emerald-700" /> Financeiro dos seus eventos
+              </h3>
+              <p className="mt-0.5 text-[10.5px] text-slate-500">
+                Receita, comissão Guigui.com, valores recebidos e pendentes. A empresa consulta; não altera transações, comissões nem repasses.
+              </p>
+            </div>
+            <span className="rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] px-2.5 py-1 text-[9px] font-black text-slate-600">
+              {finance.totals.paidOrders} pedido(s) pago(s)
+            </span>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-6">
+            {[
+              { label: 'Receita bruta', value: finance.totals.grossXOF, icon: TrendingUp },
+              { label: 'Comissão Guigui.com', value: finance.totals.commissionXOF, icon: Wallet },
+              { label: 'Valor líquido', value: finance.totals.netXOF, icon: Banknote },
+              { label: 'Já recebido', value: finance.totals.paidOutXOF, icon: CheckCircle2 },
+              { label: 'Em processamento', value: finance.totals.processingXOF, icon: Clock },
+              { label: 'Pendente de repasse', value: finance.totals.pendingPayoutXOF, icon: AlertCircle },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-2.5">
+                  <div className="flex items-center gap-1 text-[8.5px] font-black uppercase tracking-[0.12em] text-slate-500"><Icon className="h-3 w-3" />{item.label}</div>
+                  <div className="mt-1 text-[13px] font-black tabular-nums text-slate-900">{formatXof(item.value)}</div>
+                </div>
+              );
+            })}
+          </div>
+          {finance.payouts.length > 0 && (
+            <div className="mt-3 overflow-x-auto">
+              <table className="min-w-full text-left text-[10px]" aria-label="Histórico de repasses da empresa">
+                <thead className="text-[8.5px] uppercase text-slate-500">
+                  <tr><th className="py-1 pr-2">Repasse</th><th className="py-1 pr-2">Evento</th><th className="py-1 pr-2">Valor</th><th className="py-1 pr-2">Método</th><th className="py-1 pr-2">Referência</th><th className="py-1 pr-2">Estado</th></tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--color-border-subtle)]">
+                  {finance.payouts.slice(0, 8).map((payout) => (
+                    <tr key={payout.id}>
+                      <td className="py-1.5 pr-2 font-mono text-[9px]">{payout.id}</td>
+                      <td className="py-1.5 pr-2">{payout.eventTitle || '—'}</td>
+                      <td className="py-1.5 pr-2 font-bold">{formatXof(payout.amountXOF)}</td>
+                      <td className="py-1.5 pr-2">{payout.methodLabel}</td>
+                      <td className="py-1.5 pr-2">{payout.reference || '—'}</td>
+                      <td className="py-1.5 pr-2">{payout.statusLabel}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : financeError ? (
+        <p className="rounded-xl border border-[var(--tone-warning-border)] bg-[var(--tone-warning-bg)] px-3 py-2 text-[10px] font-bold text-[var(--tone-warning-text)]">
+          {financeError}
+        </p>
+      ) : null}
+
+      {/* Events List */}
+      {myEvents.length === 0 ? (
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 p-8 text-center text-[var(--color-text-muted)] space-y-4 shadow-[var(--shadow-xs)]">
+          <Calendar className="w-12 h-12 mx-auto text-slate-300" />
+          <h3 className="font-bold text-sm text-slate-800">
+            {t('noEventsCreated')}
+          </h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            {t('noEventsHint')}
+          </p>
+          <button type="button"
+            onClick={() => setShowCreateModal(true)}
+            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition inline-flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            <span>{t('createFirstEvent')}</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {myEvents.map((ev) => (
+            <div
+              key={ev.id}
+              className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] hover:shadow-[var(--shadow-md)] transition flex flex-col justify-between overflow-hidden"
+            >
+              <div>
+                <div className="h-36 relative overflow-hidden bg-slate-100 dark:bg-slate-800">
+                  {ev.mediaType === 'video' ? (
+                    <video src={ev.coverImage} controls muted className="w-full h-full object-cover" aria-label={ev.title} />
+                  ) : (
+                    <img src={ev.coverImage || business.coverImage || business.logo} alt={ev.title} className="w-full h-full object-cover" />
+                  )}
+                  <div className="absolute top-3 right-3 bg-slate-900/80 text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase">
+                    {ev.category}
+                  </div>
+                  {ev.status === 'cancelled' && (
+                    <div className="absolute inset-0 bg-red-900/70 flex items-center justify-center text-white font-black text-xs uppercase">
+                      {t('eventCancelled')}
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-5 space-y-3">
+                  <h3 className="font-black text-sm text-slate-900 line-clamp-1">{ev.title}</h3>
+                  <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                    {ev.description}
+                  </p>
+
+                  <div className="space-y-1.5 text-xs text-slate-600 pt-1 border-t border-slate-100 font-medium">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-3.5 h-3.5 text-slate-500" />
+                      <span>{ev.date} às {ev.time}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                      <span className="truncate">{ev.location}</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="font-bold text-slate-900 font-mono">
+                        {(ev.ticketTypes?.[0]?.priceXOF || 0).toLocaleString('pt-PT')} XOF
+                      </span>
+                      <span className="text-[11px] text-emerald-600 font-bold">
+                        {ev.totalTicketsSold || 0} / {(ev.ticketTypes?.[0]?.availableQuantity || 100)} bilhetes
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-50 dark:bg-slate-800 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-[10px] text-slate-600 uppercase font-bold">
+                  Status: {({
+                    active: 'Ativo no Feed',
+                    draft: 'Em aprovação',
+                    cancelled: 'Cancelado',
+                    ended: 'Encerrado',
+                  }[ev.status])}
+                </span>
+
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => setSelectedEvent(ev)} className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 hover:text-blue-800">
+                    <Ticket className="h-3.5 w-3.5" /> Centro de controlo
+                  </button>
+                  {ev.status === 'active' && (
+                    <button type="button"
+                      onClick={() => handleCancelEvent(ev.id)}
+                      className="text-[11px] font-bold text-red-600 hover:text-red-700"
+                    >
+                      Encerrar
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {selectedEvent && (
+        <EventControlCenter
+          eventId={selectedEvent.id}
+          eventTitle={selectedEvent.title}
+          viewerRole="business"
+          onClose={() => setSelectedEvent(null)}
+        />
+      )}
+
+      {/* CREATE EVENT MODAL */}
+      {showCreateModal && (
+        <div className="event-modal-overlay fixed inset-0 z-[200] bg-slate-900/70 flex items-start justify-center p-3 overflow-y-auto">
+          <div ref={createModalRef} className="my-4 w-full max-w-3xl space-y-5 overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 p-4 shadow-[var(--shadow-lg)] sm:my-8 sm:p-7">
+          <div className="sticky top-0 z-10 -mx-4 -mt-4 flex items-start justify-between gap-3 border-b border-slate-100 bg-white px-4 py-4 sm:-mx-7 sm:-mt-7 sm:px-7">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                  <Calendar className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="truncate font-black text-base text-slate-900">Novo Evento</h3>
+                  <p className="mt-1 truncate text-[11px] text-slate-500">Para {business.name}</p>
+                </div>
+              </div>
+              <button type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="guigui-close-button"
+                aria-label="Fechar janela de criação de evento"
+                title="Fechar"
+              >
+                <X className="w-4 h-4" aria-hidden="true" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateEvent} className="space-y-3">
+            <div className="event-form-section space-y-3 rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] dark:bg-slate-800 guigui-dpanel shadow-[var(--shadow-xs)] p-3 sm:p-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">1. Informações principais</p>
+                  <p className="mt-1 text-[11px] text-slate-500">Apresente o evento com um título e uma descrição objetiva.</p>
+                </div>
+                <label className="block text-xs font-bold text-slate-700">Título do evento
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Noite de Kizomba e Marisco na Esplanada"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="mt-1.5 min-h-11 w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                </label>
+
+                <label className="block text-xs font-bold text-slate-700">Descrição / programa
+                <textarea
+                  rows={2}
+                  required
+                  placeholder="Atrações musicais, menu incluído, dress code..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="mt-1.5 min-h-28 w-full resize-y px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                </label>
+              </div>
+
+              <div className="event-form-section event-schedule-section space-y-2 rounded-2xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 sm:p-3.5">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">2. Data e local</p>
+                  <p className="mt-0.5 text-[10px] text-slate-500">Ajude os participantes a planear a presença.</p>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className="text-[11px] font-bold text-slate-700">Data
+                    <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="mt-1 w-full px-3 py-2 bg-white dark:bg-slate-900 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                  </label>
+                  <label className="text-[11px] font-bold text-slate-700">Horário
+                    <input type="time" required value={time} onChange={(e) => setTime(e.target.value)} className="mt-1 w-full px-3 py-2 bg-white dark:bg-slate-900 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                  </label>
+                  <label className="text-[11px] font-bold text-slate-700 sm:col-span-2">Local
+                    <input type="text" required value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ex: Restaurante Coqueiros, Bissau Velho" className="mt-1 w-full px-3 py-2 bg-white dark:bg-slate-900 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                  </label>
+                  <label className="text-[11px] font-bold text-slate-700">Categoria
+                    <select value={category} onChange={(e) => setCategory(e.target.value as typeof category)} className="mt-1 w-full px-3 py-2 bg-white dark:bg-slate-900 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-[11px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                      <option value="todos">Todos</option>
+                      <option value="gastronomia">Gastronomia</option>
+                      <option value="musica">Música</option>
+                      <option value="cultural">Cultural</option>
+                      <option value="workshop">Workshop</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div className="event-form-section space-y-2.5 rounded-2xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 sm:p-3.5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">3. Divulgação</p>
+                    <label className="text-xs font-black text-slate-800">Imagem ou vídeo do evento</label>
+                    <p className="mt-0.5 text-[10px] text-slate-500">Escolha um ficheiro ou cole um URL para destacar o evento.</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1 rounded-xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-white dark:bg-slate-900 p-1">
+                    <button type="button" onClick={() => { setMediaType('image'); setMediaError(''); }} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold ${mediaType === 'image' ? 'bg-blue-600 text-white' : 'text-slate-600'}`}><ImageIcon className="mr-1 inline h-3 w-3" />{t('business.Imagem')}</button>
+                    <button type="button" onClick={() => { setMediaType('video'); setMediaError(''); }} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold ${mediaType === 'video' ? 'bg-violet-600 text-white' : 'text-slate-600'}`}><Video className="mr-1 inline h-3 w-3" />{t('video')}</button>
+                  </div>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <input type="url" value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); setMediaError(''); }} placeholder={mediaType === 'image' ? 'URL da imagem (opcional)' : 'URL do vídeo (opcional)'} className="min-h-11 w-full rounded-xl border border-[var(--color-border-default)] dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900" />
+                  <input type="file" accept={mediaType === 'image' ? 'image/*' : 'video/*'} onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const expectedType = mediaType === 'image' ? 'image/' : 'video/';
+                    if (!file.type.startsWith(expectedType)) {
+                      setMediaError(`Seleccione um ficheiro ${mediaType === 'image' ? 'de imagem' : 'de vídeo'}.`);
+                      return;
+                    }
+                    if (file.size > 20 * 1024 * 1024) {
+                      setMediaError('O ficheiro deve ter no máximo 20 MB.');
+                      return;
+                    }
+                    try {
+                      setMediaError('');
+                      setImageUrl(await readLocalMedia(file));
+                    } catch (error) {
+                      setMediaError(error instanceof Error ? error.message : 'Não foi possível carregar este ficheiro.');
+                    }
+                  }} className="min-h-11 w-full min-w-0 rounded-xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-2 text-xs text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-xs file:font-bold file:text-white" />
+                </div>
+                {mediaError && <p className="text-xs font-semibold text-rose-600">{mediaError}</p>}
+                {imageUrl && <div className="h-36 overflow-hidden rounded-xl border border-[var(--color-border-subtle)] dark:border-slate-700 bg-white dark:bg-slate-900">{mediaType === 'video' ? <video src={imageUrl} controls muted className="h-full w-full object-cover" /> : <img src={imageUrl} alt="Pré-visualização do evento" className="h-full w-full object-cover" />}</div>}
+              </div>
+
+              <div className="event-form-section space-y-2.5 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3 sm:p-3.5">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-800">4. Bilhetes e capacidade</p>
+                  <p className="mt-1 text-[11px] text-emerald-700">Defina os valores e a lotação disponível.</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <label className="text-xs font-bold text-slate-700">Bilhete geral (XOF)
+                  <input
+                    type="number"
+                    required
+                    value={priceXOF}
+                    onChange={(e) => setPriceXOF(Number(e.target.value))}
+                    className="mt-1.5 min-h-11 w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-xs font-bold font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  </label>
+
+                  <label className="text-xs font-bold text-slate-700">Bilhete VIP (XOF)
+                  <input
+                    type="number"
+                    value={vipPriceXOF}
+                    onChange={(e) => setVipPriceXOF(Number(e.target.value))}
+                    className="mt-1.5 min-h-11 w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-xs font-bold font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  </label>
+                  <label className="text-xs font-bold text-slate-700">Lotação máxima
+                  <input
+                    type="number"
+                    required
+                    value={capacity}
+                    onChange={(e) => setCapacity(Number(e.target.value))}
+                    className="mt-1.5 min-h-11 w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border-default)] dark:border-slate-600 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="min-h-11 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition sm:min-h-0"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="min-h-11 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition shadow-xs sm:min-h-0"
+                >
+                  Enviar para aprovação
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

@@ -1,0 +1,5 @@
+# Checksums das migrações: o SHA-256 em `guigui_schema_migrations` é calculado
+# sobre o ficheiro, por isso os .sql têm de ter os mesmos bytes em qualquer
+# sistema. Sem esta regra, um clone Windows (core.autocrlf=true) converte as
+# migrações para CRLF e o arranque acusa "Migrações alteradas depois de aplicadas".
+*.sql text eol=lf

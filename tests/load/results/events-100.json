@@ -1,0 +1,155 @@
+{
+    "metrics": {
+        "http_req_connecting": {
+            "med": 0,
+            "max": 1.5641,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0.026896855345911946,
+            "min": 0
+        },
+        "iteration_duration": {
+            "avg": 2652.0329033542985,
+            "min": 1072.0837,
+            "med": 2714.9321,
+            "max": 3969.3624,
+            "p(90)": 3765.97413,
+            "p(95)": 3846.7176449999997
+        },
+        "http_req_duration{expected_response:true}": {
+            "p(95)": 959.0853,
+            "avg": 547.440035674353,
+            "min": 3.5643,
+            "med": 563.69435,
+            "max": 1095.3621,
+            "p(90)": 917.26408
+        },
+        "http_reqs": {
+            "count": 2862,
+            "rate": 69.9853766509167
+        },
+        "data_received": {
+            "count": 3453843474,
+            "rate": 84457909.30160749
+        },
+        "http_req_blocked": {
+            "avg": 0.032862054507337535,
+            "min": 0,
+            "med": 0,
+            "max": 1.5641,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "data_sent": {
+            "count": 352026,
+            "rate": 8608.201328062754
+        },
+        "vus": {
+            "value": 9,
+            "min": 6,
+            "max": 99
+        },
+        "vus_max": {
+            "value": 100,
+            "min": 100,
+            "max": 100
+        },
+        "http_req_duration": {
+            "p(95)": 959.0853,
+            "avg": 547.440035674353,
+            "min": 3.5643,
+            "med": 563.69435,
+            "max": 1095.3621,
+            "p(90)": 917.26408,
+            "thresholds": {
+                "p(95)<1500": false,
+                "p(99)<3000": false
+            }
+        },
+        "checks": {
+            "passes": 3816,
+            "fails": 0,
+            "value": 1
+        },
+        "http_req_tls_handshaking": {
+            "p(95)": 0,
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0
+        },
+        "http_req_waiting": {
+            "p(95)": 957.0471299999999,
+            "avg": 546.0109100279526,
+            "min": 3.0473,
+            "med": 562.5273,
+            "max": 1092.8007,
+            "p(90)": 916.07082
+        },
+        "http_req_receiving": {
+            "min": 0,
+            "med": 0.7415499999999999,
+            "max": 28.1121,
+            "p(90)": 2.9669700000000003,
+            "p(95)": 3.6739199999999963,
+            "avg": 1.411064290705801
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 2862,
+            "thresholds": {
+                "rate<0.02": false
+            },
+            "value": 0
+        },
+        "http_req_sending": {
+            "avg": 0.01806135569531796,
+            "min": 0,
+            "med": 0,
+            "max": 1.5086,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "iterations": {
+            "count": 954,
+            "rate": 23.328458883638902
+        }
+    },
+    "root_group": {
+        "checks": {
+            "eventos: 200": {
+                "fails": 0,
+                "name": "eventos: 200",
+                "path": "::eventos: 200",
+                "id": "45a0558c2a8855751b3998209f8e7764",
+                "passes": 954
+            },
+            "eventos: lista": {
+                "fails": 0,
+                "name": "eventos: lista",
+                "path": "::eventos: lista",
+                "id": "1c7dd730f7e22550343fcb71e262c2c8",
+                "passes": 954
+            },
+            "agendados públicos: 200": {
+                "name": "agendados públicos: 200",
+                "path": "::agendados públicos: 200",
+                "id": "e307c113def3ff9f6b0e41f418f2b1b0",
+                "passes": 954,
+                "fails": 0
+            },
+            "empresas da agenda: 200": {
+                "name": "empresas da agenda: 200",
+                "path": "::empresas da agenda: 200",
+                "id": "064a88d78c183fe86ef00fc0211af8fc",
+                "passes": 954,
+                "fails": 0
+            }
+        },
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {}
+    }
+}

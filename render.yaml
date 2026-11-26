@@ -1,0 +1,45 @@
+# Blueprint de deploy para o Render (https://render.com/docs/blueprint-spec)
+# Depois de fazer push para o GitHub, no painel do Render escolha
+# "New +" -> "Blueprint" e seleccione este repositório.
+services:
+  - type: web
+    name: guigui
+    runtime: node
+    plan: free            # mude para starter se precisar de mais recursos
+    region: frankfurt     # região mais próxima de Portugal/Brasil (eu-central)
+    branch: main
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      # O Render injecta automaticamente a porta correta; não defina PORT.
+      # URL pública do serviço (substitua pelo seu domínio quando existir).
+      - key: APP_URL
+        sync: false       # preencha no painel: https://guigui.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false       # mesma URL do APP_URL
+      # Base de dados: crie um Postgres no Render (ou Neon) e cole a connection
+      # string aqui no painel. Sem DATABASE_URL o sistema usa ficheiros JSON em
+      # data/, que se PERDEM a cada reinício do serviço free — use Postgres!
+      - key: DATABASE_URL
+        sync: false
+      # Segredos: gere com `openssl rand -hex 32` e cole no painel do Render.
+      - key: SESSION_COOKIE_SECRET
+        generateValue: true
+      - key: MFA_SECRET
+        generateValue: true
+      - key: TICKET_SIGNING_SECRET
+        generateValue: true
+      - key: PAYMENT_WEBHOOK_SECRET
+        generateValue: true
+      - key: SCANNER_DOOR_CODE
+        sync: false
+      - key: GUIGUI_BACKUP_ENCRYPTION_KEY
+        sync: false
+      - key: ENABLE_DEMO_ACCOUNTS
+        value: "false"    # em produção pública, desligue as contas demo

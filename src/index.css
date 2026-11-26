@@ -1,0 +1,3832 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: var(--font-family);
+  --font-display: "Fraunces", Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  --text-xs: 0.6875rem;
+  --text-sm: 0.8125rem;
+  --text-md: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --leading-tight: 1.1;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+  --tracking-tight: -0.025em;
+  --tracking-label: 0.1em;
+  /* ------------------------------------------------------------
+     PALETA CANÓNICA GUIGUI.COM - fonte única de verdade.
+     Regra: nenhum componente deve usar cores fora desta paleta.
+     Escalas completas (50 - 950) para nunca cair no Tailwind.
+     ------------------------------------------------------------ */
+
+  /* Verde e identidade principal, sucesso, confirmação */
+  --color-green-50: #EEF7F4;
+  --color-green-100: #DCEAE6;
+  --color-green-200: #C2DFD4;
+  --color-green-300: #9BCDBB;
+  --color-green-400: #66BE9C;
+  --color-green-500: #3FAE80;
+  --color-green-600: #2F9E68;
+  --color-green-700: #176158;
+  --color-green-800: #0F4A44;
+  --color-green-900: #0B3B37;
+  --color-green-950: #071f1d;
+
+  /* Dourado - ação de destaque, premium, recompensa */
+  --color-gold-50: #FFF9ED;
+  --color-gold-100: #FFF1D5;
+  --color-gold-200: #FCE3B4;
+  --color-gold-300: #F8D18C;
+  --color-gold-400: #F0B65B;
+  --color-gold-500: #E8A23A;
+  --color-gold-600: #C9852A;
+  --color-gold-700: #A86516;
+  --color-gold-800: #8A5211;
+  --color-gold-900: #6B3F0D;
+  --color-gold-950: #452A08;
+
+  /* Coral - ação secundária quente, promoções */
+  --color-coral-50: #FFF1EC;
+  --color-coral-100: #FFE4DC;
+  --color-coral-200: #FFCDBE;
+  --color-coral-300: #FCAE98;
+  --color-coral-400: #F07A4F;
+  --color-coral-500: #EC6640;
+  --color-coral-600: #E5572B;
+  --color-coral-700: #C4451F;
+  --color-coral-800: #9E3718;
+  --color-coral-900: #7C2B13;
+
+  /* Vermelho - erro, perigo, remoção */
+  --color-red-50: #FEF3F2;
+  --color-red-100: #FEE4E2;
+  --color-red-200: #FECDCA;
+  --color-red-300: #FDA29B;
+  --color-red-400: #F97066;
+  --color-red-500: #F04438;
+  --color-red-600: #D92D20;
+  --color-red-700: #B42318;
+  --color-red-800: #912018;
+  --color-red-900: #7A271A;
+  --color-red-950: var(--color-red-900);
+
+  /* Amarelo - aviso, atenção, pendente */
+  --color-yellow-50: #FFFBEB;
+  --color-yellow-100: #FFF3CD;
+  --color-yellow-200: #FDE68A;
+  --color-yellow-300: #FCD34D;
+  --color-yellow-400: #FBBF24;
+  --color-yellow-500: #F59E0B;
+  --color-yellow-600: #D97706;
+  --color-yellow-700: #A15C07;
+  --color-yellow-800: #854D0E;
+  --color-yellow-900: #713F12;
+  --color-yellow-950: var(--color-yellow-900);
+
+  /* Azul - informação, dados, indicadores neutros */
+  --color-blue-50: #EFF8FF;
+  --color-blue-100: #DBEAFE;
+  --color-blue-200: #B2DDFF;
+  --color-blue-300: #84CAFF;
+  --color-blue-400: #53B1FD;
+  --color-blue-500: #2E90FA;
+  --color-blue-600: #1570EF;
+  --color-blue-700: #175CD3;
+  --color-blue-800: #1849A9;
+  --color-blue-900: #194185;
+  --color-blue-950: var(--color-blue-900);
+  /* Neutro quente - superfícies, texto, bordas */
+  --color-neutral-0: #FFFFFF;
+  --color-neutral-25: #FCFBF8;
+  --color-neutral-50: #F7F5F1;
+  --color-neutral-100: #EEEAE2;
+  --color-neutral-200: #E4DFD4;
+  --color-neutral-300: #DCD6C8;
+  --color-neutral-400: #ABA79B;
+  --color-neutral-500: #5B6B67;
+  --color-neutral-600: #52615C;
+  --color-neutral-700: #34423E;
+  --color-neutral-800: #253230;
+  --color-neutral-900: #16221F;
+  --color-neutral-950: #091B1E;
+  /* ============================================================
+     NORMALIZAÇÃO DE PALETA
+     As famílias abaixo vêm do Tailwind e NÃO pertencem a identidade
+     Guigui (cinza azulado, esmeralda, indigo, roxo, rosa...).
+     São remapeadas para a paleta canónica para que TODO o sistema
+     use as mesmas cores a sem reescrever os componentes.
+     ============================================================ */
+
+  /* slate / gray / zinc / stone (cinza azulado ou neutro frio) ? neutro quente */
+  --color-slate-50: var(--color-neutral-50);
+  --color-slate-100: var(--color-neutral-100);
+  --color-slate-200: var(--color-neutral-200);
+  --color-slate-300: var(--color-neutral-300);
+  --color-slate-400: var(--color-neutral-400);
+  --color-slate-500: var(--color-neutral-500);
+  --color-slate-600: var(--color-neutral-600);
+  --color-slate-700: var(--color-neutral-700);
+  --color-slate-800: var(--color-neutral-800);
+  --color-slate-900: var(--color-neutral-900);
+  --color-slate-950: var(--color-neutral-950);
+  --color-gray-50: var(--color-neutral-50);
+  --color-gray-100: var(--color-neutral-100);
+  --color-gray-200: var(--color-neutral-200);
+  --color-gray-300: var(--color-neutral-300);
+  --color-gray-400: var(--color-neutral-400);
+  --color-gray-500: var(--color-neutral-500);
+  --color-gray-600: var(--color-neutral-600);
+  --color-gray-700: var(--color-neutral-700);
+  --color-gray-800: var(--color-neutral-800);
+  --color-gray-900: var(--color-neutral-900);
+  --color-gray-950: var(--color-neutral-950);
+  --color-zinc-50: var(--color-neutral-50);
+  --color-zinc-100: var(--color-neutral-100);
+  --color-zinc-200: var(--color-neutral-200);
+  --color-zinc-300: var(--color-neutral-300);
+  --color-zinc-400: var(--color-neutral-400);
+  --color-zinc-500: var(--color-neutral-500);
+  --color-zinc-600: var(--color-neutral-600);
+  --color-zinc-700: var(--color-neutral-700);
+  --color-zinc-800: var(--color-neutral-800);
+  --color-zinc-900: var(--color-neutral-900);
+  --color-zinc-950: var(--color-neutral-950);
+  --color-stone-50: var(--color-neutral-50);
+  --color-stone-100: var(--color-neutral-100);
+  --color-stone-200: var(--color-neutral-200);
+  --color-stone-300: var(--color-neutral-300);
+  --color-stone-400: var(--color-neutral-400);
+  --color-stone-500: var(--color-neutral-500);
+  --color-stone-600: var(--color-neutral-600);
+  --color-stone-700: var(--color-neutral-700);
+  --color-stone-800: var(--color-neutral-800);
+  --color-stone-900: var(--color-neutral-900);
+  --color-stone-950: var(--color-neutral-950);
+
+  /* emerald / teal / lime / green (verdes do Tailwind) ? verde da marca */
+  --color-emerald-50: var(--color-green-50);
+  --color-emerald-100: var(--color-green-100);
+  --color-emerald-200: var(--color-green-200);
+  --color-emerald-300: var(--color-green-300);
+  --color-emerald-400: var(--color-green-400);
+  /* 500/600 são usados sobretudo em texto pequeno e botões com texto branco.
+     Apontam para green-700 (7.27:1 sobre branco) para cumprir WCAG AA. */
+  --color-emerald-500: var(--color-green-700);
+  --color-emerald-600: var(--color-green-700);
+  --color-emerald-700: var(--color-green-700);
+  --color-emerald-800: var(--color-green-800);
+  --color-emerald-900: var(--color-green-900);
+  --color-emerald-950: var(--color-green-950);
+  --color-teal-50: var(--color-green-50);
+  --color-teal-100: var(--color-green-100);
+  --color-teal-200: var(--color-green-200);
+  --color-teal-300: var(--color-green-300);
+  --color-teal-400: var(--color-green-400);
+  --color-teal-500: var(--color-green-500);
+  --color-teal-600: var(--color-green-600);
+  --color-teal-700: var(--color-green-700);
+  --color-teal-800: var(--color-green-800);
+  --color-teal-900: var(--color-green-900);
+  --color-teal-950: var(--color-green-950);
+  --color-lime-50: var(--color-green-50);
+  --color-lime-100: var(--color-green-100);
+  --color-lime-200: var(--color-green-200);
+  --color-lime-300: var(--color-green-300);
+  --color-lime-400: var(--color-green-400);
+  --color-lime-500: var(--color-green-500);
+  --color-lime-600: var(--color-green-600);
+  --color-lime-700: var(--color-green-700);
+  --color-lime-800: var(--color-green-800);
+  --color-lime-900: var(--color-green-900);
+  --color-lime-950: var(--color-green-950);
+
+  /* amber (âmbar do Tailwind) ? dourado da marca */
+  --color-amber-50: var(--color-gold-50);
+  --color-amber-100: var(--color-gold-100);
+  --color-amber-200: var(--color-gold-200);
+  --color-amber-300: var(--color-gold-300);
+  --color-amber-400: var(--color-gold-400);
+  /* Texto âmbar pequeno sobre branco: gold-700 garante 4.63:1. */
+  --color-amber-500: var(--color-gold-700);
+  --color-amber-600: var(--color-gold-700);
+  --color-amber-700: var(--color-gold-700);
+  --color-amber-800: var(--color-gold-800);
+  --color-amber-900: var(--color-gold-900);
+  --color-amber-950: var(--color-gold-950);
+
+  /* orange / rose (laranja e rosa do Tailwind) ? coral da marca */
+  --color-orange-50: var(--color-coral-50);
+  --color-orange-100: var(--color-coral-100);
+  --color-orange-200: var(--color-coral-200);
+  --color-orange-300: var(--color-coral-300);
+  --color-orange-400: var(--color-coral-400);
+  --color-orange-500: var(--color-coral-500);
+  --color-orange-600: var(--color-coral-600);
+  --color-orange-700: var(--color-coral-700);
+  --color-orange-800: var(--color-coral-800);
+  --color-orange-900: var(--color-coral-900);
+  --color-orange-950: var(--color-coral-900);
+  --color-rose-50: var(--color-coral-50);
+  --color-rose-100: var(--color-coral-100);
+  --color-rose-200: var(--color-coral-200);
+  --color-rose-300: var(--color-coral-300);
+  --color-rose-400: var(--color-coral-400);
+  --color-rose-500: var(--color-coral-500);
+  --color-rose-600: var(--color-coral-600);
+  --color-rose-700: var(--color-coral-700);
+  --color-rose-800: var(--color-coral-800);
+  --color-rose-900: var(--color-coral-900);
+  --color-rose-950: var(--color-coral-900);
+
+  /* indigo / sky / cyan (azuis-arroxeados do Tailwind) ? azul da marca */
+  --color-indigo-50: var(--color-blue-50);
+  --color-indigo-100: var(--color-blue-100);
+  --color-indigo-200: var(--color-blue-200);
+  --color-indigo-300: var(--color-blue-300);
+  --color-indigo-400: var(--color-blue-400);
+  --color-indigo-500: var(--color-blue-500);
+  --color-indigo-600: var(--color-blue-600);
+  --color-indigo-700: var(--color-blue-700);
+  --color-indigo-800: var(--color-blue-800);
+  --color-indigo-900: var(--color-blue-900);
+  --color-indigo-950: var(--color-blue-900);
+  --color-sky-50: var(--color-blue-50);
+  --color-sky-100: var(--color-blue-100);
+  --color-sky-200: var(--color-blue-200);
+  --color-sky-300: var(--color-blue-300);
+  --color-sky-400: var(--color-blue-400);
+  --color-sky-500: var(--color-blue-500);
+  --color-sky-600: var(--color-blue-600);
+  --color-sky-700: var(--color-blue-700);
+  --color-sky-800: var(--color-blue-800);
+  --color-sky-900: var(--color-blue-900);
+  --color-sky-950: var(--color-blue-900);
+  --color-cyan-50: var(--color-blue-50);
+  --color-cyan-100: var(--color-blue-100);
+  --color-cyan-200: var(--color-blue-200);
+  --color-cyan-300: var(--color-blue-300);
+  --color-cyan-400: var(--color-blue-400);
+  --color-cyan-500: var(--color-blue-500);
+  --color-cyan-600: var(--color-blue-600);
+  --color-cyan-700: var(--color-blue-700);
+  --color-cyan-800: var(--color-blue-800);
+  --color-cyan-900: var(--color-blue-900);
+  --color-cyan-950: var(--color-blue-900);
+
+  /* purple / violet (roxo do Tailwind) ? azul da marca (a identidade não tem roxo) */
+  --color-purple-50: var(--color-blue-50);
+  --color-purple-100: var(--color-blue-100);
+  --color-purple-200: var(--color-blue-200);
+  --color-purple-300: var(--color-blue-300);
+  --color-purple-400: var(--color-blue-400);
+  --color-purple-500: var(--color-blue-500);
+  --color-purple-600: var(--color-blue-600);
+  --color-purple-700: var(--color-blue-700);
+  --color-purple-800: var(--color-blue-800);
+  --color-purple-900: var(--color-blue-900);
+  --color-purple-950: var(--color-blue-900);
+  --color-violet-50: var(--color-blue-50);
+  --color-violet-100: var(--color-blue-100);
+  --color-violet-200: var(--color-blue-200);
+  --color-violet-300: var(--color-blue-300);
+  --color-violet-400: var(--color-blue-400);
+  --color-violet-500: var(--color-blue-500);
+  --color-violet-600: var(--color-blue-600);
+  --color-violet-700: var(--color-blue-700);
+  --color-violet-800: var(--color-blue-800);
+  --color-violet-900: var(--color-blue-900);
+  --color-violet-950: var(--color-blue-900);
+
+  /* fuchsia / pink (rosa do Tailwind) ? coral da marca */
+  --color-fuchsia-50: var(--color-coral-50);
+  --color-fuchsia-100: var(--color-coral-100);
+  --color-fuchsia-200: var(--color-coral-200);
+  --color-fuchsia-300: var(--color-coral-300);
+  --color-fuchsia-400: var(--color-coral-400);
+  --color-fuchsia-500: var(--color-coral-500);
+  --color-fuchsia-600: var(--color-coral-600);
+  --color-fuchsia-700: var(--color-coral-700);
+  --color-fuchsia-800: var(--color-coral-800);
+  --color-fuchsia-900: var(--color-coral-900);
+  --color-fuchsia-950: var(--color-coral-900);
+  --color-pink-50: var(--color-coral-50);
+  --color-pink-100: var(--color-coral-100);
+  --color-pink-200: var(--color-coral-200);
+  --color-pink-300: var(--color-coral-300);
+  --color-pink-400: var(--color-coral-400);
+  --color-pink-500: var(--color-coral-500);
+  --color-pink-600: var(--color-coral-600);
+  --color-pink-700: var(--color-coral-700);
+  --color-pink-800: var(--color-coral-800);
+  --color-pink-900: var(--color-coral-900);
+  --color-pink-950: var(--color-coral-900);
+
+  --color-bg-canvas: var(--color-neutral-50);
+  --color-bg-surface: #fff;
+  /* Fundo quente dos painéis de perfil (Admin/Empresa): manteve o tom de papel
+     no tema claro e escurece no tema escuro para o texto não perder contraste. */
+  --color-bg-dashboard-canvas: #f3efe9;
+  --color-bg-subtle: var(--color-neutral-25);
+  /* Superfícies "-dark" da marca: usadas com texto branco, por isso tem de ser
+     escuras também no tema claro (antes estavam por definir e ficavam
+     transparentes, deixando texto branco sobre fundo claro). */
+  --color-bg-surface-dark: #0b3b37;
+  --color-bg-subtle-dark: #0f4a44;
+  --color-border-subtle-dark: #2b6157;
+  --color-text-muted-dark: #a9c0b9;
+  --color-text-strong-dark: #f1fbf6;
+  --color-bg-brand: var(--color-green-900);
+  --color-bg-brand-soft: var(--color-green-50);
+  --color-bg-accent: var(--color-gold-500);
+  --color-bg-danger: var(--color-red-700);
+  --color-accent-500: var(--color-coral-500);
+  --color-accent-600: var(--color-coral-600);
+  --color-bg-strong: var(--color-neutral-200);
+  --color-paper: var(--color-bg-canvas);
+  /* Limite de campos: 5.61:1 sobre branco (WCAG 1.4.11 exige 3:1). */
+  --color-border-input: var(--color-neutral-500);
+  --color-text-strong: var(--color-neutral-900);
+  --color-text-default: var(--color-neutral-700);
+  --color-text-muted: var(--color-neutral-500);
+  --color-text-on-brand: #fff;
+  --color-text-on-accent: #28210A;
+  --color-text-link: var(--color-green-800);
+  --color-text-danger: var(--color-red-700);
+  /* Variações de KPI (subida/descida): claras no tema claro e ainda mais
+     claras no escuro, para não caírem para 2:1 sobre a superfície do cartão. */
+  --color-text-positive: var(--color-green-700);
+  --color-text-negative: var(--color-red-700);
+  --color-border-default: var(--color-neutral-200);
+  --color-border-subtle: rgba(16, 41, 35, 0.08);
+  --color-border-strong: var(--color-green-900);
+  --color-focus-ring: var(--color-green-700);
+  --color-state-success: var(--color-green-600);
+  --color-state-warning: var(--color-yellow-700);
+  --color-state-danger: var(--color-red-700);
+  --color-state-info: var(--color-blue-700);
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.375rem;
+  --radius-2xl: 1.75rem;
+  --radius-pill: 999px;
+  --shadow-xs: 0 1px 2px rgba(11, 59, 55, 0.06);
+  --shadow-sm: 0 8px 20px -16px rgba(11, 59, 55, 0.3);
+  --shadow-md: 0 18px 40px -26px rgba(11, 59, 55, 0.38);
+  --shadow-lg: 0 30px 80px -38px rgba(7, 33, 30, 0.58);
+
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 140ms;
+  --duration-normal: 200ms;
+  --duration-slow: 320ms;
+  --motion-distance-sm: 8px;
+  --motion-distance-md: 16px;
+  color-scheme: light;
+
+  /* ------------------------------------------------------------
+     ALIASES DE COMPATIBILIDADE (nomes legados).
+     Todos apontam para a paleta canónica - fonte única de verdade.
+     Não usar em código novo: preferir sempre --color-*.
+     ------------------------------------------------------------ */
+  --ink: var(--color-green-900);
+  --ink-2: var(--color-green-800);
+  --gold: var(--color-gold-500);
+  --gold-2: var(--color-gold-600);
+  --coral: var(--color-coral-600);
+  --color-brand-accent: var(--color-coral-500);
+  --color-brand-accent-soft: var(--color-coral-200);
+  --color-accent-hover: var(--color-coral-600);
+  --paper: var(--color-neutral-50);
+  --paper-2: #fff;
+  --text: var(--color-neutral-900);
+  --mute: var(--color-text-muted);
+  --line: var(--color-neutral-200);
+  --line-2: var(--color-neutral-300);
+  --guigui-blue: var(--ink);
+  --guigui-blue-dark: var(--ink-2);
+  --guigui-gold: var(--gold);
+  --guigui-ink: var(--text);
+  --guigui-muted: var(--mute);
+  --guigui-surface: #ffffff;
+  --guigui-border: var(--line);
+  --guigui-shadow: 0 18px 45px rgba(11, 59, 55, 0.10);
+  --guigui-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --app-header-height: 120px;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; background: var(--paper); text-rendering: optimizeLegibility; overflow-x: clip; }
+#root { width: 100%; min-width: 0; overflow-x: clip; }
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+  background: var(--paper);
+  color: var(--text);
+  font-family: var(--font-family);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Keep Tailwind utility text aligned with the typography used by the citizen area. */
+.font-sans {
+  font-family: var(--font-family);
+}
+.font-serif {
+  font-family: var(--font-family);
+}
+
+html.dark {
+  background: #071d1b;
+  color: #edf7f5;
+  --color-bg-canvas: #071d1b;
+  --color-bg-dashboard-canvas: #071d1b;
+  --color-bg-surface: #0d2725;
+  --color-bg-subtle: #102d2b;
+  --color-bg-surface-dark: #081c19;
+  --color-bg-subtle-dark: #102d2b;
+  --color-border-subtle-dark: #285849;
+  --color-text-strong: #f4fbf8;
+  --color-text-default: var(--color-green-100);
+  --color-text-muted: #a9c0b9;
+  --color-border-default: rgba(220, 234, 230, 0.18);
+  --color-border-subtle: rgba(220, 234, 230, 0.1);
+  --color-text-positive: #8be2be;
+  --color-text-negative: #ffa198;
+  --color-accent-500: var(--color-coral-400);
+  --color-accent-600: var(--color-coral-500);
+  --color-bg-strong: var(--color-green-800);
+  --color-border-input: var(--color-neutral-400);
+  --color-focus-ring: #8be2be;
+}
+html.dark body {
+  background: linear-gradient(180deg, #071d1b 0%, #0b2122 100%);
+  color: #edf7f5;
+}
+html.dark .guigui-app-shell {
+  background:
+    radial-gradient(circle at top, rgba(232, 162, 58, 0.12), transparent 18%),
+    linear-gradient(180deg, #071d1b 0%, #0a1a1b 38%, var(--color-neutral-950) 100%);
+  color: #edf7f5;
+}
+html.dark .guigui-navbar {
+  background: #0b1416;
+  border-color: rgba(148, 163, 184, 0.2);
+}
+html.dark .guigui-nav-search,
+html.dark .guigui-nav-popover,
+html.dark .guigui-icon-button {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-color: rgba(148, 163, 184, 0.25);
+}
+html.dark .guigui-primary-button,
+html.dark .guigui-outline-button {
+  background: var(--color-bg-surface-dark);
+  color: var(--color-text-strong);
+  border-color: var(--color-border-subtle-dark);
+}
+html.dark .guigui-primary-button:hover,
+html.dark .guigui-outline-button:hover {
+  background: var(--color-bg-surface);
+  color: var(--color-text-strong);
+  border-color: var(--color-border-strong);
+}
+html.dark .guigui-gold-button {
+  background: var(--color-gold-500);
+  color: var(--color-text-on-accent);
+}
+html.dark .guigui-gold-button:hover {
+  background: var(--color-gold-400);
+}
+html.dark .guigui-coral-button {
+  background: var(--color-coral-500);
+  color: var(--color-text-on-brand);
+}
+html.dark .guigui-coral-button:hover {
+  background: var(--color-coral-400);
+}
+html.dark .guigui-backbar {
+  background: #0d2725;
+  border-color: rgba(148, 163, 184, 0.18);
+}
+html.dark .guigui-nav-link,
+html.dark .guigui-nav-link:hover,
+html.dark .guigui-nav-link.active,
+html.dark .guigui-nav-popover button {
+  color: #e2e8f0;
+}
+html.dark .guigui-nav-popover button:hover {
+  background: rgba(148, 163, 184, 0.12);
+}
+
+/* ------------------------------------------------------------
+   Legibilidade global no modo escuro.
+   Componentes antigos ainda usam escala escura fixa (text-slate-900/800/700)
+   e tokens da paleta escura (green-900/800/700, neutral-900/800/700) como cor
+   de texto. Sobre as superfícies escuras isso desaparece. Estas regras só
+   actuam em html.dark, por isso o tema claro fica intacto.
+   ------------------------------------------------------------ */
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark .text-slate-700 {
+  color: #e8f2ee;
+}
+html.dark .text-slate-600,
+html.dark .text-slate-500 {
+  color: #c2d3cd;
+}
+html.dark .text-emerald-500,
+html.dark .text-emerald-600,
+html.dark .text-emerald-700,
+html.dark .text-emerald-800 {
+  color: #7fe0bb;
+}
+html.dark .text-amber-500,
+html.dark .text-amber-600 {
+  color: var(--color-gold-300);
+}
+html.dark [class*="text-[var(--color-green-950)]"],
+html.dark [class*="text-[var(--color-green-900)]"],
+html.dark [class*="text-[var(--color-green-800)]"],
+html.dark [class*="text-[var(--color-green-700)]"] {
+  color: var(--color-green-200);
+}
+html.dark [class*="text-[var(--color-neutral-950)]"],
+html.dark [class*="text-[var(--color-neutral-900)]"],
+html.dark [class*="text-[var(--color-neutral-800)]"],
+html.dark [class*="text-[var(--color-neutral-700)]"] {
+  color: #e2efeb;
+}
+html.dark [class*="text-[var(--color-neutral-600)]"],
+html.dark [class*="text-[var(--color-neutral-500)]"] {
+  color: #b9cdc6;
+}
+/* Superfícies claras fixas (bg-white / bg-slate-*) passam a usar o tom
+   escuro da aplicação; sem isto os cartões ficam brancos com texto claro. */
+html.dark .bg-white {
+  background-color: var(--color-bg-surface);
+}
+html.dark .bg-slate-50 {
+  background-color: var(--color-bg-surface-dark);
+}
+html.dark .bg-slate-100 {
+  background-color: var(--color-bg-subtle);
+}
+html.dark .bg-slate-200 {
+  background-color: #16332f;
+}
+html.dark .bg-emerald-50 {
+  background-color: rgba(63, 174, 128, 0.16);
+}
+html.dark .bg-emerald-100 {
+  background-color: rgba(63, 174, 128, 0.24);
+}
+
+/* ------------------------------------------------------------
+   Tons semânticos: sucesso, aviso, perigo e informação.
+   Os componentes de gestão usam estes tokens em vez de cores fixas
+   (emerald/amber/rose/sky-50…), para que cartões, chips, alertas e KPIs
+   sigam a paleta do tema ativo — claro ou escuro.
+   ------------------------------------------------------------ */
+:root {
+  --tone-success-bg: var(--color-green-50);
+  --tone-success-border: var(--color-green-200);
+  --tone-success-text: var(--color-green-800);
+  --tone-warning-bg: var(--color-gold-50);
+  --tone-warning-border: var(--color-gold-200);
+  --tone-warning-text: var(--color-gold-800);
+  --tone-danger-bg: var(--color-coral-50);
+  --tone-danger-border: var(--color-coral-200);
+  --tone-danger-text: var(--color-coral-800);
+  --tone-info-bg: var(--color-sky-50);
+  --tone-info-border: var(--color-sky-200);
+  --tone-info-text: var(--color-blue-800);
+}
+html.dark {
+  --tone-success-bg: rgba(63, 174, 128, 0.16);
+  --tone-success-border: rgba(155, 205, 187, 0.42);
+  --tone-success-text: #b6f0d6;
+  --tone-warning-bg: rgba(232, 162, 58, 0.16);
+  --tone-warning-border: rgba(248, 209, 140, 0.4);
+  --tone-warning-text: #f8d9a5;
+  --tone-danger-bg: rgba(255, 107, 87, 0.16);
+  --tone-danger-border: rgba(245, 181, 168, 0.42);
+  --tone-danger-text: #ffc4b8;
+  --tone-info-bg: rgba(96, 165, 250, 0.16);
+  --tone-info-border: rgba(147, 197, 253, 0.38);
+  --tone-info-text: #c7dcff;
+}
+html.dark .guigui-filter-chip {
+  background: #16332f;
+  border-color: rgba(220, 234, 230, 0.22);
+  color: #dbeae5;
+}
+html.dark .guigui-filter-chip:hover,
+html.dark .guigui-filter-chip.active {
+  background: linear-gradient(135deg, #1d6f66, #0f4d4a);
+  border-color: rgba(155, 205, 187, 0.6);
+  color: #ffffff;
+}
+/* Barra de navegação inferior flutuante (fundo sólido) */
+.guigui-bottom-nav__surface {
+  border-radius: 9999px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface);
+  box-shadow:
+    0 10px 24px -18px rgba(15, 23, 42, 0.35),
+    0 1px 2px rgba(15, 23, 42, 0.06);
+  transition: background-color 300ms ease, box-shadow 300ms ease;
+}
+.guigui-bottom-nav__item--active {
+  background: radial-gradient(120% 130% at 50% 120%, rgba(16, 185, 129, 0.22), rgba(16, 185, 129, 0.1));
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.22);
+}
+html.dark .guigui-bottom-nav__surface {
+  border-color: rgba(148, 226, 202, 0.18);
+  background: var(--color-bg-surface);
+  box-shadow:
+    0 12px 26px -18px rgba(0, 0, 0, 0.6),
+    0 1px 2px rgba(0, 0, 0, 0.4);
+}
+html.dark .guigui-bottom-nav__item--active {
+  background: radial-gradient(120% 130% at 50% 120%, rgba(52, 211, 153, 0.26), rgba(52, 211, 153, 0.1));
+  box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.28);
+}
+@media (prefers-reduced-motion: reduce) {
+  .guigui-bottom-nav__surface *,
+  .guigui-bottom-nav__surface {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+html.dark [class*="text-[#16221F]"],
+html.dark [class*="text-[#0B3B37]"],
+html.dark [class*="text-[#0F4A44]"],
+html.dark [class*="text-[#176158]"],
+html.dark [class*="text-[#5B6B67]"],
+html.dark [class*="text-[#52615C]"] {
+  color: #d7e7e1;
+}
+
+h1, h2, h3, h4, h5, h6, .guigui-display { font-family: var(--font-family); }
+.guigui-hero-title, .guigui-secondary-hero-inner h1, .guigui-display-title { font-family: var(--font-display); }
+button, input, select, textarea { font-family: inherit; }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button, a { min-width: 0; transition: transform 160ms var(--guigui-ease), box-shadow 180ms var(--guigui-ease), background-color 180ms ease, color 180ms ease, border-color 180ms ease, opacity 180ms ease; }
+button:active:not(:disabled) { transform: scale(.975); }
+button:disabled { cursor: not-allowed; }
+:where(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+/* Limites de campos e placeholders com contraste suficiente nos dois temas. */
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+select,
+textarea { border-color: var(--color-border-input); }
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):focus,
+select:focus,
+textarea:focus { border-color: var(--color-green-500); }
+input::placeholder,
+textarea::placeholder { color: var(--color-text-muted); opacity: 1; }
+img, svg, video { max-width: 100%; }
+img { display: block; height: auto; }
+::selection { background: rgba(232, 162, 58, .32); color: var(--ink); }
+
+/* Base responsiva: nenhuma caixa deve forçar rolagem lateral da página.
+   Qualquer rolagem horizontal intencional fica isolada no próprio
+   contentor (overflow-x: auto) em vez de esticar o documento. */
+*, *::before, *::after { min-width: 0; }
+.guigui-app-shell,
+.guigui-main,
+.guigui-profile-dashboard,
+.guigui-secondary-page,
+.guigui-panel,
+main, section, article, aside, header, footer, form {
+  max-width: 100%;
+}
+p, h1, h2, h3, h4, h5, h6, li, td, th, span, a, button, label, small {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+table { border-collapse: collapse; }
+pre, code { white-space: pre-wrap; word-break: break-word; max-width: 100%; }
+
+* { scrollbar-color: rgba(91, 107, 103, .45) transparent; scrollbar-width: thin; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background-clip: padding-box; background-color: rgba(91, 107, 103, .38); }
+*::-webkit-scrollbar-thumb:hover { background-color: rgba(11, 59, 55, .62); }
+
+.modal-open { overflow: hidden !important; touch-action: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+.guigui-app-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top, rgba(232, 162, 58, 0.08), transparent 18%),
+    linear-gradient(180deg, #f7f4ef 0%, #f4f8f7 100%);
+  color: var(--text);
+}
+.guigui-main {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 4px 0.35rem 48px;
+}
+.guigui-modebar {
+  position: sticky;
+  top: 72px;
+  z-index: 90;
+  background: var(--ink);
+  color: var(--color-green-100);
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.guigui-backbar {
+  position: sticky;
+  top: 112px;
+  z-index: 30;
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  margin: 0 0.35rem 10px;
+  padding: 5px 6px 5px 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: 0 6px 18px -14px rgba(11, 59, 55, 0.4);
+  margin-left: var(--backbar-offset, 0.35rem);
+}
+.guigui-profile-dashboard,
+.guigui-profile-dashboard main,
+.guigui-profile-footer {
+  min-width: 0;
+  max-width: 100vw;
+}
+.guigui-profile-footer {
+  margin-left: var(--sidebar-offset, 0px);
+  transition: margin-left 300ms ease-out;
+}
+/* Rodapé escuro também no tema claro: o texto não pode herdar tons escuros. */
+html:not(.dark) .guigui-profile-footer :is(.text-slate-300, .text-slate-400, .text-slate-500) {
+  color: var(--color-green-100);
+}
+.guigui-secondary-page {
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+
+/* Fluid foundations shared by the public pages and all profile dashboards. */
+html {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+body {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+}
+#root {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+}
+img, video, canvas, svg, iframe {
+  max-width: 100%;
+}
+img, video {
+  height: auto;
+}
+.guigui-app-shell,
+.guigui-main,
+.guigui-profile-dashboard,
+.guigui-profile-dashboard > div,
+.guigui-profile-dashboard main {
+  min-width: 0;
+  max-width: 100%;
+}
+.guigui-profile-dashboard {
+  overflow-x: clip;
+  --dashboard-sidebar-width: 248px;
+}
+.guigui-profile-dashboard main > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.guigui-profile-dashboard table {
+  width: 100%;
+  max-width: 100%;
+}
+.guigui-profile-dashboard .overflow-x-auto {
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+}
+.guigui-profile-dashboard img,
+.guigui-secondary-page img,
+.guigui-panel img {
+  height: auto;
+  object-fit: cover;
+}
+
+/* Admin & Empresa: dashboards com design fixo claro - manter texto escuro e
+   superfícies claras mesmo em dark mode (evita texto branco invisível sobre
+   fundo branco herdado do body/.guigui-app-shell escuros). */
+.guigui-light-dashboard {
+  color: #1e293b;
+  --color-bg-surface: #fff;
+  --color-bg-subtle: #f8fafc;
+  --color-text-strong: #0f172a;
+  --color-text-default: #1e293b;
+  /* Escurecido para >=4.5:1 sobre o fundo quente do dashboard (var(--color-bg-dashboard-canvas)). */
+  --color-text-muted: #5b6b67;
+  --color-border-default: rgba(15, 23, 42, 0.14);
+  --color-border-subtle: rgba(15, 23, 42, 0.08);
+}
+html.dark .guigui-light-dashboard {
+  color: #f1fbf6;
+  --color-bg-surface: #0d2924;
+  --color-bg-subtle: #081c19;
+  --color-text-strong: #f1fbf6;
+  --color-text-default: #cfe3da;
+  --color-text-muted: #9bb8ad;
+  --color-border-default: #285849;
+  --color-border-subtle: rgba(158, 227, 195, 0.16);
+  --color-border-input: #52796b;
+}
+.guigui-light-dashboard .guigui-communication-shell { color: #1b1f29; }
+html.dark .guigui-light-dashboard .guigui-communication-shell { color: var(--color-green-50); }
+
+/* Texto pequeno em modo escuro: evita texto claro sobre painéis escuros
+   mantendo as cores do dashboard escuro. */
+html.dark .guigui-light-dashboard [class*="text-[11px]"],
+html.dark .guigui-light-dashboard [class*="text-[10px]"],
+html.dark .guigui-light-dashboard [class*="text-[9px]"],
+html.dark .guigui-light-dashboard [class*="text-[8px]"] {
+  color: var(--color-text-muted) !important;
+}
+
+.guigui-profile-dashboard input,
+.guigui-profile-dashboard select,
+.guigui-profile-dashboard textarea {
+  max-width: 100%;
+}
+
+/* Brand and navigation */
+.guigui-navbar { position: sticky; top: 0; z-index: 100 !important; background: #f7f5f1; border-bottom: 1px solid var(--line); }
+.guigui-navbar-inner { min-height: 72px; width: 100%; max-width: 1440px; margin: 0 auto; padding: 12px clamp(16px, 4vw, 56px); display: flex; align-items: center; gap: 18px; }
+.guigui-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; flex-shrink: 0; }
+.guigui-brand-mark { width: 34px; height: 34px; flex: 0 0 34px; }
+.guigui-brand-word { font-family: var(--font-family); font-size: 23px; font-weight: 700; letter-spacing: -.02em; }
+.guigui-brand-word .dot { color: var(--color-gold-800); }
+html.dark .guigui-brand { color: #edf7f5; }
+html.dark .guigui-navbar .guigui-brand-word { color: #edf7f5; }
+html.dark .guigui-brand-word .dot { color: var(--color-gold-400); }
+/* O corpo da estrela é verde-escuro; no navbar escuro fica quase invisível. */
+html.dark .guigui-navbar .guigui-brand-mark svg path { fill: var(--color-green-100); }
+.guigui-nav-links { display: flex; align-items: center; gap: 4px; flex: 1; }
+.guigui-nav-link { border: 0; background: transparent; color: var(--mute); padding: 10px 12px; border-radius: 10px; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.guigui-nav-link:hover, .guigui-nav-link.active { color: var(--ink); background: rgba(11,59,55,.07); }
+.guigui-nav-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.guigui-icon-button { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); cursor: pointer; }
+.guigui-icon-button:hover { border-color: var(--gold); background: #fffaf0; }
+.guigui-primary-button, .guigui-gold-button, .guigui-outline-button, .guigui-coral-button { border-radius: 11px; padding: 10px 16px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid transparent; }
+.guigui-primary-button { background: var(--ink); color: #fff; }
+.guigui-primary-button:hover { background: var(--ink-2); box-shadow: 0 10px 22px -12px rgba(11,59,55,.55); }
+.guigui-gold-button { background: var(--gold); color: #28210a; }
+.guigui-gold-button:hover { background: #F0AE4C; box-shadow: 0 10px 22px -12px rgba(232,162,58,.55); }
+.guigui-outline-button { background: transparent; color: var(--ink); border-color: var(--ink); }
+.guigui-outline-button:hover { background: var(--ink); color: #fff; }
+.guigui-coral-button { background: var(--coral); color: #fff; }
+.guigui-coral-button:hover { background: #EF6A3F; }
+.guigui-menu-button { display: inline-flex; }
+.guigui-nav-search { display: flex; align-items: center; gap: 8px; min-width: 180px; max-width: 250px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--mute); }
+.guigui-nav-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 12px; }
+.guigui-nav-popover { position: absolute; top: calc(100% + 10px); right: 0; min-width: 250px; padding: 10px; border: 1px solid var(--line); border-radius: 16px; background: #fff; box-shadow: 0 24px 48px -24px rgba(11,59,55,.35); }
+.guigui-nav-popover button { display: flex; width: 100%; align-items: center; gap: 10px; padding: 10px; border: 0; border-radius: 10px; background: transparent; color: var(--text); text-align: left; font-size: 12px; font-weight: 700; cursor: pointer; }
+.guigui-nav-popover button:hover { background: var(--paper); }
+.guigui-nav-drawer { position: fixed; inset: 0; z-index: 120; background: rgba(11,59,55,.35); animation: guigui-scale-in var(--duration-normal) ease-out both; }
+.guigui-nav-drawer-panel { width: min(330px, 88vw); height: 100%; padding: 24px 18px; background: var(--ink); color: #fff; box-shadow: 18px 0 50px -30px rgba(0,0,0,.5); animation: guigui-fade-up var(--duration-slow) var(--ease-emphasized) both; }
+.guigui-nav-drawer-panel button { display: flex; width: 100%; align-items: center; gap: 12px; padding: 12px; border: 0; border-radius: 10px; background: transparent; color: var(--color-green-100); text-align: left; font-size: 13px; font-weight: 500; cursor: pointer; }
+.guigui-nav-drawer-panel button:hover, .guigui-nav-drawer-panel button.active { background: rgba(255,255,255,.12); color: #fff; }
+
+/* Homepage */
+.guigui-hero {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(34px, 6vw, 74px) clamp(20px, 6vw, 84px) 42px;
+  border-radius: 30px;
+  background: linear-gradient(135deg, #0d3b39 0%, #0b2e2b 28%, #071f1d 100%);
+  color: #fff;
+  box-shadow: 0 30px 80px -38px rgba(7, 33, 30, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.guigui-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 20% 15%, rgba(232, 162, 58, 0.28), transparent 28%);
+  pointer-events: none;
+}
+.guigui-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: .08;
+  pointer-events: none;
+  background-image: radial-gradient(#fff 1px, transparent 1px);
+  background-size: 5px 5px;
+}
+.guigui-hero-inner { position: relative; z-index: 1; max-width: 820px; margin: 0 auto; text-align: center; }
+.guigui-eyebrow { display: inline-flex; align-items: center; gap: 9px; color: var(--gold); font-size: 11px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; }
+.guigui-eyebrow::before { content: ""; width: 22px; height: 2px; background: currentColor; }
+.guigui-hero-title { margin: 14px 0 12px; color: #fff; font-size: clamp(32px, 5vw, 58px); font-weight: 600; line-height: 1.04; letter-spacing: -.02em; }
+.guigui-hero-title em { color: var(--gold); font-style: normal; }
+.guigui-hero-copy { max-width: 650px; margin: 0 auto 26px; color: var(--color-green-100); font-size: 15px; line-height: 1.65; }
+.guigui-home-hero { padding-top: clamp(30px, 5vw, 58px); padding-bottom: 34px; }
+.guigui-home-hero .guigui-hero-title { font-size: clamp(30px, 4.5vw, 52px); }
+/* Destaque da página inicial: fotografia a preencher o cartão inteiro e o
+   texto sobreposto à esquerda. O gradiente verde-escuro garante contraste em
+   qualquer imagem e repete a identidade da marca; sem fotografia, fica o
+   mesmo fundo sólido. */
+/* Destaques: a fotografia aparece inteira e sem véu — o texto vive numa faixa
+   sólida por baixo dela, pelo que nenhum pixel da imagem fica tapado. A caixa
+   da imagem tem proporção fixa (3:1) para todos os slides manterem o mesmo
+   tamanho e o carrossel não saltar de altura ao rodar. */
+.guigui-sponsored-banner { position: relative; overflow: hidden; border: 1px solid rgba(11, 59, 55, .18); border-radius: 22px; background: #0B3B37; box-shadow: 0 26px 50px -34px rgba(11, 59, 55, .75); isolation: isolate; }
+.guigui-sponsored-slide { position: relative; display: flex; flex-direction: column; width: 100%; overflow: hidden; color: inherit; text-decoration: none; }
+.guigui-sponsored-media { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 3 / 1; max-height: 420px; overflow: hidden; background: #0B3B37; }
+.guigui-sponsored-bg { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; }
+.guigui-sponsored-content { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: clamp(20px, 3vw, 40px); row-gap: 10px; padding: clamp(20px, 2.4vw, 30px) clamp(22px, 3vw, 40px) clamp(54px, 5vw, 64px); }
+.guigui-sponsored-label { grid-column: 1; display: inline-flex; width: fit-content; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,.32); border-radius: 999px; background: #062a20; padding: 8px 16px; color: #fff; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.guigui-sponsored-title { grid-column: 1; display: -webkit-box; margin: 0; padding-bottom: .14em; overflow: hidden; color: #fff; font-family: var(--font-family); font-size: clamp(26px, 2.6vw, 36px); font-weight: 800; line-height: 1.1; letter-spacing: -.025em; text-shadow: none; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.guigui-sponsored-accent { color: #F58220; }
+.guigui-sponsored-description { grid-column: 1; display: -webkit-box; max-width: 640px; margin: 0; overflow: hidden; color: rgba(255, 255, 255, .9); font-size: 15px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.guigui-sponsored-cta { grid-column: 2; grid-row: 1 / span 3; align-self: center; display: inline-flex; width: fit-content; align-items: center; gap: 8px; border: 0; border-radius: 999px; background: #F58220; padding: 13px 26px; color: #2B1200; font-size: 14px; font-weight: 700; line-height: 1; cursor: pointer; box-shadow: 0 14px 26px -16px rgba(245, 130, 32, .95); transition: background-color .2s ease, transform .2s ease; }
+.guigui-sponsored-slide:hover .guigui-sponsored-cta { background: #E6730F; }
+.guigui-sponsored-cta:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.guigui-sponsored-pager { position: absolute; right: clamp(18px, 3vw, 36px); bottom: clamp(16px, 2vw, 22px); z-index: 2; display: flex; align-items: center; gap: 14px; }
+.guigui-sponsored-progress { width: clamp(90px, 20vw, 230px); height: 2px; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, .3); }
+.guigui-sponsored-progress > span { display: block; height: 100%; border-radius: inherit; background: #F58220; transition: width .45s ease; }
+.guigui-sponsored-controls { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255, 255, 255, .24); border-radius: 999px; background: #062a20; padding: 4px 7px; }
+.guigui-sponsored-nav { display: inline-flex; height: 28px; width: 28px; align-items: center; justify-content: center; border: 1px solid rgba(255, 255, 255, .28); border-radius: 999px; background: #062a20; color: #fff; cursor: pointer; transition: background-color .2s ease; }
+.guigui-sponsored-nav:hover { background: #14574A; }
+.guigui-sponsored-nav:focus-visible { outline: 2px solid #F58220; outline-offset: 2px; }
+.guigui-sponsored-counter { min-width: 30px; text-align: center; color: #fff; font-size: 13px; font-weight: 700; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+.guigui-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(720px, 100%);
+  margin: 0 auto;
+  padding: 6px 7px 6px 16px;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 18px;
+  background: #ffffff;
+  color: var(--mute);
+  box-shadow: 0 20px 50px -28px rgba(0,0,0,0.55);
+}
+.guigui-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 13px; }
+.dark .guigui-search {
+  background: #0f172a;
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #cbd5e1;
+  box-shadow: 0 20px 50px -28px rgba(0, 0, 0, 0.9);
+}
+.dark .guigui-search input { color: #e2e8f0; }
+.dark .guigui-search input::placeholder { color: #94a3b8; }
+.guigui-search-button {
+  border: 0;
+  border-radius: 12px;
+  padding: 11px 16px;
+  background: linear-gradient(135deg, var(--gold), #d4932b);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  min-width: 96px;
+  flex-shrink: 0;
+  cursor: pointer;
+  box-shadow: 0 12px 24px -16px rgba(232, 162, 58, 0.85);
+}
+.guigui-quick-links { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.guigui-quick-link {
+  border: 1px solid rgba(255,255,255,.26);
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: #0B3B37;
+  color: #EAF2EF;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.guigui-quick-link:hover {
+  border-color: rgba(232,162,58,.75);
+  background: #6B3F0D;
+  color: #fff;
+}
+.guigui-section { margin-top: 28px; }
+.guigui-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 14px; }
+.guigui-section-heading h2, .guigui-section-heading h3 { margin: 0; color: var(--ink); font-size: 23px; font-weight: 600; }
+.guigui-section-heading p { margin: 5px 0 0; color: var(--mute); font-size: 12px; }
+.guigui-section-heading button { border: 0; background: transparent; color: var(--gold-2); font-size: 12px; font-weight: 600; cursor: pointer; }
+.guigui-category-grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 10px; }
+.guigui-category-card { display: flex; min-height: 92px; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 12px 7px; border: 1px solid var(--line); border-radius: 15px; background: #fff; color: var(--text); text-align: center; font-size: 10px; font-weight: 600; cursor: pointer; }
+.guigui-category-card:hover { transform: translateY(-2px); border-color: var(--gold); box-shadow: 0 12px 26px -18px rgba(11,59,55,.36); }
+.guigui-category-icon { display: inline-flex; width: 36px; height: 36px; align-items: center; justify-content: center; border-radius: 11px; background: var(--paper); color: var(--ink); }
+.guigui-panel {
+  border: 1px solid rgba(16, 41, 35, 0.08);
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 18px 40px -30px rgba(11,59,55,.35);
+}
+.guigui-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px 13px; border-bottom: 1px solid rgba(16,41,35,0.08); }
+.guigui-panel-header h3 { margin: 0; color: var(--ink); font-family: var(--font-family); font-size: 13px; font-weight: 600; }
+.guigui-card-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; padding: 16px; }
+.guigui-mini-card {
+  overflow: hidden;
+  border: 1px solid rgba(16,41,35,0.08);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fff 0%, #f8fbfa 100%);
+  cursor: pointer;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.guigui-mini-card:hover { transform: translateY(-3px); border-color: rgba(11,59,55,.18); box-shadow: 0 18px 32px -22px rgba(11,59,55,.4); }
+.guigui-mini-thumb { height: 106px; background: linear-gradient(135deg, #12534C, var(--ink)); }
+.guigui-mini-thumb.gold { background: linear-gradient(135deg, var(--color-gold-400), #D98C24); }
+.guigui-mini-thumb.coral { background: linear-gradient(135deg, #F17A4E, #D6461F); }
+.guigui-mini-body { padding: 11px 12px 13px; }
+.guigui-mini-body h4 { margin: 0 0 4px; color: var(--text); font-family: var(--font-family); font-size: 12px; font-weight: 600; }
+.guigui-mini-body p { margin: 0; color: var(--mute); font-size: 10px; }
+.guigui-mini-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 9px; }
+.guigui-verified { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 4px 8px 4px 5px; background: var(--ink); color: #fff; font-size: 9px; font-weight: 600; }
+.guigui-verified svg { width: 14px; height: 14px; }
+
+/* Directory and reusable business cards */
+.guigui-directory-header { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
+.guigui-directory-header h1 { margin: 0; color: var(--ink); font-size: clamp(28px, 4vw, 42px); font-weight: 600; line-height: 1.04; }
+.guigui-directory-header p { max-width: 620px; margin: 9px 0 0; color: var(--mute); font-size: 13px; line-height: 1.6; }
+.guigui-filterbar { display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 5px 0 15px; }
+.guigui-filter-chip {
+  flex-shrink: 0;
+  border: 1px solid rgba(16,41,35,0.12);
+  border-radius: 999px;
+  padding: 8px 13px;
+  background: #ffffff;
+  color: var(--mute);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.guigui-filter-chip:hover, .guigui-filter-chip.active {
+  border-color: var(--ink);
+  background: linear-gradient(135deg, var(--ink), #0f4d4a);
+  color: #fff;
+}
+/* Cartão do diretório — mesma estrutura do destaque: fotografia full-bleed,
+   selos sobrepostos e corpo verde-escuro com logótipo, etiquetas e CTA. */
+.guigui-business-card {
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+  border: 1px solid rgba(20, 87, 74, .65);
+  border-radius: 20px;
+  background: linear-gradient(180deg, #0C3B33 0%, #072B25 100%);
+  box-shadow: 0 22px 44px -34px rgba(4, 32, 26, .9);
+  transition: transform var(--duration-normal) var(--ease-standard), box-shadow var(--duration-normal) var(--ease-standard), border-color var(--duration-normal) var(--ease-standard);
+}
+.guigui-business-card:hover { transform: translateY(-3px); border-color: rgba(255, 255, 255, .3); box-shadow: 0 28px 50px -34px rgba(4, 32, 26, .95); }
+.guigui-business-cover { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #0A332B; }
+.guigui-business-cover-image { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 320ms var(--guigui-ease); }
+.guigui-business-card:hover .guigui-business-cover-image { transform: scale(1.03); }
+.guigui-business-cover-fallback { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; background: radial-gradient(circle at 30% 20%, #1C6E5C, #062A24 70%); color: rgba(255, 255, 255, .85); font-size: 44px; font-weight: 800; letter-spacing: .08em; }
+.guigui-business-cover-tags { position: absolute; top: 12px; left: 12px; display: flex; max-width: calc(100% - 132px); flex-wrap: wrap; gap: 6px; }
+.guigui-business-tag { display: inline-flex; align-items: center; gap: 5px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 999px; background: #0A352C; padding: 5px 10px; color: #fff; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.guigui-business-tag--gold { border-color: rgba(255, 214, 153, .45); color: #FFD79A; }
+.guigui-business-status { position: absolute; top: 12px; right: 12px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 999px; background: #0A352C; padding: 7px 14px; color: #fff; font-size: 12px; font-weight: 600; }
+.guigui-business-status-dot { width: 8px; height: 8px; border-radius: 999px; background: #8FA7A0; }
+.guigui-business-status-dot.is-open { background: #37D67A; box-shadow: 0 0 0 3px rgba(55, 214, 122, .18); }
+.guigui-business-status-dot.is-closed { background: #F0A04B; }
+.guigui-business-compare { position: absolute; right: 12px; bottom: 12px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(255, 255, 255, .2); border-radius: 999px; background: #0A352C; padding: 7px 14px; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; transition: background-color .2s ease, border-color .2s ease; }
+.guigui-business-compare:hover { background: #0D4238; }
+.guigui-business-compare.is-selected { border-color: #F58220; background: #F58220; }
+.guigui-business-compare:disabled { cursor: not-allowed; opacity: .5; }
+.guigui-business-compare:focus-visible, .guigui-business-actions .contact:focus-visible, .guigui-business-actions .view:focus-visible { outline: 2px solid #F58220; outline-offset: 2px; }
+.guigui-business-body { display: flex; flex: 1; flex-direction: column; padding: 16px 18px 18px; }
+.guigui-business-heading { display: flex; align-items: center; gap: 12px; }
+.guigui-business-logo { width: 54px; height: 54px; flex-shrink: 0; border: 2px solid rgba(255, 255, 255, .9); border-radius: 999px; background: #fff; object-fit: cover; }
+.guigui-business-logo.is-fallback { display: flex; align-items: center; justify-content: center; color: #0C3B33; font-size: 16px; font-weight: 800; letter-spacing: .02em; }
+.guigui-business-title { display: -webkit-box; min-width: 0; margin: 0; overflow: hidden; color: #fff; font-family: var(--font-family); font-size: clamp(18px, 1.5vw, 23px); font-weight: 800; line-height: 1.15; letter-spacing: -.01em; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.guigui-business-title:hover { color: #FFD79A; }
+.guigui-business-verified { width: 18px; height: 18px; flex-shrink: 0; color: #37D67A; fill: #37D67A; }
+.guigui-business-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; color: rgba(255, 255, 255, .86); font-size: 12.5px; }
+.guigui-business-location { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.guigui-business-location svg { color: rgba(255, 255, 255, .72); }
+.guigui-business-meta-divider { width: 1px; height: 16px; background: rgba(255, 255, 255, .22); }
+.guigui-business-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255, 255, 255, .22); border-radius: 999px; padding: 5px 11px; color: rgba(255, 255, 255, .9); font-size: 12px; font-weight: 500; }
+.guigui-business-chip svg { color: rgba(255, 255, 255, .65); }
+.guigui-business-description { display: -webkit-box; margin: 12px 0 0; overflow: hidden; color: rgba(255, 255, 255, .78); font-size: 13px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.guigui-business-more { color: #FFB067; font-weight: 700; }
+.guigui-business-rating { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; color: #FFD79A; font-size: 12px; font-weight: 600; }
+.guigui-business-rating svg { color: #FFB067; fill: #FFB067; }
+.guigui-business-rating-count { color: rgba(255, 255, 255, .55); font-weight: 500; }
+.guigui-business-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, .12); background: transparent; }
+.guigui-business-actions a, .guigui-business-actions button { display: inline-flex; align-items: center; justify-content: center; border: 1px solid; cursor: pointer; transition: background-color .2s ease, border-color .2s ease, color .2s ease; }
+.guigui-business-actions .contact { width: 40px; height: 40px; flex-shrink: 0; border-color: rgba(255, 255, 255, .22); border-radius: 999px; background: #0A352C; color: #fff; }
+.guigui-business-actions .contact:hover { border-color: rgba(255, 255, 255, .36); background: #14574A; }
+.guigui-business-actions .contact.is-active { border-color: rgba(245, 130, 32, .6); background: #8A5211; color: #FFD79A; }
+.guigui-business-actions .view { flex: 1 1 120px; min-height: 44px; gap: 8px; border: 0; border-radius: 999px; background: #F58220; color: #fff; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.guigui-business-actions .view:hover { background: #E6730F; }
+
+/* Identidade: ação primária e ligações em verde da marca, não no azul informativo.
+   (As restantes equivalências são garantidas pela normalização de paleta em :root.) */
+html:not(.dark) .guigui-app-shell .text-blue-600, html:not(.dark) .guigui-app-shell .text-blue-700, html:not(.dark) .guigui-app-shell .text-blue-500 { color: var(--ink) !important; }
+.guigui-app-shell .bg-blue-600, .guigui-app-shell .bg-blue-700, .guigui-app-shell .bg-emerald-600 { background-color: var(--ink) !important; }
+html:not(.dark) .guigui-app-shell .text-emerald-600, html:not(.dark) .guigui-app-shell .text-emerald-700 { color: var(--ink) !important; }
+
+@media (max-width: 1024px) {
+  .guigui-nav-links { display: none; }
+  .guigui-menu-button { display: inline-flex; }
+  .guigui-nav-search { max-width: 220px; margin-left: auto; }
+  .guigui-category-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .guigui-navbar-inner > div:first-child { min-width: 0; flex: 1 1 auto; }
+  .guigui-navbar-inner > div:first-child > form { min-width: 0; width: clamp(150px, 28vw, 240px); }
+}
+@media (max-width: 760px) {
+  .guigui-modebar { top: 123px; }
+  /* Em ecrã estreito a backbar deixa de ser sticky: sobrepunha o cabeçalho
+     dos painéis e interceptava o botão que abre o menu lateral. */
+  .guigui-backbar { position: relative; top: 0; }
+  .guigui-backbar,
+  .guigui-profile-footer {
+    margin-left: 0 !important;
+  }
+  .guigui-main { padding: 4px 4px 40px; }
+  .guigui-navbar-inner { min-height: 62px; padding: 10px 14px; gap: 8px; }
+  .guigui-brand-word { font-size: 21px; }
+  .guigui-nav-search { display: none; }
+  .guigui-nav-actions .guigui-outline-button { display: none; }
+  .guigui-hero { border-radius: 18px; padding: 30px 18px 24px; }
+  .guigui-hero-copy { font-size: 13px; }
+  .guigui-search { padding-left: 12px; }
+  .guigui-search-button { padding: 10px 12px; }
+  .guigui-category-grid { display: flex; overflow-x: auto; margin: 0 -2px; padding-bottom: 4px; }
+  .guigui-category-card { min-width: 82px; }
+  /* Em ecrã estreito a fotografia mantém-se inteira e o texto passa para
+     baixo dela, a toda a largura. */
+  .guigui-sponsored-media { aspect-ratio: 16 / 9; max-height: 260px; }
+  .guigui-sponsored-content { grid-template-columns: minmax(0, 1fr); row-gap: 10px; padding: 20px 20px 72px; }
+  .guigui-sponsored-title { font-size: clamp(24px, 6.4vw, 30px); }
+  .guigui-sponsored-description { font-size: 13.5px; -webkit-line-clamp: 2; }
+  .guigui-sponsored-cta { grid-column: 1; grid-row: auto; justify-self: start; }
+  .guigui-sponsored-pager { right: 20px; bottom: 16px; left: 20px; justify-content: space-between; gap: 10px; }
+  .guigui-sponsored-progress { flex: 1; width: auto; }
+  /* Cartões do diretório em ecrã estreito: uma coluna, para a fotografia,
+     as etiquetas e as acções manterem a mesma estrutura do cartão largo. */
+  .guigui-business-body { padding: 14px 14px 16px; }
+  .guigui-business-logo { width: 48px; height: 48px; }
+  .guigui-business-actions { gap: 8px; padding-top: 14px; }
+  .guigui-business-actions .contact { width: 40px; height: 40px; }
+  .guigui-business-actions .view { min-height: 42px; font-size: 12.5px; }
+  .guigui-card-grid { grid-template-columns: 1fr; padding: 12px; }
+  .guigui-mini-thumb { height: 82px; }
+  .guigui-directory-header { align-items: start; flex-direction: column; }
+}
+@media (max-width: 480px) {
+  .guigui-brand-mark { width: 30px; height: 30px; flex-basis: 30px; }
+  .guigui-brand-word { font-size: 19px; }
+  .guigui-primary-button { padding: 9px 11px; }
+  .guigui-hero-title { font-size: 34px; }
+  .guigui-card-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 360px) {
+  .guigui-search {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+  }
+  .guigui-search input {
+    min-height: 38px;
+    padding: 0 4px;
+  }
+  .guigui-search-button {
+    width: 100%;
+    min-height: 42px;
+  }
+  .guigui-hero {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}
+@media (max-width: 340px) {
+  .guigui-modebar { top: 123px; }
+  .guigui-backbar { position: relative; top: 0; }
+  .guigui-panel-sidebar {
+    top: 190px !important;
+    height: calc(100vh - 190px) !important;
+  }
+}
+@keyframes guigui-fade-up {
+  from { opacity: 0; transform: translateY(var(--motion-distance-sm)); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes guigui-scale-in {
+  from { opacity: 0; transform: scale(.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes guigui-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+.guigui-animate-fade-up { animation: guigui-fade-up var(--duration-slow) var(--ease-emphasized) both; }
+.guigui-animate-scale-in { animation: guigui-scale-in var(--duration-normal) var(--ease-emphasized) both; }
+.guigui-stagger > * { animation: guigui-fade-up var(--duration-slow) var(--ease-emphasized) both; }
+.guigui-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.guigui-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.guigui-stagger > *:nth-child(4) { animation-delay: 120ms; }
+.guigui-skeleton {
+  background: linear-gradient(110deg, rgba(113,128,123,.12) 8%, rgba(255,255,255,.68) 18%, rgba(113,128,123,.12) 33%);
+  background-size: 200% 100%;
+  animation: guigui-shimmer 1.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+
+   .guigui-tap-target { min-width: 44px; min-height: 44px; }
+
+/* ============================================================
+   DASHBOARDS EM MODO ESCURO
+   Quando o root está em dark mode, força os dashboards
+   .guigui-light-dashboard a receber a cor de superfície escura
+   em vez de branco. Obrigatoriamente com !important para
+   sobrescrever qualquer class inline ou variável que resuma
+   para #fff no subtree.
+   ============================================================ */
+html.dark .guigui-light-dashboard,
+html.dark .guigui-light-dashboard * {
+  background-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Controlos de acção com preenchimento próprio: o reset acima apaga todos os
+   fundos do subtree, o que deixava o texto escuro (#06231d) dos filtros activos,
+   do botão «Nova mensagem» e do «Enviar mensagem» sobre a superfície escura.
+   Repõe-se apenas o preenchimento de acento, sem mudar a identidade visual. */
+html.dark .guigui-light-dashboard .guigui-inbox-filters button.is-active,
+html.dark .guigui-light-dashboard .guigui-inbox-new,
+html.dark .guigui-light-dashboard button.guigui-composer-send {
+  background: var(--color-green-400) !important;
+  border-color: var(--color-green-400) !important;
+  color: #06231d !important;
+}
+
+html.dark .guigui-light-dashboard .guigui-inbox-filters button.is-active span {
+  background: rgba(255, 255, 255, 0.24) !important;
+  color: #06231d !important;
+}
+
+/* Avatares do fio de conversa: o mesmo reset retira o fundo claro e deixava as
+   iniciais (#08332c) sobre a superfície escura. Usa-se a paleta de avatar
+   escura já aplicada aos avatares da lista lateral. */
+.dark .guigui-message-avatar {
+  background: #1c4a3e;
+  color: #bfe8d5;
+}
+
+html.dark .guigui-light-dashboard .guigui-message-avatar {
+  background: #1c4a3e !important;
+  color: #bfe8d5 !important;
+}
+
+.dark .guigui-message-avatar.is-support {
+  background: #3d2a12;
+  color: #ffdca8;
+}
+
+html.dark .guigui-light-dashboard .guigui-message-avatar.is-support {
+  background: #3d2a12 !important;
+  color: #ffdca8 !important;
+}
+
+/* Nome do autor dentro do balão: a cor de tema claro (#3f5a52) ficava sobre a
+   superfície escura do balão. Usa-se o cinza-esverdeado claro já presente nos
+   metadados do tema escuro. */
+.dark .guigui-message-row .guigui-message-bubble .guigui-message-author {
+  color: #a7c3b8;
+}
+
+html.dark .guigui-light-dashboard .guigui-message-row .guigui-message-bubble .guigui-message-author {
+  color: #a7c3b8 !important;
+}
+
+.dark .guigui-message-row.is-own .guigui-message-bubble .guigui-message-author {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+html.dark .guigui-light-dashboard .guigui-message-row.is-own .guigui-message-bubble .guigui-message-author {
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+
+/* Parágrafos de identificação (ex.: linha de empresa+data atrás do cartão de bilhete):
+   o parágrafo em si carrega o fundo branco via classe inline, por isso o seletor abaixo
+   aplica o fundo escuro mesmo quando o elemento não é filho direto de .guigui-light-dashboard. */
+html.dark .guigui-light-dashboard [class*="text-[11px]"][class*="font-semibold"][class*="text-[var(--color-text-muted)]"] {
+  background-color: var(--color-bg-subtle-dark) !important;
+  background: var(--color-bg-subtle-dark) !important;
+  color: var(--color-text-muted-dark) !important;
+}
+
+/* Excepções à regra acima: os fundos de destaque (item activo da navegação
+   lateral e marca da conta) têm de continuar visíveis em dark mode,
+   senão a navegação perde a indicação de onde o utilizador está. */
+html.dark .guigui-light-dashboard .guigui-accent-surface {
+  background: var(--color-green-800) !important;
+  color: var(--color-neutral-50) !important;
+  box-shadow: 0 10px 24px -16px rgba(11, 74, 69, 0.75) !important;
+}
+
+html.dark .guigui-light-dashboard .guigui-brand-mark {
+  background: var(--color-gold-500) !important;
+  color: var(--color-green-950) !important;
+  box-shadow: none !important;
+}
+
+/* Caixas de fundo claro (Tailwind e arbitrárias) — tornam-se cor de
+   superfície escura para não ficarem brancas em dark mode. */
+
+html.dark .guigui-light-dashboard :is(
+  .bg-white,
+  .bg-slate-50,
+  .bg-slate-100,
+  .bg-neutral-50,
+  .bg-neutral-100,
+  .bg-zinc-50,
+  .bg-zinc-100,
+  .bg-gray-50,
+  .bg-gray-100,
+  .bg-stone-50,
+  .bg-stone-100,
+  .bg-red-50,
+  .bg-blue-50,
+  .bg-green-50,
+  .bg-yellow-50,
+  .bg-amber-50,
+  .bg-emerald-50,
+  .bg-cyan-50,
+  .bg-indigo-50,
+  .bg-violet-50,
+  .bg-purple-50,
+  .bg-pink-50,
+  .bg-fuchsia-50,
+  .bg-rose-50,
+  .bg-orange-50,
+  .bg-lime-50,
+  .bg-teal-50,
+  .bg-sky-50,
+  .bg-rose-100,
+  .bg-orange-100,
+  .bg-amber-100,
+  .bg-yellow-100,
+  .bg-lime-100,
+  .bg-green-100,
+  .bg-emerald-100,
+  .bg-teal-100,
+  .bg-cyan-100,
+  .bg-sky-100,
+  .bg-blue-100,
+  .bg-indigo-100,
+  .bg-violet-100,
+  .bg-purple-100,
+  .bg-fuchsia-100,
+  .bg-pink-100,
+  .bg-rose-200,
+  .bg-orange-200,
+  .bg-amber-200,
+  .bg-yellow-200,
+  .bg-lime-200,
+  .bg-green-200,
+  .bg-emerald-200,
+  .bg-teal-200,
+  .bg-cyan-200,
+  .bg-sky-200,
+  .bg-blue-200,
+  .bg-indigo-200,
+  .bg-violet-200,
+  .bg-purple-200,
+  .bg-fuchsia-200,
+  .bg-pink-200
+) {
+  background-color: var(--color-bg-subtle-dark) !important;
+  background: var(--color-bg-subtle-dark) !important;
+}
+
+
+html.dark .guigui-light-dashboard :is(
+  [class*="bg-[#ffffff]"],
+  [class*="bg-[#f8fafc]"],
+  [class*="bg-[#f1f5f9]"],
+  [class*="bg-[#f3f4f6]"],
+  [class*="bg-[#f5f5f4]"],
+  [class*="bg-[#f7f5f0]"],
+  [class*="bg-[#fcfcfc]"],
+  [class*="bg-[#fafafa]"],
+  [class*="bg-[#fbfbfb]"],
+  [class*="bg-[#f9fafb]"],
+  [class*="bg-[#eef2f6]"],
+  [class*="bg-[#eef2ff]"],
+  [class*="bg-[#e0e7ff]"],
+  [class*="bg-[#c7d2fe]"],
+  [class*="bg-[#a5b4fc]"],
+  [class*="bg-[#bae6fd]"],
+  [class*="bg-[#7dd3fc]"],
+  [class*="bg-[#ccfbf1]"],
+  [class*="bg-[#99f6e4]"],
+  [class*="bg-[#5eead4]"],
+  [class*="bg-[#a7f3d0]"],
+  [class*="bg-[#6ee7b7]"],
+  [class*="bg-[#d1fae5]"],
+  [class*="bg-[#fef3c7]"],
+  [class*="bg-[#fde68a]"],
+  [class*="bg-[#fcd34d]"],
+  [class*="bg-[#fca5a5]"],
+  [class*="bg-[#f87171]"],
+  [class*="bg-[#fdba74]"],
+  [class*="bg-[#fb923c]"],
+  [class*="bg-[#fbbf24]"],
+  [class*="bg-[#fecaca]"],
+  [class*="bg-[#fed7aa]"],
+  [class*="bg-[var(--color-neutral-0)]"],
+  [class*="bg-[var(--color-paper)]"],
+  [style*="#fff"],
+  [style*="#ffffff"],
+  [style*="rgb(255, 255, 255)"],
+  [style*="rgb(255,255,255)"]
+) {
+  background-color: var(--color-bg-subtle-dark) !important;
+  background: var(--color-bg-subtle-dark) !important;
+}
+
+/* Manter cores da marca proposicionais. */
+html.dark .guigui-light-dashboard .bg-green-900,
+html.dark .guigui-light-dashboard .bg-green-800,
+html.dark .guigui-light-dashboard .bg-green-700,
+html.dark .guigui-light-dashboard .bg-green-950,
+html.dark .guigui-light-dashboard .bg-red-900,
+html.dark .guigui-light-dashboard .bg-red-800,
+html.dark .guigui-light-dashboard .bg-red-700,
+html.dark .guigui-light-dashboard .bg-red-950,
+html.dark .guigui-light-dashboard .bg-blue-900,
+html.dark .guigui-light-dashboard .bg-blue-800,
+html.dark .guigui-light-dashboard .bg-blue-700,
+html.dark .guigui-light-dashboard .bg-blue-950,
+html.dark .guigui-light-dashboard .bg-gold-600,
+html.dark .guigui-light-dashboard .bg-gold-700,
+html.dark .guigui-light-dashboard .bg-gold-800,
+html.dark .guigui-light-dashboard .bg-coral-500,
+html.dark .guigui-light-dashboard .bg-coral-600,
+html.dark .guigui-light-dashboard .bg-coral-700,
+html.dark .guigui-light-dashboard .bg-coral-800 {
+  background-color: inherit !important;
+  background: inherit !important;
+}
+
+}
+
+/* Navigation refinement for the existing tab and account controls. */
+.guigui-navbar nav { display: flex; align-items: center; justify-content: center; gap: 4px; flex: 1; max-width: 560px; margin: 0 auto; }
+.guigui-navbar nav > button { position: relative; display: inline-flex; min-width: 72px; flex: 1; align-items: center; justify-content: center; border: 0; border-radius: 10px; background: transparent; color: var(--mute); padding: 8px 10px; font-size: 11px; font-weight: 500; cursor: pointer; }
+.guigui-navbar nav > button:hover { background: rgba(11,59,55,.07); color: var(--ink); }
+.guigui-navbar nav > button .guigui-icon-slot { height: 24px; }
+.guigui-navbar nav > button .guigui-icon-slot > svg { color: currentColor !important; }
+.guigui-navbar nav > button > div:last-child { background: var(--gold) !important; }
+.guigui-navbar > div:last-child { border-color: var(--line) !important; color: var(--mute) !important; }
+
+/* Navegação de tabs do cabeçalho: só cabe em ecrãs grandes (4 tabs a 72px +
+   pesquisa + ações). Abaixo disso a barra secundária móvel (Navbar) assume. */
+.guigui-navbar nav { display: none; }
+@media (min-width: 1101px) {
+  .guigui-navbar nav { display: flex; }
+}
+/* Entre 1024px e 1100px o cabeçalho ainda não cabe, mas a barra inferior já
+   estava escondida por `lg:hidden`. Mantém-se a navegação acessível. */
+@media (min-width: 1024px) and (max-width: 1100px) {
+  .guigui-bottom-nav { display: flex; }
+}
+.guigui-navbar-inner > .guigui-nav-actions { display: flex; align-items: center; gap: 8px; }
+html:not(.dark) .guigui-business-content .text-slate-900 { color: var(--ink) !important; }
+html:not(.dark) .guigui-business-content .text-emerald-700, html:not(.dark) .guigui-business-content .text-emerald-600 { color: var(--ink) !important; }
+.guigui-business-content .text-blue-600 { color: var(--gold-2) !important; }
+.guigui-business-cover .bg-emerald-600 { background: var(--ink) !important; }
+.guigui-business-cover .bg-amber-500 { background: var(--gold) !important; color: #28210a !important; }
+.guigui-modebar .bg-slate-800 { background: var(--color-green-800) !important; border-color: #2a5a50 !important; }
+.guigui-modebar .text-blue-400 { color: var(--gold) !important; }
+.guigui-modebar .text-slate-300, .guigui-modebar .text-slate-500 { color: var(--color-green-100) !important; }
+
+/* Keep dense business surfaces usable on narrow screens. */
+.guigui-profile-dashboard main,
+.guigui-profile-dashboard section,
+.guigui-profile-dashboard article,
+.guigui-profile-dashboard form,
+.guigui-profile-dashboard table {
+  min-width: 0;
+  max-width: 100%;
+}
+.guigui-profile-dashboard .overflow-x-auto {
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+/* === Comunicação restaurada: mensagens e suporte === */
+.guigui-communication-shell {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  background: #fff;
+  box-shadow: 0 20px 50px -36px rgba(11, 59, 55, .45);
+}
+.guigui-communication-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 24px 26px 20px;
+  background: linear-gradient(135deg, #fff 0%, #f5faf8 100%);
+  border-bottom: 1px solid var(--line);
+}
+.guigui-communication-header h2 { margin: 4px 0 0; color: var(--ink); font-family: var(--font-family); font-size: clamp(24px, 3vw, 32px); font-weight: 700; line-height: 1.05; }
+.guigui-communication-header p:not(.guigui-communication-eyebrow) { max-width: 650px; margin: 7px 0 0; color: var(--mute); font-size: 12px; line-height: 1.5; }
+.guigui-communication-eyebrow { margin: 0; color: var(--gold-2); font-size: 10px; font-weight: 500; letter-spacing: .16em; text-transform: uppercase; }
+.guigui-communication-icon { display: flex; width: 48px; height: 48px; flex: 0 0 48px; align-items: center; justify-content: center; border-radius: 16px; background: #e6f2ee; color: var(--ink); }
+.guigui-communication-icon.is-support { background: #fff0d8; color: #9a6317; }
+.guigui-communication-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 14px 26px; border-bottom: 1px solid var(--line); background: #fbfcfb; }
+.guigui-communication-tabs button { display: flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; border: 1px solid transparent; border-radius: 13px; background: transparent; color: var(--mute); font-size: 12px; font-weight: 600; cursor: pointer; }
+.guigui-communication-tabs button span { min-width: 20px; padding: 2px 6px; border-radius: 999px; background: rgba(11,59,55,.08); font-size: 10px; }
+.guigui-communication-tabs button.is-active { background: var(--ink); color: #fff; box-shadow: 0 10px 22px -16px rgba(11,59,55,.65); }
+.guigui-communication-tabs button.is-active.is-support { background: var(--color-gold-700); }
+.guigui-communication-tabs button.is-active span { background: rgba(255,255,255,.18); }
+.guigui-communication-layout { display: grid; grid-template-columns: minmax(260px, .72fr) minmax(0, 1.28fr); gap: 16px; padding: 20px 26px 24px; background: #fcfdfc; }
+.guigui-communication-sidebar, .guigui-support-list { display: grid; align-content: start; gap: 14px; min-width: 0; }
+.guigui-communication-compose { display: grid; gap: 10px; padding: 16px; border: 1px solid #cfe5dc; border-radius: 18px; background: #eef8f3; }
+.guigui-communication-compose.is-support { border-color: #edd7a9; background: #fff8ea; }
+.guigui-compose-heading { display: flex; gap: 9px; align-items: flex-start; color: var(--ink); }
+.guigui-compose-heading svg { margin-top: 2px; color: #237a64; }
+.guigui-compose-heading p { margin: 0; font-size: 12px; font-weight: 600; }
+.guigui-compose-heading span { display: block; margin-top: 3px; color: var(--mute); font-size: 10px; line-height: 1.4; }
+.guigui-communication-compose.is-support .guigui-compose-heading svg { color: var(--color-gold-700); }
+.guigui-communication-compose input, .guigui-communication-compose select, .guigui-communication-compose textarea { width: 100%; min-width: 0; border: 1px solid var(--color-border-default); border-radius: 11px; background: #fff; padding: 10px 11px; color: var(--text); font-size: 12px; outline: none; }
+.guigui-communication-compose input:focus, .guigui-communication-compose select:focus, .guigui-communication-compose textarea:focus, .guigui-message-reply input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(232,162,58,.16); }
+.guigui-communication-compose button { min-height: 40px; border: 0; border-radius: 11px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
+.guigui-communication-compose.is-support button { background: var(--color-gold-700); }
+.guigui-list-heading { display: flex; align-items: center; justify-content: space-between; padding: 0 2px; color: var(--ink); font-size: 12px; font-weight: 600; }
+.guigui-list-heading > div { min-width: 0; }
+.guigui-list-heading em { display: block; margin-top: 3px; color: var(--mute); font-size: 10px; font-style: normal; font-weight: 600; }
+.guigui-list-heading small { min-width: 22px; padding: 3px 6px; border-radius: 999px; background: #e7f1ed; color: var(--ink); text-align: center; font-size: 10px; }
+.guigui-communication-list { display: grid; gap: 8px; }
+.guigui-communication-list button { display: flex; width: 100%; align-items: center; gap: 10px; padding: 11px; border: 1px solid var(--line); border-radius: 14px; background: #fff; text-align: left; cursor: pointer; }
+.guigui-communication-list button:hover, .guigui-communication-list button.is-selected { border-color: #78b9a4; background: #f0f8f4; }
+.guigui-list-avatar { display: flex; width: 34px; height: 34px; flex: 0 0 34px; align-items: center; justify-content: center; border-radius: 11px; background: #e8f2ef; color: var(--ink); }
+.guigui-communication-list p, .guigui-communication-list strong, .guigui-communication-list span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guigui-communication-list p { margin: 0; color: var(--ink); font-size: 11px; font-weight: 600; }
+.guigui-communication-list strong { margin-top: 2px; color: var(--text); font-size: 11px; }
+.guigui-communication-list span { margin-top: 3px; color: var(--mute); font-size: 10px; }
+.guigui-communication-list i { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 999px; background: var(--gold); }
+.guigui-communication-empty { padding: 28px 16px; border: 1px dashed var(--line-2); border-radius: 15px; color: var(--mute); font-size: 11px; font-weight: 700; text-align: center; }
+.guigui-communication-empty.is-centered { display: flex; min-height: 240px; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border: 0; }
+.guigui-communication-thread { display: flex; min-height: 420px; flex-direction: column; border: 1px solid var(--line); border-radius: 18px; background: #fff; }
+.guigui-thread-header { display: flex; align-items: center; gap: 10px; padding: 15px 16px; border-bottom: 1px solid var(--line); }
+.guigui-thread-header p { margin: 0; color: var(--ink); font-size: 13px; font-weight: 600; }
+.guigui-thread-header span { display: block; margin-top: 3px; color: var(--mute); font-size: 10px; }
+.guigui-thread-messages { display: flex; flex: 1; flex-direction: column; gap: 9px; overflow-y: auto; padding: 18px 16px; background: #fafcfb; }
+.guigui-message-bubble { max-width: 82%; align-self: flex-start; padding: 11px 13px; border: 1px solid var(--line); border-radius: 15px 15px 15px 5px; background: #fff; color: var(--text); box-shadow: 0 7px 18px -17px rgba(11,59,55,.55); }
+.guigui-message-bubble.is-own { align-self: flex-end; border-color: var(--ink); border-radius: 15px 15px 5px 15px; background: var(--ink); color: #fff; }
+.guigui-message-bubble p { margin: 0 0 5px; font-size: 10px; font-weight: 600; opacity: .72; }
+.guigui-message-bubble span { display: block; font-size: 12px; line-height: 1.5; }
+.guigui-message-bubble small { display: block; margin-top: 6px; font-size: 9px; opacity: .62; }
+.guigui-message-reply { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+.guigui-message-reply input { min-width: 0; flex: 1; border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; color: var(--text); font-size: 12px; outline: none; }
+.guigui-message-reply button { display: flex; width: 40px; height: 40px; flex: 0 0 40px; align-items: center; justify-content: center; border: 0; border-radius: 11px; background: var(--ink); color: #fff; cursor: pointer; }
+.guigui-new-conversation { display: grid; align-content: center; gap: 12px; min-height: 100%; padding: 34px clamp(20px, 6vw, 64px); background: linear-gradient(145deg, #f3faf6, #fff); }
+.guigui-new-conversation-icon { display: flex; width: 48px; height: 48px; align-items: center; justify-content: center; border-radius: 15px; background: #dcefe7; color: var(--ink); }
+.guigui-new-conversation-eyebrow { margin: 0; color: var(--gold-2); font-size: 10px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; }
+.guigui-new-conversation h3 { margin: 4px 0 0; color: var(--ink); font-family: var(--font-family); font-size: clamp(20px, 3vw, 28px); font-weight: 700; line-height: 1.1; }
+.guigui-new-conversation > div > span { display: block; margin-top: 6px; color: var(--mute); font-size: 11px; line-height: 1.5; }
+.guigui-new-conversation input, .guigui-new-conversation textarea { width: 100%; border: 1px solid var(--color-border-default); border-radius: 12px; background: #fff; padding: 11px 12px; color: var(--text); font-size: 12px; outline: none; }
+.guigui-new-conversation input:focus, .guigui-new-conversation textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(232,162,58,.16); }
+.guigui-new-conversation button { min-height: 42px; border: 0; border-radius: 12px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
+.guigui-support-list { grid-column: 2; }
+.guigui-support-card { padding: 16px; border: 1px solid var(--line); border-radius: 17px; background: #fff; }
+.guigui-support-card.is-focused { border-color: #d69a3e; box-shadow: 0 0 0 3px rgba(214,154,62,.16); }
+.guigui-support-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.guigui-support-category { color: #8a5714; font-size: 9px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; }
+.guigui-support-card h3 { margin: 4px 0 0; color: var(--ink); font-size: 14px; font-weight: 600; }
+.guigui-support-card-header b { padding: 5px 8px; border-radius: 999px; background: #fff0d2; color: #8b5b17; font-size: 9px; white-space: nowrap; }
+.guigui-support-description { margin: 10px 0 0; color: #435c54; font-size: 11px; line-height: 1.55; }
+.guigui-support-replies, .guigui-support-last-reply { display: grid; gap: 8px; margin-top: 13px; }
+.guigui-support-replies > div, .guigui-support-last-reply { padding: 10px 12px; border-radius: 12px; background: #f4f8f6; color: var(--text); }
+.guigui-support-replies > div.is-own { background: #e5f3ec; }
+.guigui-support-replies small, .guigui-support-last-reply small { color: #4a645c; font-size: 9px; font-weight: 500; text-transform: uppercase; }
+.guigui-support-replies p, .guigui-support-last-reply p { margin: 4px 0 0; font-size: 11px; line-height: 1.5; }
+.guigui-support-card footer { display: flex; align-items: center; gap: 5px; margin-top: 13px; color: #1f6b58; font-size: 10px; font-weight: 600; }
+.guigui-communication-notice { display: flex; align-items: flex-start; gap: 8px; margin: 0 26px 22px; padding: 11px 13px; border-radius: 12px; background: #f3f7f5; color: #435c54; font-size: 10px; font-weight: 700; line-height: 1.45; }
+.guigui-communication-notice svg { flex: 0 0 auto; color: #39836d; }
+
+@media (max-width: 760px) {
+  .guigui-communication-header { padding: 20px 16px 17px; }
+  .guigui-communication-tabs { padding: 12px 16px; }
+  .guigui-communication-layout { grid-template-columns: 1fr; padding: 16px; }
+  .guigui-support-list { grid-column: auto; }
+  .guigui-communication-thread { min-height: 360px; }
+  .guigui-communication-notice { margin: 0 16px 16px; }
+}
+
+.dark .guigui-communication-shell { background: #0c211d; border-color: #285849; }
+.dark .guigui-communication-header, .dark .guigui-communication-layout, .dark .guigui-communication-tabs { background: #0a1c18; border-color: #285849; }
+.dark .guigui-communication-header h2, .dark .guigui-compose-heading, .dark .guigui-list-heading, .dark .guigui-thread-header p, .dark .guigui-support-card h3 { color: var(--color-green-50); }
+.dark .guigui-communication-header p:not(.guigui-communication-eyebrow), .dark .guigui-compose-heading span, .dark .guigui-communication-list span, .dark .guigui-thread-header span, .dark .guigui-support-description { color: var(--color-green-200); }
+.dark .guigui-communication-tabs button:not(.is-active) { color: var(--color-green-200); }
+.dark .guigui-communication-compose, .dark .guigui-communication-compose.is-support { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); }
+.dark .guigui-communication-compose input, .dark .guigui-communication-compose select, .dark .guigui-communication-compose textarea, .dark .guigui-message-reply input { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #f1fbf6; }
+.dark .guigui-communication-list button, .dark .guigui-communication-thread, .dark .guigui-support-card { background: var(--color-bg-subtle); border-color: #285849; }
+.dark .guigui-communication-list button:hover, .dark .guigui-communication-list button.is-selected { background: var(--color-bg-subtle); border-color: #4f997c; }
+.dark .guigui-communication-list p, .dark .guigui-communication-list strong, .dark .guigui-support-card h3 { color: var(--color-green-50); }
+.dark .guigui-list-avatar { background: var(--color-bg-subtle); color: var(--color-green-300); }
+.dark .guigui-thread-messages { background: #081c19; }
+.dark .guigui-message-bubble { background: var(--color-bg-subtle); border-color: #285849; color: var(--color-green-50); }
+.dark .guigui-message-bubble.is-own { background: var(--color-green-700); border-color: var(--color-green-400); }
+.dark .guigui-new-conversation { background: linear-gradient(145deg, var(--color-bg-subtle), var(--color-bg-subtle)); }
+.dark .guigui-new-conversation h3 { color: var(--color-green-50); }
+.dark .guigui-new-conversation > div > span { color: var(--color-green-200); }
+.dark .guigui-new-conversation input, .dark .guigui-new-conversation textarea { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #f1fbf6; }
+.dark .guigui-message-reply, .dark .guigui-support-replies > div, .dark .guigui-support-last-reply { border-color: #285849; background: var(--color-bg-subtle); color: var(--color-green-50); }
+.dark .guigui-support-replies > div.is-own { background: #163b31; }
+.dark .guigui-communication-empty, .dark .guigui-communication-notice { background: var(--color-bg-subtle); border-color: #285849; color: var(--color-green-200); }
+/* === Comunicação fim: mensagens e suporte === */
+
+/* ------------------------------------------------------------------ *
+ * Comunicação (mensagens e suporte): painel fixo, duas colunas.
+ * A página não cresce: a lista e as mensagens rolam dentro do painel.
+ * ------------------------------------------------------------------ */
+.guigui-communication-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: calc(100dvh - 210px);
+  min-height: 520px;
+  max-height: 820px;
+}
+.guigui-communication-shell > .guigui-communication-header,
+.guigui-communication-shell > .guigui-communication-tabs,
+.guigui-communication-shell > .guigui-communication-notice { flex: 0 0 auto; }.guigui-communication-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: visible;
+}.guigui-communication-sidebar,
+.guigui-support-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: visible;
+}
+.guigui-communication-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+.guigui-message-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--mute);
+}
+.guigui-message-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  outline: none;
+}
+.guigui-message-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.guigui-message-filters button {
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--mute);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.guigui-message-filters button.is-active {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #fff;
+}
+.guigui-message-filters .guigui-new-message-button {
+  border-color: #78b9a4;
+  background: #eef8f3;
+  color: var(--ink);
+}.guigui-communication-thread {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: visible;
+}
+.guigui-thread-header { flex: 0 0 auto; }
+.guigui-thread-messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.guigui-message-reply { flex: 0 0 auto; }
+.guigui-message-date {
+  align-self: center;
+  margin: 2px 0;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(11, 59, 55, .07);
+  color: var(--mute);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .guigui-communication-shell { height: auto; max-height: none; min-height: 0; }
+  .guigui-communication-layout { overflow: visible; }
+  .guigui-communication-sidebar { overflow-y: visible !important; max-height: none !important; }  .guigui-communication-thread { overflow: visible !important; }
+  .guigui-communication-list { max-height: none !important; }
+  .guigui-communication-thread { max-height: none !important; overflow: visible !important; }
+  .guigui-thread-messages { min-height: auto !important; }
+}
+
+.dark .guigui-message-search,
+.dark .guigui-message-filters button { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #cfe8dd; }
+.dark .guigui-message-filters button.is-active { background: var(--color-green-400); border-color: var(--color-green-400); color: #06231d; }
+.dark .guigui-message-filters .guigui-new-message-button { background: var(--color-bg-subtle); border-color: #4f997c; color: var(--color-green-50); }
+.dark .guigui-message-date { background: var(--color-bg-subtle); color: var(--color-green-200); }
+
+/* Vigas e capas de cartão continuam escuras no tema escuro. */
+.dark .guigui-business-cover { background: var(--color-bg-subtle); }
+
+/* Rede de segurança: superfícies com fundo branco translúcido acompanham o tema
+   escuro mesmo quando a variante dark: não chega ao elemento (ex.: barras fixas). */
+html.dark [class~="bg-white"] {
+  background-color: #0f172a;
+}
+
+/* Componentes clássicos de superfície clara: acompanham o tema escuro. */
+.dark .guigui-panel {
+  background: var(--color-bg-subtle);
+  border-color: #285849;
+  box-shadow: 0 18px 40px -30px rgba(0, 0, 0, 0.8);
+}
+.dark .guigui-category-card {
+  background: var(--color-bg-subtle);
+  border-color: #285849;
+  color: var(--color-green-100);
+}
+.dark .guigui-category-icon { background: var(--color-bg-subtle); color: var(--color-green-300); }
+.dark .guigui-icon-button {
+  background: var(--color-bg-subtle);
+  border-color: #285849;
+  color: var(--color-green-50);
+}
+.dark .guigui-icon-button:hover { background: var(--color-bg-subtle); border-color: #4f997c; }
+.dark .guigui-nav-search,
+.dark .guigui-nav-popover {
+  background: var(--color-bg-subtle);
+  border-color: #285849;
+  color: var(--color-green-200);
+}
+
+/* Barra fixa inferior (mobile): acompanha o tema escuro. */
+html.dark [class*="max-[1100px]:flex"] {
+  background-color: #0D2924 !important;
+  border-color: #285849 !important;
+}
+
+/* Nos painéis autenticados, parágrafos e células não pintam superfícies claras
+   próprias: herdam o fundo escuro do cartão/tabela no tema escuro. */
+html.dark .guigui-profile-dashboard p[class*="bg-"] { background-color: transparent !important; }
+html.dark .guigui-profile-dashboard table,
+html.dark .guigui-profile-dashboard table th,
+html.dark .guigui-profile-dashboard table td { background-color: transparent !important; }
+
+/* === Caixa de mensagem: estrutura de conversa (cabeçalho, bolhas, composer) === */
+.guigui-communication-layout {
+  grid-template-columns: minmax(280px, .78fr) minmax(0, 1.22fr);
+  align-items: start;
+}
+.guigui-communication-thread {
+  height: clamp(520px, 72vh, 780px);
+  min-height: 480px;
+  overflow: hidden;
+  border-radius: 22px;
+  background: #fff;
+}
+.guigui-thread-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+.guigui-thread-back {
+  display: flex;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.guigui-thread-back:hover { background: #eef8f3; }
+.guigui-thread-avatar {
+  display: flex;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e6f2ee;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+}
+.guigui-thread-avatar.is-support { background: #fff0d8; color: #9a6317; }
+.guigui-thread-identity { min-width: 0; flex: 1 1 auto; }
+.guigui-thread-identity strong {
+  display: block;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.guigui-thread-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  color: #2f7a63;
+  font-size: 12px;
+  font-weight: 600;
+}
+.guigui-thread-status i {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 999px;
+  background: #b9c6c2;
+}
+.guigui-thread-status i.is-online { background: #22b573; box-shadow: 0 0 0 3px rgba(34, 181, 115, .18); }
+.guigui-thread-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.guigui-thread-actions .guigui-thread-info,
+.guigui-thread-info {
+  display: flex;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.guigui-thread-info:hover { border-color: #78b9a4; background: #f4faf7; color: var(--ink); }
+
+/* Fundo da conversa com motivo discreto (palmeira e talheres) */
+.guigui-thread-messages {
+  gap: 10px;
+  padding: 20px 18px 24px;
+  background-color: #fbf8ee;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='none' stroke='%230d3d33' stroke-opacity='0.07' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M32 64c0-14 9-23 21-25'/%3E%3Cpath d='M53 39c-9 2-16 9-18 18'/%3E%3Cpath d='M53 39c4 7 6 13 6 20'/%3E%3Cpath d='M30 66h26'/%3E%3Cpath d='M116 46v18M122 46v18M128 46v18M122 64v34'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+.guigui-message-date {
+  align-self: center;
+  margin: 4px auto 8px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: rgba(11, 59, 55, .07);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+.guigui-message-bubble {
+  max-width: min(78%, 520px);
+  padding: 12px 14px 9px;
+  border: 1px solid rgba(11, 59, 55, .07);
+  border-radius: 16px 16px 16px 5px;
+  background: #fff;
+  color: var(--text);
+  box-shadow: 0 12px 26px -24px rgba(11, 59, 55, .75);
+}
+.guigui-message-bubble.is-own {
+  border-color: #0b3b37;
+  border-radius: 16px 16px 5px 16px;
+  background: #0b3b37;
+  color: #fff;
+}
+.guigui-message-bubble > p.guigui-message-author {
+  margin: 0 0 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  opacity: .7;
+}
+.guigui-message-bubble span { font-size: 14px; line-height: 1.45; }
+.guigui-message-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 7px;
+}
+.guigui-message-meta small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  font-size: 11px;
+  opacity: .78;
+}
+.guigui-message-meta small b { font-weight: 700; letter-spacing: -1px; }
+.guigui-message-actions { display: inline-flex; align-items: center; gap: 1px; }
+.guigui-message-actions button {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.guigui-message-actions button:hover { background: rgba(255, 255, 255, .16); }
+.guigui-message-bubble:not(.is-own) .guigui-message-actions button:hover { background: rgba(11, 59, 55, .08); }
+
+/* Composer: emoji + campo arredondado + enviar */
+.guigui-message-reply {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 14px;
+  border-top: 0;
+  background: #fff;
+}
+.guigui-message-reply textarea {
+  min-width: 0;
+  flex: 1 1 auto;
+  min-height: 46px;
+  max-height: 120px;
+  padding: 13px 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+  outline: none;
+  resize: none;
+}
+.guigui-message-reply textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(232, 162, 58, .16); }
+.guigui-message-reply .guigui-composer-action,
+.guigui-message-reply > button[type="submit"] {
+  display: flex;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+}
+.guigui-message-reply .guigui-composer-action:hover,
+.guigui-message-reply > button[type="submit"]:hover { background: #12574a; }
+.guigui-emoji-picker {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 14px;
+  z-index: 3;
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 16px 32px -22px rgba(11, 59, 55, .6);
+}
+.guigui-emoji-picker button {
+  display: flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 16px;
+  cursor: pointer;
+}
+.guigui-emoji-picker button:hover { background: #eef8f3; }
+.guigui-reply-preview {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--gold);
+  border-radius: 10px;
+  background: #fff8ea;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .guigui-communication-thread { height: 70vh; min-height: 420px; max-height: none; }
+  .guigui-thread-identity strong { font-size: 15px; }
+  .guigui-message-bubble { max-width: 86%; }
+}
+
+.dark .guigui-communication-thread,
+.dark .guigui-thread-header,
+.dark .guigui-message-reply { background: var(--color-bg-subtle); border-color: #285849; }
+.dark .guigui-thread-identity strong { color: var(--color-green-50); }
+.dark .guigui-thread-status { color: var(--color-green-300); }
+.dark .guigui-thread-avatar { background: var(--color-bg-subtle); color: var(--color-green-300); }
+.dark .guigui-thread-info { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #cfe8dd; }
+.dark .guigui-thread-messages {
+  background-color: #081c19;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='none' stroke='%23cfe8dd' stroke-opacity='0.06' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M32 64c0-14 9-23 21-25'/%3E%3Cpath d='M53 39c-9 2-16 9-18 18'/%3E%3Cpath d='M53 39c4 7 6 13 6 20'/%3E%3Cpath d='M30 66h26'/%3E%3Cpath d='M116 46v18M122 46v18M128 46v18M122 64v34'/%3E%3C/g%3E%3C/svg%3E");
+}
+.dark .guigui-message-bubble { background: var(--color-bg-subtle); border-color: #285849; color: var(--color-green-50); }
+.dark .guigui-message-bubble.is-own { background: var(--color-green-700); border-color: var(--color-green-700); color: #f1fbf6; }
+.dark .guigui-message-reply textarea { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #f1fbf6; }
+.dark .guigui-emoji-picker { background: var(--color-bg-subtle); border-color: #285849; }
+.dark .guigui-message-date { background: var(--color-bg-subtle); color: var(--color-green-200); }
+
+/* === Comprovativo de levantamento (pós-compra) === */
+.guigui-voucher-modal {
+  margin-top: 0;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: .25rem;
+}
+
+.guigui-voucher-stack { display: grid; gap: 14px; }
+
+.guigui-voucher {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #1f6f59;
+  border-radius: 22px;
+  background: radial-gradient(120% 80% at 50% 0%, #0e5142 0%, #07362b 55%, #04241d 100%);
+  color: #eaf7f1;
+  box-shadow: 0 28px 60px -38px rgba(0, 0, 0, .95);
+  text-align: center;
+}
+
+.guigui-voucher-top { padding: 20px 20px 18px; }
+
+.guigui-voucher-kicker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--color-green-300);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.guigui-voucher-title {
+  margin: 12px 0 0;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: left;
+}
+
+.guigui-voucher-subline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  text-align: left;
+}
+
+.guigui-voucher-subtitle { color: #ffffff; font-size: 13px; font-weight: 600; }
+
+.guigui-voucher-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid #2fae7d;
+  border-radius: 999px;
+  color: #8ef0c0;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.guigui-voucher-divider {
+  position: relative;
+  height: 0;
+  margin: 0 34px;
+  border-top: 1.5px dashed rgba(126, 205, 176, .45);
+}
+
+.guigui-voucher-divider::before,
+.guigui-voucher-divider::after {
+  content: '';
+  position: absolute;
+  top: -14px;
+  width: 27px;
+  height: 27px;
+  border: 1px solid #1f6f59;
+  border-radius: 999px;
+  background: #04201a;
+}
+
+.guigui-voucher-divider::before { left: -48px; }
+.guigui-voucher-divider::after { right: -48px; }
+
+.guigui-voucher-body {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 22px 20px 20px;
+}
+
+.guigui-voucher-qr {
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.guigui-voucher-qr img { width: 186px; height: 186px; object-fit: contain; }
+
+.guigui-voucher-token {
+  margin: 0;
+  max-width: 100%;
+  color: #f4fdfa;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+  word-break: break-all;
+}
+
+.guigui-voucher-codes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+}
+
+.guigui-voucher-code {
+  padding: 12px 8px;
+  border: 1px solid rgba(126, 205, 176, .35);
+  border-radius: 14px;
+}
+
+.guigui-voucher-code span {
+  display: block;
+  color: rgba(255, 255, 255, .8);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.guigui-voucher-code strong {
+  display: block;
+  margin-top: 6px;
+  color: #ffffff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  word-break: break-all;
+}
+
+.guigui-voucher-details {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid rgba(126, 205, 176, .28);
+  border-radius: 14px;
+  text-align: left;
+}
+
+.guigui-voucher-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 5px 0;
+  font-size: 13px;
+}
+
+.guigui-voucher-row span { color: #9ed2c0; flex-shrink: 0; }
+.guigui-voucher-row strong { color: #ffffff; font-weight: 700; text-align: right; word-break: break-word; }
+
+.guigui-voucher-row.is-price {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(126, 205, 176, .28);
+}
+
+.guigui-voucher-row.is-price strong { color: var(--color-green-300); font-size: 17px; }
+
+.guigui-voucher-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.guigui-voucher-buttons button {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 6px;
+  border: 1px solid rgba(126, 205, 176, .35);
+  border-radius: 14px;
+  background: var(--color-green-800);
+  color: #eaf7f1;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .18s ease, border-color .18s ease;
+}
+
+.guigui-voucher-buttons button:hover:not(:disabled) { background: rgba(116, 227, 176, .12); border-color: var(--color-green-300); }
+.guigui-voucher-buttons button:disabled { opacity: .5; cursor: not-allowed; }
+
+.guigui-voucher-note {
+  margin: 0;
+  color: rgba(255, 255, 255, .8);
+  font-size: 11px;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.guigui-voucher-actions { display: grid; gap: 10px; margin-top: 16px; }
+
+.guigui-voucher-action {
+  display: inline-flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .18s ease;
+}
+
+.guigui-voucher-action.is-contact {
+  border: 1px solid #1f6f59;
+  background: var(--color-bg-surface);
+  color: #eaf7f1;
+}
+
+.guigui-voucher-action.is-contact:hover { background: #12574a; }
+
+.guigui-voucher-action.is-close {
+  border: 1px solid transparent;
+  background: #22b573;
+  color: #04201a;
+}
+
+.guigui-voucher-action.is-close:hover { background: #2ecb85; }
+
+@media (max-width: 420px) {
+  .guigui-voucher-top { padding: 18px 16px 16px; }
+  .guigui-voucher-body { padding: 20px 16px 18px; }
+  .guigui-voucher-title { font-size: 18px; }
+  .guigui-voucher-qr img { width: 158px; height: 158px; }
+  .guigui-voucher-code strong { font-size: 15px; }
+}
+
+/* Tema escuro: qualquer botão/ligação de fundo branco passa a superfície escura
+   com letras brancas, para não ficar um bloco claro no meio do ecrã. */
+html.dark button.bg-white,
+html.dark a.bg-white {
+  background-color: #0f2f2b !important;
+  color: #ffffff !important;
+}
+html.dark button.bg-white:hover,
+html.dark a.bg-white:hover {
+  background-color: #16473f !important;
+  color: #ffffff !important;
+}
+html.dark button.bg-white svg,
+html.dark a.bg-white svg {
+  color: #ffffff;
+}
+
+/* ------------------------------------------------------------------ *
+ * Caixa de mensagem / suporte: cabeçalho, bolhas e composer finais.
+ * Estrutura da referência: avatar + nome + estado, bolhas com avatar na
+ * recebida, meta (hora + Confirmação + reacções) e composer em pílula.
+ * ------------------------------------------------------------------ */
+.guigui-thread-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(11, 59, 55, .1);
+  background: #ffffff;
+}
+
+.guigui-thread-back,
+.guigui-thread-info {
+  display: inline-flex;
+  height: 34px;
+  width: 34px;
+  flex: 0 0 34px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(11, 59, 55, .12);
+  border-radius: 999px;
+  background: #f6faf8;
+  color: #0b3b37;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.guigui-thread-back:hover,
+.guigui-thread-info:hover { background: #eaf4ef; }
+
+.guigui-thread-avatar {
+  display: inline-flex;
+  height: 42px;
+  width: 42px;
+  flex: 0 0 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: linear-gradient(140deg, #cfe9dd, #9fd2bd);
+  color: #08332c;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.guigui-thread-avatar.is-support {
+  background: linear-gradient(140deg, #ffe6b8, #f3c877);
+  color: #6b4610;
+}
+
+.guigui-thread-identity { min-width: 0; flex: 1; }
+
+.guigui-thread-identity strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #08332c;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.guigui-thread-status {
+  display: inline-flex;
+  margin-top: 3px;
+  align-items: center;
+  gap: 5px;
+  color: #5d7d74;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.guigui-thread-status i {
+  display: inline-block;
+  height: 7px;
+  width: 7px;
+  border-radius: 999px;
+  background: #b9c9c3;
+}
+
+.guigui-thread-status i.is-online { background: #26b57a; }
+.guigui-thread-actions { display: inline-flex; gap: 8px; flex: 0 0 auto; }
+
+.guigui-thread-messages {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding: 18px 14px 20px;
+  background-color: #f6f5ec;
+  background-image: radial-gradient(rgba(11, 59, 55, .07) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.guigui-message-date {
+  align-self: center;
+  margin: 6px 0 4px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #5d7d74;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.guigui-message-row { display: flex; width: 100%; align-items: flex-end; gap: 7px; }
+.guigui-message-row.is-own { justify-content: flex-end; }
+
+.guigui-message-avatar {
+  display: inline-flex;
+  height: 26px;
+  width: 26px;
+  flex: 0 0 26px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #dcefe7;
+  color: #08332c;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.guigui-message-avatar.is-support { background: #ffe6b8; color: #6b4610; }
+
+.guigui-message-row .guigui-message-bubble {
+  max-width: min(80%, 520px);
+  padding: 8px 11px 6px;
+  border: 0;
+  border-radius: 14px 14px 14px 4px;
+  background: #ffffff;
+  color: #12211f;
+  box-shadow: 0 2px 6px -3px rgba(11, 59, 55, .25);
+}
+
+.guigui-message-row.is-own .guigui-message-bubble {
+  border-radius: 14px 14px 4px 14px;
+  background: #0b3b37;
+  color: #ffffff;
+}
+
+.guigui-message-row .guigui-message-bubble span {
+  display: block;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.guigui-message-row .guigui-message-bubble .guigui-message-author {
+  margin: 0 0 3px;
+  color: #3f5a52;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.guigui-message-row.is-own .guigui-message-bubble .guigui-message-author {
+  color: rgba(255, 255, 255, .72);
+}
+
+.guigui-message-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.guigui-message-meta small {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #4f665f;
+  font-size: 9.5px;
+  font-weight: 600;
+}
+
+.guigui-message-meta small b { color: #26b57a; font-weight: 700; letter-spacing: -.5px; }
+.guigui-message-row.is-own .guigui-message-meta small { color: rgba(255, 255, 255, .72); }
+.guigui-message-row.is-own .guigui-message-meta small b { color: #9fe8c6; }
+
+.guigui-message-actions { display: inline-flex; align-items: center; gap: 2px; }
+
+.guigui-message-actions button {
+  display: inline-flex;
+  height: 20px;
+  width: 20px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.guigui-message-actions button:hover { background: rgba(11, 59, 55, .08); }
+.guigui-message-row.is-own .guigui-message-actions button:hover { background: rgba(255, 255, 255, .16); }
+
+.guigui-message-quote {
+  display: inline-block;
+  margin: 0 0 5px;
+  padding: 0 0 0 7px;
+  border: 0;
+  border-left: 2px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: .75;
+  cursor: pointer;
+}
+
+.guigui-message-reactions {
+  display: inline-flex;
+  gap: 2px;
+  margin-top: 4px;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(11, 59, 55, .08);
+}
+
+.guigui-thread-notice {
+  margin: 0;
+  padding: 8px 16px 0;
+  background: #f6f5ec;
+  color: #6c8179;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.guigui-message-reply {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid rgba(11, 59, 55, .08);
+  background: #f6f5ec;
+}
+
+.guigui-message-reply .guigui-composer-action {
+  display: inline-flex;
+  height: 44px;
+  width: 44px;
+  flex: 0 0 44px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(11, 59, 55, .12);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0b3b37;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.guigui-message-reply textarea {
+  min-height: 44px;
+  max-height: 120px;
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  border: 1px solid rgba(11, 59, 55, .12);
+  border-radius: 22px;
+  background: #ffffff;
+  padding: 12px 16px;
+  color: #12211f;
+  font-size: 13px;
+  line-height: 1.35;
+  outline: none;
+}
+
+.guigui-message-reply textarea:focus {
+  border-color: #3fae80;
+  box-shadow: 0 0 0 3px rgba(63, 174, 128, .16);
+}
+
+.guigui-message-reply button[type="submit"] {
+  display: inline-flex;
+  height: 44px;
+  width: 44px;
+  flex: 0 0 44px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: #12b76a;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.guigui-message-reply button[type="submit"]:hover { background: #0fa25f; }
+
+.guigui-reply-preview {
+  order: -2;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #eaf4ef;
+  color: #3c5f56;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.guigui-reply-preview button {
+  width: auto;
+  height: auto;
+  min-width: 0;
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.guigui-emoji-picker {
+  position: absolute;
+  bottom: calc(100% - 2px);
+  left: 12px;
+  z-index: 5;
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid rgba(11, 59, 55, .1);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 16px 30px -20px rgba(11, 59, 55, .6);
+}
+
+.guigui-emoji-picker button {
+  width: auto;
+  height: auto;
+  min-width: 0;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 4px;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.guigui-emoji-picker button:hover { background: #eef8f3; }
+
+html.dark .guigui-thread-header { background: var(--color-bg-subtle); border-color: #285849; }
+html.dark .guigui-thread-identity strong { color: #f2fbf7; }
+html.dark .guigui-thread-status { color: var(--color-green-200); }
+html.dark .guigui-thread-back,
+html.dark .guigui-thread-info { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #e9f7f1; }
+html.dark .guigui-thread-back:hover,
+html.dark .guigui-thread-info:hover { background: #1b4639; }
+html.dark .guigui-thread-messages {
+  background-color: #081c19;
+  background-image: radial-gradient(rgba(158, 227, 195, .07) 1px, transparent 1px);
+}
+html.dark .guigui-message-date { background: rgba(21, 54, 45, .92); color: var(--color-green-200); }
+html.dark .guigui-message-row .guigui-message-bubble { background: var(--color-bg-subtle); color: var(--color-green-50); }
+html.dark .guigui-message-row.is-own .guigui-message-bubble { background: var(--color-green-700); color: #ffffff; }
+html.dark .guigui-message-meta small { color: var(--color-green-200); }
+html.dark .guigui-thread-notice { background: #081c19; color: var(--color-green-200); }
+html.dark .guigui-message-reply { background: #081c19; border-color: #285849; }
+html.dark .guigui-message-reply textarea { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #f4fdfa; }
+html.dark .guigui-message-reply .guigui-composer-action { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #e9f7f1; }
+html.dark .guigui-reply-preview { background: var(--color-bg-subtle); color: #cfe8dd; }
+html.dark .guigui-emoji-picker { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); }
+html.dark .guigui-emoji-picker button:hover { background: #1b4639; }
+
+@media (max-width: 640px) {
+  .guigui-thread-header { padding: 10px 12px; gap: 10px; }
+  .guigui-thread-messages { padding: 14px 10px 16px; }
+  .guigui-message-row .guigui-message-bubble { max-width: 86%; }
+  .guigui-message-reply { padding: 8px 10px 10px; }
+}/* === Caixa de entrada (desktop): lista à esquerda, conversa à direita ===
+   Um único cartão com dois painéis encostados, como uma caixa de mensagens
+   de ambiente de trabalho: cabeçalho e pesquisa fixos, lista com scroll
+   próprio, conversa com histórico rolável e composer sempre visível. */
+.guigui-communication-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 344px) minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  background: #fff;
+  align-items: stretch;
+  overflow: visible;
+}.guigui-communication-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: visible;
+  border-right: 1px solid var(--line);
+  background: #fff;
+}
+.guigui-inbox-toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+.guigui-communication-sidebar .guigui-inbox-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.guigui-communication-sidebar .guigui-inbox-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+.guigui-communication-sidebar .guigui-inbox-title strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.guigui-communication-sidebar .guigui-inbox-title span {
+  flex: 0 0 auto;
+  min-width: 22px;
+  margin: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #e8f2ef;
+  color: #0b3b37;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
+.guigui-communication-sidebar .guigui-inbox-new {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-height: 34px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid #0b3b37;
+  border-radius: 999px;
+  background: #0b3b37;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.guigui-communication-sidebar .guigui-inbox-new:hover { background: #12574a; }
+.guigui-communication-sidebar .guigui-inbox-new span { margin: 0; color: inherit; font-size: inherit; font-weight: inherit; }
+.guigui-communication-sidebar .guigui-inbox-search {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f6f9f8;
+  color: #4f665f;
+}
+.guigui-communication-sidebar .guigui-inbox-search:focus-within {
+  border-color: #78b9a4;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(120, 185, 164, .16);
+}
+.guigui-communication-sidebar .guigui-inbox-search input {
+  min-width: 0;
+  flex: 1 1 auto;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 12.5px;
+  outline: none;
+}
+.guigui-communication-sidebar .guigui-inbox-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.guigui-communication-sidebar .guigui-inbox-filters button {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: #435c54;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.guigui-communication-sidebar .guigui-inbox-filters button span {
+  min-width: 16px;
+  margin: 0;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(11, 59, 55, .07);
+  font-size: 9.5px;
+  font-weight: 800;
+  text-align: center;
+}
+.guigui-communication-sidebar .guigui-inbox-filters button.is-active {
+  border-color: #0b3b37;
+  background: #0b3b37;
+  color: #fff;
+}
+.guigui-communication-sidebar .guigui-inbox-filters button.is-active span { background: rgba(255, 255, 255, .22); }
+
+.guigui-communication-sidebar > .guigui-communication-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+  overscroll-behavior: contain;
+}
+.guigui-communication-sidebar .guigui-conversation-item,
+.guigui-communication-sidebar .guigui-ticket-item {
+  display: grid;
+  width: 100%;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  padding: 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.guigui-communication-sidebar .guigui-conversation-item:hover,
+.guigui-communication-sidebar .guigui-ticket-item:hover { border: 0; background: #f3f8f6; }
+.guigui-communication-sidebar .guigui-conversation-item.is-selected,
+.guigui-communication-sidebar .guigui-ticket-item.is-selected { border: 0; background: #e9f4ef; }
+.guigui-communication-sidebar .guigui-conversation-avatar,
+.guigui-communication-sidebar .guigui-ticket-icon {
+  display: flex;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  margin: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background: linear-gradient(140deg, #d7efe4, #a4d6c1);
+  color: #08332c;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.guigui-communication-sidebar .guigui-ticket-icon { background: linear-gradient(140deg, #ffe6b8, #f0c473); color: #6b4610; }
+.guigui-communication-sidebar .guigui-conversation-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+.guigui-communication-sidebar .guigui-conversation-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.guigui-communication-sidebar .guigui-conversation-top strong {
+  overflow: hidden;
+  margin: 0;
+  color: #122320;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.guigui-communication-sidebar .guigui-conversation-top time {
+  flex: 0 0 auto;
+  color: #566f67;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.guigui-communication-sidebar .guigui-conversation-subject {
+  overflow: hidden;
+  margin: 0;
+  color: #377a67;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.guigui-communication-sidebar .guigui-conversation-preview {
+  overflow: hidden;
+  margin: 0;
+  color: #4d665e;
+  font-size: 11.5px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.guigui-communication-sidebar .guigui-conversation-item.is-unread .guigui-conversation-top strong { font-weight: 800; }
+.guigui-communication-sidebar .guigui-conversation-item.is-unread .guigui-conversation-preview { color: #16332c; font-weight: 700; }
+.guigui-communication-sidebar .guigui-unread-badge {
+  display: inline-flex;
+  min-width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #e8a23a;
+  color: #3d2606;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+.guigui-communication-sidebar .guigui-ticket-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 1px 0 0;
+}
+.guigui-communication-sidebar .guigui-ticket-category { margin: 0; color: #8a5714; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.guigui-communication-sidebar .guigui-ticket-state {
+  margin: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #eef4f2;
+  color: #37534a;
+  font-size: 9.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.guigui-communication-sidebar .guigui-ticket-state.is-open { background: #fff0d2; color: #8b5b17; }
+.guigui-communication-sidebar .guigui-ticket-state.is-in_progress { background: #e6efff; color: #2c5aa0; }
+.guigui-communication-sidebar .guigui-ticket-state.is-resolved { background: #e4f5ec; color: #24785a; }
+.guigui-communication-sidebar > .guigui-communication-list > .guigui-communication-empty { margin: 8px; }
+
+/* Painel da conversa encostado à lista, sem moldura dupla. */
+.guigui-communication-layout > .guigui-communication-thread {
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+}
+.guigui-communication-thread > .guigui-thread-notice {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 7px 18px;
+  border-top: 1px solid var(--line);
+  background: #fbfdfc;
+}
+
+@media (max-width: 900px) {
+  .guigui-communication-layout { grid-template-columns: minmax(240px, 40%) minmax(0, 1fr); }
+}
+
+@media (max-width: 760px) {
+  .guigui-communication-layout { grid-template-columns: 1fr; }
+  .guigui-communication-sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
+  .guigui-communication-layout.is-mobile-thread > .guigui-communication-sidebar { display: none; }
+  .guigui-communication-layout.is-mobile-list > .guigui-communication-thread { display: none; }
+  .guigui-communication-sidebar > .guigui-communication-list { max-height: none; }
+}
+
+.dark .guigui-communication-layout,
+.dark .guigui-communication-sidebar,
+.dark .guigui-inbox-toolbar { background: var(--color-bg-subtle); border-color: #285849; }
+.dark .guigui-communication-sidebar .guigui-inbox-title strong { color: var(--color-green-50); }
+.dark .guigui-communication-sidebar .guigui-inbox-title span { background: var(--color-bg-subtle); color: var(--color-green-300); }
+.dark .guigui-communication-sidebar .guigui-inbox-new { border-color: var(--color-green-400); background: var(--color-green-400); color: #06231d; }
+.dark .guigui-communication-sidebar .guigui-inbox-new:hover { background: #7ddcb4; }
+.dark .guigui-communication-sidebar .guigui-inbox-search { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #9dbcb1; }
+.dark .guigui-communication-sidebar .guigui-inbox-search input { color: #f1fbf6; }
+.dark .guigui-communication-sidebar .guigui-inbox-filters button { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #cfe8dd; }
+.dark .guigui-communication-sidebar .guigui-inbox-filters button span { background: rgba(255, 255, 255, .1); color: #cfe8dd; }
+.dark .guigui-communication-sidebar .guigui-inbox-filters button.is-active { background: var(--color-green-400); border-color: var(--color-green-400); color: #06231d; }
+.dark .guigui-communication-sidebar .guigui-conversation-item:hover,
+.dark .guigui-communication-sidebar .guigui-ticket-item:hover { background: #133229; }
+.dark .guigui-communication-sidebar .guigui-conversation-item.is-selected,
+.dark .guigui-communication-sidebar .guigui-ticket-item.is-selected { background: #17453a; }
+.dark .guigui-communication-sidebar .guigui-conversation-top strong { color: var(--color-green-50); }
+.dark .guigui-communication-sidebar .guigui-conversation-preview { color: #a9c7bc; }
+.dark .guigui-communication-sidebar .guigui-conversation-item.is-unread .guigui-conversation-preview { color: #e6f6ef; }
+.dark .guigui-communication-sidebar .guigui-conversation-subject { color: #8dd4b8; }
+.dark .guigui-communication-sidebar .guigui-conversation-top time { color: #a7c3b8; }
+.dark .guigui-composer-status { color: #a7c3b8; }
+.dark .guigui-communication-sidebar .guigui-conversation-avatar,
+.dark .guigui-communication-sidebar .guigui-ticket-icon { background: #1c4a3e; color: #bfe8d5; }
+.dark .guigui-communication-sidebar .guigui-ticket-state { background: var(--color-bg-subtle); color: var(--color-green-200); }
+.dark .guigui-communication-thread > .guigui-thread-notice { background: #081c19; border-color: #285849; }
+/* === Mensagens: desenho de referência (barra, lista e conversa) === */.guigui-communication-shell {
+  border: 1px solid var(--color-green-100);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(11, 59, 55, .04);
+  overflow: visible;
+}
+.guigui-communication-topbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: #fff;
+}
+.guigui-communication-brand { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.guigui-communication-brand-mark {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--color-bg-surface);
+  color: #eaf6f0;
+}
+.guigui-communication-brand-mark.is-support { background: var(--color-gold-700); }
+.guigui-communication-brand-label {
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.guigui-communication-brand-divider { width: 1px; height: 20px; flex: 0 0 1px; background: var(--color-green-100); }
+.guigui-communication-topbar-title {
+  overflow: hidden;
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.guigui-communication-account { display: flex; min-width: 0; align-items: center; gap: 8px; }
+.guigui-communication-account-avatar {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #e5eeea;
+  color: #1c4c3f;
+  font-size: 11px;
+  font-weight: 800;
+}
+.guigui-communication-account-name {
+  overflow: hidden;
+  max-width: 180px;
+  color: #3c534c;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.guigui-communication-tabs { padding: 10px 18px; border-bottom: 1px solid var(--color-border-subtle); background: #fff; }
+.guigui-communication-tabs button { min-height: 36px; font-size: 12px; font-weight: 600; }
+.guigui-communication-tabs button.is-active { background: var(--color-bg-surface); box-shadow: none; }
+
+.guigui-communication-layout {
+  grid-template-columns: clamp(280px, 33%, 380px) minmax(0, 1fr);
+  background: #f6f8f7;
+}
+.guigui-communication-sidebar { border-right: 1px solid var(--color-border-subtle); background: #fff; }
+.guigui-inbox-toolbar { gap: 12px; padding: 16px 16px 14px; border-bottom: 1px solid #eef1ef; }
+.guigui-communication-sidebar .guigui-inbox-title strong { color: var(--color-text-strong); font-size: 20px; font-weight: 700; }
+.guigui-communication-sidebar .guigui-inbox-title span {
+  background: #eef2f0;
+  color: #48605a;
+  font-size: 11px;
+  font-weight: 700;
+}
+.guigui-communication-sidebar .guigui-inbox-new {
+  min-height: 36px;
+  gap: 7px;
+  border-color: var(--color-green-800);
+  border-radius: 10px;
+  background: var(--color-green-800);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.guigui-communication-sidebar .guigui-inbox-new:hover { background: #115347; }
+.guigui-communication-sidebar .guigui-inbox-search {
+  min-height: 38px;
+  border-color: var(--color-green-100);
+  border-radius: 10px;
+  background: #f5f7f6;
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+.guigui-communication-sidebar .guigui-inbox-search:focus-within {
+  border-color: #8fc4b1;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(143, 196, 177, .18);
+}
+.guigui-communication-sidebar .guigui-inbox-search input { font-size: 12.5px; font-weight: 500; }
+.guigui-communication-sidebar .guigui-inbox-search input::placeholder { color: #96a7a0; font-weight: 400; }
+.guigui-communication-sidebar .guigui-inbox-filters button {
+  min-height: 30px;
+  border-color: var(--color-green-100);
+  color: #5b7169;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.guigui-communication-sidebar .guigui-inbox-filters button span { background: #eef2f0; color: #43584f; }
+.guigui-communication-sidebar .guigui-inbox-filters button.is-active { border-color: var(--color-green-800); background: var(--color-green-800); color: #fff; }
+.guigui-communication-sidebar .guigui-inbox-filters button.is-active span { background: rgba(255, 255, 255, .2); color: inherit; }
+
+.guigui-communication-sidebar > .guigui-communication-list { gap: 2px; padding: 6px; }
+.guigui-communication-sidebar .guigui-conversation-item,
+.guigui-communication-sidebar .guigui-ticket-item { gap: 12px; padding: 10px 12px; border-radius: 10px; }
+.guigui-communication-sidebar .guigui-conversation-item:hover,
+.guigui-communication-sidebar .guigui-ticket-item:hover { background: #f5f9f7; }
+.guigui-communication-sidebar .guigui-conversation-item.is-selected,
+.guigui-communication-sidebar .guigui-ticket-item.is-selected { background: #eef7f1; }
+.guigui-communication-sidebar .guigui-conversation-avatar,
+.guigui-communication-sidebar .guigui-ticket-icon {
+  width: 40px;
+  height: 40px;
+  flex-basis: 40px;
+  background: #e2f0e8;
+  color: #1d5a47;
+  font-size: 12px;
+  font-weight: 700;
+}
+.guigui-communication-sidebar .guigui-conversation-top strong { color: #17211e; font-size: 13px; font-weight: 700; }
+.guigui-communication-sidebar .guigui-conversation-top time { color: #5b7169; font-size: 11px; font-weight: 500; }
+.guigui-communication-sidebar .guigui-conversation-preview { margin-top: 1px; color: #566b64; font-size: 12px; }
+.guigui-communication-sidebar .guigui-conversation-item.is-unread .guigui-conversation-preview { color: #33473f; font-weight: 600; }
+.guigui-communication-sidebar .guigui-unread-badge {
+  min-width: 18px;
+  height: 18px;
+  background: var(--color-bg-surface);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.guigui-communication-layout > .guigui-communication-thread { background: #fff; }
+.guigui-thread-header { min-height: 64px; gap: 12px; padding: 10px 18px; border-bottom: 1px solid #eef1ef; background: #fff; }
+.guigui-thread-back,
+.guigui-thread-info {
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
+  border: 1px solid var(--color-green-100);
+  background: #fff;
+  color: #46605a;
+  font-size: 13px;
+}
+.guigui-thread-back:hover,
+.guigui-thread-info:hover { background: #f2f7f4; color: #0b3b37; }
+.guigui-thread-avatar { width: 40px; height: 40px; flex-basis: 40px; background: #e2f0e8; color: #1d5a47; font-size: 13px; font-weight: 700; }
+.guigui-thread-identity strong { color: var(--color-text-strong); font-size: 15px; font-weight: 700; }
+.guigui-thread-status { gap: 6px; margin-top: 2px; color: #5f7a71; font-size: 11.5px; font-weight: 500; }
+.guigui-thread-status i { width: 7px; height: 7px; flex-basis: 7px; }
+.guigui-thread-status i.is-online { background: #2fae77; box-shadow: none; }
+.guigui-thread-messages { gap: 10px; padding: 20px 22px 24px; background-color: #f7f8f7; background-image: none; }
+.guigui-message-date {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0;
+  padding: 0;
+  background: none;
+}
+.guigui-message-date::before,
+.guigui-message-date::after { content: ""; flex: 1 1 auto; height: 1px; background: #e6ebe8; }
+.guigui-message-date > span {
+  padding: 3px 10px;
+  border: 1px solid #e6ebe8;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.guigui-message-row { gap: 8px; }
+.guigui-message-row .guigui-message-bubble {
+  max-width: min(78%, 560px);
+  padding: 10px 14px 8px;
+  border: 1px solid #e8ecea;
+  border-radius: 12px 12px 12px 4px;
+  background: #fff;
+  color: #1d2b27;
+  box-shadow: none;
+}
+.guigui-message-row.is-own .guigui-message-bubble {
+  border-color: #0b3b37;
+  border-radius: 12px 12px 4px 12px;
+  background: #0b3b37;
+  color: #f4faf7;
+}
+.guigui-message-content { display: grid; gap: 4px; }
+.guigui-message-row .guigui-message-bubble .guigui-message-content p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.guigui-message-row .guigui-message-bubble .guigui-message-field { color: inherit; }
+.guigui-message-row .guigui-message-bubble .guigui-message-field strong { font-weight: 700; }
+.guigui-message-row.is-own .guigui-message-bubble .guigui-message-field strong { color: #cdeee0; }
+.guigui-message-meta { margin-top: 5px; gap: 6px; opacity: .62; }
+.guigui-message-row.is-own .guigui-message-meta { opacity: .72; }
+.guigui-message-meta small { color: inherit; font-size: 10px; font-weight: 400; }
+.guigui-message-meta small b { font-weight: 700; }
+.guigui-message-actions { opacity: 0; transition: opacity .15s ease; }
+.guigui-message-row:hover .guigui-message-actions,
+.guigui-message-row:focus-within .guigui-message-actions { opacity: 1; }
+@media (hover: none) { .guigui-message-actions { opacity: 1; } }
+.guigui-message-actions button { font-size: 12px; }
+
+.guigui-message-reply { gap: 8px; padding: 10px 16px 14px; border-top: 1px solid #eef1ef; background: #fff; }
+.guigui-message-reply textarea {
+  min-height: 42px;
+  padding: 11px 16px;
+  border-color: var(--color-green-100);
+  border-radius: 12px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 400;
+}
+.guigui-message-reply textarea::placeholder { color: #96a7a0; }
+.guigui-message-reply .guigui-composer-action {
+  width: 38px;
+  height: 38px;
+  flex-basis: 38px;
+  border: 1px solid var(--color-green-100);
+  background: #f5f7f6;
+  color: #5b7169;
+  font-size: 16px;
+}
+.guigui-message-reply .guigui-composer-action:hover { background: #eef4f1; color: #0b3b37; }
+.guigui-message-reply > button.guigui-composer-send {
+  display: inline-flex;
+  width: auto;
+  height: 40px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--color-green-800);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.guigui-message-reply > button.guigui-composer-send:hover { background: #115347; }
+.guigui-message-reply > button.guigui-composer-send span { font-size: 12px; }
+.guigui-communication-thread > .guigui-thread-notice {
+  padding: 7px 18px;
+  border-top: 1px solid #f0f3f1;
+  background: #fbfcfb;
+  color: #5b7169;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+@media (max-width: 1100px) {
+  .guigui-communication-layout { grid-template-columns: minmax(260px, 36%) minmax(0, 1fr); }
+}@media (max-width: 1024px) {
+  .guigui-communication-layout { grid-template-columns: minmax(240px, 32%) minmax(0, 1fr); }
+}
+@media (max-width: 860px) {
+  .guigui-communication-layout { grid-template-columns: 1fr; }
+  .guigui-communication-sidebar { border-right: 0; border-bottom: 1px solid var(--color-border-subtle); }
+  .guigui-communication-layout.is-mobile-thread > .guigui-communication-sidebar { display: none; }
+  .guigui-communication-layout.is-mobile-list > .guigui-communication-thread { display: none; }
+  .guigui-communication-account-name { display: none; }
+  .guigui-communication-brand-label { display: none; }
+  .guigui-communication-brand-divider { display: none; }
+}@media (max-width: 767px) {
+  .guigui-communication-layout { grid-template-columns: 1fr; }
+  .guigui-communication-sidebar { border-right: 0; border-bottom: 1px solid var(--color-border-subtle); overflow-y: auto; }
+  .guigui-communication-layout.is-mobile-thread > .guigui-communication-sidebar { display: none; }
+  .guigui-communication-layout.is-mobile-list > .guigui-communication-thread { display: none; }
+  .guigui-communication-account-name { display: none; }
+  .guigui-communication-brand-label { display: none; }
+  .guigui-communication-brand-divider { display: none; }
+}
+@media (max-width: 760px) {
+  .guigui-communication-layout { grid-template-columns: 1fr; }
+  .guigui-communication-sidebar { border-right: 0; border-bottom: 1px solid var(--line); overflow: hidden; }
+  .guigui-communication-layout.is-mobile-thread > .guigui-communication-sidebar { display: none; }
+  .guigui-communication-layout.is-mobile-list > .guigui-communication-thread { display: none; }
+  .guigui-communication-account-name { display: none; }
+  .guigui-communication-brand-label { display: none; }
+  .guigui-communication-brand-divider { display: none; }
+  .guigui-communication-topbar { padding: 10px 14px; }
+  .guigui-inbox-toolbar { padding: 14px 12px 12px; }
+  .guigui-thread-header { padding: 10px 12px; }
+  .guigui-thread-messages { padding: 16px 12px 18px; }
+  .guigui-message-reply { padding: 8px 12px 12px; }
+  .guigui-message-reply > button.guigui-composer-send { padding: 0 12px; }
+  .guigui-message-reply > button.guigui-composer-send span { display: none; }
+}
+
+.dark .guigui-communication-shell,
+.dark .guigui-communication-topbar,
+.dark .guigui-communication-sidebar,
+.dark .guigui-inbox-toolbar,
+.dark .guigui-thread-header,
+.dark .guigui-message-reply { background: var(--color-bg-subtle); border-color: #285849; }
+.dark .guigui-communication-topbar-title,
+.dark .guigui-communication-sidebar .guigui-inbox-title strong,
+.dark .guigui-thread-identity strong { color: var(--color-green-50); }
+.dark .guigui-communication-brand-label,
+.dark .guigui-communication-account-name { color: #a9c7bc; }
+.dark .guigui-communication-brand-divider { background: #285849; }
+.dark .guigui-communication-account-avatar { background: var(--color-bg-subtle); color: var(--color-green-300); }
+.dark .guigui-communication-layout { background: #0a1c18; }
+.dark .guigui-thread-messages { background-color: #081c19; }
+.dark .guigui-message-date::before,
+.dark .guigui-message-date::after { background: #285849; }
+.dark .guigui-message-date > span { background: var(--color-bg-subtle); border-color: #285849; color: var(--color-green-200); }
+.dark .guigui-message-row .guigui-message-bubble { background: var(--color-bg-subtle); border-color: #285849; color: var(--color-green-50); }
+.dark .guigui-message-row.is-own .guigui-message-bubble { background: var(--color-green-700); border-color: var(--color-green-700); }
+.dark .guigui-message-reply textarea { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #f4fdfa; }
+.dark .guigui-message-reply .guigui-composer-action { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); color: #cfe8dd; }
+.dark .guigui-message-reply > button.guigui-composer-send { background: var(--color-green-400); color: #06231d; }
+.dark .guigui-communication-thread > .guigui-thread-notice { background: #081c19; border-color: #285849; }
+/* === Anexos nas mensagens === */
+.guigui-message-reply { flex-wrap: wrap; }
+.guigui-composer-attachment {
+  display: flex;
+  flex: 1 0 100%;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-green-100);
+  border-radius: 10px;
+  background: #f7faf8;
+}
+.guigui-composer-attachment img {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.guigui-composer-attachment-icon {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #e6f1ec;
+  color: #1d5a47;
+}
+.guigui-composer-attachment-meta { display: flex; min-width: 0; flex: 1 1 auto; flex-direction: column; gap: 2px; }
+.guigui-composer-attachment-meta strong {
+  overflow: hidden;
+  color: #1d2b27;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.guigui-composer-attachment-meta small { color: var(--color-text-muted); font-size: 10.5px; font-weight: 400; }
+.guigui-composer-attachment button {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.guigui-composer-attachment button:hover { background: #e8efec; color: #17211e; }
+.guigui-composer-status { flex: 1 0 100%; margin: 0 0 2px; color: #6b7f77; font-size: 11px; }
+.guigui-composer-status.is-error { color: #b3462f; }
+.guigui-message-reply .guigui-composer-action[disabled] { opacity: .5; cursor: progress; }
+.guigui-message-reply > button.guigui-composer-send[disabled] { opacity: .55; cursor: not-allowed; }
+.guigui-message-attachment { display: block; margin: 0 0 6px; }
+.guigui-message-attachment.is-image img {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  max-height: 240px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+.guigui-message-attachment.is-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(11, 59, 55, .12);
+  border-radius: 10px;
+  background: #ffffff;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.guigui-message-attachment.is-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guigui-message-row.is-own .guigui-message-attachment.is-file {
+  border-color: rgba(255, 255, 255, .24);
+  background: #2a745f;
+  color: #f4faf7;
+}
+.dark .guigui-composer-attachment { background: var(--color-bg-subtle); border-color: #285849; }
+.dark .guigui-composer-attachment-meta strong { color: var(--color-green-50); }
+.dark .guigui-composer-attachment-icon { background: var(--color-bg-subtle); color: var(--color-green-300); }
+.dark .guigui-message-attachment.is-file { background: var(--color-bg-subtle); border-color: var(--color-border-subtle-dark); }
+/* === Estados de envio e erros das mensagens === */
+.guigui-message-state {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.guigui-message-state.is-sending { color: var(--color-text-muted); }
+.guigui-message-state.is-failed { color: #b3462f; }
+.guigui-message-retry {
+  margin-left: 8px;
+  border: 0;
+  background: transparent;
+  color: #b3462f;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.guigui-message-retry:hover { color: #8f3524; }
+.guigui-message-row.is-own .guigui-message-retry { color: #ffe0d6; }
+.guigui-message-row.is-own .guigui-message-state.is-sending { color: rgba(255, 255, 255, .78); }
+.guigui-message-row.is-own .guigui-message-state.is-failed { color: #ffd9cf; }
+.guigui-new-conversation-error {
+  margin: 8px 0 0;
+  border-radius: 10px;
+  background: #fdf1ee;
+  color: #b3462f;
+  padding: 8px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.dark .guigui-new-conversation-error { background: #3a1f18; color: #ffb9a8; }
+
+/* ------------------------------------------------------------------
+   Comentários mobile — estabilidade ao abrir o teclado virtual.
+   O Safari iOS faz zoom automático em campos com fonte < 16px; manter
+   os campos de escrita em 16px evita o zoom sem bloquear o zoom do
+   utilizador (a viewport continua a permitir pinch/scale).
+   ------------------------------------------------------------------ */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+@media (max-width: 767px) {
+  .guigui-mobile-input {
+    font-size: 16px;
+    line-height: 1.25;
+  }
+}
+
+/* Apenas iOS/iPadOS: garante 16px nos restantes formulários para que o
+   comportamento não regresse ao tocar noutros campos. */
+@supports (-webkit-touch-callout: none) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}
+
+/* ------------------------------------------------------------------
+   Composição de email externo (hub de mensagens e administração)
+   ------------------------------------------------------------------ */
+.guigui-communication-topbar-actions { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.guigui-communication-external-email {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border: 1px solid #d7e3dd;
+  border-radius: 999px;
+  background: #f6faf8;
+  color: #0b3b37;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+.guigui-communication-external-email:hover { border-color: #0b3b37; background: #eaf4ef; }
+.guigui-communication-external-email:focus-visible { outline: 2px solid #0b3b37; outline-offset: 2px; }
+
+.guigui-email-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(8, 26, 22, .55);
+}
+.guigui-email-card {
+  display: flex;
+  width: min(620px, 100%);
+  max-height: calc(100vh - 32px);
+  flex-direction: column;
+  gap: 14px;
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid #e2ebe6;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 26px 70px rgba(6, 32, 26, .28);
+  color: var(--color-text-strong);
+  font-size: 12px;
+}
+.guigui-email-card.is-inline { width: 100%; max-height: none; box-shadow: none; }
+.guigui-email-head { display: flex; align-items: flex-start; gap: 10px; }
+.guigui-email-mark {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--color-bg-surface);
+  color: #eaf6f0;
+}
+.guigui-email-heading { min-width: 0; flex: 1; }
+.guigui-email-heading h2 { margin: 0; color: var(--color-text-strong); font-size: 15px; font-weight: 800; letter-spacing: -.01em; }
+.guigui-email-heading p { margin: 4px 0 0; color: #58706a; font-size: 11px; line-height: 1.5; }
+.guigui-email-close {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2ebe6;
+  border-radius: 999px;
+  background: #fff;
+  color: #58706a;
+  cursor: pointer;
+}
+.guigui-email-close:hover { border-color: #0b3b37; color: #0b3b37; }
+
+.guigui-email-identity {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 8px 11px;
+  border-radius: 10px;
+  background: #f4f8f6;
+  color: #4c635c;
+  font-size: 10.5px;
+}
+.guigui-email-identity strong { color: var(--color-text-strong); font-weight: 800; }
+
+.guigui-email-form { display: flex; flex-direction: column; gap: 12px; }
+.guigui-email-field { display: flex; flex-direction: column; gap: 5px; }
+.guigui-email-field label { color: var(--color-text-strong); font-size: 11px; font-weight: 800; }
+.guigui-email-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.guigui-email-counter { color: var(--color-text-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.guigui-email-counter.is-near-limit { color: var(--color-gold-700); font-weight: 700; }
+.guigui-email-field input,
+.guigui-email-field textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid #5e827a;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--color-text-strong);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.guigui-email-field textarea { min-height: 150px; resize: vertical; }
+.guigui-email-field input:focus-visible,
+.guigui-email-field textarea:focus-visible { outline: 2px solid #8fc7b1; outline-offset: 1px; border-color: #2b5548; }
+.guigui-email-field input:disabled,
+.guigui-email-field textarea:disabled { background: #f4f8f6; color: var(--color-text-muted); }
+.guigui-email-hint { margin: 0; color: var(--color-text-muted); font-size: 10.5px; line-height: 1.5; }
+
+.guigui-email-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #d7e3dd;
+  border-radius: 12px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.guigui-email-status svg { margin-top: 1px; flex: 0 0 auto; }
+.guigui-email-status strong { display: block; font-size: 11.5px; font-weight: 800; }
+.guigui-email-status p { margin: 2px 0 0; }
+.guigui-email-status.is-accepted { border-color: #bfe3d0; background: #eef7f2; color: #17603f; }
+.guigui-email-status.is-failed,
+.guigui-email-status.is-invalid { border-color: #f3c8bd; background: #fdf1ee; color: #94331c; }
+.guigui-email-status.is-limited { border-color: #f2ddb4; background: #fff6e6; color: #8a5211; }
+.guigui-email-status.is-unconfigured { border-color: #cadcf5; background: #eef3fb; color: #274b7a; }
+.guigui-email-status.is-internal { border-color: #cfe2d9; background: #f2f7f5; color: #2b5548; }
+
+.guigui-email-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.guigui-email-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border: 1px solid var(--color-green-800);
+  border-radius: 11px;
+  background: var(--color-green-800);
+  color: #f2fbf6;
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.guigui-email-submit:hover:not(:disabled) { background: #125245; }
+.guigui-email-submit:disabled { cursor: progress; opacity: .7; }
+.guigui-email-secondary {
+  padding: 9px 14px;
+  border: 1px solid #d7e3dd;
+  border-radius: 11px;
+  background: #fff;
+  color: #0b3b37;
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.guigui-email-secondary:hover { border-color: #0b3b37; background: #f6faf8; }
+
+@media (max-width: 640px) {
+  .guigui-communication-external-email span { display: none; }
+  .guigui-communication-external-email { padding: 7px; }
+  .guigui-email-card { padding: 16px; }
+}
+
+.dark .guigui-communication-external-email { border-color: #285849; background: var(--color-bg-subtle); color: #bfe8d5; }
+.dark .guigui-communication-external-email:hover { border-color: var(--color-green-300); background: var(--color-bg-subtle); }
+.dark .guigui-email-card { border-color: #285849; background: var(--color-bg-subtle); color: var(--color-green-50); }
+.dark .guigui-email-heading h2,
+.dark .guigui-email-field label,
+.dark .guigui-email-identity strong { color: var(--color-green-50); }
+.dark .guigui-email-heading p,
+.dark .guigui-email-identity,
+.dark .guigui-email-hint,
+.dark .guigui-email-counter { color: #a9c7bc; }
+.dark .guigui-email-identity { background: var(--color-bg-subtle); }
+.dark .guigui-email-close { border-color: #285849; background: var(--color-bg-subtle); color: #a9c7bc; }
+.dark .guigui-email-field input,
+.dark .guigui-email-field textarea { border-color: #285849; background: #0a1c18; color: var(--color-green-50); }
+.dark .guigui-email-field input:disabled,
+.dark .guigui-email-field textarea:disabled { background: var(--color-bg-subtle); color: #8aa79c; }
+.dark .guigui-email-status.is-internal { border-color: #285849; background: var(--color-bg-subtle); color: var(--color-green-200); }
+.dark .guigui-email-secondary { border-color: #285849; background: var(--color-bg-subtle); color: #bfe8d5; }
+
+/* Linhas de tabela: o reset escuro anula o hover claro; repõe um destaque escuro.
+   Fica dentro de @layer utilities para vencer o `background` importante do reset. */
+@layer utilities {
+  html.dark .guigui-light-dashboard tbody tr:hover {
+    background-color: var(--color-bg-subtle-dark) !important;
+  }
+  /* O reset escuro do dashboard anula o fundo; mantém o botão verde legível. */
+  html.dark .guigui-light-dashboard .guigui-email-submit {
+    background-color: var(--color-green-800) !important;
+    border-color: var(--color-green-800) !important;
+    color: #f2fbf6 !important;
+  }
+  html.dark .guigui-light-dashboard .guigui-email-submit:hover:not(:disabled) {
+    background-color: #125245 !important;
+  }
+}

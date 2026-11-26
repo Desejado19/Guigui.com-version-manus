@@ -1,0 +1,6076 @@
+import React, { useEffect, useState } from 'react';
+import { usePostEngagement } from './PostEngagementProvider';
+import {
+  LayoutDashboard,
+  FileText,
+  Tag,
+  CreditCard,
+  Sparkles,
+  Eye,
+  MessageCircle,
+  Phone,
+  ArrowUpRight,
+  ShieldCheck,
+  PlusCircle,
+  CheckCircle2,
+  XCircle,
+  Percent,
+  Smartphone,
+  Check,
+  Award,
+  MessageSquare,
+  Flag,
+  Table,
+  Edit2,
+  Save,
+  Ticket,
+  DollarSign,
+  History,
+  RefreshCw,
+  Sliders,
+  Download,
+  Layers,
+  Settings,
+  QrCode,
+  Search,
+  Zap,
+  CheckCircle,
+  AlertCircle,
+  Package,
+  Loader2,
+  Clock,
+  X,
+  BarChart3,
+  TrendingUp,
+  PieChart as PieChartIcon,
+  Calendar,
+  ShoppingBag,
+  Receipt,
+  Filter,
+  Printer,
+  FileSpreadsheet,
+  User,
+  Copy,
+  ExternalLink,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+  CheckCheck,
+  FileDown,
+  Crown,
+  Star,
+  Video,
+  Image as ImageIcon,
+  Play,
+  Plus,
+  Building2,
+  Bell,
+  Users,
+  Megaphone,
+  Palette,
+  Globe,
+  KeyRound,
+  LifeBuoy,
+} from 'lucide-react';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  CartesianGrid,
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts';
+import { QRCodeDisplay } from './QRCodeDisplay';
+import { ClientBusinessProfile } from './client/ClientBusinessProfile';
+import { ClientEventsManagement } from './client/ClientEventsManagement';
+import { SoldTicketsPanel } from './SoldTicketsPanel';
+import { AdminPagination } from './admin/AdminPagination';
+import { ClientNotificationsHub } from './client/ClientNotificationsHub';
+import { ClientSettingsHub } from './client/ClientSettingsHub';
+import { ClientExportHub } from './client/ClientExportHub';
+import { ClientSecurityHub } from './client/ClientSecurityHub';
+import { ClientReportsHub } from './client/ClientReportsHub';
+import { TeamAccessHub } from './client/TeamAccessHub';
+import { CommunicationHub } from './CommunicationHub';
+import {
+  Business,
+  BusinessCategory,
+  BusinessPost,
+  Promotion,
+  Language,
+  ModerationResult,
+  CategoryGroup,
+  BusinessModelConfig,
+  PriceAuditLogItem,
+  SubscriptionTier,
+  PurchaseOrder,
+  TeamModuleAccess,
+  EventItem,
+  AppNotification,
+  Conversation,
+  ConversationMessage,
+  SupportRequest,
+  SupportCategory,
+  UserProfile,
+  NotificationPreferences,
+  SubscriptionPlan,
+  MonetizationCatalog,
+  MonetizationWallet,
+  ContentService,
+  BusinessTeamMember,
+  BusinessTeamAuditEntry,
+  BusinessTeamRole,
+  MarketingCampaign,
+  MarketingAudienceSegment,
+  MarketingLibraryAsset,
+  Story,
+} from '../types';
+import { StoriesManagementHub } from './StoriesManagementHub';
+import { getLanguageShortLabel, getNextLanguage, getTranslation } from '../utils/i18n';
+import { QUALITATIVE_SCORE_LABELS, calculateBusinessRating, getQualitativeScoreLabel } from '../utils/reviews';
+import { usePersistentState } from '../utils/persistentState';
+import { DEFAULT_SUBSCRIPTION_PLANS, getAnnualPlanPrice, getBusinessPlan, getBusinessUsage, getPlanById, limitLabel, normaliseSubscriptionPlans } from '../data/subscriptionCatalog';
+import { DEFAULT_MONETIZATION_CATALOG, getCommercialProduct, getPriceRule, normaliseMonetizationCatalog, resolveProductPrice } from '../data/monetizationCatalog';
+import { addSubscriptionPeriod, getSubscriptionAccessState, getSubscriptionRemainingMs, getSubscriptionTierLabel, shouldBlockBusinessMutation } from '../utils/subscriptions';
+import {
+  BUSINESS_ROLE_PERMISSIONS,
+  BUSINESS_TAB_ACCESS_MODULE,
+  BUSINESS_TAB_PERMISSIONS,
+  effectiveBusinessAccess,
+  hasBusinessPermission,
+} from '../utils/businessPermissions';
+import { hasModuleAccess } from '../config/teamAccess';
+import { usePageEntryScroll } from '../utils/navigationBehavior';
+import { usePaginatedList } from '../hooks/usePaginatedList';
+import { Badge, Button, Card, EmptyState, IconButton, Panel, PanelHeader, StatCard } from './ui';
+import { BottomNav } from './navigation/BottomNav';
+import { ChartFrame } from './charts/ChartFrame';
+import { ChartTooltip } from './charts/ChartTooltip';
+import { chartColors } from './charts/chartTheme';
+import type { ScheduledItem } from '../types';
+import { BUSINESS_NAVIGATION } from '../config/navigation';
+
+const readLocalMediaFile = (file: File): Promise<string> => new Promise((resolve, reject) => {
+  if (!/^image\/(jpeg|png|webp|gif)|^video\/(mp4|webm|quicktime)$/.test(file.type)) {
+    reject(new Error('Formato não suportado. Use imagem JPG/PNG/WebP/GIF ou vídeo MP4/WebM.'));
+    return;
+  }
+  if (file.size > 25 * 1024 * 1024) {
+    reject(new Error('O ficheiro excede o limite de 25 MB da versão de demonstração.'));
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result || ''));
+  reader.onerror = () => reject(new Error('Não foi possível ler o ficheiro local.'));
+  reader.readAsDataURL(file);
+});
+
+export type BusinessDashboardTab =
+  | 'overview'
+  | 'stories'
+  | 'my_business'
+  | 'posts'
+  | 'promotions'
+  | 'events'
+  | 'tickets'
+  | 'analytics'
+  | 'billing'
+  | 'pricing'
+  | 'team'
+  | 'notifications'
+  | 'communications'
+  | 'clients'
+  | 'marketing'
+  | 'support'
+  | 'security'
+  | 'reports'
+  | 'settings'
+  | 'reviews'
+  | 'order_history'
+  | 'redemptions'
+  | 'marketing_campaigns'
+  | 'marketing_calendar';
+
+// O módulo Marketing foi retirado do painel da empresa. Estes separadores
+// continuam a existir apenas para compatibilidade de tipos/estado antigo e
+// são sempre redirecionados para a Visão Geral.
+const RETIRED_MARKETING_TABS = new Set<BusinessDashboardTab>([
+  'marketing',
+  'marketing_campaigns',
+  'marketing_calendar',
+  'posts',
+  'promotions',
+]);
+
+const MARKETING_TABS = [
+  { id: 'overview', label: 'Visão geral', icon: LayoutDashboard },
+  { id: 'campaigns', label: 'Campanhas', icon: Megaphone },
+  { id: 'content', label: 'Conteúdos', icon: FileText },
+  { id: 'audience', label: 'Público', icon: Users },
+  { id: 'calendar', label: 'Calendário', icon: Calendar },
+  { id: 'library', label: 'Biblioteca', icon: Layers },
+  { id: 'budget', label: 'Orçamento', icon: DollarSign },
+  { id: 'reports', label: 'Relatórios', icon: BarChart3 },
+] as const;
+
+const MARKETING_CHANNEL_LABELS: Record<MarketingCampaign['channels'][number], string> = {
+  guigui: 'Guigui',
+  social: 'Redes sociais',
+  sms: 'SMS',
+  email: 'Email',
+  banner: 'Banner',
+};
+
+const MARKETING_OBJECTIVE_LABELS: Record<MarketingCampaign['objective'], string> = {
+  awareness: 'Notoriedade',
+  engagement: 'Envolvimento',
+  traffic: 'Tráfego',
+  conversions: 'Conversões',
+  sales: 'Vendas',
+};
+
+const MARKETING_STATUS_LABELS: Record<MarketingCampaign['status'], string> = {
+  draft: 'Rascunho',
+  scheduled: 'Agendada',
+  active: 'Ativa',
+  paused: 'Pausada',
+  ended: 'Encerrada',
+  archived: 'Arquivada',
+};
+
+const MARKETING_STATUS_VARIANTS = {
+  draft: 'neutral',
+  scheduled: 'info',
+  active: 'success',
+  paused: 'warning',
+  ended: 'neutral',
+  archived: 'neutral',
+} as const;
+
+const MARKETING_CAMPAIGN_FILTERS = [
+  { id: 'all', label: 'Todas' },
+  { id: 'draft', label: 'Rascunhos' },
+  { id: 'scheduled', label: 'Agendadas' },
+  { id: 'active', label: 'Ativas' },
+  { id: 'paused', label: 'Pausadas' },
+  { id: 'ended', label: 'Encerradas' },
+] as const;
+
+const MARKETING_ASSET_LABELS: Record<MarketingLibraryAsset['type'], string> = {
+  image: 'Imagens',
+  video: 'Vídeos',
+  banner: 'Banners',
+  logo: 'Logótipos',
+  document: 'Documentos',
+};
+
+interface BusinessDashboardProps {
+  business: Business;
+  currentUser: UserProfile;
+  businesses: Business[];
+  categories: BusinessCategory[];
+  followerCount?: number;
+  audienceReach?: number;
+  initialTab?: BusinessDashboardTab;
+  currentLang: Language;
+  currentThemeMode?: 'light' | 'dark' | 'auto';
+  onLanguageChange?: (lang: Language) => void;
+  onThemeModeChange?: (mode: 'light' | 'dark' | 'auto') => void;
+  onAddPost: (businessId: string, post: BusinessPost) => void;
+  onAddPromotion: (businessId: string, promo: Promotion) => void;
+  onReplyReview?: (businessId: string, reviewId: string, replyText: string) => void;
+  onFlagReview?: (businessId: string, reviewId: string, reason: string) => void;
+  purchaseOrders?: PurchaseOrder[];
+  events?: EventItem[];
+  onValidatePurchaseOrder?: (orderId: string, redeemedBy: string) => void;
+  onUpdateBusiness?: (updatedBiz: Business) => void;
+  onSaveBusinessProfile?: (updatedBiz: Business) => Promise<void>;
+  onStoryPublished?: (story: Story) => void;
+  onEventSubmitted?: (event: EventItem) => void;
+  onEventCancelled?: (event: EventItem) => void;
+  notifications?: AppNotification[];
+  onMarkNotificationAsRead?: (id: string) => void;
+  onMarkAllNotificationsAsRead?: () => void;
+  onClearNotifications?: () => void;
+  onNavigateNotificationTab?: (tab: string) => void;
+  onOpenNotification?: (notification: AppNotification) => void;
+  notificationPreferences?: NotificationPreferences;
+  onNotificationPreferencesChange?: (next: NotificationPreferences) => void;
+  conversations: Conversation[];
+  conversationMessages: ConversationMessage[];
+  supportRequests: SupportRequest[];
+  onCreateConversation: (businessId: string, subject: string, text: string) => void;
+  onSendMessage: (conversationId: string, text: string) => void;
+  onCreateSupport: (subject: string, description: string, businessId?: string, category?: SupportCategory) => void;
+  onReplySupport: (requestId: string, text: string) => void;
+  onMarkConversationRead: (conversationId: string) => void;
+  focusConversationId?: string | null;
+  focusSupportId?: string | null;
+  onActiveTabChange?: (tab: BusinessDashboardTab) => void;
+  onLogout?: () => void;
+  sidebarCollapsed?: boolean;
+  onSidebarCollapsedChange?: (collapsed: boolean) => void;
+}
+
+export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
+  business,
+  currentUser,
+  businesses,
+  categories,
+  followerCount = 0,
+  audienceReach = 0,
+  initialTab = 'overview',
+  currentLang,
+  currentThemeMode = 'auto',
+  onLanguageChange,
+  onThemeModeChange,
+  onAddPost,
+  onAddPromotion,
+  onReplyReview,
+  onFlagReview,
+  purchaseOrders = [],
+  events = [],
+  onValidatePurchaseOrder,
+  onUpdateBusiness,
+  onSaveBusinessProfile,
+  onStoryPublished,
+  onEventSubmitted,
+  onEventCancelled,
+  notifications = [],
+  onMarkNotificationAsRead,
+  onMarkAllNotificationsAsRead,
+  onClearNotifications,
+  onNavigateNotificationTab,
+  onOpenNotification,
+  notificationPreferences,
+  onNotificationPreferencesChange,
+  conversations,
+  conversationMessages,
+  supportRequests,
+  onCreateConversation,
+  onSendMessage,
+  onCreateSupport,
+  onReplySupport,
+  onMarkConversationRead,
+  focusConversationId,
+  focusSupportId,
+  onActiveTabChange,
+  onLogout,
+  sidebarCollapsed: controlledSidebarCollapsed,
+  onSidebarCollapsedChange,
+}) => {
+  const t = (key: string, variables?: Record<string, string | number>) => getTranslation(currentLang, key, variables);
+  const paymentStatusMessage = (transaction: { status?: string; providerMode?: string }) => {
+    if (transaction.status === 'confirmed_api') {
+      return transaction.providerMode === 'simulated' ? t('paymentSimulationConfirmed') : t('paymentConfirmed');
+    }
+    if (transaction.status === 'failed') {
+      return transaction.providerMode === 'simulated' ? t('paymentSimulationFailed') : t('paymentFailed');
+    }
+    if (transaction.status === 'confirmed_manual' || transaction.status === 'reconciled') {
+      return t('paymentManualConfirmationUnsupported');
+    }
+    return transaction.providerMode === 'simulated' ? t('paymentSimulationPending') : t('paymentConfirmationPending');
+  };
+
+  const [activeTab, setActiveTab] = useState<BusinessDashboardTab>('overview');
+const [billingSection, setBillingSection] = usePersistentState<'plans' | 'services' | 'history'>('guigui_billing_section', 'plans');
+  const [selectedBusinessPost, setSelectedBusinessPost] = useState<BusinessPost | null>(null);
+  const selectedPostEngagement = usePostEngagement(selectedBusinessPost?.id ?? null);
+  const [marketingSection, setMarketingSection] = useState<
+    'overview' | 'campaigns' | 'content' | 'audience' | 'calendar' | 'library' | 'budget' | 'reports'
+  >('campaigns');
+  const [marketingCampaigns, setMarketingCampaigns] = usePersistentState<MarketingCampaign[]>(`guigui_marketing_campaigns_${business.id}`, []);
+  const [marketingSegments, setMarketingSegments] = usePersistentState<MarketingAudienceSegment[]>(`guigui_marketing_segments_${business.id}`, []);
+  const [campaignName, setCampaignName] = useState('');
+  const [campaignObjective, setCampaignObjective] = useState<MarketingCampaign['objective']>('awareness');
+  const [campaignBudget, setCampaignBudget] = useState('');
+  const [campaignChannels, setCampaignChannels] = useState<MarketingCampaign['channels']>(['guigui']);
+  const [campaignAudienceId, setCampaignAudienceId] = useState('');
+  const [campaignContentIds, setCampaignContentIds] = useState<string[]>([]);
+  const [campaignStartsAt, setCampaignStartsAt] = useState('');
+  const [campaignEndsAt, setCampaignEndsAt] = useState('');
+  const [campaignFilter, setCampaignFilter] = useState<'all' | MarketingCampaign['status']>('all');
+  const [contentFilter, setContentFilter] = useState<'all' | 'posts' | 'promotions' | 'scheduled'>('all');
+  const [assetFilter, setAssetFilter] = useState<'all' | MarketingLibraryAsset['type']>('all');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  usePageEntryScroll(activeTab);
+  useEffect(() => {
+    onActiveTabChange?.(activeTab);
+  }, [activeTab, onActiveTabChange]);
+  React.useEffect(() => {
+    setOrderItemTypeFilter(activeTab === 'tickets' ? 'ticket' : 'all');
+  }, [activeTab]);
+  const [teamMembers, setTeamMembers] = usePersistentState<BusinessTeamMember[]>(`guigui_business_team_${business.id}`, []);
+  const [teamAudit, setTeamAudit] = usePersistentState<BusinessTeamAuditEntry[]>(`guigui_business_team_audit_${business.id}`, []);
+  const [teamName, setTeamName] = useState('');
+  const [teamEmail, setTeamEmail] = useState('');
+  const [teamRole, setTeamRole] = useState<BusinessTeamRole>('editor');
+  const [teamNotice, setTeamNotice] = useState<string | null>(null);
+  // Acesso efectivo vindos do servidor (fonte de verdade); o login também já
+  // transporta `teamAccess`, usado como valor inicial antes da resposta.
+  const [liveAccess, setLiveAccess] = useState<{ loaded: boolean; full: boolean; access: TeamModuleAccess | null; status: string }>({
+    loaded: false,
+    full: true,
+    access: null,
+    status: 'active',
+  });
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch('/api/me/access', { credentials: 'include', cache: 'no-store' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { scope?: string; fullAccess?: boolean; access?: TeamModuleAccess | null; status?: string } | null) => {
+        if (cancelled || !payload || payload.scope !== 'business') return;
+        setLiveAccess({ loaded: true, full: payload.fullAccess === true, access: payload.access || {}, status: payload.status || 'active' });
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [business.id, currentUser.id]);
+
+  const activeAccess: TeamModuleAccess | null = liveAccess.loaded
+    ? (liveAccess.full ? null : liveAccess.access)
+    : effectiveBusinessAccess(currentUser, business.id, teamMembers);
+  const can = (permission: keyof BusinessTeamMember['permissions']) => hasBusinessPermission(currentUser, business.id, teamMembers, permission);
+  const canTab = (tab: BusinessDashboardTab) => {
+    const moduleId = BUSINESS_TAB_ACCESS_MODULE[tab];
+    if (!moduleId) return true;
+    if (activeAccess === null) return true;
+    return hasModuleAccess(activeAccess, moduleId);
+  };
+  const denyPermission = (permission: keyof BusinessTeamMember['permissions']) => {
+    if (can(permission)) return true;
+    setTeamNotice('Não tem permissão para executar esta operação.');
+    return false;
+  };
+  // Item destacado na barra inferior móvel (o marketing agrega os separadores
+  // de conteúdos, campanhas e calendário).
+  const businessBottomNavActive = (() => {
+    const tab = String(activeTab);
+    if (['overview', 'my_business', 'communications', 'settings'].includes(tab)) return tab;
+    return '';
+  })();
+  const [internalSidebarCollapsed, setInternalSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.localStorage.getItem('guigui-business-sidebar-collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const sidebarCollapsed = controlledSidebarCollapsed ?? internalSidebarCollapsed;
+  const setSidebarCollapsed = (next: boolean | ((value: boolean) => boolean)) => {
+    const value = typeof next === 'function' ? next(sidebarCollapsed) : next;
+    if (controlledSidebarCollapsed === undefined) setInternalSidebarCollapsed(value);
+    onSidebarCollapsedChange?.(value);
+  };
+
+  React.useEffect(() => {
+    setActiveTab(canTab(initialTab as BusinessDashboardTab) ? initialTab : 'overview');
+  }, [initialTab, teamMembers, currentUser.id, business.id]);
+  React.useEffect(() => {
+    if (!canTab(activeTab as BusinessDashboardTab)) setActiveTab('overview');
+  }, [activeTab, teamMembers, currentUser.id, business.id]);
+
+  React.useEffect(() => {
+    if (RETIRED_MARKETING_TABS.has(activeTab)) setActiveTab('overview');
+  }, [activeTab]);
+
+  // O módulo autónomo Exportação foi integrado em Relatórios. Estados
+  // guardados de versões anteriores passam a abrir esse módulo.
+  React.useEffect(() => {
+    if (String(activeTab) === 'export') setActiveTab('reports');
+  }, [activeTab]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('guigui-business-sidebar-collapsed', String(sidebarCollapsed));
+    } catch {
+      // Ignore storage issues in restricted contexts.
+    }
+  }, [sidebarCollapsed]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('guigui-billing-section', String(billingSection));
+    } catch {
+      // Ignore storage issues in restricted contexts.
+    }
+  }, [billingSection]);
+  useEffect(() => {
+    onSidebarCollapsedChange?.(sidebarCollapsed);
+  }, [onSidebarCollapsedChange, sidebarCollapsed]);
+
+  const businessNavigationGroups: Array<{ heading: string; items: Array<{ label: string; tab: typeof activeTab; icon: React.ComponentType<{ className?: string }>; help: string; count?: number }> }> = [
+    {
+      heading: t('businessNavSummary'),
+      items: [
+        { label: t('businessNavOverview'), tab: 'overview', icon: LayoutDashboard, help: t('businessNavOverviewHelp') },
+        { label: t('businessNavMyBusiness'), tab: 'my_business', icon: Building2, help: t('businessNavMyBusinessHelp') },
+        { label: 'Stories', tab: 'stories', icon: ImageIcon, help: 'Publicar, arquivar e gerir stories' },
+      ],
+    },
+    {
+      heading: t('businessNavContent'),
+      items: [
+        { label: t('businessNavEvents'), tab: 'events', icon: Calendar, help: t('businessNavEventsHelp') },
+        { label: t('businessNavReviews'), tab: 'reviews', icon: Star, help: t('businessNavReviewsHelp') },
+      ],
+    },
+    {
+      heading: t('businessNavSales'),
+      items: [
+        { label: t('businessNavTickets'), tab: 'tickets', icon: Ticket, help: t('businessNavTicketsHelp') },
+        { label: t('business.orderHistory'), tab: 'order_history', icon: History, help: t('business.orderHistory') },
+        { label: t('businessNavRedemptions'), tab: 'redemptions', icon: QrCode, help: t('businessNavRedemptionsHelp') },
+        { label: t('businessNavClients'), tab: 'clients', icon: Users, help: t('businessNavClientsHelp') },
+        { label: t('businessNavBilling'), tab: 'billing', icon: CreditCard, help: t('businessNavBillingHelp') },
+        { label: t('business.teamPermissions'), tab: 'team', icon: Users, help: t('business.teamPermissions') },
+      ],
+    },
+    {
+      heading: t('businessNavSupport'),
+      items: [
+        { label: t('support'), tab: 'support', icon: LifeBuoy, help: t('businessNavSupportHelp') },
+        { label: t('businessNavReports'), tab: 'reports', icon: BarChart3, help: t('businessNavReportsHelp') },
+        { label: t('businessNavSecurity'), tab: 'security', icon: ShieldCheck, help: t('businessNavSecurityHelp') },
+        { label: t('businessNavAccountSettings'), tab: 'settings', icon: KeyRound, help: t('businessNavAccountSettingsHelp') },
+      ],
+    },
+  ];
+
+  const visibleBusinessNavigationGroups = businessNavigationGroups
+    .map((group) => ({ ...group, items: group.items.filter((item) => canTab(item.tab)) }))
+    .filter((group) => group.items.length > 0);
+  const activeTabRetired = RETIRED_MARKETING_TABS.has(activeTab);
+  const activeTabAllowed = canTab(activeTab) && !activeTabRetired;
+  const currentBusinessSection = businessNavigationGroups.flatMap((group) => group.items).find((item) => item.tab === activeTab)?.label
+    || BUSINESS_NAVIGATION[0].items[0].label;
+  const isMarketingTab = !RETIRED_MARKETING_TABS.has(activeTab) && (activeTab === 'marketing' || activeTab === 'marketing_campaigns' || activeTab === 'posts' || activeTab === 'promotions' || activeTab === 'marketing_calendar');
+  const businessEvents = events.filter((event) => event.businessId === business.id);
+  const marketingContentItems = [
+    ...business.posts.map((post) => ({ id: post.id, title: post.title, kind: 'post' as const, typeLabel: t('business.Publicacao'), status: String(post.status) })),
+    ...business.promotions.map((promotion) => ({ id: promotion.id, title: promotion.title, kind: 'promotion' as const, typeLabel: t('business.Promocao'), status: String(promotion.status || (promotion.isActive ? 'active' : 'draft')) })),
+  ].filter((item) => contentFilter === 'all'
+    || (contentFilter === 'posts' && item.kind === 'post')
+    || (contentFilter === 'promotions' && item.kind === 'promotion')
+    || (contentFilter === 'scheduled' && ['scheduled', 'publishing'].includes(item.status)));
+  const overviewEngagementData = [
+    { name: t('business.Visualizacoes'), value: business.metrics.views, fill: '#2563eb' },
+    { name: 'WhatsApp', value: business.metrics.whatsappClicks, fill: '#059669' },
+    { name: t('business.Chamadas'), value: business.metrics.phoneClicks, fill: '#d97706' },
+    { name: t('business.Mapa'), value: business.metrics.directionsClicks, fill: '#7c3aed' },
+  ];
+  const overviewActivityData = [
+    { name: t('posts'), total: business.posts.length },
+    { name: t('promotions'), total: business.promotions.length },
+    { name: t('businessNavEvents'), total: businessEvents.length },
+    { name: t('monetization.tabRequests'), total: purchaseOrders.filter((order) => order.businessId === business.id).length },
+  ];
+  const themeLabel = currentThemeMode === 'dark' ? t('business.Escuro') : currentThemeMode === 'light' ? t('business.Claro') : t('business.Auto');
+  const nextThemeMode: 'light' | 'dark' | 'auto' = currentThemeMode === 'dark' ? 'light' : currentThemeMode === 'light' ? 'auto' : 'dark';
+  const languageLabel = getLanguageShortLabel(currentLang);
+  const nextLanguage: Language = getNextLanguage(currentLang);
+
+  const [analyticsTimeframe, setAnalyticsTimeframe] = useState<'daily' | 'weekly'>('daily');
+  const [analyticsMetric, setAnalyticsMetric] = useState<'revenue' | 'units'>('revenue');
+  const [analyticsSubSection, setAnalyticsSubSection] = useState<'all' | 'views_clicks' | 'promotions' | 'sales'>('all');
+  const [replyingToReviewId, setReplyingToReviewId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+
+  // Redemption & Validation State
+  const [redemptionCodeInput, setRedemptionCodeInput] = useState('');
+  const [redemptionFilter, setRedemptionFilter] = useState('');
+  const [redemptionMessage, setRedemptionMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [selectedOrderForQr, setSelectedOrderForQr] = useState<PurchaseOrder | null>(null);
+
+  // New Order History Sub-Section Filters & States
+  const [orderDateFilter, setOrderDateFilter] = useState<'all' | 'today' | '7days' | '30days' | 'custom'>('all');
+  const [orderDateFrom, setOrderDateFrom] = useState('');
+  const [orderDateTo, setOrderDateTo] = useState('');
+  const [orderItemTypeFilter, setOrderItemTypeFilter] = useState<'all' | 'product' | 'promotion' | 'ticket' | 'service'>('all');
+  const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | 'pending' | 'redeemed' | 'cancelled'>('all');
+  const [orderPaymentMethodFilter, setOrderPaymentMethodFilter] = useState<'all' | 'orange_money' | 'telecel' | 'cash'>('all');
+  const [orderMinAmount, setOrderMinAmount] = useState<number | ''>('');
+  const [orderMaxAmount, setOrderMaxAmount] = useState<number | ''>('');
+  const [orderValuePreset, setOrderValuePreset] = useState<'all' | 'high_val' | 'very_high' | 'top_tier' | 'under_10k' | 'custom'>('all');
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
+  const [orderSortBy, setOrderSortBy] = useState<'date_desc' | 'date_asc' | 'price_desc' | 'price_asc'>('date_desc');
+  const [selectedOrderDetails, setSelectedOrderDetails] = useState<PurchaseOrder | null>(null);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  // Instant Automated Subscription Upgrade State
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [targetUpgradeTier, setTargetUpgradeTier] = useState<SubscriptionTier>('professional');
+  const [targetUpgradePlanId, setTargetUpgradePlanId] = useState('plan-professional');
+  const [upgradePaymentPhone, setUpgradePaymentPhone] = useState('955001122');
+  const [isUpgrading, setIsUpgrading] = useState(false);
+
+  // Filter orders for this specific business
+  const myBusinessOrders = purchaseOrders.filter((ord) => ord.businessId === business.id);
+
+  // Filtered order history calculation
+  const filteredOrderHistory = myBusinessOrders.filter((order) => {
+    // 1. Date Filter
+    if (orderDateFilter === 'today') {
+      const orderDate = new Date(order.purchasedAt).toDateString();
+      const today = new Date().toDateString();
+      if (orderDate !== today) return false;
+    } else if (orderDateFilter === '7days') {
+      const orderTime = new Date(order.purchasedAt).getTime();
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      if (orderTime < sevenDaysAgo) return false;
+    } else if (orderDateFilter === '30days') {
+      const orderTime = new Date(order.purchasedAt).getTime();
+      const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      if (orderTime < thirtyDaysAgo) return false;
+    } else if (orderDateFilter === 'custom') {
+      const orderTime = new Date(order.purchasedAt).getTime();
+      if (orderDateFrom) {
+        const fromTime = new Date(orderDateFrom).getTime();
+        if (orderTime < fromTime) return false;
+      }
+      if (orderDateTo) {
+        const toTime = new Date(orderDateTo).setHours(23, 59, 59, 999);
+        if (orderTime > toTime) return false;
+      }
+    }
+
+    // 2. Item Type Filter
+    if (orderItemTypeFilter !== 'all' && order.itemType !== orderItemTypeFilter) {
+      return false;
+    }
+
+    // 3. Status Filter
+    if (orderStatusFilter !== 'all' && order.status !== orderStatusFilter) {
+      return false;
+    }
+
+    // 4. Payment Method Filter
+    if (orderPaymentMethodFilter !== 'all') {
+      if (orderPaymentMethodFilter === 'cash' && !['cash', 'no_local', 'local'].includes(order.paymentMethod.toLowerCase())) {
+        return false;
+      } else if (orderPaymentMethodFilter !== 'cash' && !order.paymentMethod.toLowerCase().includes(orderPaymentMethodFilter)) {
+        return false;
+      }
+    }
+
+    // 5. Price / Value Range Filter (Min & Max XOF)
+    if (orderMinAmount !== '' && order.totalPriceXOF < Number(orderMinAmount)) {
+      return false;
+    }
+    if (orderMaxAmount !== '' && order.totalPriceXOF > Number(orderMaxAmount)) {
+      return false;
+    }
+
+    // 6. Search Text Filter
+    if (orderSearchQuery.trim()) {
+      const q = orderSearchQuery.toLowerCase().trim();
+      const matchCode = order.orderCode?.toLowerCase().includes(q);
+      const matchCustomer = order.customerName?.toLowerCase().includes(q);
+      const matchPhone = order.customerPhone?.toLowerCase().includes(q);
+      const matchItem = order.itemTitle?.toLowerCase().includes(q);
+      const matchToken = order.qrToken?.toLowerCase().includes(q);
+      if (!matchCode && !matchCustomer && !matchPhone && !matchItem && !matchToken) {
+        return false;
+      }
+    }
+
+    return true;
+  }).sort((a, b) => {
+    if (orderSortBy === 'date_asc') return new Date(a.purchasedAt).getTime() - new Date(b.purchasedAt).getTime();
+    if (orderSortBy === 'price_desc') return b.totalPriceXOF - a.totalPriceXOF;
+    if (orderSortBy === 'price_asc') return a.totalPriceXOF - b.totalPriceXOF;
+    return new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime();
+  });
+
+  const orderPagination = usePaginatedList(filteredOrderHistory, {
+    initialPageSize: 20,
+    pageSizeOptions: [20],
+    persist: false,
+    resetKey: [
+      activeTab,
+      orderDateFilter,
+      orderDateFrom,
+      orderDateTo,
+      orderItemTypeFilter,
+      orderStatusFilter,
+      orderPaymentMethodFilter,
+      orderMinAmount,
+      orderMaxAmount,
+      orderSearchQuery,
+      orderSortBy,
+    ].join('|'),
+  });
+
+  // KPI calculations for Order History
+  const totalOrdersAmount = filteredOrderHistory.reduce(
+    (acc, o) => acc + (o.status !== 'cancelled' ? o.totalPriceXOF : 0),
+    0
+  );
+  const countRedeemed = filteredOrderHistory.filter((o) => o.status === 'redeemed').length;
+  const countPending = filteredOrderHistory.filter((o) => o.status === 'pending').length;
+  const countCancelled = filteredOrderHistory.filter((o) => o.status === 'cancelled').length;
+  const countHighValue = filteredOrderHistory.filter((o) => o.totalPriceXOF >= 20000).length;
+  const averageTicketValue = filteredOrderHistory.length > 0
+    ? Math.round(totalOrdersAmount / filteredOrderHistory.length)
+    : 0;
+
+  const handleApplyValuePreset = (preset: 'all' | 'high_val' | 'very_high' | 'top_tier' | 'under_10k') => {
+    setOrderValuePreset(preset);
+    if (preset === 'all') {
+      setOrderMinAmount('');
+      setOrderMaxAmount('');
+    } else if (preset === 'high_val') {
+      setOrderMinAmount(20000);
+      setOrderMaxAmount('');
+    } else if (preset === 'very_high') {
+      setOrderMinAmount(50000);
+      setOrderMaxAmount('');
+    } else if (preset === 'top_tier') {
+      setOrderMinAmount(100000);
+      setOrderMaxAmount('');
+    } else if (preset === 'under_10k') {
+      setOrderMinAmount('');
+      setOrderMaxAmount(10000);
+    }
+  };
+
+  const handleResetOrderFilters = () => {
+    setOrderDateFilter('all');
+    setOrderDateFrom('');
+    setOrderDateTo('');
+    setOrderItemTypeFilter(activeTab === 'tickets' ? 'ticket' : 'all');
+    setOrderStatusFilter('all');
+    setOrderPaymentMethodFilter('all');
+    setOrderMinAmount('');
+    setOrderMaxAmount('');
+    setOrderValuePreset('all');
+    setOrderSearchQuery('');
+    setOrderSortBy('date_desc');
+  };
+
+  const handleCopyCode = (code: string) => {
+    navigator.clipboard?.writeText(code);
+    setCopiedCode(code);
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const handleExportOrdersCsv = () => {
+    if (filteredOrderHistory.length === 0) {
+      alert('Não há pedidos correspondentes aos filtros selecionados para exportar.');
+      return;
+    }
+
+    const headers = [
+      'Codigo_Pedido',
+      'Data_Compra',
+      'Cliente_Nome',
+      'Cliente_Telefone',
+      'Tipo_Item',
+      'Titulo_Item',
+      'Quantidade',
+      'Preco_Total_XOF',
+      'Metodo_Pagamento',
+      'Status_Pedido',
+      'QR_Token',
+      'Data_Levantamento',
+    ];
+
+    const rows = filteredOrderHistory.map((o) => [
+      `"${o.orderCode}"`,
+      `"${new Date(o.purchasedAt).toLocaleString('pt-PT')}"`,
+      `"${o.customerName.replace(/"/g, '""')}"`,
+      `"${o.customerPhone}"`,
+      `"${o.itemType}"`,
+      `"${o.itemTitle.replace(/"/g, '""')}"`,
+      o.quantity,
+      o.totalPriceXOF,
+      `"${o.paymentMethod}"`,
+      `"${o.status}"`,
+      `"${o.qrToken}"`,
+      `"${o.redeemedAt ? new Date(o.redeemedAt).toLocaleString('pt-PT') : 'N/A'}"`,
+    ]);
+
+    // Blob UTF-8 com BOM: acentos e cedilha abrem corretamente no Excel e
+    // evitam o limite de tamanho dos URLs `data:`.
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `pedidos_${business.name.toLowerCase().replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleValidateCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!denyPermission('tickets')) return;
+    setRedemptionMessage(null);
+    const query = redemptionCodeInput.trim();
+    if (!query) return;
+
+    const found = myBusinessOrders.find(
+      (o) =>
+        o.orderCode?.toUpperCase() === query.toUpperCase() ||
+        o.qrToken?.toUpperCase() === query.toUpperCase() ||
+        o.id.toUpperCase() === query.toUpperCase()
+    );
+
+    if (!found) {
+      setRedemptionMessage({
+        text: t('business.searchEmpty', { query }),
+        type: 'error',
+      });
+      return;
+    }
+
+    if (found.itemType !== 'ticket' || !found.eventId) {
+      setRedemptionMessage({
+        text: 'Este código pertence a uma compra de produto, promoção ou serviço e não pode ser validado como bilhete.',
+        type: 'error',
+      });
+      return;
+    }
+
+    const scopedEvent = events.find((event) => event.id === found.eventId && event.businessId === business.id);
+    if (!scopedEvent) {
+      setRedemptionMessage({ text: t('business.eventMissing'), type: 'error' });
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/tickets/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          codeOrToken: query,
+          doorCode: scopedEvent.scannerDoorCode,
+          eventId: scopedEvent.id,
+          businessId: business.id,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.valid) {
+        setRedemptionMessage({
+          text: result.message || 'O bilhete não foi validado pelo servidor.',
+          type: result.status === 'already_used' ? 'info' : 'error',
+        });
+        return;
+      }
+
+      onValidatePurchaseOrder?.(found.id, business.name);
+      setRedemptionMessage({
+        text: `LEVANTAMENTO CONFIRMADO! Bilhete ${result.ticket?.ticketCode || found.orderCode} validado no servidor para ${found.customerName}.`,
+        type: 'success',
+      });
+      setRedemptionCodeInput('');
+    } catch {
+      setRedemptionMessage({ text: 'Não foi possível contactar o servidor de validação.', type: 'error' });
+    }
+  };
+
+  const handleExecuteAutomatedPlanUpgrade = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!denyPermission('billing')) return;
+    if (!upgradePaymentPhone.trim()) {
+      alert('Introduza o número de telemóvel usado no pagamento.');
+      return;
+    }
+
+    setIsUpgrading(true);
+    try {
+      const selectedPlan = getPlanById(normaliseSubscriptionPlans(subscriptionPlans), targetUpgradePlanId, targetUpgradeTier);
+      const monthlyPrice = selectedPlan.price;
+      if (monthlyPrice <= 0) {
+        alert(t('business.planNegotiated'));
+        return;
+      }
+      const selectedPlanAmount = isAnnualBilling
+        ? Math.round(monthlyPrice * 12 * (1 - pricingConfig.annualDiscountPercent / 100))
+        : monthlyPrice;
+      const res = await fetch('/api/payments/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          useCase: business.subscriptionStartedAt ? 'subscription_renewal' : 'subscription_initial',
+          useCaseLabel: `${business.subscriptionStartedAt ? 'Renovação' : 'Activação'} Plano ${targetUpgradeTier.toUpperCase()} (${isAnnualBilling ? '1 ano' : '1 mjs'})`,
+          businessId: business.id,
+          businessName: business.name,
+          payerName: business.ownerName || business.name,
+          payerPhone: upgradePaymentPhone.trim(),
+          amountXOF: selectedPlanAmount,
+          provider: selectedPaymentProvider === 'orange' ? 'orange_money' : 'telecel',
+          subscriptionInterval: isAnnualBilling ? 'annual' : 'monthly',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success || !data.transaction) {
+        throw new Error(data.error || 'O pagamento do upgrade não foi aceite.');
+      }
+
+      if (data.transaction.status !== 'confirmed_api') {
+        alert(paymentStatusMessage(data.transaction));
+        return;
+      }
+
+      const confirmedAt = new Date().toISOString();
+      const period = isAnnualBilling ? 'annual' : 'monthly';
+      const renewDate = addSubscriptionPeriod(confirmedAt, period).toISOString();
+      const updatedBiz: Business = {
+        ...business,
+          tier: selectedPlan.legacyTier || targetUpgradeTier,
+          planId: selectedPlan.id,
+          planName: selectedPlan.name,
+          subscriptionPlanVersion: selectedPlan.version,
+          subscriptionPlanSnapshot: selectedPlan,
+          subscriptionUsage: { periodKey: new Date().toISOString().slice(0, 7), postsUsed: 0, promotionsUsed: 0, eventsUsed: 0, imagesUsed: 0, campaignsUsed: 0, updatedAt: confirmedAt },
+          postsQuotaRemaining: selectedPlan.postsPerMonth === 'unlimited' || selectedPlan.postsPerMonth === 'negotiated' ? Number.MAX_SAFE_INTEGER : Number(selectedPlan.postsPerMonth || 0),
+        verified: true,
+        status: business.status === 'suspended' && !business.subscriptionAutoSuspended ? 'suspended' : 'active',
+        subscriptionStatus: business.status === 'suspended' && !business.subscriptionAutoSuspended ? 'suspended' : 'active',
+        subscriptionPeriod: period,
+        subscriptionStartedAt: confirmedAt,
+        subscriptionPaymentId: data.transaction.id,
+        subscriptionRenewDate: renewDate,
+        subscriptionAlertKeys: [],
+        subscriptionSuspendedAt: undefined,
+        subscriptionSuspensionReason: undefined,
+        subscriptionAutoSuspended: false,
+      };
+      onUpdateBusiness?.(updatedBiz);
+      setPostsQuota(selectedPlan.postsPerMonth === 'unlimited' || selectedPlan.postsPerMonth === 'negotiated' ? Number.MAX_SAFE_INTEGER : Number(selectedPlan.postsPerMonth || 0));
+      setShowUpgradeModal(false);
+      alert(`${paymentStatusMessage(data.transaction)}\n\nPLANO ${selectedPlan.name.toUpperCase()} ACTIVADO COM SUCESSO!\n\nPeríodo: ${isAnnualBilling ? 'anual' : 'mensal'}. Próxima renovação: ${new Date(renewDate).toLocaleDateString('pt-PT')}. Limites configurados: ${limitLabel(selectedPlan.postsPerMonth)} posts e ${limitLabel(selectedPlan.promotionsPerMonth)} promoções por mês.`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t('business.upgradeFailed'));
+    } finally {
+      setIsUpgrading(false);
+    }
+  };
+
+  // Configurable Business Model & Price Matrix State (4.1, 4.2, 4.3)
+  const [subscriptionPlans, setSubscriptionPlans] = usePersistentState<SubscriptionPlan[]>('guigui_subscription_plans', DEFAULT_SUBSCRIPTION_PLANS);
+  const availableSubscriptionPlans = normaliseSubscriptionPlans(subscriptionPlans).filter((plan) => plan.isActive && plan.isPublic);
+  const currentPlan = getBusinessPlan(business, normaliseSubscriptionPlans(subscriptionPlans));
+  const currentUsage = getBusinessUsage(business);
+
+  const [extraPostQuantity, setExtraPostQuantity] = useState(1);
+  const [extraPromotionQuantity, setExtraPromotionQuantity] = useState(1);
+  const [pricingConfig, setPricingConfig] = usePersistentState<BusinessModelConfig>('guigui_admin_business_model_config', {
+    ticketCommissionPercent: 10,
+    ticketFixedFeeXOF: 200,
+    extraPostPriceXOF: 5000,
+    extraPromotionPriceXOF: 10000,
+    bannerWeeklyPriceXOF: 50000,
+    annualDiscountPercent: 15,
+    includedPostsPerMonth: 3,
+    automaticSubscriptionSuspensionEnabled: true,
+  });
+  const [monetizationCatalog, setMonetizationCatalog] = usePersistentState<MonetizationCatalog>('guigui_monetization_catalog', DEFAULT_MONETIZATION_CATALOG);
+  const resolvedMonetizationCatalog = normaliseMonetizationCatalog(monetizationCatalog, pricingConfig);
+
+  useEffect(() => {
+    let active = true;
+    const query = business.id ? `?companyId=${encodeURIComponent(business.id)}` : '';
+    fetch(`/api/commercial/public-catalog${query}`)
+      .then((response) => response.ok ? response.json() : null)
+      .then((catalog) => {
+        if (!active || !catalog) return;
+        if (Array.isArray(catalog.plans) && catalog.plans.length > 0) setSubscriptionPlans(catalog.plans as SubscriptionPlan[]);
+        if (Array.isArray(catalog.products)) setMonetizationCatalog((previous) => ({ ...previous, products: catalog.products, ...(catalog.ticketFeePolicy ? { ticketFeePolicy: catalog.ticketFeePolicy } : {}) }));
+        setPricingConfig((previous) => ({
+          ...previous,
+          ...(catalog.ticketFeePolicy ? {
+            ticketCommissionPercent: Number(catalog.ticketFeePolicy.commissionPercentage),
+            ticketFixedFeeXOF: Number(catalog.ticketFeePolicy.fixedFee),
+          } : {}),
+          ...(typeof catalog.annualDiscountPercent === 'number' ? { annualDiscountPercent: catalog.annualDiscountPercent } : {}),
+          ...(typeof catalog.monthlyPostRule === 'number' ? { includedPostsPerMonth: catalog.monthlyPostRule } : {}),
+        }));
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [business.id, setMonetizationCatalog, setSubscriptionPlans, setPricingConfig]);
+  const postExtraProduct = getCommercialProduct(resolvedMonetizationCatalog, 'POST_EXTRA');
+  const promotionExtraProduct = getCommercialProduct(resolvedMonetizationCatalog, 'PROMOTION_EXTRA');
+  const postExtraPrice = resolveProductPrice(resolvedMonetizationCatalog, 'POST_EXTRA', extraPostQuantity);
+  const promotionExtraPrice = resolveProductPrice(resolvedMonetizationCatalog, 'PROMOTION_EXTRA', extraPromotionQuantity);
+
+  const [categoryGroupsList, setCategoryGroupsList] = usePersistentState<CategoryGroup[]>('guigui_admin_category_groups', [
+    {
+      id: 'restauracao',
+      name: 'Restauração, Cafés e Pequeno Comércio',
+      description: 'Restaurantes, bares, lanchonetes, padarias, pequenas lojas de bairro',
+      prices: { basic: 10000, professional: 25000, premium: 45000, enterprise: 85000 },
+    },
+    {
+      id: 'hotelaria_saude_educacao',
+      name: 'Hotelaria, Clínicas, Escolas e Comércio Médio',
+      description: 'Hotéis, pousadas, clínicas médicas, escolas privadas, supermercados',
+      prices: { basic: 15000, professional: 35000, premium: 65000, enterprise: 120000 },
+    },
+    {
+      id: 'corporativo_financeiro',
+      name: 'Bancos, Seguradoras, Telecoms e Construção',
+      description: 'Instituições financeiras, operadoras telemóvel, concessionárias, construtoras',
+      prices: { basic: 35000, professional: 75000, premium: 150000, enterprise: 300000 },
+    },
+    {
+      id: 'ongs_artesãos',
+      name: 'ONGs, Associações e Artesãos Local',
+      description: 'Organizações comunitárias, artesãos de Bissau, cooperativas culturais',
+      prices: { basic: 5000, professional: 12000, premium: 25000, enterprise: 50000 },
+    },
+    {
+      id: 'servicos_profissionais',
+      name: 'Serviços Profissionais e Consultoria',
+      description: 'Escritórios de advocacia, contabilidade, oficinas, consultores independentes',
+      prices: { basic: 12000, professional: 28000, premium: 50000, enterprise: 95000 },
+    },
+  ]);
+
+  const [editingCell, setEditingCell] = useState<{
+    groupId: string;
+    tier: SubscriptionTier;
+    price: number;
+  } | null>(null);
+
+  const [priceAuditLogs, setPriceAuditLogs] = useState<PriceAuditLogItem[]>([
+    {
+      id: 'audit-2026-101',
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      categoryGroup: 'Restauração, Cafés e Pequeno Comércio',
+      tier: 'professional',
+      oldPrice: 20000,
+      newPrice: 25000,
+      updatedBy: 'Admin da Empresa / ' + (business.ownerName || business.name),
+    },
+    {
+      id: 'audit-2026-102',
+      date: '2026-08-01 11:20',
+      categoryGroup: 'Bancos, Seguradoras, Telecoms e Construção',
+      tier: 'enterprise',
+      oldPrice: 280000,
+      newPrice: 300000,
+      updatedBy: 'Administração Guigui',
+    },
+  ]);
+
+  const [saveToast, setSaveToast] = useState<string | null>(null);
+
+  const handleSaveCellPrice = (groupId: string, tier: SubscriptionTier, newPrice: number) => {
+    const group = categoryGroupsList.find((g) => g.id === groupId);
+    if (!group) return;
+
+    const oldPrice = group.prices[tier];
+
+    setCategoryGroupsList((prev) =>
+      prev.map((g) => {
+        if (g.id === groupId) {
+          return {
+            ...g,
+            prices: {
+              ...g.prices,
+              [tier]: newPrice,
+            },
+          };
+        }
+        return g;
+      })
+    );
+
+    const newLog: PriceAuditLogItem = {
+      id: `audit-${Date.now()}`,
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      categoryGroup: group.name,
+      tier,
+      oldPrice,
+      newPrice,
+      updatedBy: 'Gestor / ' + (business.ownerName || business.name),
+    };
+
+    setPriceAuditLogs((prev) => [newLog, ...prev]);
+    setEditingCell(null);
+    setSaveToast(`Preço do escalão ${tier.toUpperCase()} atualizado para ${newPrice.toLocaleString('pt-PT')} XOF!`);
+    setTimeout(() => setSaveToast(null), 4000);
+  };
+
+  const handleUpdateConfigParam = (key: keyof BusinessModelConfig, value: number) => {
+    setPricingConfig((prev) => ({ ...prev, [key]: value }));
+    setSaveToast(`Valor de tarifário (${key}) atualizado com sucesso!`);
+    setTimeout(() => setSaveToast(null), 3500);
+  };
+
+  const handleResetPricingDefaults = () => {
+    if (confirm('Tem a certeza de que deseja restaurar a matriz de preços e taxas de bilhética para os valores padrão?')) {
+      setPricingConfig({
+        ticketCommissionPercent: 10,
+        ticketFixedFeeXOF: 200,
+        extraPostPriceXOF: 5000,
+        extraPromotionPriceXOF: 10000,
+        annualDiscountPercent: 15,
+        bannerWeeklyPriceXOF: 50000,
+        includedPostsPerMonth: 3,
+        automaticSubscriptionSuspensionEnabled: true,
+      });
+      setCategoryGroupsList([
+        {
+          id: 'restauracao',
+          name: 'Restauração, Cafés e Pequeno Comércio',
+          description: 'Restaurantes, bares, lanchonetes, padarias, pequenas lojas de bairro',
+          prices: { basic: 10000, professional: 25000, premium: 45000, enterprise: 85000 },
+        },
+        {
+          id: 'hotelaria_saude_educacao',
+          name: 'Hotelaria, Clínicas, Escolas e Comércio Médio',
+          description: 'Hotéis, pousadas, clínicas médicas, escolas privadas, supermercados',
+          prices: { basic: 15000, professional: 35000, premium: 65000, enterprise: 120000 },
+        },
+        {
+          id: 'corporativo_financeiro',
+          name: 'Bancos, Seguradoras, Telecoms e Construção',
+          description: 'Instituições financeiras, operadoras telemóvel, concessionárias, construtoras',
+          prices: { basic: 35000, professional: 75000, premium: 150000, enterprise: 300000 },
+        },
+        {
+          id: 'ongs_artesãos',
+          name: 'ONGs, Associações e Artesãos Local',
+          description: 'Organizações comunitárias, artesãos de Bissau, cooperativas culturais',
+          prices: { basic: 5000, professional: 12000, premium: 25000, enterprise: 50000 },
+        },
+        {
+          id: 'servicos_profissionais',
+          name: 'Serviços Profissionais e Consultoria',
+          description: 'Escritórios de advocacia, contabilidade, oficinas, consultores independentes',
+          prices: { basic: 12000, professional: 28000, premium: 50000, enterprise: 95000 },
+        },
+      ]);
+      setSaveToast('Valores padrão da matriz de preços restaurados com sucesso.');
+      setTimeout(() => setSaveToast(null), 3500);
+    }
+  };
+
+  const handleExportPricingCsv = () => {
+    const csvHeader = 'Grupo_Categoria;Escalao_Basico_XOF;Escalao_Profissional_XOF;Escalao_Premium_XOF;Escalao_Enterprise_XOF\n';
+    const csvRows = categoryGroupsList
+      .map((g) =>
+        [
+          `"${g.name}"`,
+          g.prices.basic,
+          g.prices.professional,
+          g.prices.premium,
+          g.prices.enterprise,
+        ].join(';')
+      )
+      .join('\n');
+
+    const blob = new Blob([csvHeader + csvRows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Guigui_Matriz_Precos_Categorias_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Quota & Extra Purchases State (4.1 & 4.3)
+  const [postsQuota, setPostsQuota] = useState(business.postsQuotaRemaining);
+  const [showBuyPostModal, setShowBuyPostModal] = useState(false);
+  const [showBuyPromoModal, setShowBuyPromoModal] = useState(false);
+  const [mobileMoneyPhone, setMobileMoneyPhone] = useState('955123456');
+  const [selectedPaymentProvider, setSelectedPaymentProvider] = useState<'orange' | 'telecel'>('orange');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [selectedContentServiceId, setSelectedContentServiceId] = useState('');
+  const [contentServiceRequestNote, setContentServiceRequestNote] = useState('');
+  const [monetizationNotice, setMonetizationNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeTab !== 'my_business') setShowBuyPostModal(false);
+  }, [activeTab]);
+
+  React.useEffect(() => {
+    const isModalOpen = Boolean(
+      showBuyPostModal ||
+      showBuyPromoModal ||
+      showUpgradeModal ||
+      selectedOrderForQr
+    );
+    if (isModalOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      document.body.classList.add('modal-open');
+      return () => {
+        document.body.style.overflow = prev;
+        document.body.classList.remove('modal-open');
+      };
+    }
+  }, [showBuyPostModal, showBuyPromoModal, showUpgradeModal, selectedOrderForQr]);
+
+  const subscriptionAccessState = getSubscriptionAccessState(business);
+  const subscriptionReadOnly = shouldBlockBusinessMutation(business);
+  const subscriptionRemainingMs = getSubscriptionRemainingMs(business.subscriptionRenewDate);
+  const subscriptionRemainingDays = subscriptionRemainingMs === null ? null : Math.max(0, Math.ceil(subscriptionRemainingMs / (24 * 60 * 60 * 1000)));
+  const subscriptionInterval = business.subscriptionPeriod || 'monthly';
+
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch('/api/payments/transactions')
+      .then((response) => response.ok ? response.json() : [])
+      .then((transactions: Array<Record<string, unknown>>) => {
+        if (cancelled) return;
+        const confirmed = transactions
+          .filter((transaction) => transaction.businessId === business.id
+            && ['subscription_initial', 'subscription_renewal', 'subscription_upgrade'].includes(String(transaction.useCase))
+            && ['confirmed_api', 'confirmed_manual', 'reconciled'].includes(String(transaction.status)))
+          .sort((a, b) => Date.parse(String(b.confirmedAt || b.createdAt || '')) - Date.parse(String(a.confirmedAt || a.createdAt || '')))[0];
+        if (!confirmed || confirmed.id === business.subscriptionPaymentId) return;
+        const confirmedAt = String(confirmed.subscriptionStartedAt || confirmed.confirmedAt || new Date().toISOString());
+        const period = confirmed.subscriptionInterval === 'annual' || /ano|annual/i.test(String(confirmed.useCaseLabel || '')) ? 'annual' : 'monthly';
+        const renewAt = String(confirmed.subscriptionRenewDate || addSubscriptionPeriod(confirmedAt, period).toISOString());
+        if (can('billing')) {
+          onUpdateBusiness?.({
+            ...business,
+            status: 'active',
+            subscriptionStatus: 'active',
+            subscriptionPeriod: period,
+            subscriptionStartedAt: confirmedAt,
+            subscriptionPaymentId: String(confirmed.id),
+            subscriptionRenewDate: renewAt,
+            subscriptionAlertKeys: [],
+            subscriptionSuspendedAt: undefined,
+            subscriptionSuspensionReason: undefined,
+            subscriptionAutoSuspended: false,
+          });
+        }
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [business.id]);
+
+  const guardSubscriptionAction = () => {
+    if (!subscriptionReadOnly) return true;
+    alert('O plano terminou ou a empresa está suspensa. Pode consultar os dados, mas deve renovar o plano antes de criar, editar, publicar, promover ou gerir operações comerciais.');
+    return false;
+  };
+
+  // Billing Cycle Toggle (4.2.d)
+  const [isAnnualBilling, setIsAnnualBilling] = useState(false);
+
+  // New Post Form State
+  const [postTitle, setPostTitle] = useState('');
+  const [postContent, setPostContent] = useState('');
+  const [postMediaType, setPostMediaType] = useState<'image' | 'video' | 'gallery'>('image');
+  const [postImageUrl, setPostImageUrl] = useState('');
+  const [postVideoUrl, setPostVideoUrl] = useState('');
+  const [dashboardGalleryUrls, setDashboardGalleryUrls] = useState<string[]>([]);
+  const [newDashboardGalleryInput, setNewDashboardGalleryInput] = useState('');
+  const [isModerating, setIsModerating] = useState(false);
+  const [aiResult, setAiResult] = useState<ModerationResult | null>(null);
+  const [postPublishMode, setPostPublishMode] = useState<'now' | 'scheduled'>('now');
+  const [postScheduledAt, setPostScheduledAt] = useState('');
+  const [scheduledItems, setScheduledItems] = useState<ScheduledItem[]>([]);
+
+  // New Promo Form State
+  const [promoTitle, setPromoTitle] = useState('');
+  const [promoDesc, setPromoDesc] = useState('');
+  const [promoBadge, setPromoBadge] = useState('-20% OFF');
+  const [promoDays, setPromoDays] = useState(15);
+  const [promoMediaType, setPromoMediaType] = useState<'image' | 'video'>('image');
+  const [promoImageUrl, setPromoImageUrl] = useState('');
+  const [promoVideoUrl, setPromoVideoUrl] = useState('');
+  const [promoPublishMode, setPromoPublishMode] = useState<'now' | 'scheduled'>('now');
+  const [promoScheduledAt, setPromoScheduledAt] = useState('');
+
+  const loadScheduledItems = React.useCallback(async () => {
+    try {
+      const response = await fetch(`/api/marketing/scheduled-items?businessId=${encodeURIComponent(business.id)}`, { credentials: 'include' });
+      if (!response.ok) return;
+      const data = await response.json() as { items?: ScheduledItem[] };
+      const nextItems = Array.isArray(data.items) ? data.items : [];
+      setScheduledItems(nextItems);
+      if (!onUpdateBusiness) return;
+      const publishedPostIds = new Set(nextItems.filter((item) => item.itemType === 'post' && item.status === 'published').map((item) => item.itemId));
+      const failedPost = nextItems.find((item) => item.itemType === 'post' && item.status === 'failed');
+      const publishedPromoIds = new Set(nextItems.filter((item) => item.itemType === 'promotion' && item.status === 'published').map((item) => item.itemId));
+      const expiredPromoIds = new Set(nextItems.filter((item) => item.itemType === 'promotion' && item.status === 'expired').map((item) => item.itemId));
+      const updatedBusiness: Business = {
+        ...business,
+        posts: business.posts.map((post) => publishedPostIds.has(post.id)
+          ? { ...post, status: 'approved', publishedAt: nextItems.find((item) => item.itemId === post.id)?.publishedAt }
+          : failedPost?.itemId === post.id ? { ...post, status: 'failed', schedulingError: failedPost.errorMessage } : post),
+        promotions: business.promotions.map((promotion) => publishedPromoIds.has(promotion.id)
+          ? { ...promotion, status: 'active', isActive: true, activatedAt: nextItems.find((item) => item.itemId === promotion.id)?.publishedAt }
+          : expiredPromoIds.has(promotion.id) ? { ...promotion, status: 'expired', isActive: false } : promotion),
+      };
+      const postsChanged = updatedBusiness.posts.some((post, index) => post.status !== business.posts[index]?.status || post.publishedAt !== business.posts[index]?.publishedAt || post.schedulingError !== business.posts[index]?.schedulingError);
+      const promotionsChanged = updatedBusiness.promotions.some((promotion, index) => promotion.status !== business.promotions[index]?.status || promotion.isActive !== business.promotions[index]?.isActive || promotion.activatedAt !== business.promotions[index]?.activatedAt);
+      if (postsChanged || promotionsChanged) onUpdateBusiness(updatedBusiness);
+    } catch {
+      // The local Marketing view remains usable when the optional backend is unavailable.
+    }
+  }, [business, onUpdateBusiness]);
+
+  const updateSchedule = async (item: ScheduledItem, action: 'cancel' | 'publish' | 'reschedule') => {
+    if (action === 'reschedule') {
+      const value = window.prompt('Nova data e hora (formato ISO, por exemplo 2026-09-20T18:00:00):', item.scheduledAt.slice(0, 16));
+      if (!value) return;
+      const response = await fetch(`/api/marketing/scheduled-items/${item.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ scheduledAt: value }) });
+      if (!response.ok) alert('Não foi possível reagendar este conteúdo.');
+    } else {
+      const response = await fetch(`/api/marketing/scheduled-items/${item.id}${action === 'publish' ? '/publish-now' : ''}`, { method: action === 'publish' ? 'POST' : 'PATCH', headers: action === 'cancel' ? { 'Content-Type': 'application/json' } : undefined, credentials: 'include', body: action === 'cancel' ? JSON.stringify({ status: 'cancelled' }) : undefined });
+      if (!response.ok) alert('Não foi possível atualizar este agendamento.');
+    }
+    await loadScheduledItems();
+  };
+
+  useEffect(() => {
+    void loadScheduledItems();
+    const interval = window.setInterval(() => void loadScheduledItems(), 30_000);
+    return () => window.clearInterval(interval);
+  }, [loadScheduledItems]);
+
+  const handleLocalPostImage = async (file?: File) => {
+    if (!file) return;
+    try { setPostImageUrl(await readLocalMediaFile(file)); } catch (error) { alert(error instanceof Error ? error.message : 'Falha ao carregar a imagem.'); }
+  };
+
+  const handleLocalPostVideo = async (file?: File) => {
+    if (!file) return;
+    try { setPostVideoUrl(await readLocalMediaFile(file)); } catch (error) { alert(error instanceof Error ? error.message : 'Falha ao carregar o vídeo.'); }
+  };
+
+  const handleLocalGalleryImages = async (files: FileList | null) => {
+    if (!files) return;
+    try {
+      const urls = await Promise.all(Array.from(files).map(readLocalMediaFile));
+      setDashboardGalleryUrls((previous) => [...previous, ...urls]);
+    } catch (error) { alert(error instanceof Error ? error.message : 'Falha ao carregar a galeria.'); }
+  };
+
+  const handleLocalPromoMedia = async (file?: File) => {
+    if (!file) return;
+    try {
+      const dataUrl = await readLocalMediaFile(file);
+      if (promoMediaType === 'video') setPromoVideoUrl(dataUrl);
+      else setPromoImageUrl(dataUrl);
+    } catch (error) { alert(error instanceof Error ? error.message : 'Falha ao carregar o media da promoção.'); }
+  };
+
+  const handleRequestContentService = async (service: ContentService) => {
+    if (!denyPermission('content')) return;
+    if (!guardSubscriptionAction()) return;
+    try {
+      const response = await fetch('/api/monetization/requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'content_service', businessId: business.id, businessName: business.name, serviceId: service.id, serviceName: service.name, notes: contentServiceRequestNote.trim() }) });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Não foi possível enviar o pedido de orçamento.');
+      setMonetizationNotice(`Pedido de orçamento enviado para ${service.name}. A Administração entrará em contacto.`);
+      setContentServiceRequestNote('');
+      setSelectedContentServiceId('');
+    } catch (error) {
+      setMonetizationNotice(error instanceof Error ? error.message : 'Não foi possível enviar o pedido.');
+    }
+  };
+
+  const handleBuyAdvertising = async (productCode: string) => {
+    if (!denyPermission('content')) return;
+    if (!guardSubscriptionAction()) return;
+    const advertisingProduct = getCommercialProduct(resolvedMonetizationCatalog, productCode);
+    if (!advertisingProduct) return;
+    if (advertisingProduct.requiresQuote) {
+      try {
+        const response = await fetch('/api/monetization/requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'advertising', businessId: business.id, businessName: business.name, productId: advertisingProduct.id, productCode: advertisingProduct.code, productName: advertisingProduct.name }) });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'Não foi possível solicitar a campanha.');
+        setMonetizationNotice(`Pedido de orçamento enviado para ${advertisingProduct.name}.`);
+      } catch (error) { setMonetizationNotice(error instanceof Error ? error.message : 'Não foi possível solicitar a campanha.'); }
+      return;
+    }
+    const amount = resolveProductPrice(resolvedMonetizationCatalog, advertisingProduct.code, 1, advertisingProduct.periodDays);
+    try {
+      const response = await fetch('/api/payments/create', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': `ad-${business.id}-${advertisingProduct.code}-${Date.now()}` }, body: JSON.stringify({ useCase: 'advertising_purchase', useCaseLabel: advertisingProduct.name, productId: advertisingProduct.id, productCode: advertisingProduct.code, quantity: 1, businessId: business.id, businessName: business.name, payerName: business.ownerName || business.name, payerPhone: mobileMoneyPhone.startsWith('+245') ? mobileMoneyPhone : `+245 ${mobileMoneyPhone}`, amountXOF: amount, provider: selectedPaymentProvider === 'orange' ? 'orange_money' : 'telecel' }) });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Não foi possível iniciar o pagamento da publicidade.');
+      setMonetizationNotice(result.transaction
+        ? `${paymentStatusMessage(result.transaction)} ${advertisingProduct.name}.`
+        : `Pagamento registado para ${advertisingProduct.name}.`);
+    } catch (error) { setMonetizationNotice(error instanceof Error ? error.message : 'Não foi possível iniciar o pagamento.'); }
+  };
+
+  const handleBuyExtraPost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!denyPermission('content')) return;
+    if (!guardSubscriptionAction()) return;
+    setIsProcessingPayment(true);
+    try {
+      const res = await fetch('/api/payments/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          useCase: 'extra_posts',
+          useCaseLabel: `Pacote Extra +${extraPostQuantity} Posts Sociais (${postExtraPrice.toLocaleString('pt-PT')} XOF)`,
+          productId: postExtraProduct?.id,
+          productCode: 'POST_EXTRA',
+          quantity: extraPostQuantity,
+          businessId: business.id,
+          businessName: business.name,
+          payerName: business.ownerName || business.name,
+          payerPhone: mobileMoneyPhone.startsWith('+245') ? mobileMoneyPhone : `+245 ${mobileMoneyPhone}`,
+          amountXOF: postExtraPrice,
+          provider: selectedPaymentProvider === 'orange' ? 'orange_money' : 'telecel',
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.transaction) {
+        throw new Error(data.error || 'O pagamento não foi aceite pelo servidor.');
+      }
+      setIsProcessingPayment(false);
+      setShowBuyPostModal(false);
+
+      if (data.transaction.status !== 'confirmed_api') {
+        alert(paymentStatusMessage(data.transaction));
+        return;
+      }
+      const previousWallet: MonetizationWallet = business.monetizationWallet || { postsExtraPurchased: 0, promotionsExtraPurchased: 0, postsExtraUsed: 0, promotionsExtraUsed: 0, updatedAt: new Date().toISOString() };
+      onUpdateBusiness?.({ ...business, monetizationWallet: { ...previousWallet, postsExtraPurchased: previousWallet.postsExtraPurchased + extraPostQuantity, updatedAt: new Date().toISOString() } });
+      setPostsQuota((prev) => prev + extraPostQuantity);
+      alert(`${paymentStatusMessage(data.transaction)} +${extraPostQuantity} post(s) extra(s) adicionado(s) é carteira.`);
+    } catch (err) {
+      console.error(err);
+      setIsProcessingPayment(false);
+      alert(err instanceof Error ? err.message : 'Erro ao processar pagamento.');
+    }
+  };
+
+  const handleBuyExtraPromo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!denyPermission('content')) return;
+    if (!guardSubscriptionAction()) return;
+    setIsProcessingPayment(true);
+    try {
+      const res = await fetch('/api/payments/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          useCase: 'extra_promotions',
+          useCaseLabel: `Pacote Extra +${extraPromotionQuantity} Destaque(s) Promocional(is) (${promotionExtraPrice.toLocaleString('pt-PT')} XOF)`,
+          productId: promotionExtraProduct?.id,
+          productCode: 'PROMOTION_EXTRA',
+          quantity: extraPromotionQuantity,
+          businessId: business.id,
+          businessName: business.name,
+          payerName: business.ownerName || business.name,
+          payerPhone: mobileMoneyPhone.startsWith('+245') ? mobileMoneyPhone : `+245 ${mobileMoneyPhone}`,
+          amountXOF: promotionExtraPrice,
+          provider: selectedPaymentProvider === 'orange' ? 'orange_money' : 'telecel',
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.transaction) {
+        throw new Error(data.error || 'O pagamento não foi aceite pelo servidor.');
+      }
+      setIsProcessingPayment(false);
+      setShowBuyPromoModal(false);
+
+      if (data.transaction.status !== 'confirmed_api') {
+        alert(paymentStatusMessage(data.transaction));
+        return;
+      }
+      const previousWallet: MonetizationWallet = business.monetizationWallet || { postsExtraPurchased: 0, promotionsExtraPurchased: 0, postsExtraUsed: 0, promotionsExtraUsed: 0, updatedAt: new Date().toISOString() };
+      onUpdateBusiness?.({ ...business, monetizationWallet: { ...previousWallet, promotionsExtraPurchased: previousWallet.promotionsExtraPurchased + extraPromotionQuantity, updatedAt: new Date().toISOString() } });
+      alert(`${paymentStatusMessage(data.transaction)} +${extraPromotionQuantity} promoção(res) extra(s) adicionada(s) é carteira.`);
+    } catch (err) {
+      console.error(err);
+      setIsProcessingPayment(false);
+      alert(err instanceof Error ? err.message : 'Erro ao processar pagamento.');
+    }
+  };
+
+  const handleTestAiModerationAndSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!denyPermission('content')) return;
+    if (!guardSubscriptionAction()) return;
+    if (!postTitle || !postContent) return;
+
+    if (postsQuota <= 0 || (currentPlan.postsPerMonth !== 'unlimited' && currentPlan.postsPerMonth !== 'negotiated' && currentUsage.postsUsed >= Number(currentPlan.postsPerMonth))) {
+      alert(`A cota mensal de posts (${limitLabel(currentPlan.postsPerMonth)}) foi atingida. Por favor adquira um post extra por ${pricingConfig.extraPostPriceXOF.toLocaleString('pt-PT')} XOF.`);
+      setShowBuyPostModal(true);
+      return;
+    }
+
+    setIsModerating(true);
+    setAiResult(null);
+
+    try {
+      const res = await fetch('/api/moderate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: `${postTitle}\n${postContent}`,
+          author: business.name,
+          type: 'post',
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.result) {
+        throw new Error(data.error || 'O serviço de moderação não devolveu uma decisão válida.');
+      }
+      setAiResult(data.result);
+
+      if (data.result.status === 'verde' || data.result.status === 'amarelo') {
+        if (postPublishMode === 'scheduled' && data.result.status !== 'verde') {
+          alert('Este conteúdo precisa de aprovação antes de ser agendado para publicação automática.');
+          return;
+        }
+        if (postPublishMode === 'scheduled' && (!postScheduledAt || Date.parse(postScheduledAt) <= Date.now())) {
+          alert('Escolha uma data e hora futuras para o agendamento.');
+          return;
+        }
+        const isSubscriber = Boolean(business.tier);
+        const finalGallery = postMediaType === 'gallery' ? dashboardGalleryUrls : postImageUrl ? [postImageUrl] : [];
+
+        const newPost: BusinessPost = {
+          id: 'post-' + Date.now(),
+          businessId: business.id,
+          businessName: business.name,
+          businessLogo: business.logo,
+          title: postTitle,
+          content: postContent,
+          imageUrl: postImageUrl || (dashboardGalleryUrls.length > 0 ? dashboardGalleryUrls[0] : undefined),
+          videoUrl: postMediaType === 'video' && postVideoUrl ? postVideoUrl : undefined,
+          mediaType: postMediaType,
+          mediaGallery: finalGallery.length > 0 ? finalGallery : undefined,
+          isPlanSubscriberPost: isSubscriber,
+          planBadge: isSubscriber ? `Plano ${business.tier?.toUpperCase()}` : undefined,
+          createdAt: new Date().toISOString(),
+          status: postPublishMode === 'scheduled' ? 'scheduled' : data.result.status === 'verde' ? 'approved' : 'pending_moderation',
+          scheduledAt: postPublishMode === 'scheduled' ? new Date(postScheduledAt).toISOString() : undefined,
+          likesCount: 0,
+          reactions: {},
+          comments: [],
+          sharesCount: 0,
+          neighborhood: business.neighborhood,
+        };
+
+        if (postPublishMode === 'scheduled') {
+          const response = await fetch('/api/marketing/scheduled-items', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              businessId: business.id,
+              itemType: 'post',
+              itemId: newPost.id,
+              scheduledAt: newPost.scheduledAt,
+              moderationStatus: 'approved',
+              paymentStatus: 'not_required',
+            }),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.error || 'Não foi possível criar o agendamento.');
+        }
+        onAddPost(business.id, newPost);
+        setPostsQuota((prev) => Math.max(0, prev - 1));
+        setPostTitle('');
+        setPostContent('');
+        setPostImageUrl('');
+        setPostVideoUrl('');
+        setDashboardGalleryUrls([]);
+        setPostPublishMode('now');
+        setPostScheduledAt('');
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : 'Erro ao comunicar com o serviço de moderação.');
+    } finally {
+      setIsModerating(false);
+    }
+  };
+
+  const handleCreatePromo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!denyPermission('content')) return;
+    if (!guardSubscriptionAction()) return;
+    if (!promoTitle || !promoDesc) return;
+    if (currentPlan.promotionsPerMonth !== 'unlimited' && currentPlan.promotionsPerMonth !== 'negotiated' && currentUsage.promotionsUsed >= Number(currentPlan.promotionsPerMonth)) {
+      alert(`A cota mensal de promoções (${limitLabel(currentPlan.promotionsPerMonth)}) foi atingida. Pode comprar uma promoção extra por ${pricingConfig.extraPromotionPriceXOF.toLocaleString('pt-PT')} XOF.`);
+      setShowBuyPromoModal(true);
+      return;
+    }
+
+    const validUntilDate = new Date();
+    validUntilDate.setDate(validUntilDate.getDate() + promoDays);
+
+    const newPromo: Promotion = {
+      id: 'promo-' + Date.now(),
+      businessId: business.id,
+      businessName: business.name,
+      title: promoTitle,
+      description: promoDesc,
+      discountBadge: promoBadge,
+      imageUrl: promoMediaType === 'image' ? promoImageUrl || undefined : undefined,
+      videoUrl: promoMediaType === 'video' ? promoVideoUrl || undefined : undefined,
+      mediaType: promoMediaType,
+      validUntil: validUntilDate.toISOString(),
+      code: 'PROMO-' + Math.floor(1000 + Math.random() * 9000),
+      categoryName: business.subcategoryId,
+      neighborhood: business.neighborhood,
+      isActive: promoPublishMode === 'now',
+      status: promoPublishMode === 'scheduled' ? 'scheduled' : 'active',
+      startsAt: promoPublishMode === 'scheduled' ? new Date(promoScheduledAt).toISOString() : new Date().toISOString(),
+      scheduledAt: promoPublishMode === 'scheduled' ? new Date(promoScheduledAt).toISOString() : undefined,
+      clicksCount: 0,
+    };
+
+    if (promoPublishMode === 'scheduled' && (!promoScheduledAt || Date.parse(promoScheduledAt) <= Date.now())) {
+      alert('Escolha uma data e hora futuras para o agendamento.');
+      return;
+    }
+    try {
+      const response = await fetch('/api/marketing/promotions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(newPromo),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || 'Não foi possível guardar a promoção.');
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Não foi possível guardar a promoção.');
+      return;
+    }
+    onAddPromotion(business.id, newPromo);
+    setPromoPublishMode('now');
+    setPromoScheduledAt('');
+    setPromoTitle('');
+    setPromoDesc('');
+    setPromoImageUrl('');
+    setPromoVideoUrl('');
+    alert('Promoção criada com sucesso!');
+  };
+
+  const teamRoleLabels: Record<BusinessTeamRole, string> = {
+    manager: 'Administrador',
+    editor: 'Editor',
+    finance: 'Financeiro',
+    support: 'Atendimento',
+  };
+  const addTeamAudit = (member: BusinessTeamMember, action: string) => {
+    setTeamAudit((previous) => [{ id: `team-audit-${Date.now()}`, businessId: business.id, memberName: member.name, action, createdAt: new Date().toISOString() }, ...previous].slice(0, 50));
+  };
+  const handleInviteTeamMember = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!denyPermission('profile')) return;
+    const name = teamName.trim();
+    const email = teamEmail.trim().toLowerCase();
+    if (!name || !email) return;
+    if (teamMembers.some((member) => member.email === email)) {
+      setTeamNotice('Jd existe um colaborador com este e-mail.');
+      return;
+    }
+    const invitationToken = `${crypto.randomUUID()}-${crypto.randomUUID()}`;
+    try {
+      const response = await fetch('/api/business/team/invitations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipientEmail: email,
+          recipientName: name,
+          businessId: business.id,
+          businessName: business.name,
+          role: teamRole,
+          permissions: BUSINESS_ROLE_PERMISSIONS[teamRole],
+          roleLabel: teamRoleLabels[teamRole],
+          token: invitationToken,
+        }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({ error: "" } as { error?: string }));
+        setTeamNotice(payload.error || 'Não foi possível enviar o convite por e-mail.');
+        return;
+      }
+      const payload = await response.json().catch(() => ({}));
+    } catch {
+      setTeamNotice('Não foi possível contactar o serviço de e-mail. Tente novamente.');
+      return;
+    }
+    const member: BusinessTeamMember = {
+      id: `team-${Date.now()}`,
+      businessId: business.id,
+      name,
+      email,
+      role: teamRole,
+      status: 'invited',
+      permissions: BUSINESS_ROLE_PERMISSIONS[teamRole],
+      createdAt: new Date().toISOString(),
+    };
+    setTeamMembers((previous) => [member, ...previous]);
+    addTeamAudit(member, 'Convite enviado');
+    setTeamName('');
+    setTeamEmail('');
+    setTeamNotice(`Convite enviado para ${email}.`);
+  };
+  const handleTeamStatus = (member: BusinessTeamMember) => {
+    if (!denyPermission('profile')) return;
+    const status = member.status === 'suspended' ? 'active' : 'suspended';
+    const updated = { ...member, status } as BusinessTeamMember;
+    setTeamMembers((previous) => previous.map((item) => item.id === member.id ? updated : item));
+    addTeamAudit(updated, status === 'active' ? 'Acesso reactivado' : 'Acesso suspenso');
+  };
+  const handleRemoveTeamMember = (member: BusinessTeamMember) => {
+    if (!denyPermission('profile')) return;
+    if (!window.confirm(`Remover ${member.name} da equipa?`)) return;
+    setTeamMembers((previous) => previous.filter((item) => item.id !== member.id));
+    addTeamAudit(member, 'Colaborador removido');
+  };
+
+  const marketingAssets = React.useMemo<MarketingLibraryAsset[]>(() => {
+    const assets: MarketingLibraryAsset[] = [];
+    business.posts.forEach((post) => {
+      const urls = [post.imageUrl, post.videoUrl, ...(post.mediaGallery || [])].filter((url): url is string => Boolean(url));
+      urls.forEach((url, index) => assets.push({
+        id: `asset-${post.id}-${index}`,
+        businessId: business.id,
+        name: post.title || `Conteúdo ${post.id}`,
+        type: post.videoUrl === url ? 'video' : post.mediaType === 'gallery' ? 'banner' : 'image',
+        url,
+        sourceId: post.id,
+        usedBy: [post.id, ...marketingCampaigns.filter((campaign) => campaign.contentIds.includes(post.id)).map((campaign) => campaign.id)],
+        createdAt: post.createdAt,
+      }));
+    });
+    if (business.logo) assets.push({ id: `asset-logo-${business.id}`, businessId: business.id, name: 'Logótipo da empresa', type: 'logo', url: business.logo, usedBy: [business.id], createdAt: new Date().toISOString() });
+    return assets;
+  }, [business, marketingCampaigns]);
+
+  const createMarketingCampaign = async () => {
+    if (!denyPermission('content') || !campaignName.trim()) return;
+    const startsAt = campaignStartsAt ? new Date(campaignStartsAt) : undefined;
+    const endsAt = campaignEndsAt ? new Date(campaignEndsAt) : undefined;
+    if (startsAt && Number.isNaN(startsAt.getTime())) {
+      alert('Escolha uma data de início válida.');
+      return;
+    }
+    if (endsAt && Number.isNaN(endsAt.getTime())) {
+      alert('Escolha uma data de fim válida.');
+      return;
+    }
+    if (startsAt && endsAt && endsAt <= startsAt) {
+      alert('A data de fim deve ser posterior à data de início.');
+      return;
+    }
+    const now = new Date().toISOString();
+    const campaign: MarketingCampaign = {
+      id: `campaign-${Date.now()}`,
+      businessId: business.id,
+      name: campaignName.trim(),
+      objective: campaignObjective,
+      contentIds: campaignContentIds,
+      channels: campaignChannels,
+      audienceSegmentId: campaignAudienceId || undefined,
+      startsAt: startsAt?.toISOString(),
+      endsAt: endsAt?.toISOString(),
+      budgetXOF: campaignBudget ? Number(campaignBudget) : undefined,
+      spentXOF: 0,
+      status: startsAt && startsAt > new Date() ? 'scheduled' : 'draft',
+      createdAt: now,
+      updatedAt: now,
+    };
+    try {
+      const response = await fetch('/api/marketing/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(campaign),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Não foi possível guardar a campanha.');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Não foi possível guardar a campanha.');
+      return;
+    }
+    setMarketingCampaigns((previous) => [campaign, ...previous]);
+    setCampaignName('');
+    setCampaignObjective('awareness');
+    setCampaignBudget('');
+    setCampaignAudienceId('');
+    setCampaignContentIds([]);
+    setCampaignStartsAt('');
+    setCampaignEndsAt('');
+  };
+
+  const updateCampaignStatus = async (campaign: MarketingCampaign, status: MarketingCampaign['status']) => {
+    if (!denyPermission('content')) return;
+    const updatedAt = new Date().toISOString();
+    try {
+      const response = await fetch(`/api/marketing/campaigns/${encodeURIComponent(campaign.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status, updatedAt }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Não foi possível atualizar a campanha.');
+      setMarketingCampaigns((previous) => previous.map((item) => item.id === campaign.id ? { ...item, status, updatedAt } : item));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Não foi possível atualizar a campanha.');
+    }
+  };
+
+  const createAudienceSegment = () => {
+    if (!denyPermission('content')) return;
+    const now = new Date().toISOString();
+    setMarketingSegments((previous) => [{
+      id: `segment-${Date.now()}`,
+      businessId: business.id,
+      name: 'Bissau · clientes interessados',
+      location: business.neighborhood,
+      interests: ['conteúdo da empresa'],
+      estimatedReach: audienceReach > 0 ? audienceReach : undefined,
+      createdAt: now,
+    }, ...previous]);
+  };
+
+  return (
+    <div className="guigui-profile-dashboard guigui-light-dashboard w-full min-h-[calc(100vh-72px)] bg-[var(--color-bg-surface)] overflow-x: visible">
+      <BottomNav
+        ariaLabel="Navegação principal da empresa"
+        testId="business-bottom-nav"
+        activeId={businessBottomNavActive}
+        onSelect={(id) => { if (canTab(id as BusinessDashboardTab)) setActiveTab(id as BusinessDashboardTab); }}
+        items={[
+          { id: 'overview', label: 'Visão Geral', icon: LayoutDashboard },
+          { id: 'my_business', label: 'Perfil', icon: Building2 },
+          { id: 'communications', label: 'Mensagens', icon: MessageCircle },
+          { id: 'settings', label: 'Definições', icon: Settings },
+        ].filter((item) => canTab(item.id as BusinessDashboardTab))}
+      />
+      <div className="flex min-h-[calc(100vh-72px)] w-full bg-[var(--color-bg-surface)]">
+        <div className={`${mobileSidebarOpen ? 'block' : 'hidden'} fixed inset-0 z-40 bg-[var(--color-bg-surface)]/60 md:hidden`} onClick={() => setMobileSidebarOpen(false)} />
+
+        <aside
+          style={{ width: sidebarCollapsed ? 72 : 248 }}
+          className={`${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed left-0 top-[62px] z-[110] h-[calc(100vh-62px)] max-w-[calc(100vw-16px)] shrink-0 border-r border-[#0c3a34] bg-[radial-gradient(135%_85%_at_0%_0%,_#10443d_0%,_#0b332e_45%,_#072420_100%)] text-white shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)] transition-[transform,box-shadow,width] duration-300 ease-out min-[761px]:top-[72px] min-[761px]:h-[calc(100vh-72px)] md:translate-x-0 md:z-50`}
+        >
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="flex items-center justify-between px-3 py-4">
+              <div className={`flex items-center ${sidebarCollapsed ? 'w-full justify-center' : 'gap-2.5'}`}>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#3fae80] text-lg font-black text-[#072420] shadow-[0_12px_22px_-12px_rgba(63,174,128,0.85)]">
+                  G
+                </div>
+                {!sidebarCollapsed && (
+                  <div className="min-w-0">
+                    <div className="text-lg font-black leading-none text-white">Guigui<span className="text-[#e8a23a]">.com</span></div>
+                    <div className="mt-1.5 text-[8.5px] font-black uppercase tracking-[0.2em] text-[var(--color-text-muted-dark)]">{t('merchantRole')}</div>
+                  </div>
+                )}
+              </div>
+
+              {!sidebarCollapsed && (
+                <div className="flex items-center gap-1">
+                  <IconButton
+                    label={t('collapseMenu')}
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 w-8 rounded-full border-0 bg-transparent text-[var(--color-text-muted-dark)] shadow-none hover:bg-[var(--color-green-800)] hover:text-white"
+                    onClick={() => setSidebarCollapsed(true)}
+                    title={t('collapseMenu')}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </IconButton>
+                  <IconButton
+                    label={`Fechar menu lateral`}
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 w-8 rounded-full border-0 bg-transparent text-[var(--color-text-muted-dark)] shadow-none hover:bg-[var(--color-green-800)] hover:text-white md:hidden"
+                    onClick={() => setMobileSidebarOpen(false)}
+                  >
+                    <X className="h-4 w-4" />
+                  </IconButton>
+                </div>
+              )}
+              {sidebarCollapsed && (
+                <IconButton
+                  label={t('expandMenu')}
+                  variant="secondary"
+                  size="sm"
+                  className="absolute right-1 top-3 h-6 w-6 rounded-full border-0 bg-transparent text-[var(--color-text-muted-dark)] shadow-none hover:bg-[var(--color-green-800)] hover:text-white"
+                  onClick={() => setSidebarCollapsed(false)}
+                  title={t('expandMenu')}
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </IconButton>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
+              {!sidebarCollapsed && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('my_business');
+                    setMobileSidebarOpen(false);
+                  }}
+                  className="mb-2 flex w-full items-center gap-3 rounded-2xl border border-[#1b4a43] bg-[#0d3a34] p-2.5 text-left transition hover:bg-[var(--color-green-800)]"
+                >
+                  {business.logo ? (
+                    <img src={business.logo} alt={business.name} className="h-10 w-10 shrink-0 rounded-full border border-[var(--color-green-800)] object-cover" />
+                  ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-green-800)] text-xs font-black text-[var(--color-green-100)]">
+                      {business.name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[12px] font-black text-white">{business.name}</div>
+                    <div className="mt-0.5 text-[10px] font-semibold text-[var(--color-text-muted-dark)]">{t('merchantRole')}</div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[var(--color-text-muted-dark)]" />
+                </button>
+              )}
+
+              {visibleBusinessNavigationGroups.map((group) => (
+                <div key={group.heading} className={sidebarCollapsed ? 'mb-2 space-y-1.5' : 'mb-3 space-y-1'}>
+                  {!sidebarCollapsed && group.heading !== t('businessNavSummary') && (
+                    <div className="px-3 pb-1 pt-1.5 text-[8px] font-black uppercase tracking-[0.22em] text-[var(--color-text-muted-dark)]">
+                      {group.heading}
+                    </div>
+                  )}
+
+                  <div className={sidebarCollapsed ? 'space-y-1.5' : 'space-y-1'}>
+                    {group.items.filter((item) => canTab(item.tab)).map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activeTab === item.tab || (item.tab === 'marketing' && isMarketingTab);
+
+                      return (
+                        <button
+                          key={`${group.heading}-${item.label}`}
+                          type="button"
+                          onClick={() => {
+                            setActiveTab(item.tab);
+                            setMobileSidebarOpen(false);
+                          }}
+                          aria-label={item.label}
+                          aria-current={isActive ? 'page' : undefined}
+                          title={item.label}
+                          className={`group relative flex w-full items-center rounded-full text-left transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[var(--color-green-700)]/50 ${
+                            sidebarCollapsed
+                              ? 'justify-center p-2.5'
+                              : 'gap-3 px-3 py-2'
+                          } ${
+                            isActive
+                              ? 'bg-[var(--color-green-700)] text-white shadow-[0_16px_28px_-16px_rgba(23,97,88,0.9)]'
+                              : 'text-[var(--color-green-100)] hover:bg-[var(--color-green-800)]'
+                          }`}
+                        >
+                          <div className={`flex shrink-0 items-center justify-center rounded-full ${sidebarCollapsed ? 'h-8 w-8' : 'h-9 w-9'} ${isActive ? 'bg-black/10 text-white' : 'bg-[#124039] text-[#a9c4be] group-hover:bg-[var(--color-green-800)] group-hover:text-white'}`}>
+                            <Icon className="h-4 w-4" />
+                          </div>
+
+                          {!sidebarCollapsed && (
+                            <div className="min-w-0 flex-1">
+                              <div className={`truncate text-[11.5px] font-black leading-snug ${isActive ? 'text-white' : 'text-[#eef6f4]'}`}>{item.label}</div>
+                              <div className={`mt-0.5 truncate text-[9.5px] font-medium leading-relaxed ${isActive ? 'text-white/75' : 'text-[var(--color-text-muted-dark)]'}`}>
+                                {item.help}
+                              </div>
+                            </div>
+                          )}
+
+                          {!sidebarCollapsed && item.count !== undefined && item.count > 0 && (
+                            <span className={`flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-black ${isActive ? 'bg-white/25 text-white' : 'bg-[#f7bcbc] text-[#8a1f1f]'}`}>
+                              {item.count}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-auto border-t border-[var(--color-green-800)] px-2 py-2.5">
+              {!sidebarCollapsed && (
+                <div className="flex items-center gap-3 rounded-2xl px-1 py-1.5">
+                  {business.logo ? (
+                    <img src={business.logo} alt={business.name} className="h-9 w-9 shrink-0 rounded-full border border-[var(--color-green-800)] object-cover" />
+                  ) : (
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-green-800)] text-[10px] font-black text-[var(--color-green-100)]">
+                      {business.name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[11.5px] font-black text-white">{business.name}</div>
+                    <div className="text-[9.5px] font-semibold text-[var(--color-text-muted-dark)]">{t('merchantRole')}</div>
+                  </div>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={onLogout}
+                title="Terminar sessão"
+                className={`mt-1 flex w-full items-center rounded-2xl py-2.5 text-left text-[var(--color-green-100)] transition hover:bg-[var(--color-green-800)] hover:text-white ${sidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-2'}`}
+              >
+                <LogOut className="h-5 w-5 shrink-0 text-[#a9c4be]" />
+                {!sidebarCollapsed && <span className="text-[12px] font-black">Terminar sessão</span>}
+              </button>
+            </div>
+          </div>
+        </aside>        <main
+          style={{ '--business-sidebar-width': `${sidebarCollapsed ? 72 : 248}px` } as React.CSSProperties}
+          className="min-w-0 flex-1 overflow-visible bg-[#f7f5f3] p-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))] sm:p-4 sm:pb-[calc(4.75rem+env(safe-area-inset-bottom))] md:ml-[var(--business-sidebar-width)] lg:pb-4"
+        >
+          <div className="mb-3">
+            <div className="flex items-center gap-2">
+              <IconButton
+                label={t('openSidebar')}
+                variant="secondary"
+                className="h-9 w-9 rounded-full md:hidden"
+                onClick={() => setMobileSidebarOpen(true)}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
+              </IconButton>
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--color-text-muted)]">Guigui.com / {t('merchantRole')}</div>
+                <h1 className="mt-0.5 text-lg font-black text-[var(--color-text-strong)] sm:text-xl">{isMarketingTab ? 'Marketing' : currentBusinessSection}</h1>
+                {isMarketingTab && <p className="mt-1 text-xs text-[var(--color-text-muted)]">{t('business.GerencieSuasCampanhas')}</p>}
+              </div>
+            </div>
+          </div>
+
+          {!activeTabAllowed && !activeTabRetired && (
+            <div role="alert" className="rounded-[var(--radius-xl)] border border-rose-200 bg-rose-50 p-5 text-rose-900 shadow-[var(--shadow-xs)] dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
+              <h2 className="flex items-center gap-2 text-base font-black"><ShieldCheck className="h-5 w-5" /> Acesso não autorizado</h2>
+              <p className="mt-1 text-xs leading-relaxed">
+                A sua conta não tem autorização para este módulo. Se precisar de acesso, peça ao responsável da empresa para actualizar as suas permissões.
+              </p>
+              <button type="button" onClick={() => setActiveTab('overview')} className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-1.5 text-[11px] font-black text-white">
+                Voltar à Visão Geral
+              </button>
+            </div>
+          )}
+
+          <div className={`space-y-5 text-[var(--color-text-strong)] ${activeTabAllowed ? '' : 'hidden'}`}>
+            {isMarketingTab && (
+              <div className="sticky top-[70px] z-20 overflow-x-auto rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-1.5 shadow-sm md:top-[80px]">
+                <div className="flex min-w-max gap-1" role="tablist" aria-label={t('business.SeccoesMarketing')}>
+                  {MARKETING_TABS.map(({ id, label, icon: TabIcon }) => {
+                    const selected = activeTab === 'marketing_calendar'
+                      ? id === 'calendar'
+                      : activeTab === 'marketing_campaigns'
+                        ? id === 'campaigns'
+                        : id === marketingSection || (id === 'content' && (activeTab === 'posts' || activeTab === 'promotions'));
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        role="tab"
+                        aria-selected={selected}
+                        onClick={() => {
+                          setMarketingSection(id);
+                          setActiveTab(id === 'campaigns' ? 'marketing_campaigns' : id === 'calendar' ? 'marketing_calendar' : 'marketing');
+                        }}
+                        className={`inline-flex items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-[11px] font-black transition ${selected ? 'bg-[var(--color-green-700)] text-white shadow-sm' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text-strong)]'} focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]`}
+                      >
+                        <TabIcon className="h-4 w-4" aria-hidden="true" />
+                        <span>{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {/* Business Header Banner */}
+            {activeTab === 'my_business' && (
+              <Card className="min-w-0 border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-2 sm:p-3 flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center sm:gap-3 shadow-sm">
+                <div className="flex min-w-0 w-full items-center gap-2 sm:gap-2.5">
+                  <div className="h-10 w-10 rounded-lg border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] overflow-hidden shadow-sm flex-shrink-0 sm:h-11 sm:w-11">
+                    <img src={business.logo} alt={`Logotipo de ${business.name}`} className="w-full h-full object-cover" />
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <h1 className="min-w-0 break-words text-base sm:text-lg font-black">{business.name}</h1>
+                      <Badge variant="info" className="px-2 py-0.5 text-[9px] uppercase">
+                        Escalão {business.tier}
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">
+                      📍 {business.neighborhood} • Directório Guigui.com
+                    </p>
+                  </div>
+                </div>
+
+                <div className="w-full bg-[var(--color-bg-subtle)] p-2 sm:p-2.5 rounded-xl border border-[var(--color-border-subtle)] flex flex-wrap items-center gap-2 sm:gap-2.5 sm:w-auto">
+                  <div>
+                    <div className="text-[10px] text-[var(--color-text-muted)] uppercase font-bold">Cota Mensal de Posts ({limitLabel(currentPlan.postsPerMonth)})</div>
+                    <div className="text-xs font-extrabold text-[var(--color-green-700)] mt-0.5">
+                      {currentPlan.postsPerMonth === 'unlimited' || currentPlan.postsPerMonth === 'negotiated' ? 'Ilimitado' : `${postsQuota} de ${limitLabel(currentPlan.postsPerMonth)} restantes`}
+                    </div>
+                    <div className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
+                      Posts extra: {pricingConfig.extraPostPriceXOF.toLocaleString('pt-PT')} XOF/post
+                    </div>
+                  </div>
+
+                  <Button type="button"
+                    variant="primary"
+                    size="sm"
+                    onClick={() => { if (denyPermission('content') && guardSubscriptionAction()) setShowBuyPostModal(true); }}
+                    className="min-h-[30px] rounded-lg bg-[var(--color-green-600)] px-2 py-1 text-[10px] font-bold hover:bg-[var(--color-green-700)]"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5" />
+                    <span>Comprar Post Extra</span>
+                  </Button>
+                </div>
+              </Card>
+            )}
+
+            {activeTab === 'overview' && (
+              <Card className={`rounded-2xl border p-4 ${subscriptionAccessState === 'active' ? 'border-[var(--color-green-200)] bg-[var(--color-green-50)] text-[var(--color-green-950)]' : subscriptionAccessState === 'expired' ? 'border-[var(--color-gold-300)] bg-[var(--color-gold-50)] text-[var(--color-gold-950)]' : 'border-[var(--color-red-300)] bg-[var(--color-red-50)] text-[var(--color-red-950)]'}`}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    {subscriptionAccessState === 'active' ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[var(--color-green-600)]" /> : <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[var(--color-gold-600)]" />}
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-wide">
+                        {subscriptionAccessState === 'active' ? `Plano ${getSubscriptionTierLabel(business.tier)} activo` : subscriptionAccessState === 'expired' ? 'Plano expirado — modo de consulta' : 'Empresa suspensa — modo de consulta'}
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed">
+                        {subscriptionAccessState === 'active'
+                          ? `Próximo pagamento: ${new Date(business.subscriptionRenewDate).toLocaleDateString('pt-PT')} (${subscriptionInterval === 'annual' ? 'renovação anual' : 'renovação mensal'}${subscriptionRemainingDays !== null ? `, faltam ${subscriptionRemainingDays} dias` : ''}).`
+                          : 'Pode consultar dados, histórico, métricas e facturação, mas não pode criar, editar, publicar, promover, gerir eventos ou validar operações até renovar ou ser reactivada.'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button type="button" variant="primary" size="sm" onClick={() => { if (canTab('billing')) setActiveTab('billing'); else denyPermission('billing'); }} className="bg-[var(--color-bg-surface-dark)] hover:bg-[var(--color-bg-surface-dark)]/80">
+                    {subscriptionAccessState === 'active' ? 'Ver renovação' : 'Renovar plano'}
+                  </Button>
+                </div>
+              </Card>
+            )}
+
+            {/* Tab Contents */}
+      {activeTab === 'overview' && (
+        <div className="space-y-4">
+        {/* 6 Indicadores Principais */}
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+          <StatCard
+            label="Receita Total"
+            value={`${filteredOrderHistory.reduce((acc, o) => acc + (o.totalPriceXOF ?? 0), 0).toLocaleString('pt-PT')} XOF`}
+            icon={TrendingUp}
+            tone="success"
+            hint="Faturamento geral"
+          />
+          <StatCard
+            label={t('business.Visualizacoes')}
+            value={business.metrics.views.toLocaleString('pt-PT')}
+            icon={Eye}
+            tone="info"
+            hint="Este mês"
+          />
+          <StatCard
+            label="Seguidores"
+            value={followerCount.toLocaleString('pt-PT')}
+            icon={Users}
+            tone="accent"
+            hint="Pessoas com o sino activo"
+          />
+          <StatCard
+            label="Eventos Ativos"
+            value={businessEvents.length}
+            icon={Calendar}
+            tone="info"
+            hint="Ativos"
+          />
+          <StatCard
+            label="WhatsApp Leads"
+            value={business.metrics.whatsappClicks}
+            icon={MessageCircle}
+            tone="success"
+            hint="Leads diretos"
+          />
+          <StatCard
+            label="Bilhetes Vendidos"
+            value={filteredOrderHistory.length}
+            icon={Ticket}
+            tone="accent"
+            hint="Total de bilhetes"
+          />
+        </div>
+
+          <div className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
+            <ChartFrame
+              title={t('business.InteracaoComPerfil')}
+              description="Dados reais dos acessos e contactos registados para esta empresa."
+              eyebrow="Atividade"
+              height="md"
+              action={<BarChart3 className="h-5 w-5 text-[var(--color-green-600)]" />}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={overviewEngagementData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }} barCategoryGap="22%">
+                  <CartesianGrid vertical={false} strokeDasharray="3 5" stroke="var(--color-border-default)" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fontWeight: 600, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} dy={8} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} width={34} />
+                  <Tooltip cursor={{ fill: 'var(--color-green-600)', opacity: 0.06 }} content={<ChartTooltip />} />
+                  <Bar dataKey="value" name="Total" radius={[10, 10, 4, 4]} maxBarSize={38}>
+                    {overviewEngagementData.map((entry) => <Cell key={entry.name} fill={entry.fill} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartFrame>
+
+            <ChartFrame
+              title="Atividade comercial"
+              description="Volume atual dos módulos da empresa."
+              eyebrow="Visão geral"
+              height="md"
+              action={<PieChartIcon className="h-5 w-5 text-[var(--color-green-600)]" />}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={overviewActivityData} dataKey="total" nameKey="name" innerRadius={58} outerRadius={88} paddingAngle={4} cornerRadius={5} stroke="var(--color-bg-surface)" strokeWidth={3}>
+                    {overviewActivityData.map((entry, index) => <Cell key={entry.name} fill={[chartColors.primary, chartColors.accent, chartColors.info, chartColors.warm][index % 4]} />)}
+                  </Pie>
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 10, paddingTop: 8, fontWeight: 600 }} formatter={(value) => <span style={{ color: 'var(--color-text-strong)' }}>{value}</span>} />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartFrame>
+          </div>
+        </div>
+      )}
+
+      {/* My Business Tab */}
+      {activeTab === 'my_business' && (
+        <ClientBusinessProfile
+          business={business}
+          categories={categories}
+          currentLang={currentLang}
+          onUpdateBusiness={async (updatedBusiness) => {
+            if (!denyPermission('profile')) throw new Error('Não tem permissão para editar o perfil.');
+            if (!guardSubscriptionAction()) throw new Error('A empresa deve renovar o plano antes de editar o perfil.');
+            if (!onSaveBusinessProfile) throw new Error('A gravação do perfil não está disponível.');
+            await onSaveBusinessProfile(updatedBusiness);
+          }}
+        />
+      )}
+
+      {/* Events Tab */}
+      {activeTab === 'events' && (
+        <div className="space-y-4">
+          <ClientEventsManagement
+            business={business}
+            currentLang={currentLang}
+            events={events}
+            purchaseOrders={myBusinessOrders}
+            onEventSubmitted={(event) => {
+              if (denyPermission('events') && guardSubscriptionAction()) onEventSubmitted?.(event);
+            }}
+            onEventCancelled={(event) => {
+              if (denyPermission('events') && guardSubscriptionAction()) onEventCancelled?.(event);
+            }}
+          />
+          {/* Bilheteira real: bilhetes vendidos e pedido de reembolso (GUI-3.4.11). */}
+          <SoldTicketsPanel currentLang={currentLang} />
+        </div>
+      )}
+
+      {activeTab === 'stories' && (
+        <StoriesManagementHub currentUser={currentUser} embedded onStoryPublished={onStoryPublished} />
+      )}
+
+      {/* Posts Tab */}
+      {activeTab === 'posts' && (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+          <Card className="space-y-5 border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5 shadow-sm sm:p-6 xl:col-span-7 dark:bg-[var(--color-bg-surface-dark)]">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--color-border-subtle)] pb-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--color-green-600)]">{t('business.ProducaoConteudo')}</p>
+                <h3 className="mt-1 flex items-center gap-2 text-lg font-black text-[var(--color-text-strong)]">
+                  <FileText className="h-5 w-5 text-[var(--color-green-600)]" />{t('business.NovaPublicacao')}</h3>
+                <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">{t('business.CrieUmaAtualizacao')}</p>
+              </div>
+              <Badge variant="info" className="px-2.5 py-1 text-[10px]">
+                Gemini IA
+              </Badge>
+            </div>
+
+            {/* Media Tabs Selector */}
+            <div className="bg-[var(--color-bg-subtle)] p-1 rounded-2xl grid grid-cols-3 gap-1 font-bold text-center text-xs">
+              <Button
+                type="button"
+                variant={postMediaType === 'image' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setPostMediaType('image')}
+                className="rounded-xl py-2 text-[var(--color-text-strong)]"
+              >
+                <ImageIcon className="w-3.5 h-3.5 text-[var(--color-green-600)]" />
+                <span>{t('business.FotoUnica')}</span>
+              </Button>
+
+              <Button
+                type="button"
+                variant={postMediaType === 'video' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setPostMediaType('video')}
+                className="rounded-xl py-2 text-[var(--color-text-strong)]"
+              >
+                <Video className="w-3.5 h-3.5 text-[var(--color-violet-600)]" />
+                <span className="flex items-center gap-1">
+                  <span>{t('video')}</span>
+                  {business.tier && <Crown className="w-3 h-3 text-[var(--color-gold-500)]" />}
+                </span>
+              </Button>
+
+              <Button
+                type="button"
+                variant={postMediaType === 'gallery' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setPostMediaType('gallery')}
+                className="rounded-xl py-2 text-[var(--color-text-strong)]"
+              >
+                <Tag className="w-3.5 h-3.5 text-[var(--color-green-600)]" />
+                <span>Galeria de Fotos</span>
+              </Button>
+            </div>
+
+            <form onSubmit={handleTestAiModerationAndSubmit} className="space-y-5 text-xs">
+              <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-3">
+                <p className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-text-muted)]">{t('business.Publicacao')}</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button type="button" size="sm" variant={postPublishMode === 'now' ? 'primary' : 'ghost'} onClick={() => setPostPublishMode('now')}>Publicar agora</Button>
+                  <Button type="button" size="sm" variant={postPublishMode === 'scheduled' ? 'primary' : 'ghost'} onClick={() => setPostPublishMode('scheduled')}>{t('business.AgendarPublicacao')}</Button>
+                </div>
+                {postPublishMode === 'scheduled' && (
+                  <label className="mt-3 block font-bold text-[var(--color-text-strong)]">Data e hora <span className="font-normal text-[var(--color-text-muted)]">(Africa/Bissau)</span>
+                    <input type="datetime-local" required value={postScheduledAt} onChange={(e) => setPostScheduledAt(e.target.value)} className="mt-1 w-full rounded-xl border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-3 text-[var(--color-text-strong)]" />
+                  </label>
+                )}
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--color-text-muted)]">1. Mensagem</p>
+                  <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">{t('business.DefinaTituloInformacao')}</p>
+                </div>
+                <label className="block font-bold text-[var(--color-text-strong)]">{t('title')}<input
+                  type="text"
+                  required
+                  value={postTitle}
+                  onChange={(e) => setPostTitle(e.target.value)}
+                  placeholder="Ex: Novo Prato de Peixe Fresco!"
+                  className="w-full bg-[var(--color-bg-subtle)] border-[var(--color-border-subtle)] rounded-xl p-3 text-[var(--color-text-strong)]"
+                />
+                </label>
+
+                <label className="block font-bold text-[var(--color-text-strong)]">{t('businessNavContent')}<textarea
+                  required
+                  rows={4}
+                  value={postContent}
+                  onChange={(e) => setPostContent(e.target.value)}
+                  placeholder="Descreva a novidade..."
+                  className="w-full bg-[var(--color-bg-subtle)] border-[var(--color-border-subtle)] rounded-xl p-3 text-[var(--color-text-strong)]"
+                />
+                </label>
+              </div>
+
+              {/* 1. Single Image */}
+              {postMediaType === 'image' && (
+                <div>
+                  <label className="block text-[var(--color-text-strong)] font-semibold mb-1">{t('business.ImagemPublicacao')}</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-[var(--color-green-300)] bg-[var(--color-green-50)] px-3 py-3 text-[11px] font-bold text-[var(--color-emerald-800)] hover:bg-[var(--color-emerald-100)]">
+                      <span>Carregar</span>
+                      <input type="file" accept="image/*" className="sr-only" onChange={(e) => handleLocalPostImage(e.target.files?.[0])} />
+                    </label>
+                    <input
+                      type="url"
+                      value={postImageUrl.startsWith('data:') ? '' : postImageUrl}
+                      onChange={(e) => setPostImageUrl(e.target.value)}
+                      placeholder="Ou inserir URL da imagem..."
+                      className="w-full bg-[var(--color-bg-subtle)] border-[var(--color-border-subtle)] rounded-xl p-3 text-[var(--color-text-strong)]"
+                    />
+                  </div>
+                  {postImageUrl && (
+                    <div className="mt-2 h-32 rounded-xl overflow-hidden border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)]">
+                      <img src={postImageUrl} alt={t('business.PreVisualizacao')} className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 2. Video */}
+              {postMediaType === 'video' && (
+                <div className="bg-[var(--color-violet-50)]/60 p-3.5 rounded-2xl border-[var(--color-violet-200)] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[var(--color-violet-900)] font-extrabold flex items-center gap-1.5">
+                      <Video className="w-4 h-4 text-[var(--color-violet-600)]" />
+                      <span>{t('business.LinkVideoComercial')}</span>
+                    </label>
+                    <span className="text-[10px] font-extrabold text-[var(--color-violet-800)] bg-[var(--color-violet-100)] px-2 py-0.5 rounded-md">
+                      👑 Recurso para Assinantes de Planos
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-[var(--color-violet-300)] bg-[var(--color-violet-100)]/70 px-3 py-3 text-[11px] font-bold text-[var(--color-violet-900)] hover:bg-[var(--color-violet-100)]">
+                      <span>Carregar</span>
+                      <input type="file" accept="video/*" className="sr-only" onChange={(e) => handleLocalPostVideo(e.target.files?.[0])} />
+                    </label>
+                    <input
+                      type="url"
+                      value={postVideoUrl.startsWith('data:') ? '' : postVideoUrl}
+                      onChange={(e) => setPostVideoUrl(e.target.value)}
+                      placeholder="Ou inserir URL YouTube, Vimeo ou .MP4..."
+                      className="w-full bg-[var(--color-bg-surface)] border-[var(--color-violet-200)] rounded-xl p-2.5 text-[var(--color-text-strong)] font-mono text-xs"
+                    />
+                  </div>
+                  <p className="text-[11px] text-[var(--color-violet-700)]">{t('business.ReprodutorVideoAlta')}</p>
+                </div>
+              )}
+
+              {/* 3. Photo Gallery */}
+              {postMediaType === 'gallery' && (
+                <div className="bg-[var(--color-green-50)]/60 p-3.5 rounded-2xl border-[var(--color-green-200)] space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[var(--color-green-900)] font-extrabold flex items-center gap-1.5">
+                      <ImageIcon className="w-4 h-4 text-[var(--color-green-600)]" />
+                      <span>Galeria de Fotos do Estabelecimento</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-[var(--color-blue-800)] bg-[var(--color-blue-100)] px-2 py-0.5 rounded-md">
+                      {dashboardGalleryUrls.length} foto(s)
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-[var(--color-green-300)] bg-[var(--color-blue-100)]/70 px-3 py-2 text-[11px] font-bold text-[var(--color-green-900)] hover:bg-[var(--color-blue-100)]">
+                      <span>Carregar</span>
+                      <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => handleLocalGalleryImages(e.target.files)} />
+                    </label>
+                    <input
+                      type="url"
+                      value={newDashboardGalleryInput}
+                      onChange={(e) => setNewDashboardGalleryInput(e.target.value)}
+                      placeholder="URL da foto (ex: Unsplash, CDN)..."
+                      className="flex-1 bg-[var(--color-bg-surface)] border-[var(--color-green-200)] rounded-xl p-2 text-xs text-[var(--color-text-strong)]"
+                    />
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      type="button"
+                      onClick={() => {
+                        if (!newDashboardGalleryInput.trim()) return;
+                        setDashboardGalleryUrls((prev) => [...prev, newDashboardGalleryInput.trim()]);
+                        setNewDashboardGalleryInput('');
+                      }}
+                      className="px-3 py-2 bg-[var(--color-green-600)] text-white font-bold rounded-xl text-xs hover:bg-[var(--color-green-700)] flex items-center gap-1 shrink-0"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Anexar</span>
+                    </Button>
+                  </div>
+
+                  {dashboardGalleryUrls.length > 0 && (
+                    <div className="grid grid-cols-4 gap-2 pt-1">
+                      {dashboardGalleryUrls.map((url, idx) => (
+                        <div key={idx} className="relative h-16 rounded-xl overflow-hidden border-[var(--color-green-200)]">
+                          <img src={url} alt="" className="w-full h-full object-cover" />
+                          <IconButton
+                            label="Remover imagem"
+                            variant="danger"
+                            size="sm"
+                            type="button"
+                            onClick={() => setDashboardGalleryUrls((prev) => prev.filter((_, i) => i !== idx))}
+                            className="absolute top-1 right-1 bg-[var(--color-red-600)] text-white p-1 rounded-full text-[10px]"
+                          >
+                            <X className="w-3 h-3" />
+                          </IconButton>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                loading={isModerating}
+                className="w-full rounded-xl bg-[var(--color-green-600)] text-xs hover:bg-[var(--color-green-700)]"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>{isModerating ? 'A Analisar...' : 'Validar com IA & Publicar'}</span>
+              </Button>
+            </form>
+
+            {aiResult && (
+              <div
+                className={`p-4 rounded-xl border text-xs ${
+                  aiResult.status === 'verde'
+                    ? 'bg-[var(--color-green-50)] border-[var(--color-green-300)] text-[var(--color-emerald-900)]'
+                    : 'bg-[var(--color-red-50)] border-[var(--color-red-300)] text-[var(--color-red-900)]'
+                }`}
+              >
+                <div className="font-bold flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Moderação IA: {aiResult.status.toUpperCase()}</span>
+                </div>
+                <p className="mt-1">{aiResult.reason}</p>
+              </div>
+            )}
+          </Card>
+
+          <div className="space-y-4 xl:col-span-5">
+            <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5 dark:bg-[var(--color-bg-surface-dark)]">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--color-text-muted)]">Biblioteca</p>
+              <h3 className="mt-1 text-lg font-black text-[var(--color-text-strong)]">{t('business.PublicacoesActivas')}</h3>
+              <p className="mt-1 text-xs text-[var(--color-text-muted)]">{business.posts.length} publicação(res) visível(eis) no perfil.</p>
+            </Card>
+
+            {business.posts.map((p) => (
+              <Card
+                key={p.id}
+                className="cursor-pointer border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 space-y-2 transition hover:-translate-y-0.5 hover:border-[var(--color-green-300)] hover:shadow-md focus-within:ring-2 focus-within:ring-[var(--color-green-200)]"
+                onClick={() => setSelectedBusinessPost(p)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelectedBusinessPost(p);
+                  }
+                }}
+              >
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-[var(--color-text-strong)]">{p.title || 'Publicação sem título'}</span>
+                  <Badge variant="success" className="px-2 py-0.5 text-[10px]">
+                    Aprovado
+                  </Badge>
+                </div>
+                <p className="text-xs text-[var(--color-text-muted)] line-clamp-2">{p.content}</p>
+                <span className="text-[10px] font-black uppercase tracking-wide text-[var(--color-green-600)]">{t('business.AbrirPublicacao')}</span>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Promotions Tab */}
+      {activeTab === 'promotions' && (
+        <Card className="mx-auto w-full max-w-3xl overflow-hidden border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] shadow-[0_22px_60px_-38px_rgba(15,23,42,0.35)] dark:bg-[var(--color-bg-surface-dark)]">
+          <div className="border-b border-[var(--color-border-subtle)] bg-gradient-to-br from-[var(--color-bg-surface)] via-[var(--color-bg-surface)] to-[var(--color-gold-50)]/60 px-5 py-5 sm:px-7">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--color-gold-100)] text-[var(--color-gold-700)]">
+                <Tag className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-lg font-black tracking-tight text-[var(--color-text-strong)]">{t('business.CriarNovaPromocao')}</h3>
+                <p className="mt-1 max-w-xl text-xs leading-relaxed text-[var(--color-text-muted)]">
+                  {t('business.DestaqueOfertaClara')}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleCreatePromo} className="space-y-5 p-5 text-xs sm:p-7">
+            <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-3">
+              <p className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-text-muted)]">{t('business.Ativacao')}</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button type="button" size="sm" variant={promoPublishMode === 'now' ? 'primary' : 'ghost'} onClick={() => setPromoPublishMode('now')}>Ativar agora</Button>
+                <Button type="button" size="sm" variant={promoPublishMode === 'scheduled' ? 'primary' : 'ghost'} onClick={() => setPromoPublishMode('scheduled')}>{t('business.AgendarInicio')}</Button>
+              </div>
+              {promoPublishMode === 'scheduled' && (
+                <label className="mt-3 block font-bold text-[var(--color-text-strong)]">{t('monetization.start')}<span className="font-normal text-[var(--color-text-muted)]">(Africa/Bissau)</span>
+                  <input type="datetime-local" required value={promoScheduledAt} onChange={(e) => setPromoScheduledAt(e.target.value)} className="mt-1 w-full rounded-xl border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-3 text-[var(--color-text-strong)]" />
+                </label>
+              )}
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1.5 block font-black uppercase tracking-wide text-[10px] text-[var(--color-text-muted)]">{t('title')}</label>
+              <input
+                type="text"
+                required
+                value={promoTitle}
+                onChange={(e) => setPromoTitle(e.target.value)}
+                placeholder={t('business.AlmocoComOff')}
+                className="w-full bg-[var(--color-bg-subtle)] border-[var(--color-border-subtle)] rounded-xl p-3 text-[var(--color-text-strong)]"
+              />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block font-black uppercase tracking-wide text-[10px] text-[var(--color-text-muted)]">Selo / Badge</label>
+              <input
+                type="text"
+                required
+                value={promoBadge}
+                onChange={(e) => setPromoBadge(e.target.value)}
+                placeholder="Ex: -20% OFF"
+                className="w-full bg-[var(--color-bg-subtle)] border-[var(--color-border-subtle)] rounded-xl p-3 text-[var(--color-text-strong)]"
+              />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block font-black uppercase tracking-wide text-[10px] text-[var(--color-text-muted)]">{t('description')}</label>
+              <textarea
+                required
+                rows={3}
+                value={promoDesc}
+                onChange={(e) => setPromoDesc(e.target.value)}
+                placeholder={t('business.ExpliqueQueEsta')}
+                className="min-h-28 w-full resize-y bg-[var(--color-bg-subtle)] border-[var(--color-border-subtle)] rounded-xl p-3 text-[var(--color-text-strong)]"
+              />
+            </div>
+
+            <div className="space-y-3 rounded-2xl border-[var(--color-gold-200)] bg-[var(--color-gold-50)]/50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <label className="block font-black uppercase tracking-wide text-[10px] text-[var(--color-gold-900)]">{t('business.MediaPromocao')}</label>
+                  <p className="mt-1 text-[10px] text-[var(--color-gold-800)]/70">{t('business.UseUmaImagem')}</p>
+                </div>
+                <div className="flex rounded-xl bg-[var(--color-bg-surface)] p-1 border-[var(--color-gold-200)]">
+                  <button type="button" onClick={() => setPromoMediaType('image')} className={`rounded-lg px-2.5 py-1 text-[10px] font-bold ${promoMediaType === 'image' ? 'bg-[var(--color-gold-500)] text-[var(--color-text-strong)]' : 'text-[var(--color-text-muted)]'}`}>Foto</button>
+                  <button type="button" onClick={() => setPromoMediaType('video')} className={`rounded-lg px-2.5 py-1 text-[10px] font-bold ${promoMediaType === 'video' ? 'bg-[var(--color-violet-600)] text-white' : 'text-[var(--color-text-muted)]'}`}>{t('video')}</button>
+                </div>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-[var(--color-gold-300)] bg-[var(--color-bg-surface)] px-3 py-3 text-[11px] font-bold text-[var(--color-gold-900)] hover:bg-[var(--color-gold-100)]">
+                  <span>Carregar</span>
+                  <input type="file" accept={promoMediaType === 'image' ? 'image/*' : 'video/*'} className="sr-only" onChange={(e) => handleLocalPromoMedia(e.target.files?.[0])} />
+                </label>
+                <input
+                  type="url"
+                  value={(promoMediaType === 'image' ? promoImageUrl : promoVideoUrl).startsWith('data:') ? '' : (promoMediaType === 'image' ? promoImageUrl : promoVideoUrl)}
+                  onChange={(e) => promoMediaType === 'image' ? setPromoImageUrl(e.target.value) : setPromoVideoUrl(e.target.value)}
+                  placeholder={promoMediaType === 'image' ? 'Ou inserir URL de imagem...' : 'Ou inserir URL de vídeo...'}
+                  className="w-full bg-[var(--color-bg-surface)] border-[var(--color-gold-200)] rounded-xl p-3 text-[var(--color-text-strong)]"
+                />
+              </div>
+              {promoMediaType === 'image' && promoImageUrl && <img src={promoImageUrl} alt={t('business.PreVisualizacaoPromocao')} className="h-32 w-full rounded-xl object-cover border-[var(--color-gold-200)]" />}
+              {promoMediaType === 'video' && promoVideoUrl && <video src={promoVideoUrl} controls className="h-32 w-full rounded-xl object-cover border-[var(--color-violet-200)]" />}
+            </div>
+
+            <div className="max-w-sm">
+              <label className="mb-1.5 block font-black uppercase tracking-wide text-[10px] text-[var(--color-text-muted)]">{t('business.DiasDuracao')}</label>
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={promoDays}
+                onChange={(e) => setPromoDays(Number(e.target.value))}
+                className="w-full bg-[var(--color-bg-subtle)] border-[var(--color-border-subtle)] rounded-xl p-3 text-[var(--color-text-strong)]"
+              />
+            </div>
+
+            <Button
+              variant="primary"
+              size="lg"
+              type="submit"
+              className="w-full rounded-xl bg-[var(--color-green-600)] py-3.5 font-black text-white shadow-sm transition hover:bg-[var(--color-green-700)] min-h-[48px]"
+            >{t('business.PublicarPromocao')}</Button>
+          </form>
+        </Card>
+      )}
+
+      {/* Reviews & Replies Tab (Section 8) */}
+      {activeTab === 'reviews' && (
+        <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-6 rounded-2xl space-y-4 shadow-sm max-w-4xl mx-auto dark:bg-[var(--color-bg-surface-dark)]">
+          {/* Header */}
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4 border-[var(--color-border-subtle)]">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="bg-[var(--color-violet-100)] text-[var(--color-violet-900)] px-2.5 py-0.5 rounded font-black text-[10px] uppercase">{t('business.SeccaoAvaliacoesQualitativas')}</span>
+                <h3 className="text-base font-extrabold text-[var(--color-text-strong)] flex items-center gap-2">
+                  <Award className="w-5 h-5 text-[var(--color-violet-600)]" />
+                  <span>{t('business.GestaoAvaliacoesRespostas')}</span>
+                </h3>
+              </div>
+              <p className="text-xs text-[var(--color-text-muted)] mt-1">{t('reviews.dashboardHint')}</p>
+            </div>
+          </div>
+
+          {/* Qualitative Score Summary */}
+          {(() => {
+            const ratingData = calculateBusinessRating(business.reviews);
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                {/* Main Qualitative Badge */}
+                <div className="bg-gradient-to-br from-[var(--color-violet-900)] to-[var(--color-blue-950)] text-white p-5 rounded-2xl space-y-2 border-[var(--color-violet-800)] shadow-sm flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black uppercase text-[var(--color-violet-300)]">{t('business.RotuloPredominante')}</span>
+                    <div className="text-xl font-black text-[var(--color-gold-300)] flex items-center gap-2">
+                      <Award className="w-5 h-5 text-[var(--color-gold-400)]" />
+                      <span>{ratingData.ratingLabel}</span>
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-[var(--color-violet-200)] border-t-[var(--color-violet-800)]/80 pt-2">
+                    Baseado em <strong>{ratingData.reviewsCount}</strong>{t('business.AvaliacoesConfirmadasPor')}</div>
+                </div>
+
+                {/* Score Breakdown Bar */}
+                <div className="md:col-span-2 bg-[var(--color-bg-subtle)] p-4 rounded-2xl border-[var(--color-border-subtle)] space-y-2">
+                  <div className="font-extrabold text-[var(--color-text-strong)] text-xs uppercase tracking-wider mb-2">{t('reviews.breakdown')}</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="bg-[var(--color-green-50)] border-[var(--color-green-200)] p-2.5 rounded-xl text-center">
+                      <div className="text-lg font-black text-[var(--color-emerald-800)]">{ratingData.breakdown.muito_bom}</div>
+                      <div className="text-[10px] font-bold text-[var(--color-emerald-700)]">{getQualitativeScoreLabel(currentLang, 'muito_bom')}</div>
+                    </div>
+                    <div className="bg-[var(--color-gold-50)] border-[var(--color-gold-200)] p-2.5 rounded-xl text-center">
+                      <div className="text-lg font-black text-[var(--color-gold-800)]">{ratingData.breakdown.gostei_muito}</div>
+                      <div className="text-[10px] font-bold text-[var(--color-gold-700)]">{getQualitativeScoreLabel(currentLang, 'gostei_muito')}</div>
+                    </div>
+                    <div className="bg-[var(--color-green-50)] border-[var(--color-green-200)] p-2.5 rounded-xl text-center">
+                      <div className="text-lg font-black text-[var(--color-blue-800)]">{ratingData.breakdown.gostei}</div>
+                      <div className="text-[10px] font-bold text-[var(--color-green-700)]">{getQualitativeScoreLabel(currentLang, 'gostei')}</div>
+                    </div>
+                    <div className="bg-[var(--color-red-50)] border-[var(--color-red-200)] p-2.5 rounded-xl text-center">
+                      <div className="text-lg font-black text-[var(--color-red-800)]">{ratingData.breakdown.nao_gostei}</div>
+                      <div className="text-[10px] font-bold text-[var(--color-red-700)]">{getQualitativeScoreLabel(currentLang, 'nao_gostei')}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Customer Reviews List & Response Controls */}
+          <div className="space-y-4 pt-2">
+            <h4 className="text-xs font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider">
+              Todas as Avaliações ({business.reviews.length})
+            </h4>
+
+            {business.reviews.length === 0 ? (
+              <EmptyState
+                title={t('business.AindaNaoRecebeu')}
+                description="As avaliações confirmadas por SMS aparecerão aqui."
+              />
+            ) : (
+              business.reviews.map((rev) => {
+                const labelInfo = QUALITATIVE_SCORE_LABELS[rev.qualitativeScore] || QUALITATIVE_SCORE_LABELS.gostei;
+                const isReplying = replyingToReviewId === rev.id;
+
+                return (
+                  <div key={rev.id} className="bg-[var(--color-bg-subtle)] p-5 rounded-2xl border-[var(--color-border-subtle)] space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-[var(--color-text-strong)] text-xs sm:text-sm">{rev.authorName}</span>
+                        <span className="text-[11px] font-mono text-[var(--color-text-muted)]">({rev.authorPhone})</span>
+                        {rev.verifiedSms && (
+                          <span className="bg-[var(--color-emerald-100)] text-[var(--color-emerald-800)] text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-[var(--color-green-600)]" />
+                            SMS Confirmado
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span className="text-[11px] text-[var(--color-text-muted)]">
+                          {new Date(rev.createdAt).toLocaleDateString('pt-PT')}
+                        </span>
+                        {onFlagReview && (
+                          <button type="button"
+                            onClick={() => {
+                              if (!denyPermission('content')) return;
+                              const reason = prompt('Motivo da denúncia desta avaliação (ex: difamação, não-cliente):', 'Apreciação inadequada');
+                              if (reason) {
+                                onFlagReview(business.id, rev.id, reason);
+                                alert('Denúncia enviada é administração do Guigui.com.');
+                              }
+                            }}
+                            className="text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-red-600)] font-bold flex items-center gap-1 hover:bg-[var(--color-red-50)] px-2 py-1 rounded transition"
+                            title={t('business.DenunciarAvaliacaoAbusiva')}
+                          >
+                            <Flag className="w-3.5 h-3.5" />
+                            <span>Denunciar</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className={`inline-block px-3 py-1 rounded-xl text-xs font-black border ${labelInfo.badgeBg}`}>
+                        {getQualitativeScoreLabel(currentLang, rev.qualitativeScore)}
+                      </span>
+                    </div>
+
+                    {rev.comment && (
+                      <p className="text-[var(--color-text-strong)] text-xs leading-relaxed bg-[var(--color-bg-surface)] p-3 rounded-xl border-[var(--color-border-subtle)]">
+                        "{rev.comment}"
+                      </p>
+                    )}
+
+                    {/* Owner Public Reply section */}
+                    {rev.ownerReply ? (
+                      <div className="bg-[var(--color-violet-50)]/80 border-[var(--color-violet-200)] p-3.5 rounded-xl space-y-1 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold text-[var(--color-violet-900)] flex items-center gap-1.5 text-[11px]">
+                            <MessageSquare className="w-3.5 h-3.5 text-[var(--color-violet-600)]" />
+                            <span>{t('business.SuaRespostaPublica')}</span>
+                          </span>
+                          <button type="button"
+                            onClick={() => {
+                              if (!denyPermission('content')) return;
+                              setReplyingToReviewId(rev.id);
+                              setReplyText(rev.ownerReply || '');
+                            }}
+                            className="text-[10px] text-[var(--color-violet-700)] hover:underline font-bold"
+                          >
+                            Editar resposta
+                          </button>
+                        </div>
+                        <p className="text-[var(--color-violet-950)] font-medium leading-relaxed">{rev.ownerReply}</p>
+                      </div>
+                    ) : (
+                      <div>
+                        {!isReplying ? (
+                          <button type="button"
+                            onClick={() => {
+                              if (!denyPermission('content')) return;
+                              setReplyingToReviewId(rev.id);
+                              setReplyText('');
+                            }}
+                            className="text-xs font-bold text-[var(--color-violet-700)] hover:text-[var(--color-violet-900)] bg-[var(--color-violet-50)] hover:bg-[var(--color-violet-100)] px-3 py-1.5 rounded-xl border-[var(--color-violet-200)] transition flex items-center gap-1.5"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>Responder Publicamente</span>
+                          </button>
+                        ) : null}
+                      </div>
+                    )}
+
+                    {/* Active Reply Editor */}
+                    {isReplying && (
+                      <div className="bg-[var(--color-bg-surface)] p-4 rounded-xl border-[var(--color-violet-300)] space-y-3 shadow-sm text-xs">
+                        <div className="font-extrabold text-[var(--color-text-strong)]">
+                          {rev.ownerReply ? 'Editar Resposta' : 'Nova Resposta Publica do Estabelecimento'}
+                        </div>
+                        <textarea
+                          rows={2}
+                          value={replyText}
+                          onChange={(e) => setReplyText(e.target.value)}
+                          placeholder={t('business.AgradecaFeedbackCliente')}
+                          className="w-full border-[var(--color-border-subtle)] rounded-xl p-2.5 text-[var(--color-text-strong)] text-xs"
+                        />
+                        <div className="flex gap-2 justify-end">
+                          <button type="button"
+                            onClick={() => {
+                              if (!replyText.trim()) return;
+                              if (!denyPermission('content')) return;
+                              if (onReplyReview) {
+                                onReplyReview(business.id, rev.id, replyText.trim());
+                              } else {
+                                rev.ownerReply = replyText.trim();
+                              }
+                              setReplyingToReviewId(null);
+                              setReplyText('');
+                              alert('Resposta publicada com sucesso na ficha da sua empresa!');
+                            }}
+                            className="bg-[var(--color-violet-600)] hover:bg-[var(--color-violet-700)] text-white font-bold px-3 py-1.5 rounded-xl text-xs"
+                          >
+                            Publicar Resposta
+                          </button>
+                          <button type="button"
+                            onClick={() => {
+                              setReplyingToReviewId(null);
+                              setReplyText('');
+                            }}
+                            className="bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] font-medium px-3 py-1.5 rounded-xl text-xs"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </Card>
+      )}
+
+      {activeTab === 'team' && (
+        <TeamAccessHub business={business} currentUser={currentUser} currentLang={currentLang} />
+      )}
+
+      {/* Billing Tab (Section 4) */}
+      {activeTab === 'billing' && (
+        <div className="mx-auto max-w-5xl space-y-4">
+          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 shadow-[var(--shadow-xs)] sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--color-green-600)]">Assinatura e faturação</p>
+                <h3 className="mt-1 flex items-center gap-2 text-lg font-extrabold text-[var(--color-text-strong)]">
+                  <CreditCard className="h-5 w-5 text-[var(--color-green-600)]" />
+                  <span>{t('business.GestaoSubscricaoFacturacao')}</span>
+                </h3>
+                <p className="mt-1 max-w-2xl text-xs leading-relaxed text-[var(--color-text-muted)]">
+                  Consulte o plano, contrate serviços adicionais ou descarregue recibos. Cada área abre individualmente.
+                </p>
+              </div>
+              <Badge variant={subscriptionAccessState === 'active' ? 'success' : 'warning'} className="px-3 py-1.5">
+                {subscriptionAccessState === 'active' ? 'Subscrição ativa' : subscriptionAccessState === 'expired' ? 'Subscrição expirada' : 'Subscrição suspensa'}
+              </Badge>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              {[
+                {
+                  id: 'plans' as const,
+                  label: t('business.ComparativoPlanosDisponiveis'),
+                  description: `${availableSubscriptionPlans.length} planos disponíveis`,
+                  icon: CreditCard,
+                },
+                {
+                  id: 'services' as const,
+                  label: t('business.PublicidadeServicosAdicionais'),
+                  description: 'Publicidade, destaques e conteúdo',
+                  icon: Megaphone,
+                },
+                {
+                  id: 'history' as const,
+                  label: t('business.HistoricoPagamentosRecibos'),
+                  description: 'Consultar e imprimir recibos',
+                  icon: Receipt,
+                },
+              ].map((area) => {
+                const active = billingSection === area.id;
+                const AreaIcon = area.icon;
+                return (
+                  <button
+                    key={area.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setBillingSection(area.id)}
+                    className={`flex items-start gap-3 rounded-2xl border p-3 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] ${active ? 'border-[var(--color-green-700)] bg-[var(--color-green-700)] text-white shadow-sm' : 'border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] text-[var(--color-text-strong)] hover:border-[var(--color-green-300)] hover:bg-[var(--color-green-50)]'}`}
+                  >
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${active ? 'bg-[#2f8f6e] text-white' : 'bg-[var(--color-bg-surface)] text-[var(--color-green-700)]'}`}>
+                      <AreaIcon className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs font-black leading-snug">{area.label}</span>
+                      <span className={`mt-0.5 block text-[10px] font-semibold ${active ? 'text-white/75' : 'text-[var(--color-text-muted)]'}`}>{area.description}</span>
+                    </span>
+                    <ChevronRight className={`mt-1 h-4 w-4 shrink-0 ${active ? 'text-white/70' : 'text-[var(--color-text-muted)]'}`} aria-hidden="true" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {billingSection === 'plans' && (
+            <div className="space-y-4">
+              <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 shadow-[var(--shadow-xs)] sm:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border-subtle)] pb-4">
+                  <div>
+                    <h4 className="text-sm font-extrabold text-[var(--color-text-strong)]">Subscrição atual</h4>
+                    <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">Estado do plano, renovação e método de pagamento.</p>
+                  </div>
+                  <div className="flex items-center gap-1 rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-1 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setIsAnnualBilling(false)}
+                      className={`rounded-xl px-3 py-1.5 transition ${!isAnnualBilling ? 'bg-[var(--color-neutral-0)] text-[var(--color-green-700)] shadow-sm' : 'text-[var(--color-text-muted)]'}`}
+                    >
+                      Mensal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsAnnualBilling(true)}
+                      className={`flex items-center gap-1 rounded-xl px-3 py-1.5 transition ${isAnnualBilling ? 'bg-[var(--color-neutral-0)] text-[var(--color-green-700)] shadow-sm' : 'text-[var(--color-text-muted)]'}`}
+                    >
+                      <span>Anual</span>
+                      <Badge variant="success" className="px-1.5 py-0.5 text-[9px]">-{pricingConfig.annualDiscountPercent}% OFF</Badge>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 items-center gap-4 rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-4 text-xs md:grid-cols-4">
+                  <div>
+                    <span className="font-medium text-[var(--color-text-muted)]">{t('business.EscalaoAtual')}</span>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-sm font-extrabold uppercase text-[var(--color-green-700)]">
+                      <span>{getSubscriptionTierLabel(business.tier)}</span>
+                      {business.verified && <CheckCircle className="h-4 w-4 text-[var(--color-green-600)]" aria-label="Verificado" />}
+                    </div>
+                    <div className={`mt-1 text-[10px] font-black uppercase ${subscriptionAccessState === 'active' ? 'text-[var(--color-emerald-700)]' : 'text-[var(--color-gold-700)]'}`}>
+                      {subscriptionAccessState === 'active' ? 'Ativo' : subscriptionAccessState === 'expired' ? 'Expirado — consulta' : 'Suspenso'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="font-medium text-[var(--color-text-muted)]">{t('business.ProximaRenovacao')}</span>
+                    <div className="mt-0.5 text-sm font-bold text-[var(--color-text-strong)]">
+                      {new Date(business.subscriptionRenewDate).toLocaleDateString('pt-PT')}
+                    </div>
+                    <div className="mt-0.5 text-[10px] font-semibold text-[var(--color-text-muted)]">
+                      {subscriptionInterval === 'annual' ? 'Plano anual' : 'Plano mensal'} · alertas: 15d, 10d, 5d e 24h
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="font-medium text-[var(--color-text-muted)]">{t('business.MetodoPagamentoAtivo')}</span>
+                    <div className="mt-0.5 flex items-center gap-1 text-sm font-bold text-[var(--color-emerald-700)]">
+                      <Smartphone className="h-3.5 w-3.5" />
+                      <span>Orange Money (+245 955 *** **)</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setShowUpgradeModal(true)}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--color-green-600)] px-4 py-2.5 text-xs font-black text-white shadow-md transition hover:bg-[var(--color-green-700)]"
+                    >
+                      <Zap className="h-4 w-4 text-[var(--color-gold-300)]" />
+                      <span>{t('business.AlterarLibertarEscalao')}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 shadow-[var(--shadow-xs)] sm:p-5">
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-[var(--color-text-strong)]">{t('business.ComparativoPlanosDisponiveis')}</h4>
+                    <p className="text-[10px] text-[var(--color-text-muted)]">{t('business.ValoresBeneficiosSincronizados')}</p>
+                  </div>
+                  <span className="rounded-full border border-[var(--color-indigo-200)] bg-[var(--color-indigo-50)] px-2.5 py-1 text-[10px] font-black text-[var(--color-indigo-700)]">{availableSubscriptionPlans.length} plano(s) ativo(s)</span>
+                </div>
+                <div className="grid grid-cols-1 gap-4 text-xs md:grid-cols-2 xl:grid-cols-4">
+                  {availableSubscriptionPlans.map((plan) => {
+                    const isCurrent = business.planId === plan.id || (!business.planId && business.tier === plan.legacyTier);
+                    return (
+                      <div key={plan.id} className={`space-y-3 rounded-2xl border p-4 ${isCurrent ? 'border-[var(--color-green-300)] bg-[var(--color-green-50)]/60 ring-2 ring-[var(--color-green-600)]' : 'border-[var(--color-border-subtle)] bg-[var(--color-neutral-0)]'}`}>
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-sm font-extrabold text-[var(--color-text-strong)]">{plan.name}</div>
+                            {isCurrent && <span className="rounded-full bg-[var(--color-green-600)] px-2 py-0.5 text-[9px] font-black text-white">{t('business.ActualBadge')}</span>}
+                          </div>
+                          <div className="text-[10px] text-[var(--color-text-muted)]">{plan.price > 0 ? `${plan.price.toLocaleString('pt-PT')} ${plan.currency}${t('business.Mes')}` : t('business.PrecoNegociado')} · v{plan.version}</div>
+                        </div>
+                        <ul className="space-y-2 text-[11px] text-[var(--color-text-strong)]">
+                          <li className="flex items-center gap-1.5 font-bold text-[var(--color-green-700)]"><CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--color-green-600)]" /><span>{limitLabel(plan.postsPerMonth)} {t('business.PostsPorMes')}</span></li>
+                          <li className="flex items-center gap-1.5 font-bold text-[var(--color-gold-700)]"><CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--color-gold-600)]" /><span>{limitLabel(plan.promotionsPerMonth)} {t('business.PromocoesPorMes')}</span></li>
+                          <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--color-green-600)]" /><span>{limitLabel(plan.maxCategories)} {t('business.CategoriasCount')}</span></li>
+                          {plan.featureSlugs.filter((feature) => !['posts', 'promotions', 'categories'].includes(feature)).slice(0, 3).map((feature) => <li key={feature} className="flex items-center gap-1.5 text-[10px]"><CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--color-green-600)]" /><span>{feature.replaceAll('_', ' ')}</span></li>)}
+                        </ul>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {billingSection === 'services' && (
+            <div className="space-y-4 rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 shadow-[var(--shadow-xs)] sm:p-5">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-indigo-700)]">Divulgação</p>
+                <h4 className="mt-1 text-base font-extrabold text-[var(--color-text-strong)]">{t('business.PublicidadeServicosAdicionais')}</h4>
+                <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">{t('business.ProdutosAbaixoVem')}</p>
+              </div>
+
+              {monetizationNotice && <div className="rounded-xl border border-[var(--color-green-200)] bg-[var(--color-green-50)] px-3 py-2 text-xs font-bold text-[var(--color-emerald-800)]">{monetizationNotice}</div>}
+
+              <div className="grid gap-3 md:grid-cols-2">
+                {resolvedMonetizationCatalog.products.filter((product) => product.isActive && ['advertising', 'push_campaign'].includes(product.type)).map((product) => (
+                  <div key={product.id} className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-3 shadow-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="font-black text-[var(--color-text-strong)]">{product.name}</div>
+                        <div className="mt-1 text-[10px] text-[var(--color-text-muted)]">{product.description}</div>
+                      </div>
+                      <Megaphone className="h-4 w-4 shrink-0 text-[var(--color-indigo-600)]" />
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <span className="text-xs font-black text-[var(--color-indigo-700)]">{product.requiresQuote ? t('business.PrecoNegociado') : `${resolveProductPrice(resolvedMonetizationCatalog, product.code, 1, product.periodDays).toLocaleString('pt-PT')} ${product.currency}`}</span>
+                      <button type="button" onClick={() => handleBuyAdvertising(product.code)} className="rounded-xl bg-[var(--color-indigo-600)] px-3 py-2 text-[10px] font-black text-white hover:bg-[var(--color-indigo-700)]">{product.requiresQuote ? t('business.SolicitarOrcamento') : t('business.Comprar')}</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-3">
+                <div className="grid gap-3 md:grid-cols-[1fr_1.5fr_auto] md:items-end">
+                  <label className="text-[10px] font-black uppercase text-[var(--color-text-muted)]">
+                    {t('business.ServicoConteudo')}
+                    <select className="mt-1 w-full rounded-xl border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-3 py-2 text-xs font-bold text-[var(--color-text-strong)]" value={selectedContentServiceId} onChange={(e) => setSelectedContentServiceId(e.target.value)}>
+                      <option value="">{t('business.EscolherServico')}</option>
+                      {resolvedMonetizationCatalog.contentServices.filter((service) => service.isActive).map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="text-[10px] font-black uppercase text-[var(--color-text-muted)]">
+                    {t('business.NotasDoPedido')}
+                    <textarea className="mt-1 min-h-10 w-full rounded-xl border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-3 py-2 text-xs font-medium text-[var(--color-text-strong)]" value={contentServiceRequestNote} onChange={(e) => setContentServiceRequestNote(e.target.value)} placeholder={t('business.IndiqueOQuePrecisa')} />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={!selectedContentServiceId}
+                    onClick={() => {
+                      const service = resolvedMonetizationCatalog.contentServices.find((item) => item.id === selectedContentServiceId);
+                      if (service) void handleRequestContentService(service);
+                    }}
+                    className="rounded-xl bg-[var(--color-gold-500)] px-3 py-2 text-[10px] font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {t('business.SolicitarOrcamento')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {billingSection === 'history' && (
+            <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 shadow-[var(--shadow-xs)] sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border-subtle)] pb-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-green-700)]">Comprovativos</p>
+                  <h4 className="mt-1 text-xs font-extrabold uppercase tracking-wider text-[var(--color-text-strong)]">{t('business.HistoricoPagamentosRecibos')}</h4>
+                  <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">{t('business.ConsulteTransacoesSubscricao')}</p>
+                </div>
+                <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-1.5 rounded-xl border-[var(--color-border-subtle)] px-3 py-2 text-[10px] font-black text-[var(--color-text-strong)] hover:bg-[var(--color-bg-subtle)]">
+                  <FileDown className="h-3.5 w-3.5" /> Imprimir recibos
+                </button>
+              </div>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full min-w-[560px] text-left text-[11px]">
+                  <thead className="border-b border-[var(--color-border-subtle)] text-[10px] uppercase text-[var(--color-text-muted)]">
+                    <tr><th className="px-2 py-2">Data</th><th className="px-2 py-2">{t('description')}</th><th className="px-2 py-2">{t('business.Referencia')}</th><th className="px-2 py-2 text-right">Valor</th><th className="px-2 py-2 text-right">Estado</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--color-border-subtle)]">
+                    {business.subscriptionPaymentId && (
+                      <tr>
+                        <td className="px-2 py-2 font-mono text-[var(--color-text-muted)]">{new Date(business.subscriptionStartedAt || business.subscriptionRenewDate).toLocaleDateString('pt-PT')}</td>
+                        <td className="px-2 py-2 font-bold text-[var(--color-text-strong)]">Subscrição {getSubscriptionTierLabel(business.tier)}</td>
+                        <td className="px-2 py-2 font-mono text-[var(--color-text-muted)]">{business.subscriptionPaymentId}</td>
+                        <td className="px-2 py-2 text-right font-mono font-bold text-[var(--color-text-strong)]">{(currentPlan.price || 0).toLocaleString('pt-PT')} XOF</td>
+                        <td className="px-2 py-2 text-right font-bold text-[var(--color-emerald-700)]">Confirmado</td>
+                      </tr>
+                    )}
+                    {orderPagination.pageItems.map((order) => (
+                      <tr key={order.id}>
+                        <td className="px-2 py-2 font-mono text-[var(--color-text-muted)]">{new Date(order.purchasedAt).toLocaleDateString('pt-PT')}</td>
+                        <td className="px-2 py-2 font-bold text-[var(--color-text-strong)]">{order.itemTitle}</td>
+                        <td className="px-2 py-2 font-mono text-[var(--color-text-muted)]">{order.orderCode}</td>
+                        <td className="px-2 py-2 text-right font-mono font-bold text-[var(--color-text-strong)]">{order.totalPriceXOF.toLocaleString('pt-PT')} XOF</td>
+                        <td className={`px-2 py-2 text-right font-bold ${order.status === 'cancelled' ? 'text-[var(--color-red-700)]' : 'text-[var(--color-emerald-700)]'}`}>{order.status === 'cancelled' ? 'Cancelado' : 'Pago'}</td>
+                      </tr>
+                    ))}
+                    {!business.subscriptionPaymentId && myBusinessOrders.length === 0 && <tr><td colSpan={5} className="px-2 py-6 text-center text-[var(--color-text-muted)]">{t('business.AindaNaoExistem2')}</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB: Pricing Matrix & Tarifas Config (4.1, 4.2, 4.3) */}
+      {activeTab === 'pricing' && (
+        <div className="space-y-4 text-xs">
+          {/* Notification Toast */}
+          {saveToast && (
+            <div className="bg-[var(--color-green-600)] text-white p-4 rounded-2xl shadow-md flex items-center justify-between font-bold animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-200" />
+                <span>{saveToast}</span>
+              </div>
+              <IconButton label="Fechar aviso" variant="ghost" size="sm" onClick={() => setSaveToast(null)} className="!h-7 !w-7 !border-0 !bg-transparent !text-[var(--color-green-100)] hover:!bg-[var(--color-neutral-0)]/10 hover:!text-white" title="Fechar">
+                <X className="w-3.5 h-3.5" aria-hidden="true" />
+              </IconButton>
+            </div>
+          )}
+
+          {/* Banner: Rule of 3 Posts & Business Model */}
+          <div className="bg-gradient-to-r from-[var(--color-green-900)] via-[var(--color-green-800)] to-[var(--color-green-950)] text-white p-6 rounded-2xl border border-[var(--color-border-strong)] shadow-md space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="bg-[var(--color-gold-400)] text-[var(--color-text-strong)] px-2.5 py-0.5 rounded-lg font-black text-[10px] uppercase tracking-wider">{t('business.ConfiguracaoGestaoComercial')}</span>
+                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded text-[10px] font-bold">{t('business.AcessoAdministradorGestao')}</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button type="button" size="sm" variant="secondary"
+                  onClick={handleExportPricingCsv}
+                  className="bg-[var(--color-green-800)] hover:bg-[#236d5b] text-white font-bold px-3 py-1.5 rounded-xl border border-[#3c8574] transition flex items-center gap-1.5 min-h-[34px]"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Exportar CSV</span>
+                </Button>
+                <Button type="button" size="sm" variant="accent"
+                  onClick={handleResetPricingDefaults}
+                  className="bg-[var(--color-gold-500)]/20 hover:bg-[var(--color-gold-500)]/30 text-[var(--color-amber-200)] font-bold px-3 py-1.5 rounded-xl border border-[var(--color-gold-500)]/30 transition flex items-center gap-1.5 min-h-[34px]"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>{t('business.RestaurarPadroes')}</span>
+                </Button>
+              </div>
+            </div>
+
+            <h3 className="font-black text-base sm:text-lg text-white">{t('business.MatrizPrecosPor')}</h3>
+            <p className="text-[var(--color-text-muted)] leading-relaxed text-[11px] max-w-4xl">
+              <strong>Regra Transversal:</strong>{t('business.TodosEscaloesBasico')}<strong>{t('business.PostsMes')}</strong>{t('business.PostsAdicionaisSao')}</p>
+          </div>
+
+          {/* Matrix Configuration Card */}
+          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4 border-[var(--color-border-subtle)]">
+              <div>
+                <h3 className="text-sm font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider flex items-center gap-2">
+                  <Table className="w-4.5 h-4.5 text-[var(--color-green-600)]" />{t('business.MatrizConfiguravelSubscricao')}</h3>
+                <p className="text-[var(--color-text-muted)] text-[11px] mt-0.5">{t('business.CliqueNumaCelula')}</p>
+              </div>
+
+              <div className="flex items-center gap-3 text-[11px] font-bold">
+                <div className="bg-[var(--color-green-50)] text-[var(--color-emerald-800)] px-3 py-1.5 rounded-xl border border-[var(--color-green-200)] flex items-center gap-1.5">
+                  <Percent className="w-3.5 h-3.5 text-[var(--color-green-600)]" />
+                  <span>Desconto Anual: {pricingConfig.annualDiscountPercent}%</span>
+                </div>
+                <div className="bg-[var(--color-green-50)] text-[var(--color-blue-800)] px-3 py-1.5 rounded-xl border-[var(--color-green-200)] font-mono">
+                  Post Extra: {pricingConfig.extraPostPriceXOF.toLocaleString('pt-PT')} XOF
+                </div>
+              </div>
+            </div>
+
+            {/* Matrix Table */}
+            <div className="overflow-x-auto border border-[var(--color-border-subtle)] rounded-2xl">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[var(--color-bg-subtle)] border-b border-[var(--color-border-subtle)] text-[var(--color-text-strong)] font-extrabold uppercase text-[10px]">
+                    <th className="p-3.5 w-1/3">Grupo de Categoria (Atividade)</th>
+                    <th className="p-3.5 text-center">{t('tierBasic')}</th>
+                    <th className="p-3.5 text-center">Profissional</th>
+                    <th className="p-3.5 text-center">Premium</th>
+                    <th className="p-3.5 text-center">Enterprise</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--color-border-subtle)] text-[var(--color-text-strong)]">
+                  {categoryGroupsList.map((group) => (
+                    <tr key={group.id} className="hover:bg-[var(--color-bg-subtle)]/60 transition">
+                      <td className="p-3.5">
+                        <div className="font-bold text-[var(--color-text-strong)] text-xs">{group.name}</div>
+                        <div className="text-[10px] text-[var(--color-text-muted)] mt-0.5 leading-tight">{group.description}</div>
+                      </td>
+
+                      {(['basic', 'professional', 'premium', 'enterprise'] as SubscriptionTier[]).map((tier) => {
+                        const isEditing =
+                          editingCell?.groupId === group.id && editingCell?.tier === tier;
+                        const currentPrice = group.prices[tier];
+                        const annualDiscountedPrice = Math.round(
+                          currentPrice * 12 * (1 - pricingConfig.annualDiscountPercent / 100)
+                        );
+
+                        return (
+                          <td key={tier} className="p-3 text-center align-top">
+                            {isEditing ? (
+                              <div className="p-2 bg-[var(--color-green-50)] border border-[var(--color-green-300)] rounded-xl space-y-2 text-[10px] shadow-sm">
+                                <label className="block font-bold text-[var(--color-text-strong)]">{t('business.PrecoXofMes')}</label>
+                                <input
+                                  type="number"
+                                  step={1000}
+                                  value={editingCell.price}
+                                  onChange={(e) =>
+                                    setEditingCell({
+                                      ...editingCell,
+                                      price: Number(e.target.value),
+                                    })
+                                  }
+                                  className="w-full p-2 bg-[var(--color-bg-surface)] border border-[var(--color-border-subtle)] rounded-lg text-center font-bold text-[var(--color-text-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--color-green-600)]"
+                                />
+                                <div className="flex gap-1 justify-center pt-1">
+                                  <button type="button"
+                                    onClick={() => handleSaveCellPrice(group.id, tier, editingCell.price)}
+                                    className="bg-[var(--color-green-600)] hover:bg-[var(--color-emerald-700)] text-white font-extrabold px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow-sm transition"
+                                  >
+                                    <Save className="w-3 h-3" />
+                                    <span>Guardar</span>
+                                  </button>
+                                  <button type="button"
+                                    onClick={() => setEditingCell(null)}
+                                    className="bg-[var(--color-bg-subtle)] hover:bg-[var(--color-bg-subtle-dark)] text-[var(--color-text-strong)] font-bold px-2 py-1.5 rounded-lg transition"
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div
+                                onClick={() =>
+                                  setEditingCell({
+                                    groupId: group.id,
+                                    tier,
+                                    price: currentPrice,
+                                  })
+                                }
+                                title={t('business.CliqueParaEditar')}
+                                className="group/cell p-2.5 rounded-xl hover:bg-[var(--color-green-50)]/80 cursor-pointer transition border border-transparent hover:border-[var(--color-green-300)] space-y-1"
+                              >
+                                <div className="font-black text-[var(--color-text-strong)] font-mono text-xs flex items-center justify-center gap-1">
+                                  <span>{currentPrice.toLocaleString('pt-PT')} XOF</span>
+                                  <Edit2 className="w-3 h-3 text-[var(--color-text-muted)] group-hover/cell:text-[var(--color-green-600)] opacity-0 group-hover/cell:opacity-100 transition" />
+                                </div>
+                                <div className="text-[9px] text-[var(--color-text-muted)]">{t('business.Mes')}</div>
+                                <div className="text-[9px] text-[var(--color-emerald-800)] font-semibold bg-[var(--color-green-50)] px-1.5 py-0.5 rounded border border-emerald-100">
+                                  Anual: {annualDiscountedPrice.toLocaleString('pt-PT')} XOF
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Global Fees and Additional Revenues Parameters */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Ticket Fees Config */}
+            <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
+              <h3 className="text-sm font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider flex items-center gap-2">
+                <Ticket className="w-4.5 h-4.5 text-[var(--color-green-600)]" />{t('business.ConfiguracaoTaxasBilheteira')}</h3>
+
+              <div className="space-y-4">
+                <div className="bg-[var(--color-bg-subtle)] p-3.5 rounded-2xl border border-[var(--color-border-subtle)] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-[var(--color-text-strong)] text-xs">{t('business.ComissaoPercentualSobre')}</label>
+                    <span className="font-mono font-black text-[var(--color-emerald-700)] bg-[var(--color-green-50)] px-2 py-0.5 rounded border border-[var(--color-green-200)]">
+                      {pricingConfig.ticketCommissionPercent}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={25}
+                    value={pricingConfig.ticketCommissionPercent}
+                    onChange={(e) => handleUpdateConfigParam('ticketCommissionPercent', Number(e.target.value))}
+                    className="w-full accent-emerald-600 cursor-pointer"
+                  />
+                  <p className="text-[10px] text-[var(--color-text-muted)]">Percentagem da venda de cada bilhete retida pela plataforma Guigui.com.</p>
+                </div>
+
+                {/* Simulation Example */}
+                <div className="p-3.5 bg-[var(--color-green-50)]/80 rounded-2xl border border-[var(--color-green-200)] text-[11px] text-emerald-950 space-y-1">
+                  <div className="font-bold text-xs flex items-center gap-1.5 text-emerald-900">
+                    <Sparkles className="w-4 h-4 text-[var(--color-green-600)]" />
+                    <span>{t('business.SimuladorDinamicoExemplo')}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 pt-1 text-[10px]">
+                    <div className="bg-white p-2 rounded-xl border border-[var(--color-green-200)]">
+                      <span className="text-[var(--color-text-muted)] block">Comissão ({pricingConfig.ticketCommissionPercent}%):</span>
+                      <span className="font-extrabold text-[var(--color-emerald-800)] font-mono">
+                        {(5000 * (pricingConfig.ticketCommissionPercent / 100)).toLocaleString('pt-PT')} XOF
+                      </span>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-[var(--color-green-200)]">
+                      <span className="text-[var(--color-text-muted)] block">Taxa Guigui Total:</span>
+                      <span className="font-black text-[var(--color-blue-800)] font-mono">
+                        {(5000 * (pricingConfig.ticketCommissionPercent / 100) + pricingConfig.ticketFixedFeeXOF).toLocaleString('pt-PT')} XOF
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Additional Revenues Config */}
+            <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
+              <h3 className="text-sm font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider flex items-center gap-2">
+                <Tag className="w-4.5 h-4.5 text-[var(--color-gold-600)]" />{t('business.ConfiguracaoReceitasAdicionais')}</h3>
+
+              <div className="space-y-3">
+                <div className="p-3 bg-[var(--color-bg-subtle)] rounded-2xl border border-[var(--color-border-subtle)] space-y-1">
+                  <label className="font-bold text-[var(--color-text-strong)] text-xs block">{t('business.PrecoPostExtra')}</label>
+                  <input
+                    type="number"
+                    step={500}
+                    value={pricingConfig.extraPostPriceXOF}
+                    onChange={(e) => handleUpdateConfigParam('extraPostPriceXOF', Number(e.target.value))}
+                    className="w-full bg-[var(--color-bg-surface)] border border-[var(--color-border-subtle)] rounded-xl p-2 font-mono text-[var(--color-text-strong)] text-xs font-bold"
+                  />
+                  <span className="text-[10px] text-[var(--color-text-muted)]">{t('business.AplicaAposEsgotar')}</span>
+                </div>
+
+                <div className="p-3 bg-[var(--color-bg-subtle)] rounded-2xl border border-[var(--color-border-subtle)] space-y-1">
+                  <label className="font-bold text-[var(--color-text-strong)] text-xs block">{t('business.PrecoPromocaoExtra')}</label>
+                  <input
+                    type="number"
+                    step={1000}
+                    value={pricingConfig.extraPromotionPriceXOF}
+                    onChange={(e) => handleUpdateConfigParam('extraPromotionPriceXOF', Number(e.target.value))}
+                    className="w-full bg-[var(--color-bg-surface)] border border-[var(--color-border-subtle)] rounded-xl p-2 font-mono text-[var(--color-text-strong)] text-xs font-bold"
+                  />
+                  <span className="text-[10px] text-[var(--color-text-muted)]">Compra avulsa de destaque promocional com badge.</span>
+                </div>
+
+                <div className="p-3 bg-[var(--color-bg-subtle)] rounded-2xl border border-[var(--color-border-subtle)] space-y-1">
+                  <label className="font-bold text-[var(--color-text-strong)] text-xs block">Desconto em Pagamento Anual Antecipado (%)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={50}
+                    value={pricingConfig.annualDiscountPercent}
+                    onChange={(e) => handleUpdateConfigParam('annualDiscountPercent', Number(e.target.value))}
+                    className="w-full bg-[var(--color-bg-surface)] border border-[var(--color-border-subtle)] rounded-xl p-2 font-mono text-[var(--color-text-strong)] text-xs font-bold"
+                  />
+                  <span className="text-[10px] text-[var(--color-text-muted)]">{t('business.DescontoPercentualOferecido')}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Audit Log / Histórico de Alterações de Preço (4.2.c) */}
+          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
+            <div className="flex items-center justify-between border-b pb-3 border-[var(--color-border-subtle)]">
+              <h3 className="text-sm font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider flex items-center gap-2">
+                <History className="w-4.5 h-4.5 text-[var(--color-green-600)]" />{t('business.HistoricoAlteracoesPreco')}</h3>
+              <span className="text-[10px] text-[var(--color-text-muted)] font-bold bg-[var(--color-bg-subtle)] px-2.5 py-1 rounded-lg">
+                {priceAuditLogs.length} Registos Guardados
+              </span>
+            </div>
+
+            <div className="overflow-x-auto border border-[var(--color-border-subtle)] rounded-2xl">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[var(--color-bg-subtle)] border-b border-[var(--color-border-subtle)] text-[var(--color-text-muted)] font-bold uppercase text-[10px]">
+                    <th className="p-3">Data / Hora</th>
+                    <th className="p-3">Grupo de Categoria</th>
+                    <th className="p-3 text-center">{t('business.Escalao')}</th>
+                    <th className="p-3 text-right">{t('business.PrecoAnterior')}</th>
+                    <th className="p-3 text-right">{t('business.NovoPreco')}</th>
+                    <th className="p-3 text-right">Utilizador / Admin</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--color-border-subtle)] text-[11px] text-[var(--color-text-strong)]">
+                  {priceAuditLogs.map((log) => (
+                    <tr key={log.id} className="hover:bg-[var(--color-bg-subtle)] transition">
+                      <td className="p-3 font-mono text-[var(--color-text-muted)]">{log.date}</td>
+                      <td className="p-3 font-semibold text-[var(--color-text-strong)]">{log.categoryGroup}</td>
+                      <td className="p-3 text-center font-bold uppercase text-[10px] text-[var(--color-green-700)]">{log.tier}</td>
+                      <td className="p-3 text-right font-mono text-[var(--color-text-muted)] line-through">
+                        {log.oldPrice.toLocaleString('pt-PT')} XOF
+                      </td>
+                      <td className="p-3 text-right font-mono font-extrabold text-[var(--color-emerald-700)]">
+                        {log.newPrice.toLocaleString('pt-PT')} XOF
+                      </td>
+                      <td className="p-3 text-right text-[var(--color-text-muted)] font-medium">{log.updatedBy}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: BILHETES E HISTÓRICO DE PEDIDOS */}
+      {(activeTab === 'tickets' || activeTab === 'order_history') && (
+        <div className="space-y-4 animate-in fade-in">
+          {/* Header Banner */}
+          <div className="bg-[var(--color-bg-surface-dark)] border border-[var(--color-border-strong)] rounded-2xl p-6 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-md">
+            <div className="flex items-center gap-3">
+              <span className="p-3 bg-emerald-500/20 text-emerald-400 rounded-2xl shrink-0">
+                <ShoppingBag className="w-6 h-6" />
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg sm:text-xl font-black">
+                    {activeTab === 'tickets' ? 'Bilhetes — Levantamentos e vendas' : t('business.orderHistory')}
+                  </h2>
+                  <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase border border-emerald-500/30">
+                    {filteredOrderHistory.length} de {myBusinessOrders.length} Pedidos
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                  {activeTab === 'tickets'
+                    ? `Acompanhe bilhetes vendidos, pagamentos e levantamentos de ${business.name}.`
+                    : `Filtre e exporte o histórico completo de pedidos da empresa ${business.name}.`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-start md:self-auto">
+              <button type="button"
+                onClick={handleExportOrdersCsv}
+                className="px-4 py-2.5 bg-[var(--color-green-600)] hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-xs transition flex items-center gap-2"
+                title={t('business.DescarregarRelatorioPedidos')}
+              >
+                <FileDown className="w-4 h-4" />
+                <span>{activeTab === 'tickets' ? 'Exportar vendas' : 'Exportar CSV'}</span>
+              </button>
+
+              <button type="button"
+                onClick={handleResetOrderFilters}
+                className="px-3.5 py-2.5 bg-[var(--color-bg-surface-dark)] hover:bg-[var(--color-bg-surface-dark)]/80 text-[var(--color-text-muted-dark)] hover:text-white font-bold text-xs rounded-xl border dark:border-slate-700 transition flex items-center gap-1.5"
+                title="Limpar todos os filtros"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Restaurar</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Metrics Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+            <div className="rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-4">
+              <div className="flex items-center justify-between text-[var(--color-text-muted)] text-xs font-bold">
+                <span>Total de Pedidos</span>
+                <Package className="w-4 h-4 text-[var(--color-green-600)]" />
+              </div>
+              <div className="text-base sm:text-lg font-black text-[var(--color-text-strong)] mt-1 font-mono">
+                {filteredOrderHistory.length}
+              </div>
+              <div className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
+                {activeTab === 'tickets' ? 'Bilhetes e levantamentos' : filteredOrderHistory.length === myBusinessOrders.length ? 'Todos os registos' : 'Após filtros aplicados'}
+              </div>
+            </div>
+
+            <div className="rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-4">
+              <div className="flex items-center justify-between text-[var(--color-text-muted)] text-xs font-bold">
+                <span>Volume Faturado</span>
+                <DollarSign className="w-4 h-4 text-[var(--color-green-600)]" />
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-[var(--color-emerald-700)] mt-1 font-mono">
+                {totalOrdersAmount.toLocaleString('pt-PT')} <span className="text-xs">XOF</span>
+              </div>
+              <div className="text-[10px] text-[var(--color-green-600)] font-medium mt-0.5">
+                Ticket Médio: {averageTicketValue.toLocaleString('pt-PT')} XOF
+              </div>
+            </div>
+
+            <div className="bg-[var(--color-bg-surface)] border-[var(--color-gold-200)] bg-gradient-to-br from-[var(--color-gold-100)]/50 to-[var(--color-bg-surface)] rounded-2xl p-4 shadow-xs">
+              <div className="flex items-center justify-between text-[var(--color-gold-800)] text-xs font-bold">
+                <span>{t('business.TransacoesAltoValor')}</span>
+                <Crown className="w-4 h-4 text-[var(--color-gold-600)]" />
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-[var(--color-gold-700)] mt-1 font-mono">
+                {countHighValue}
+              </div>
+              <div className="text-[10px] text-[var(--color-gold-700)] font-bold mt-0.5">
+                ≥ 20.000 XOF por pedido
+              </div>
+            </div>
+
+            <div className="rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-4">
+              <div className="flex items-center justify-between text-[var(--color-text-muted)] text-xs font-bold">
+                <span>Levantados / Entregues</span>
+                <CheckCircle2 className="w-4 h-4 text-[var(--color-green-600)]" />
+              </div>
+              <div className="text-base sm:text-lg font-black text-[var(--color-text-strong)] mt-1 font-mono">
+                {countRedeemed}
+              </div>
+              <div className="text-[10px] text-[var(--color-text-muted)] mt-0.5">{t('qrRedeemed')}</div>
+            </div>
+
+            <div className="rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] p-4">
+              <div className="flex items-center justify-between text-[var(--color-text-muted)] text-xs font-bold">
+                <span>Pendentes de Entrega</span>
+                <Clock className="w-4 h-4 text-[var(--color-gold-600)]" />
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-[var(--color-gold-600)] mt-1 font-mono">
+                {countPending}
+              </div>
+              <div className="text-[10px] text-[var(--color-gold-600)] font-medium mt-0.5">{t('business.AguardamValidacaoLoja')}</div>
+            </div>
+          </div>
+
+          {/* Advanced Multi-Filter Control Panel */}
+          {(activeTab === 'tickets' || activeTab === 'order_history') && (
+          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
+            <div className="flex items-center justify-between border-b border-[var(--color-border-subtle)] pb-3">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-[var(--color-green-600)]" />
+                <span className="text-xs font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider">{t('business.FiltrosPesquisaSegmentacao')}</span>
+              </div>
+              {(orderDateFilter !== 'all' || (activeTab === 'order_history' && orderItemTypeFilter !== 'all') || orderStatusFilter !== 'all' || orderPaymentMethodFilter !== 'all' || orderMinAmount !== '' || orderMaxAmount !== '' || orderSearchQuery) && (
+                <button type="button"
+                  onClick={handleResetOrderFilters}
+                  className="text-[11px] font-bold text-[var(--color-emerald-700)] hover:text-emerald-900 flex items-center gap-1"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Limpar Todos os Filtros Ativos</span>
+                </button>
+              )}
+            </div>
+
+            {/* Value Interval Selector for High-Value Transactions */}
+            <div className="bg-[var(--color-bg-subtle)] p-3.5 rounded-2xl border border-[var(--color-border-subtle)]/80 space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-[var(--color-text-strong)] text-xs font-extrabold">
+                  <DollarSign className="w-4 h-4 text-[var(--color-green-600)]" />
+                  <span>{t('business.IntervaloValoresMinimo')}</span>
+                </div>
+                {(orderMinAmount !== '' || orderMaxAmount !== '') && (
+                  <span className="text-[11px] font-mono text-[var(--color-emerald-800)] bg-[var(--color-emerald-100)] font-bold px-2 py-0.5 rounded-md">
+                    Filtro Ativo: {orderMinAmount !== '' ? `${Number(orderMinAmount).toLocaleString('pt-PT')} XOF` : '0 XOF'} até {orderMaxAmount !== '' ? `${Number(orderMaxAmount).toLocaleString('pt-PT')} XOF` : 'Sem Limite'}
+                  </span>
+                )}
+              </div>
+
+              {/* Quick Value Preset Buttons */}
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => handleApplyValuePreset('all')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition ${
+                    orderValuePreset === 'all' && orderMinAmount === '' && orderMaxAmount === ''
+                      ? 'bg-[var(--color-bg-surface-dark)] text-white shadow-xs'
+                      : 'bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] border border-[var(--color-border-subtle)] hover:bg-[var(--color-bg-subtle)]'
+                  }`}
+                >
+                  Todos os Valores
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleApplyValuePreset('high_val')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1 ${
+                    orderValuePreset === 'high_val'
+                      ? 'bg-[var(--color-gold-600)] text-white shadow-xs'
+                      : 'bg-[var(--color-gold-50)] text-[var(--color-gold-900)] border-[var(--color-gold-200)] hover:bg-[var(--color-gold-100)]'
+                  }`}
+                >
+                  <Star className="w-3.5 h-3.5 fill-amber-400 text-[var(--color-gold-500)]" />
+                  <span>Alto Valor (&gt; 20.000 XOF)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleApplyValuePreset('very_high')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1 ${
+                    orderValuePreset === 'very_high'
+                      ? 'bg-[var(--color-violet-700)] text-white shadow-xs'
+                      : 'bg-[var(--color-violet-50)] text-[var(--color-violet-900)] border-[var(--color-violet-200)] hover:bg-[var(--color-violet-100)]'
+                  }`}
+                >
+                  <Crown className="w-3.5 h-3.5 text-[var(--color-gold-300)]" />
+                  <span>VIP (&gt; 50.000 XOF)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleApplyValuePreset('top_tier')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1 ${
+                    orderValuePreset === 'top_tier'
+                      ? 'bg-[var(--color-emerald-700)] text-white shadow-xs'
+                      : 'bg-[var(--color-green-50)] text-emerald-900 border border-[var(--color-green-200)] hover:bg-[var(--color-emerald-100)]'
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-[var(--color-green-600)]" />
+                  <span>Top (&gt; 100.000 XOF)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleApplyValuePreset('under_10k')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition ${
+                    orderValuePreset === 'under_10k'
+                      ? 'bg-[var(--color-green-600)] text-white shadow-xs'
+                      : 'bg-[var(--color-green-50)] text-[var(--color-green-900)] border-[var(--color-green-200)] hover:bg-[var(--color-blue-100)]'
+                  }`}
+                >
+                  Pequeno Valor (&lt; 10.000 XOF)
+                </button>
+              </div>
+
+              {/* Exact Min & Max Number Inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="text-[11px] font-bold text-[var(--color-text-muted)] block mb-1">{t('business.ValorMinimoXof')}</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min={0}
+                      step={1000}
+                      value={orderMinAmount}
+                      onChange={(e) => {
+                        setOrderMinAmount(e.target.value === '' ? '' : Number(e.target.value));
+                        setOrderValuePreset('custom');
+                      }}
+                      placeholder="Ex: 20000"
+                      className="w-full pl-3 pr-12 py-2 bg-[var(--color-bg-surface)] border border-[var(--color-border-default)] rounded-xl text-xs font-mono font-bold text-[var(--color-text-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus-ring)]"
+                    />
+                    <span className="absolute right-3 top-2 text-[10px] font-mono text-[var(--color-text-muted)] font-bold">
+                      XOF
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-[var(--color-text-muted)] block mb-1">{t('business.ValorMaximoXof')}</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min={0}
+                      step={1000}
+                      value={orderMaxAmount}
+                      onChange={(e) => {
+                        setOrderMaxAmount(e.target.value === '' ? '' : Number(e.target.value));
+                        setOrderValuePreset('custom');
+                      }}
+                      placeholder="Ex: 200000"
+                      className="w-full pl-3 pr-12 py-2 bg-[var(--color-bg-surface)] border border-[var(--color-border-default)] rounded-xl text-xs font-mono font-bold text-[var(--color-text-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus-ring)]"
+                    />
+                    <span className="absolute right-3 top-2 text-[10px] font-mono text-[var(--color-text-muted)] font-bold">
+                      XOF
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className={`grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 ${activeTab === 'tickets' ? 'lg:grid-cols-3' : 'lg:grid-cols-4'}`}>
+              
+              {/* 1. FILTRO POR DATA */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-extrabold text-[var(--color-text-strong)] flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-[var(--color-green-600)]" />
+                  <span>Filtrar por Data</span>
+                </label>
+                <select
+                  value={orderDateFilter}
+                  onChange={(e) => setOrderDateFilter(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-[var(--color-bg-subtle)] border border-[var(--color-border-subtle)] rounded-xl text-xs font-bold text-[var(--color-text-strong)] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="all">Todas as Datas</option>
+                  <option value="today">Hoje</option>
+                  <option value="7days">{t('business.UltimosDias')}</option>
+                  <option value="30days">{t('business.UltimosDias2')}</option>
+                  <option value="custom">Personalizado (Intervalo)</option>
+                </select>
+
+                {/* Custom Date Inputs if 'custom' is selected */}
+                {orderDateFilter === 'custom' && (
+                  <div className="grid grid-cols-2 gap-2 pt-1 animate-in fade-in">
+                    <div>
+                      <span className="text-[9px] text-[var(--color-text-muted)] uppercase font-bold block mb-0.5">De:</span>
+                      <input
+                        type="date"
+                        value={orderDateFrom}
+                        onChange={(e) => setOrderDateFrom(e.target.value)}
+                        className="w-full p-1.5 bg-[var(--color-bg-subtle)] border border-[var(--color-border-subtle)] rounded-lg text-[11px] font-mono text-[var(--color-text-strong)]"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-[var(--color-text-muted)] uppercase font-bold block mb-0.5">{t('business.Ate')}</span>
+                      <input
+                        type="date"
+                        value={orderDateTo}
+                        onChange={(e) => setOrderDateTo(e.target.value)}
+                        className="w-full p-1.5 bg-[var(--color-bg-subtle)] border border-[var(--color-border-subtle)] rounded-lg text-[11px] font-mono text-[var(--color-text-strong)]"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. FILTRO POR TIPO DE ITEM (apenas histórico completo) */}
+              {activeTab === 'order_history' && (
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-extrabold text-[var(--color-text-strong)] flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5 text-[var(--color-green-600)]" />
+                    <span>Tipo de Item</span>
+                  </label>
+                  <select
+                    value={orderItemTypeFilter}
+                    onChange={(e) => setOrderItemTypeFilter(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-[var(--color-bg-subtle)] border border-[var(--color-border-subtle)] rounded-xl text-xs font-bold text-[var(--color-text-strong)] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="all">Todos os Tipos de Item</option>
+                    <option value="product">{t('business.ProdutosFisicosLoja')}</option>
+                    <option value="promotion">{t('business.PromocoesCupoes')}</option>
+                    <option value="ticket">Bilhetes de Eventos</option>
+                    <option value="service">{t('business.ServicosEntregas')}</option>
+                  </select>
+                </div>
+              )}
+
+              {/* 3. FILTRO POR STATUS DE PAGAMENTO / LEVANTAMENTO */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-extrabold text-[var(--color-text-strong)] flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-green-600)]" />
+                  <span>Status do Pedido / Pagamento</span>
+                </label>
+                <select
+                  value={orderStatusFilter}
+                  onChange={(e) => setOrderStatusFilter(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-[var(--color-bg-subtle)] border border-[var(--color-border-subtle)] rounded-xl text-xs font-bold text-[var(--color-text-strong)] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="all">Todos os Estados</option>
+                  <option value="pending">Pendente (Aguardando Entrega)</option>
+                  <option value="redeemed">{t('business.LevantadoConcluidoPago')}</option>
+                  <option value="cancelled">Cancelado / Devolvido</option>
+                </select>
+              </div>
+
+              {/* 4. FILTRO POR MÉTODO DE PAGAMENTO */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-extrabold text-[var(--color-text-strong)] flex items-center gap-1.5">
+                  <CreditCard className="w-3.5 h-3.5 text-[var(--color-violet-600)]" />
+                  <span>{t('business.MetodoPagamento')}</span>
+                </label>
+                <select
+                  value={orderPaymentMethodFilter}
+                  onChange={(e) => setOrderPaymentMethodFilter(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-[var(--color-bg-subtle)] border border-[var(--color-border-subtle)] rounded-xl text-xs font-bold text-[var(--color-text-strong)] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="all">{t('business.TodosMetodos')}</option>
+                  <option value="orange_money">Orange Money Bissau</option>
+                  <option value="telecel">Telecel Cash Bissau</option>
+                  <option value="cash">Pagamento no Local (Dinheiro)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Bottom Row: Text Search & Sorting */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+              <div className="relative flex-1 w-full">
+                <Search className="w-4 h-4 text-[var(--color-text-muted)] absolute left-3.5 top-3" />
+                <input
+                  type="text"
+                  value={orderSearchQuery}
+                  onChange={(e) => setOrderSearchQuery(e.target.value)}
+                  placeholder={t('business.searchOrders')}
+                  className="w-full pl-10 pr-9 py-2.5 bg-[var(--color-bg-subtle)] border border-[var(--color-border-subtle)] rounded-xl text-xs text-[var(--color-text-strong)] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                {orderSearchQuery && (
+                  <button type="button"
+                    onClick={() => setOrderSearchQuery('')}
+                    className="absolute right-3 top-3 text-[var(--color-text-muted)] hover:text-[var(--color-text-muted)] text-xs font-bold"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                <span className="text-[11px] font-bold text-[var(--color-text-muted)] whitespace-nowrap">Ordenar por:</span>
+                <select
+                  value={orderSortBy}
+                  onChange={(e) => setOrderSortBy(e.target.value as any)}
+                  className="px-3 py-2 bg-[var(--color-bg-subtle)] border border-[var(--color-border-subtle)] rounded-xl text-xs font-bold text-[var(--color-text-strong)] focus:outline-none"
+                >
+                  <option value="date_desc">Mais Recentes</option>
+                  <option value="date_asc">Mais Antigos</option>
+                  <option value="price_desc">Maior Valor (XOF)</option>
+                  <option value="price_asc">Menor Valor (XOF)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          )}
+
+          {/* Orders List Table */}
+          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-[var(--color-green-600)]" />
+                <span>
+                  {activeTab === 'tickets' ? 'Bilhetes e levantamentos' : 'Resultados do histórico'} ({filteredOrderHistory.length} registos)
+                </span>
+              </h3>
+              <div className="text-[11px] text-[var(--color-text-muted)] font-medium">
+                {business.name} • Sistema de Bilhética e Checkout Guigui.com
+              </div>
+            </div>
+
+            {filteredOrderHistory.length === 0 ? (
+              <EmptyState
+                title={t('business.noOrders')}
+                description="Tente alterar o período de datas, o tipo de item selecionado ou limpe a barra de pesquisa para visualizar todos os pedidos."
+                actionLabel="Limpar Todos os Filtros"
+                onAction={handleResetOrderFilters}
+                actionVariant="primary"
+                icon={<ShoppingBag className="w-6 h-6" />}
+              />
+            ) : (
+              <div className="overflow-x-auto border border-[var(--color-border-subtle)] rounded-2xl">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-[var(--color-bg-subtle)] border-b border-[var(--color-border-subtle)] font-extrabold text-[var(--color-text-strong)] uppercase text-[10px]">
+                      <th className="p-3.5">{t('business.CodigoToken')}</th>
+                      <th className="p-3.5">Data & Hora</th>
+                      <th className="p-3.5">Cliente</th>
+                      <th className="p-3.5">Item & Tipo</th>
+                      <th className="p-3.5 text-right">Valor & Pagamento</th>
+                      <th className="p-3.5 text-center">Status</th>
+                      <th className="p-3.5 text-right">{t('business.Acoes')}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--color-border-subtle)] text-[var(--color-text-strong)]">
+                    {orderPagination.pageItems.map((order) => {
+                      const isPending = order.status === 'pending';
+                      const isRedeemed = order.status === 'redeemed';
+                      const isCancelled = order.status === 'cancelled';
+
+                      return (
+                        <tr key={order.id} className="hover:bg-[var(--color-bg-subtle)]/80 transition">
+                          
+                          {/* Código & QR Token */}
+                          <td className="p-3.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono font-black text-[var(--color-text-strong)] bg-[var(--color-bg-subtle)] px-2 py-0.5 rounded-md border border-[var(--color-border-subtle)]">
+                                {order.orderCode}
+                              </span>
+                              <button type="button"
+                                onClick={() => handleCopyCode(order.orderCode)}
+                                className="text-[var(--color-text-muted)] hover:text-[var(--color-text-strong)] p-1"
+                                title={t('business.CopiarCodigo')}
+                              >
+                                {copiedCode === order.orderCode ? (
+                                  <CheckCheck className="w-3.5 h-3.5 text-[var(--color-green-600)]" />
+                                ) : (
+                                  <Copy className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </div>
+                            <div className="text-[10px] font-mono text-[var(--color-text-muted)] truncate max-w-[130px] mt-0.5">
+                              {order.qrToken}
+                            </div>
+                          </td>
+
+                          {/* Data & Hora */}
+                          <td className="p-3.5 whitespace-nowrap">
+                            <div className="font-bold text-[var(--color-text-strong)]">
+                              {new Date(order.purchasedAt).toLocaleDateString('pt-PT', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                              })}
+                            </div>
+                            <div className="text-[10px] text-[var(--color-text-muted)] font-mono">
+                              {new Date(order.purchasedAt).toLocaleTimeString('pt-PT', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </div>
+                          </td>
+
+                          {/* Cliente */}
+                          <td className="p-3.5">
+                            <div className="font-extrabold text-[var(--color-text-strong)]">{order.customerName}</div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <a
+                                href={`tel:${order.customerPhone}`}
+                                className="text-[10px] text-[var(--color-green-600)] hover:underline flex items-center gap-0.5 font-medium"
+                                title="Ligar para o cliente"
+                              >
+                                <Phone className="w-3 h-3" />
+                                <span>{order.customerPhone}</span>
+                              </a>
+                              <a
+                                href={`https://wa.me/${order.customerPhone.replace(/[^0-9]/g, '')}?text=Olá%20${encodeURIComponent(order.customerName)},%20contacto%20do%20${encodeURIComponent(business.name)}%20sobre%20o%20pedido%20${order.orderCode}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[10px] text-[var(--color-green-600)] hover:underline flex items-center gap-0.5 font-medium"
+                                title="Enviar mensagem no WhatsApp"
+                              >
+                                <MessageCircle className="w-3 h-3" />
+                                <span>WhatsApp</span>
+                              </a>
+                            </div>
+                          </td>
+
+                          {/* Item & Tipo */}
+                          <td className="p-3.5">
+                            <div className="font-bold text-[var(--color-text-strong)] max-w-xs">{order.itemTitle}</div>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <span
+                                className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-md ${
+                                  order.itemType === 'product'
+                                    ? 'bg-[var(--color-blue-100)] text-[var(--color-blue-800)]'
+                                    : order.itemType === 'promotion'
+                                    ? 'bg-[var(--color-gold-100)] text-[var(--color-gold-800)]'
+                                    : order.itemType === 'ticket'
+                                    ? 'bg-[var(--color-violet-100)] text-[var(--color-violet-800)]'
+                                    : 'bg-[var(--color-green-100)] text-[var(--color-green-800)]'
+                                }`}
+                              >
+                                {order.itemType === 'product'
+                                  ? 'Produto'
+                                  : order.itemType === 'promotion'
+                                  ? 'Voucher / Desconto'
+                                  : order.itemType === 'ticket'
+                                  ? 'Bilhete'
+                                  : 'Serviço'}
+                              </span>
+                              <span className="text-[10px] text-[var(--color-text-muted)] font-bold">
+                                Qtd: {order.quantity}x
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Valor & Pagamento */}
+                          <td className="p-3.5 text-right whitespace-nowrap">
+                            <div className="font-mono font-black text-sm text-[var(--color-emerald-700)] flex items-center justify-end gap-1.5">
+                              {order.totalPriceXOF >= 50000 && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-[var(--color-violet-100)] text-purple-800 border-[var(--color-violet-200)] text-[9px] font-extrabold uppercase font-sans">
+                                  <Crown className="w-3 h-3 text-[var(--color-violet-700)]" />
+                                  <span>VIP</span>
+                                </span>
+                              )}
+                              {order.totalPriceXOF >= 20000 && order.totalPriceXOF < 50000 && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-[var(--color-gold-100)] text-[var(--color-gold-800)] border-[var(--color-gold-200)] text-[9px] font-extrabold uppercase font-sans">
+                                  <Star className="w-3 h-3 fill-amber-400 text-[var(--color-gold-600)]" />
+                                  <span>Alto Valor</span>
+                                </span>
+                              )}
+                              <span>
+                                {order.totalPriceXOF === 0 ? (
+                                  <span className="text-[var(--color-green-600)] font-extrabold">{t('business.GratisCupao')}</span>
+                                ) : (
+                                  `${order.totalPriceXOF.toLocaleString('pt-PT')} XOF`
+                                )}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-[var(--color-text-muted)] uppercase font-medium mt-0.5">
+                              {order.paymentMethod === 'orange_money'
+                                ? 'Orange Money'
+                                : order.paymentMethod === 'telecel'
+                                ? 'Telecel Cash'
+                                : 'No Local'}
+                            </div>
+                          </td>
+
+                          {/* Status */}
+                          <td className="p-3.5 text-center whitespace-nowrap">
+                            {isRedeemed && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-[var(--color-emerald-100)] text-[var(--color-emerald-800)] border border-[var(--color-green-200)]">
+                                <CheckCircle2 className="w-3 h-3 text-[var(--color-green-600)]" />
+                                <span>Levantado / Pago</span>
+                              </span>
+                            )}
+                            {isPending && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-[var(--color-gold-100)] text-[var(--color-gold-800)] border-[var(--color-gold-200)] animate-pulse">
+                                <Clock className="w-3 h-3 text-[var(--color-gold-600)]" />
+                                <span>Pendente</span>
+                              </span>
+                            )}
+                            {isCancelled && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-[var(--color-red-100)] text-[var(--color-red-800)] border border-[var(--color-red-200)]">
+                                <XCircle className="w-3 h-3 text-[var(--color-red-600)]" />
+                                <span>Cancelado</span>
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Ações */}
+                          <td className="p-3.5 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button type="button"
+                                onClick={() => setSelectedOrderDetails(order)}
+                                className="p-1.5 bg-[var(--color-bg-subtle)] hover:bg-[var(--color-bg-subtle-dark)] text-[var(--color-text-strong)] rounded-lg transition font-bold text-[11px] flex items-center gap-1"
+                                title="Ver Detalhes do Pedido e Recibo"
+                              >
+                                <Receipt className="w-3.5 h-3.5 text-[var(--color-text-muted)]" />
+                                <span className="hidden md:inline">Recibo</span>
+                              </button>
+
+                              {isPending && onValidatePurchaseOrder && (
+                                <button type="button"
+                                  onClick={() => { if (denyPermission('tickets')) onValidatePurchaseOrder(order.id, business.name); }}
+                                  className="px-2.5 py-1.5 bg-[var(--color-green-600)] hover:bg-[var(--color-emerald-700)] active:scale-95 text-white font-extrabold text-[11px] rounded-lg transition shadow-xs flex items-center gap-1"
+                                  title="Marcar como entregue / levantado"
+                                >
+                                  <CheckCircle className="w-3 h-3" />
+                                  <span>Entregar</span>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {filteredOrderHistory.length > 0 && (
+              <AdminPagination
+                className="mt-4"
+                currentLang={currentLang}
+                currentPage={orderPagination.page}
+                pageSize={orderPagination.pageSize}
+                totalItems={orderPagination.totalItems}
+                onPageChange={orderPagination.setPage}
+                onPageSizeChange={orderPagination.setPageSize}
+                pageSizeOptions={orderPagination.pageSizeOptions}
+              />
+            )}
+          </div>
+
+          {/* Modal de Detalhes do Pedido & Recibo Imprimível */}
+          {selectedOrderDetails && (
+            <div
+              className="fixed inset-0 z-50 bg-[var(--color-bg-surface-dark)]/70 flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setSelectedOrderDetails(null);
+              }}
+            >
+              <div className="bg-[var(--color-bg-surface)] rounded-2xl max-w-lg w-full shadow-2xl border border-[var(--color-border-subtle)] p-6 space-y-4 text-[var(--color-text-strong)] my-auto animate-in zoom-in-95 duration-150">
+                {/* Modal Top Header */}
+                <div className="flex items-center justify-between border-b border-[var(--color-border-subtle)] pb-4">
+                  <div className="flex items-center gap-2.5">
+                    <span className="p-2 bg-[var(--color-emerald-100)] text-[var(--color-emerald-700)] rounded-xl">
+                      <Receipt className="w-5 h-5" />
+                    </span>
+                    <div>
+                      <h3 className="font-black text-base text-[var(--color-text-strong)]">Comprovativo de Pedido</h3>
+                      <p className="text-[11px] text-[var(--color-text-muted)] font-mono">ID: {selectedOrderDetails.orderCode}</p>
+                    </div>
+                  </div>
+                  <button type="button"
+                    onClick={() => setSelectedOrderDetails(null)}
+                    className="p-1.5 rounded-full hover:bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] hover:text-[var(--color-text-strong)] transition"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* QR Code & Status Badge */}
+                <div className="flex flex-col items-center justify-center p-4 bg-[var(--color-bg-subtle)] border border-[var(--color-border-subtle)] rounded-2xl space-y-3 text-center">
+                  <div className="bg-[var(--color-neutral-0)] p-3 rounded-2xl shadow-sm border border-[var(--color-border-subtle)]">
+                    <QRCodeDisplay code={selectedOrderDetails.orderCode} qrToken={selectedOrderDetails.qrToken} title={selectedOrderDetails.itemTitle} buyerName={selectedOrderDetails.customerName} buyerPhone={selectedOrderDetails.customerPhone} amountXOF={selectedOrderDetails.totalPriceXOF} currentLang={currentLang} />
+                  </div>
+                  <div className="font-mono text-xs font-black text-[var(--color-text-strong)] tracking-wider">
+                    {selectedOrderDetails.qrToken}
+                  </div>
+                  <div>
+                    {selectedOrderDetails.status === 'redeemed' && (
+                      <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-[var(--color-emerald-100)] text-[var(--color-emerald-800)] border border-[var(--color-green-200)] flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-green-600)]" />
+                        <span>{t('business.LevantamentoConcluido')}</span>
+                      </span>
+                    )}
+                    {selectedOrderDetails.status === 'pending' && (
+                      <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-[var(--color-gold-100)] text-[var(--color-gold-800)] border-[var(--color-gold-200)] flex items-center gap-1 animate-pulse">
+                        <Clock className="w-3.5 h-3.5 text-[var(--color-gold-600)]" />
+                        <span>Aguardando Levantamento na Loja</span>
+                      </span>
+                    )}
+                    {selectedOrderDetails.status === 'cancelled' && (
+                      <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-[var(--color-red-100)] text-[var(--color-red-800)] border border-[var(--color-red-200)] flex items-center gap-1">
+                        <XCircle className="w-3.5 h-3.5 text-[var(--color-red-600)]" />
+                        <span>Pedido Cancelado</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Order Details Breakdown */}
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex justify-between py-1.5 border-b border-[var(--color-border-subtle)]">
+                    <span className="text-[var(--color-text-muted)] font-bold">Empresa Vendedora:</span>
+                    <span className="font-black text-[var(--color-text-strong)]">{business.name}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-[var(--color-border-subtle)]">
+                    <span className="text-[var(--color-text-muted)] font-bold">Cliente / Comprador:</span>
+                    <span className="font-extrabold text-[var(--color-text-strong)]">{selectedOrderDetails.customerName}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-[var(--color-border-subtle)]">
+                    <span className="text-[var(--color-text-muted)] font-bold">Telefone de Contacto:</span>
+                    <span className="font-mono font-bold text-[var(--color-text-strong)]">{selectedOrderDetails.customerPhone}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-[var(--color-border-subtle)]">
+                    <span className="text-[var(--color-text-muted)] font-bold">Item Comprado:</span>
+                    <span className="font-bold text-[var(--color-text-strong)] text-right">{selectedOrderDetails.itemTitle}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-[var(--color-border-subtle)]">
+                    <span className="text-[var(--color-text-muted)] font-bold">Quantidade:</span>
+                    <span className="font-bold text-[var(--color-text-strong)]">{selectedOrderDetails.quantity} unidade(s)</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-[var(--color-border-subtle)]">
+                    <span className="text-[var(--color-text-muted)] font-bold">{t('business.MetodoPagamento2')}</span>
+                    <span className="font-bold text-[var(--color-text-strong)] uppercase">{selectedOrderDetails.paymentMethod}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-[var(--color-border-subtle)]">
+                    <span className="text-[var(--color-text-muted)] font-bold">Data & Hora da Compra:</span>
+                    <span className="font-mono text-[var(--color-text-strong)]">{new Date(selectedOrderDetails.purchasedAt).toLocaleString('pt-PT')}</span>
+                  </div>
+                  {selectedOrderDetails.redeemedAt && (
+                    <div className="flex justify-between py-1.5 border-b border-[var(--color-border-subtle)]">
+                      <span className="text-[var(--color-text-muted)] font-bold">Data do Levantamento:</span>
+                      <span className="font-mono text-[var(--color-emerald-700)] font-bold">{new Date(selectedOrderDetails.redeemedAt).toLocaleString('pt-PT')}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center pt-2 text-sm font-black">
+                    <span className="text-[var(--color-text-strong)]">Total Pago:</span>
+                    <span className="text-[var(--color-emerald-700)] font-mono text-base">
+                      {selectedOrderDetails.totalPriceXOF.toLocaleString('pt-PT')} XOF
+                    </span>
+                  </div>
+                </div>
+
+                {/* Modal Footer Actions */}
+                <div className="flex items-center justify-between gap-3 pt-2 border-t border-[var(--color-border-subtle)]">
+                  <button type="button"
+                    onClick={() => window.print()}
+                    className="px-4 py-2.5 bg-[var(--color-bg-subtle)] hover:bg-[var(--color-bg-subtle-dark)] text-[var(--color-text-strong)] font-bold text-xs rounded-xl transition flex items-center gap-2"
+                  >
+                    <Printer className="w-4 h-4 text-[var(--color-text-muted)]" />
+                    <span>Imprimir Comprovativo</span>
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    {selectedOrderDetails.status === 'pending' && onValidatePurchaseOrder && (
+                      <button type="button"
+                        onClick={() => {
+                          onValidatePurchaseOrder(selectedOrderDetails.id, business.name);
+                          setSelectedOrderDetails((prev) => prev ? { ...prev, status: 'redeemed', redeemedAt: new Date().toISOString() } : null);
+                        }}
+                        className="px-4 py-2.5 bg-[var(--color-green-600)] hover:bg-[var(--color-emerald-700)] text-white font-extrabold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Validar & Entregar</span>
+                      </button>
+                    )}
+                    <button type="button"
+                      onClick={() => setSelectedOrderDetails(null)}
+                      className="px-4 py-2.5 bg-[var(--color-bg-surface-dark)] hover:bg-[var(--color-bg-surface-dark)]/80 text-white font-bold text-xs rounded-xl transition"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB: REDEMPTIONS / LEVANTAMENTOS */}
+      {activeTab === 'redemptions' && (
+        <div className="space-y-4">
+          <div className="bg-[var(--color-bg-surface-dark)] border border-[var(--color-border-strong)] rounded-2xl p-6 text-white space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl">
+                <QrCode className="w-5 h-5" />
+              </span>
+              <div>
+                <h2 className="text-lg font-black">{t('business.ValidacaoLevantamentosCodigos')}</h2>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  Confirme a entrega de compras, bilhetes e vouchers apresentados pelos clientes do Guigui.com.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Code Validation Input Form */}
+          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
+            <h3 className="text-sm font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider flex items-center gap-2">
+              <Search className="w-4.5 h-4.5 text-[var(--color-green-600)]" />
+              <span>{t('business.ValidarCodigoLevantamento')}</span>
+            </h3>
+
+            <form onSubmit={handleValidateCode} className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <QrCode className="w-4 h-4 text-[var(--color-text-muted)] absolute left-3.5 top-3.5" />
+                <input
+                  type="text"
+                  value={redemptionCodeInput}
+                  onChange={(e) => setRedemptionCodeInput(e.target.value)}
+                  placeholder={t('business.IntroduzaCodigoLev')}
+                  className="w-full pl-10 pr-4 py-3 bg-[var(--color-bg-subtle)] border border-[var(--color-border-subtle)] rounded-2xl text-xs font-mono font-bold text-[var(--color-text-strong)] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="px-6 py-3 bg-[var(--color-green-600)] hover:bg-[var(--color-emerald-700)] text-white font-black text-xs rounded-2xl shadow-md transition flex items-center justify-center gap-2"
+              >
+                <CheckCircle className="w-4 h-4" />
+                <span>Validar & Entregar</span>
+              </button>
+            </form>
+
+            {redemptionMessage && (
+              <div
+                className={`p-4 rounded-2xl border text-xs font-bold flex items-start gap-3 animate-in fade-in ${
+                  redemptionMessage.type === 'success'
+                    ? 'bg-[var(--color-green-50)] border-emerald-300 text-emerald-950'
+                    : redemptionMessage.type === 'error'
+                    ? 'bg-[var(--color-red-50)] border-red-300 text-red-950'
+                    : 'bg-[var(--color-green-50)] border-[var(--color-green-300)] text-blue-950'
+                }`}
+              >
+                {redemptionMessage.type === 'success' ? (
+                  <CheckCircle className="w-5 h-5 text-[var(--color-green-600)] shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-[var(--color-gold-600)] shrink-0 mt-0.5" />
+                )}
+                <span>{redemptionMessage.text}</span>
+              </div>
+            )}
+          </div>
+
+          {/* List of Orders for this Business */}
+          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-extrabold text-[var(--color-text-strong)] uppercase tracking-wider flex items-center gap-2">
+                <Package className="w-4.5 h-4.5 text-[var(--color-green-600)]" />
+                <span>Histórico de Compras & Reservas Registadas ({myBusinessOrders.length})</span>
+              </h3>
+
+              <input
+                type="text"
+                placeholder="Filtrar por nome ou telefone..."
+                value={redemptionFilter}
+                onChange={(e) => setRedemptionFilter(e.target.value)}
+                className="px-3 py-1.5 bg-[var(--color-bg-subtle)] border border-[var(--color-border-subtle)] rounded-xl text-xs text-[var(--color-text-strong)]"
+              />
+            </div>
+
+            {myBusinessOrders.length === 0 ? (
+              <EmptyState
+                title={t('business.AindaNaoCompras')}
+                description="As compras e reservas confirmadas aparecerão neste histórico."
+              />
+            ) : (
+              <div className="overflow-x-auto border border-[var(--color-border-subtle)] rounded-2xl">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-[var(--color-bg-subtle)] border-b border-[var(--color-border-subtle)] font-extrabold text-[var(--color-text-strong)] uppercase text-[10px]">
+                      <th className="p-3">{t('business.CodigoToken2')}</th>
+                      <th className="p-3">Item Comprado</th>
+                      <th className="p-3">Cliente</th>
+                      <th className="p-3 text-right">Valor Total</th>
+                      <th className="p-3 text-center">Estado</th>
+                      <th className="p-3 text-right">{t('business.Acao')}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--color-border-subtle)] text-[var(--color-text-strong)]">
+                    {myBusinessOrders
+                      .filter(
+                        (ord) =>
+                          !redemptionFilter ||
+                          ord.customerName.toLowerCase().includes(redemptionFilter.toLowerCase()) ||
+                          ord.customerPhone.includes(redemptionFilter) ||
+                          ord.orderCode.toLowerCase().includes(redemptionFilter.toLowerCase())
+                      )
+                      .map((ord) => (
+                        <tr key={ord.id} className="hover:bg-[var(--color-bg-subtle)] transition">
+                          <td className="p-3 font-mono font-bold text-[var(--color-text-strong)]">
+                            <div>{ord.orderCode}</div>
+                            <div className="text-[9px] text-[var(--color-text-muted)] font-normal">{ord.qrToken}</div>
+                          </td>
+                          <td className="p-3">
+                            <div className="font-extrabold text-[var(--color-text-strong)]">{ord.itemTitle}</div>
+                            <div className="text-[10px] text-[var(--color-text-muted)] uppercase">{ord.itemType} ({ord.quantity}x)</div>
+                          </td>
+                          <td className="p-3">
+                            <div className="font-bold text-[var(--color-text-strong)]">{ord.customerName}</div>
+                            <div className="text-[10px] text-[var(--color-text-muted)]">{ord.customerPhone}</div>
+                          </td>
+                          <td className="p-3 text-right font-mono font-bold text-[var(--color-emerald-700)]">
+                            {ord.totalPriceXOF.toLocaleString('pt-PT')} XOF
+                          </td>
+                          <td className="p-3 text-center">
+                            {ord.status === 'redeemed' ? (
+                              <span className="bg-[var(--color-emerald-100)] text-[var(--color-emerald-800)] text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                                <CheckCircle className="w-3 h-3 text-[var(--color-green-600)]" /> Entregue
+                              </span>
+                            ) : (
+                              <span className="bg-[var(--color-gold-100)] text-[var(--color-gold-800)] text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-[var(--color-gold-600)]" /> Pendente
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedOrderForQr(ord)}
+                                className="px-2.5 py-1 bg-[var(--color-bg-surface-dark)] hover:bg-[var(--color-bg-surface-dark)]/80 text-emerald-400 font-extrabold text-[11px] rounded-lg transition flex items-center gap-1 shadow-sm"
+                                title="Ver QR Code do Pedido"
+                              >
+                                <QrCode className="w-3.5 h-3.5" />
+                                <span>QR Code</span>
+                              </button>
+                              {ord.status === 'pending' && (
+                                <button type="button"
+                                  onClick={() => {
+                                    if (onValidatePurchaseOrder) {
+                                      onValidatePurchaseOrder(ord.id, business.name);
+                                      setRedemptionMessage({
+                                        text: `Entregue a ${ord.customerName} com sucesso!`,
+                                        type: 'success',
+                                      });
+                                    }
+                                  }}
+                                  className="px-3 py-1 bg-[var(--color-green-600)] hover:bg-[var(--color-emerald-700)] text-white font-bold text-[11px] rounded-lg transition"
+                                >
+                                  Confirmar Entrega
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB: Relatórios e Estatísticas (Recharts) */}
+      {activeTab === 'analytics' && (() => {
+        // Daily Data for Ticket & Product Sales
+        const dailySalesData = [
+          { period: 'Segunda', bilhetesQtd: 12, produtosQtd: 8, bilhetesXOF: 120000, produtosXOF: 40000, totalXOF: 160000 },
+          { period: 'Terça', bilhetesQtd: 18, produtosQtd: 14, bilhetesXOF: 180000, produtosXOF: 70000, totalXOF: 250000 },
+          { period: 'Quarta', bilhetesQtd: 25, produtosQtd: 19, bilhetesXOF: 250000, produtosXOF: 95000, totalXOF: 345000 },
+          { period: 'Quinta', bilhetesQtd: 32, produtosQtd: 22, bilhetesXOF: 320000, produtosXOF: 110000, totalXOF: 430000 },
+          { period: 'Sexta', bilhetesQtd: 55, produtosQtd: 38, bilhetesXOF: 550000, produtosXOF: 190000, totalXOF: 740000 },
+          { period: 'Sábado', bilhetesQtd: 80, produtosQtd: 52, bilhetesXOF: 800000, produtosXOF: 260000, totalXOF: 1060000 },
+          { period: 'Domingo', bilhetesQtd: 64, produtosQtd: 41, bilhetesXOF: 640000, produtosXOF: 205000, totalXOF: 845000 },
+        ];
+
+        // Weekly Data for Ticket & Product Sales
+        const weeklySalesData = [
+          { period: 'Semana 1', bilhetesQtd: 180, produtosQtd: 120, bilhetesXOF: 1800000, produtosXOF: 600000, totalXOF: 2400000 },
+          { period: 'Semana 2', bilhetesQtd: 210, produtosQtd: 145, bilhetesXOF: 2100000, produtosXOF: 725000, totalXOF: 2825000 },
+          { period: 'Semana 3', bilhetesQtd: 260, produtosQtd: 170, bilhetesXOF: 2600000, produtosXOF: 850000, totalXOF: 3450000 },
+          { period: 'Semana 4', bilhetesQtd: 310, produtosQtd: 215, bilhetesXOF: 3100000, produtosXOF: 1075000, totalXOF: 4175000 },
+        ];
+
+        // Views & Direct Engagement Clicks (Daily)
+        const dailyEngagementData = [
+          { period: 'Segunda', visualizacoes: 420, cliquesWhatsapp: 38, chamadasVoz: 19, direcoesMapa: 24 },
+          { period: 'Terça', visualizacoes: 510, cliquesWhatsapp: 45, chamadasVoz: 22, direcoesMapa: 31 },
+          { period: 'Quarta', visualizacoes: 580, cliquesWhatsapp: 52, chamadasVoz: 28, direcoesMapa: 39 },
+          { period: 'Quinta', visualizacoes: 690, cliquesWhatsapp: 64, chamadasVoz: 34, direcoesMapa: 45 },
+          { period: 'Sexta', visualizacoes: 980, cliquesWhatsapp: 95, chamadasVoz: 51, direcoesMapa: 78 },
+          { period: 'Sábado', visualizacoes: 1340, cliquesWhatsapp: 142, chamadasVoz: 76, direcoesMapa: 110 },
+          { period: 'Domingo', visualizacoes: 1120, cliquesWhatsapp: 118, chamadasVoz: 62, direcoesMapa: 89 },
+        ];
+
+        // Views & Direct Engagement Clicks (Weekly)
+        const weeklyEngagementData = [
+          { period: 'Semana 1', visualizacoes: 3200, cliquesWhatsapp: 310, chamadasVoz: 165, direcoesMapa: 240 },
+          { period: 'Semana 2', visualizacoes: 3850, cliquesWhatsapp: 390, chamadasVoz: 195, direcoesMapa: 290 },
+          { period: 'Semana 3', visualizacoes: 4600, cliquesWhatsapp: 480, chamadasVoz: 240, direcoesMapa: 360 },
+          { period: 'Semana 4', visualizacoes: 5650, cliquesWhatsapp: 554, chamadasVoz: 280, direcoesMapa: 420 },
+        ];
+
+        // Promotions Performance Data
+        const promoPerformanceData = [
+          {
+            titulo: 'Desconto 20% Prato de Peixe',
+            visualizacoes: 1840,
+            resgates: 142,
+            cliquesWhatsapp: 88,
+            conversao: 7.7,
+            desconto: '20% OFF',
+          },
+          {
+            titulo: 'Menu Almoço Crioulo Especial',
+            visualizacoes: 2450,
+            resgates: 215,
+            cliquesWhatsapp: 130,
+            conversao: 8.8,
+            desconto: 'Preço Fixo 3.500 XOF',
+          },
+          {
+            titulo: 'Happy Hour Chopp & Petisco 2x1',
+            visualizacoes: 2980,
+            resgates: 312,
+            cliquesWhatsapp: 175,
+            conversao: 10.5,
+            desconto: 'Leve 2 Pague 1',
+          },
+          {
+            titulo: 'Jantar Romântico com Música ao Vivo',
+            visualizacoes: 1290,
+            resgates: 94,
+            cliquesWhatsapp: 62,
+            conversao: 7.3,
+            desconto: '15% OFF Casal',
+          },
+          {
+            titulo: 'Feijoada Completa de Sábado',
+            visualizacoes: 1680,
+            resgates: 128,
+            cliquesWhatsapp: 75,
+            conversao: 7.6,
+            desconto: 'Sobremesa Grátis',
+          },
+        ];
+
+        const chartData = analyticsTimeframe === 'daily' ? dailySalesData : weeklySalesData;
+        const engagementChartData = analyticsTimeframe === 'daily' ? dailyEngagementData : weeklyEngagementData;
+
+        // Calculate Totals
+        const totalTickets = chartData.reduce((acc, d) => acc + d.bilhetesQtd, 0);
+        const totalProducts = chartData.reduce((acc, d) => acc + d.produtosQtd, 0);
+        const totalRevenue = chartData.reduce((acc, d) => acc + d.totalXOF, 0);
+        const avgOrderValue = Math.round(totalRevenue / (totalTickets + totalProducts || 1));
+
+        const totalPeriodViews = engagementChartData.reduce((acc, d) => acc + d.visualizacoes, 0);
+        const totalPeriodWhatsapp = engagementChartData.reduce((acc, d) => acc + d.cliquesWhatsapp, 0);
+        const totalPeriodCalls = engagementChartData.reduce((acc, d) => acc + d.chamadasVoz, 0);
+        const totalPeriodMaps = engagementChartData.reduce((acc, d) => acc + d.direcoesMapa, 0);
+        const totalLeads = totalPeriodWhatsapp + totalPeriodCalls + totalPeriodMaps;
+        const leadConversionRate = totalPeriodViews > 0 ? ((totalLeads / totalPeriodViews) * 100).toFixed(1) : '0.0';
+        const firstSalesPoint = chartData[0]?.totalXOF ?? 0;
+        const lastSalesPoint = chartData[chartData.length - 1]?.totalXOF ?? 0;
+        const salesTrend = firstSalesPoint > 0 ? ((lastSalesPoint - firstSalesPoint) / firstSalesPoint) * 100 : 0;
+        const firstViewsPoint = engagementChartData[0]?.visualizacoes ?? 0;
+        const lastViewsPoint = engagementChartData[engagementChartData.length - 1]?.visualizacoes ?? 0;
+        const viewsTrend = firstViewsPoint > 0 ? ((lastViewsPoint - firstViewsPoint) / firstViewsPoint) * 100 : 0;
+        const topPromotion = promoPerformanceData.reduce(
+          (top, promotion) => (promotion.resgates > top.resgates ? promotion : top),
+          promoPerformanceData[0],
+        );
+
+        const pieDistributionData = [
+          { name: 'Bilhetes VIP & Mesas', value: 42, color: '#10B981' },
+          { name: 'Bilhetes Entrada Geral', value: 33, color: '#3B82F6' },
+          { name: 'Menus & Refeições', value: 15, color: '#F59E0B' },
+          { name: 'Vouchers & Bebidas', value: 10, color: '#8B5CF6' },
+        ];
+
+        return (
+          <div className="space-y-4">
+            {/* Header & Controls */}
+            <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-extrabold text-base text-[var(--color-text-strong)] flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-[var(--color-green-600)]" />
+                    <span>{t('business.RelatoriosEstatisticasDesempenho')}</span>
+                  </h3>
+                  <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{t('business.AcompanheGraficosInterativos')}</p>
+                </div>
+
+                {/* Global Timeframe Selector */}
+                <div className="flex items-center gap-2 text-xs">
+                  <div className="bg-[var(--color-bg-subtle)] p-1 rounded-2xl flex items-center gap-1 border border-[var(--color-border-subtle)]">
+                    <button
+                      type="button"
+                      onClick={() => setAnalyticsTimeframe('daily')}
+                      className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+                        analyticsTimeframe === 'daily'
+                          ? 'bg-[var(--color-neutral-0)] text-[var(--color-text-strong)] shadow-sm'
+                          : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-strong)]'
+                      }`}
+                    >
+                      <Calendar className="w-3.5 h-3.5 text-[var(--color-green-600)]" />
+                      <span>{t('business.DiarioDias')}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAnalyticsTimeframe('weekly')}
+                      className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+                        analyticsTimeframe === 'weekly'
+                          ? 'bg-[var(--color-neutral-0)] text-[var(--color-text-strong)] shadow-sm'
+                          : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-strong)]'
+                      }`}
+                    >
+                      <TrendingUp className="w-3.5 h-3.5 text-[var(--color-green-600)]" />
+                      <span>Semanal (4 semanas)</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sub-Section Filter Pills */}
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[var(--color-border-subtle)] text-xs">
+                <span className="text-[11px] font-bold text-[var(--color-text-muted)] uppercase tracking-wider mr-1">{t('business.FiltrarSeccao')}</span>
+                <button
+                  type="button"
+                  onClick={() => setAnalyticsSubSection('all')}
+                  className={`px-3.5 py-1.5 rounded-xl font-bold transition ${
+                    analyticsSubSection === 'all'
+                      ? 'bg-[var(--color-bg-surface-dark)] text-white shadow-sm'
+                      : 'bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle-dark)]'
+                  }`}
+                >{t('business.VisaoGeralCompleta')}</button>
+                <button
+                  type="button"
+                  onClick={() => setAnalyticsSubSection('views_clicks')}
+                  className={`px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+                    analyticsSubSection === 'views_clicks'
+                      ? 'bg-[var(--color-green-600)] text-white shadow-sm'
+                      : 'bg-[var(--color-green-50)] text-[var(--color-green-700)] hover:bg-[var(--color-blue-100)]'
+                  }`}
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>{t('business.VisualizacoesCliques')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAnalyticsSubSection('promotions')}
+                  className={`px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+                    analyticsSubSection === 'promotions'
+                      ? 'bg-[var(--color-gold-600)] text-white shadow-sm'
+                      : 'bg-[var(--color-gold-50)] text-[var(--color-gold-700)] hover:bg-[var(--color-gold-100)]'
+                  }`}
+                >
+                  <Tag className="w-3.5 h-3.5" />
+                  <span>{t('business.DesempenhoDasPromocoes')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAnalyticsSubSection('sales')}
+                  className={`px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+                    analyticsSubSection === 'sales'
+                      ? 'bg-[var(--color-green-600)] text-white shadow-sm'
+                      : 'bg-[var(--color-green-50)] text-[var(--color-emerald-700)] hover:bg-[var(--color-emerald-100)]'
+                  }`}
+                >
+                  <Ticket className="w-3.5 h-3.5" />
+                  <span>{t('business.VendasBilhetica')}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* KPI Metric Cards */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard
+                label={t('business.VisualizacoesPerfil')}
+                value={totalPeriodViews.toLocaleString('pt-PT')}
+                icon={Eye}
+                tone="info"
+                hint={`${viewsTrend >= 0 ? '+' : ''}${viewsTrend.toFixed(1)}% desde o início`}
+              />
+              <StatCard
+                label="Total Leads Directos"
+                value={totalLeads.toLocaleString('pt-PT')}
+                icon={MessageCircle}
+                tone="success"
+                hint={`Taxa de Conversão: ${leadConversionRate}%`}
+              />
+              <StatCard
+                label={t('business.ResgatesPromocoes')}
+                value={`${promoPerformanceData.reduce((acc, p) => acc + p.resgates, 0)} vouchers`}
+                icon={Tag}
+                tone="accent"
+                hint={`${promoPerformanceData.length} campanhas ativas · melhor: ${topPromotion.titulo}`}
+              />
+              <StatCard
+                label={t('business.VolumeBilhetica')}
+                value={`${totalRevenue.toLocaleString('pt-PT')} XOF`}
+                icon={DollarSign}
+                tone="primary"
+                hint={`${totalTickets} bilhetes emitidos · ${salesTrend >= 0 ? '+' : ''}${salesTrend.toFixed(1)}% desde o início`}
+              />
+            </div>
+
+            {/* SECTION 1: GRÁFICO DE VISUALIZAÇÕES E CLIQUES (Recharts Area & Line Chart) */}
+            {(analyticsSubSection === 'all' || analyticsSubSection === 'views_clicks') && (
+              <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
+                <div className="flex flex-wrap items-center justify-between border-b border-[var(--color-border-subtle)] pb-3 gap-3">
+                  <div>
+                    <h4 className="font-extrabold text-sm text-[var(--color-text-strong)] flex items-center gap-2">
+                      <Eye className="w-4 h-4 text-[var(--color-green-600)]" />
+                      <span>{t('business.EvolucaoVisualizacoesCliques')}</span>
+                    </h4>
+                    <p className="text-[11px] text-[var(--color-text-muted)]">
+                      {t('business.RelacaoVisualizacoesCliques')} ({analyticsTimeframe === 'daily' ? t('business.Diario') : t('business.Semanal')}).
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] bg-[var(--color-green-50)] text-[var(--color-green-700)] px-3 py-1 rounded-full font-bold">
+                      {totalPeriodViews.toLocaleString('pt-PT')} {t('business.Visitas')}
+                    </span>
+                    <span className="text-[11px] bg-[var(--color-green-50)] text-[var(--color-emerald-700)] px-3 py-1 rounded-full font-bold">
+                      {totalLeads} Contactos Gerados
+                    </span>
+                  </div>
+                </div>
+
+                <div className="h-72 w-full pt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={engagementChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={chartColors.info} stopOpacity={0.3} />
+                          <stop offset="95%" stopColor={chartColors.info} stopOpacity={0.0} />
+                        </linearGradient>
+                        <linearGradient id="colorWhatsapp" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={chartColors.primary} stopOpacity={0.4} />
+                          <stop offset="95%" stopColor={chartColors.primary} stopOpacity={0.0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="var(--color-border-default)" />
+                      <XAxis dataKey="period" tick={{ fontSize: 10, fontWeight: 600, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
+                      <Tooltip
+                        cursor={{ fill: 'var(--color-green-600)', opacity: 0.06 }}
+                        content={
+                          <ChartTooltip
+                            formatter={(value, name) => [
+                              Number(value).toLocaleString('pt-PT'),
+                              name === 'visualizacoes' ? t('business.VisualizacoesDaPagina') :
+                              name === 'cliquesWhatsapp' ? t('business.CliquesWhatsapp') :
+                              name === 'chamadasVoz' ? t('business.ChamadasDeVoz') : t('business.DirecoesNoMapa'),
+                            ]}
+                          />
+                        }
+                      />
+                      <Legend
+                        formatter={(value) =>
+                          value === 'visualizacoes' ? t('business.VisualizacoesDaPagina') :
+                          value === 'cliquesWhatsapp' ? t('business.CliquesWhatsapp') :
+                          value === 'chamadasVoz' ? t('business.ChamadasDeVoz') : t('business.DirecoesNoMapa')
+                        }
+                        wrapperStyle={{ paddingTop: '10px', fontSize: '11px' }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="visualizacoes"
+                        stroke={chartColors.info}
+                        strokeWidth={2.5}
+                        fillOpacity={1}
+                        fill="url(#colorViews)"
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="cliquesWhatsapp"
+                        stroke={chartColors.primary}
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#colorWhatsapp)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Conversion Breakdown Row */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                  <div className="bg-[var(--color-bg-subtle)] border-[var(--color-border-subtle)] p-3.5 rounded-2xl flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-[var(--color-emerald-100)] text-[var(--color-emerald-700)] flex items-center justify-center">
+                        <MessageCircle className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-[var(--color-text-strong)]">WhatsApp Leads</div>
+                        <div className="text-[10px] text-[var(--color-text-muted)]">Contacto imediato</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono font-black text-sm text-[var(--color-emerald-700)]">{totalPeriodWhatsapp}</div>
+                      <div className="text-[10px] font-bold text-[var(--color-text-muted)]">
+                        {totalPeriodViews > 0 ? ((totalPeriodWhatsapp / totalPeriodViews) * 100).toFixed(1) : 0}% conv.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-[var(--color-bg-subtle)] border-[var(--color-border-subtle)] p-3.5 rounded-2xl flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-[var(--color-gold-100)] text-[var(--color-gold-700)] flex items-center justify-center">
+                        <Phone className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-[var(--color-text-strong)]">{t('business.ChamadasTelefonicas')}</div>
+                        <div className="text-[10px] text-[var(--color-text-muted)]">Linha direta</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono font-black text-sm text-[var(--color-gold-700)]">{totalPeriodCalls}</div>
+                      <div className="text-[10px] font-bold text-[var(--color-text-muted)]">
+                        {totalPeriodViews > 0 ? ((totalPeriodCalls / totalPeriodViews) * 100).toFixed(1) : 0}% conv.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-[var(--color-bg-subtle)] border-[var(--color-border-subtle)] p-3.5 rounded-2xl flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-[var(--color-blue-100)] text-[var(--color-green-700)] flex items-center justify-center">
+                        <ArrowUpRight className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-[var(--color-text-strong)]">Rotas & Mapa</div>
+                        <div className="text-[10px] text-[var(--color-text-muted)]">Visitas presenciais</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono font-black text-sm text-[var(--color-green-700)]">{totalPeriodMaps}</div>
+                      <div className="text-[10px] font-bold text-[var(--color-text-muted)]">
+                        {totalPeriodViews > 0 ? ((totalPeriodMaps / totalPeriodViews) * 100).toFixed(1) : 0}% conv.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SECTION 2: GRÁFICO DE DESEMPENHO DAS PROMOÇÕES (Recharts BarChart) */}
+            {(analyticsSubSection === 'all' || analyticsSubSection === 'promotions') && (
+              <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
+                <div className="flex flex-wrap items-center justify-between border-b border-[var(--color-border-subtle)] pb-3 gap-3">
+                  <div>
+                    <h4 className="font-extrabold text-sm text-[var(--color-text-strong)] flex items-center gap-2">
+                      <Tag className="w-4 h-4 text-[var(--color-gold-600)]" />
+                      <span>{t('business.DesempenhoComparativoDas')}</span>
+                    </h4>
+                    <p className="text-[11px] text-[var(--color-text-muted)]">{t('business.VisualizacoesCadaOferta')}</p>
+                  </div>
+                  <span className="text-[11px] font-mono bg-[var(--color-gold-50)] text-[var(--color-gold-700)] px-3 py-1 rounded-full font-bold">
+                    {promoPerformanceData.length} Campanhas Analisadas
+                  </span>
+                </div>
+
+                <div className="h-72 w-full pt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={promoPerformanceData} margin={{ top: 10, right: 10, left: 0, bottom: 25 }}>
+                      <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="var(--color-border-default)" />
+                      <XAxis
+                        dataKey="titulo"
+                        tick={{ fontSize: 10, fontWeight: 600, fill: 'var(--color-text-muted)' }}
+                        axisLine={false}
+                        tickLine={false}
+                        interval={0}
+                        angle={-12}
+                        textAnchor="end"
+                      />
+                      <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
+                      <Tooltip
+                        cursor={{ fill: 'var(--color-green-600)', opacity: 0.06 }}
+                        content={
+                          <ChartTooltip
+                            formatter={(value, name) => [
+                              Number(value).toLocaleString('pt-PT'),
+                              name === 'visualizacoes' ? t('business.VisualizacoesDaOferta') :
+                              name === 'resgates' ? t('business.VouchersResgatados') : t('business.CliquesWhatsapp'),
+                            ]}
+                          />
+                        }
+                      />
+                      <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 10, paddingTop: 12, fontWeight: 600 }} />
+                      <Bar dataKey="visualizacoes" name={t('business.Visualizacoes')} fill={chartColors.accent} radius={[6, 6, 2, 2]} maxBarSize={34} />
+                      <Bar dataKey="resgates" name={t('business.VouchersResgatados')} fill={chartColors.primary} radius={[6, 6, 2, 2]} maxBarSize={34} />
+                      <Bar dataKey="cliquesWhatsapp" name={t('business.CliquesWhatsapp')} fill={chartColors.info} radius={[6, 6, 2, 2]} maxBarSize={34} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Promo Performance Table */}
+                <div className="overflow-x-auto border-[var(--color-border-subtle)] rounded-2xl mt-4">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-[var(--color-bg-subtle)] border-b border-[var(--color-border-subtle)] font-extrabold text-[var(--color-text-strong)] uppercase text-[10px]">
+                        <th className="p-3">{t('business.TituloPromocao')}</th>
+                        <th className="p-3 text-center">{t('business.TipoBeneficio')}</th>
+                        <th className="p-3 text-center">{t('business.Visualizacoes2')}</th>
+                        <th className="p-3 text-center">Vouchers Resgatados</th>
+                        <th className="p-3 text-center">Cliques WhatsApp</th>
+                        <th className="p-3 text-right font-black">Taxa de Resgate</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--color-border-subtle)] text-[var(--color-text-strong)]">
+                      {promoPerformanceData.map((promo, idx) => (
+                        <tr key={idx} className="hover:bg-[var(--color-bg-subtle)] transition">
+                          <td className="p-3 font-bold text-[var(--color-text-strong)]">{promo.titulo}</td>
+                          <td className="p-3 text-center font-semibold text-[var(--color-text-muted)] bg-[var(--color-bg-subtle)]/50">
+                            <span className="bg-[var(--color-gold-100)] text-[var(--color-gold-800)] px-2 py-0.5 rounded-full text-[10px] font-bold">
+                              {promo.desconto}
+                            </span>
+                          </td>
+                          <td className="p-3 text-center font-mono font-bold text-[var(--color-text-strong)]">
+                            {promo.visualizacoes.toLocaleString('pt-PT')}
+                          </td>
+                          <td className="p-3 text-center font-mono font-bold text-[var(--color-green-600)]">
+                            {promo.resgates}
+                          </td>
+                          <td className="p-3 text-center font-mono font-bold text-[var(--color-green-600)]">
+                            {promo.cliquesWhatsapp}
+                          </td>
+                          <td className="p-3 text-right font-mono font-black text-[var(--color-emerald-700)] bg-[var(--color-green-50)]/40">
+                            {promo.conversao}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* SECTION 3: VENDAS DE BILHETES & PRODUTOS (Recharts Bar & Area & Pie) */}
+            {(analyticsSubSection === 'all' || analyticsSubSection === 'sales') && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Bar Chart: Comparison Bilhetes vs Produtos */}
+                  <div className="lg:col-span-2 rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
+                    <div className="flex items-center justify-between border-b border-[var(--color-border-subtle)] pb-3">
+                      <div>
+                        <h4 className="font-extrabold text-sm text-[var(--color-text-strong)] flex items-center gap-2">
+                          <Ticket className="w-4 h-4 text-[var(--color-green-600)]" />
+                          <span>Volume de Vendas: Bilhetes vs. Produtos</span>
+                        </h4>
+                        <p className="text-[11px] text-[var(--color-text-muted)]">
+                          Comparação da performance por {analyticsTimeframe === 'daily' ? 'dia da semana' : 'semana do mjs'}.
+                        </p>
+                      </div>
+                      <div className="bg-[var(--color-bg-subtle)] p-1 rounded-xl flex items-center gap-1 border-[var(--color-border-subtle)] text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setAnalyticsMetric('revenue')}
+                          className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                            analyticsMetric === 'revenue' ? 'bg-[var(--color-green-600)] text-white shadow-xs' : 'text-[var(--color-text-muted)]'
+                          }`}
+                        >
+                          XOF
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAnalyticsMetric('units')}
+                          className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                            analyticsMetric === 'units' ? 'bg-[var(--color-green-600)] text-white shadow-xs' : 'text-[var(--color-text-muted)]'
+                          }`}
+                        >
+                          Qtd
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="h-72 w-full pt-2">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="var(--color-border-default)" />
+                          <XAxis dataKey="period" tick={{ fontSize: 10, fontWeight: 600, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
+                          <YAxis
+                            tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
+                            axisLine={false}
+                            tickFormatter={(v) => (analyticsMetric === 'revenue' ? `${v / 1000}k` : v)}
+                          />
+                          <Tooltip
+                            cursor={{ fill: 'var(--color-green-600)', opacity: 0.06 }}
+                            content={
+                              <ChartTooltip
+                                formatter={(value) => [
+                                  analyticsMetric === 'revenue'
+                                    ? `${Number(value).toLocaleString('pt-PT')} XOF`
+                                    : `${Number(value).toLocaleString('pt-PT')} un`,
+                                  analyticsMetric === 'revenue' ? 'Receita' : 'Quantidade',
+                                ]}
+                              />
+                            }
+                          />
+                          <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 10, paddingTop: 10, fontWeight: 600 }} />
+                          <Bar
+                            dataKey={analyticsMetric === 'revenue' ? 'bilhetesXOF' : 'bilhetesQtd'}
+                            name="Bilhetes de Eventos"
+                            fill={chartColors.primary}
+                            radius={[6, 6, 2, 2]}
+                            maxBarSize={34}
+                          />
+                          <Bar
+                            dataKey={analyticsMetric === 'revenue' ? 'produtosXOF' : 'produtosQtd'}
+                            name="Produtos e Menus"
+                            fill={chartColors.info}
+                            radius={[6, 6, 2, 2]}
+                            maxBarSize={34}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Pie Chart: Distribution by Category */}
+                  <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
+                    <div className="border-b border-[var(--color-border-subtle)] pb-3">
+                      <h4 className="font-extrabold text-sm text-[var(--color-text-strong)] flex items-center gap-2">
+                        <PieChartIcon className="w-4 h-4 text-[var(--color-violet-600)]" />
+                        <span>{t('business.DistribuicaoDasVendas')}</span>
+                      </h4>
+                      <p className="text-[11px] text-[var(--color-text-muted)]">{t('business.ProporcaoPorTipo')}</p>
+                    </div>
+
+                    <div className="h-56 w-full relative">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={pieDistributionData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={55}
+                            outerRadius={80}
+                            paddingAngle={4}
+                            dataKey="value"
+                          >
+                            {pieDistributionData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value: any) => [`${value}%`, 'Quota']} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    <div className="space-y-1.5 pt-1 text-xs">
+                      {pieDistributionData.map((item) => (
+                        <div key={item.name} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                            <span className="text-[var(--color-text-strong)] font-medium text-[11px]">{item.name}</span>
+                          </div>
+                          <span className="font-mono font-bold text-[var(--color-text-strong)] text-[11px]">{item.value}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Area Chart: Receita Acumulada */}
+                <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
+                  <div className="border-b border-[var(--color-border-subtle)] pb-3 flex items-center justify-between">
+                    <div>
+                      <h4 className="font-extrabold text-sm text-[var(--color-text-strong)]">{t('business.EvolucaoReceitaBruta')}</h4>
+                      <p className="text-[11px] text-[var(--color-text-muted)]">{t('business.TrajetoriaVolumeFinanceiro')}</p>
+                    </div>
+                    <span className="font-mono font-extrabold text-[var(--color-green-600)] text-xs bg-[var(--color-green-50)] px-3 py-1 rounded-full">
+                      Total: {totalRevenue.toLocaleString('pt-PT')} XOF
+                    </span>
+                  </div>
+
+                  <div className="h-60 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={chartColors.primary} stopOpacity={0.4} />
+                            <stop offset="95%" stopColor={chartColors.primary} stopOpacity={0.0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="var(--color-border-default)" />
+                        <XAxis dataKey="period" tick={{ fontSize: 10, fontWeight: 600, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
+                        <YAxis
+                          tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={(v) => `${v / 1000}k`}
+                        />
+                        <Tooltip
+                          cursor={{ fill: 'var(--color-green-600)', opacity: 0.06 }}
+                          content={<ChartTooltip formatter={(value) => [Number(value).toLocaleString('pt-PT'), 'Receita Total']} />}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="totalXOF"
+                          stroke={chartColors.primary}
+                          strokeWidth={2.5}
+                          fillOpacity={1}
+                          fill="url(#colorTotal)"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Detailed Data Table */}
+                <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] guigui-dpanel shadow-[var(--shadow-xs)] space-y-4 p-3.5 sm:p-4">
+                  <div className="flex items-center justify-between border-b border-[var(--color-border-subtle)] pb-3">
+                    <h4 className="font-extrabold text-sm text-[var(--color-text-strong)]">{t('business.TabelaDetalhadaVendas')}</h4>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const csvHeader = 'Periodo;Bilhetes_Qtd;Produtos_Qtd;Receita_Bilhetes_XOF;Receita_Produtos_XOF;Total_XOF\n';
+                        const csvRows = chartData.map((r) =>
+                          [r.period, r.bilhetesQtd, r.produtosQtd, r.bilhetesXOF, r.produtosXOF, r.totalXOF].join(';')
+                        ).join('\n');
+                        const blob = new Blob([csvHeader + csvRows], { type: 'text/csv;charset=utf-8;' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `relatorio_estatisticas_${business.name.toLowerCase().replace(/\s+/g, '_')}.csv`;
+                        a.click();
+                        window.setTimeout(() => URL.revokeObjectURL(url), 0);
+                      }}
+                      className="px-3 py-1.5 bg-[var(--color-bg-subtle)] hover:bg-[var(--color-bg-subtle-dark)] text-[var(--color-text-strong)] font-bold text-xs rounded-xl transition flex items-center gap-1.5"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>{t('business.ExportarRelatorioCsv')}</span>
+                    </button>
+                  </div>
+
+                  <div className="overflow-x-auto border border-[var(--color-border-subtle)] rounded-2xl">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-[var(--color-bg-subtle)] border-b border-[var(--color-border-subtle)] font-extrabold text-[var(--color-text-strong)] uppercase text-[10px]">
+                          <th className="p-3">{t('business.PeriodoDia')}</th>
+                          <th className="p-3 text-center">Bilhetes Vendidos</th>
+                          <th className="p-3 text-center">Produtos / Ofertas</th>
+                          <th className="p-3 text-right">Receita Bilhetes (XOF)</th>
+                          <th className="p-3 text-right">Receita Produtos (XOF)</th>
+                          <th className="p-3 text-right font-black">Total Geral (XOF)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--color-border-subtle)] text-[var(--color-text-strong)]">
+                        {chartData.map((row) => (
+                          <tr key={row.period} className="hover:bg-[var(--color-bg-subtle)] transition">
+                            <td className="p-3 font-bold text-[var(--color-text-strong)]">{row.period}</td>
+                            <td className="p-3 text-center font-mono font-bold text-[var(--color-green-600)]">
+                              {row.bilhetesQtd}
+                            </td>
+                            <td className="p-3 text-center font-mono font-bold text-[var(--color-gold-600)]">
+                              {row.produtosQtd}
+                            </td>
+                            <td className="p-3 text-right font-mono text-[var(--color-text-strong)]">
+                              {row.bilhetesXOF.toLocaleString('pt-PT')}
+                            </td>
+                            <td className="p-3 text-right font-mono text-[var(--color-text-strong)]">
+                              {row.produtosXOF.toLocaleString('pt-PT')}
+                            </td>
+                            <td className="p-3 text-right font-mono font-black text-[var(--color-emerald-700)] bg-[var(--color-green-50)]/50">
+                              {row.totalXOF.toLocaleString('pt-PT')} XOF
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {activeTab === 'clients' && (
+        <EmptyState
+          icon={<Users className="h-6 w-6" />}
+          title="Clientes"
+          description="Este módulo está preparado para centralizar clientes, histórico de relacionamento e segmentação."
+        />
+      )}
+
+      {isMarketingTab && (
+        <div className="space-y-5">
+          {marketingSection === 'overview' && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard icon={Eye} tone="primary" label={t('business.Alcance')} value={business.metrics.views.toLocaleString('pt-PT')} hint="Visualizações do perfil" />
+            <StatCard icon={MessageCircle} tone="success" label={t('business.Contactos')} value={(business.metrics.whatsappClicks + business.metrics.phoneClicks).toLocaleString('pt-PT')} hint="Contactos diretos" />
+            <StatCard icon={FileText} tone="info" label="Conteúdos" value={business.posts.length.toLocaleString('pt-PT')} hint="Publicações no perfil" />
+            <StatCard icon={TrendingUp} tone="warning" label="Conversões" value={(business.promotions.length + businessEvents.length).toLocaleString('pt-PT')} hint="Campanhas e eventos" />
+          </div>}
+
+          {marketingSection === 'overview' && <div className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
+            <ChartFrame
+              title={t('business.AlcanceEContactos')}
+              description={t('business.ComparacaoResultadosMarketing')}
+              eyebrow="Marketing"
+              height="md"
+              action={<span className="rounded-full bg-[var(--color-green-50)] px-2.5 py-1 text-[10px] font-black text-[var(--color-emerald-700)]">{t('business.DadosReais')}</span>}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={[
+                  { name: t('business.Alcance'), alcance: business.metrics.views, contactos: business.metrics.whatsappClicks + business.metrics.phoneClicks },
+                  { name: t('business.Mapa'), alcance: business.metrics.directionsClicks, contactos: business.metrics.directionsClicks },
+                  { name: t('content'), alcance: business.posts.length, contactos: business.promotions.length },
+                  { name: t('businessNavEvents'), alcance: businessEvents.length, contactos: myBusinessOrders.length },
+                ]} margin={{ top: 16, right: 14, left: -18, bottom: 4 }}>
+                  <defs>
+                    <linearGradient id="marketingReach" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={chartColors.primary} stopOpacity={0.3} />
+                      <stop offset="90%" stopColor={chartColors.primary} stopOpacity={0.03} />
+                    </linearGradient>
+                    <linearGradient id="marketingContacts" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor={chartColors.accent} />
+                      <stop offset="100%" stopColor={chartColors.warm} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid vertical={false} strokeDasharray="3 5" stroke="var(--color-border-default)" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fontWeight: 600, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} dy={8} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} width={34} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 10, paddingTop: 8, fontWeight: 600 }} formatter={(value) => <span style={{ color: 'var(--color-text-strong)' }}>{value}</span>} />
+                  <Area type="monotone" dataKey="alcance" name={t('business.Alcance')} stroke={chartColors.primary} fill="url(#marketingReach)" strokeWidth={2.5} activeDot={{ r: 5, strokeWidth: 3, stroke: 'var(--color-bg-surface)', fill: chartColors.primary }} dot={{ r: 3, strokeWidth: 2, stroke: 'var(--color-bg-surface)', fill: chartColors.primary }} />
+                  <Area type="monotone" dataKey="contactos" name={t('business.Contactos')} stroke={chartColors.accent} fill="transparent" strokeWidth={2.5} activeDot={{ r: 5, strokeWidth: 3, stroke: 'var(--color-bg-surface)', fill: chartColors.accent }} dot={{ r: 3, strokeWidth: 2, stroke: 'var(--color-bg-surface)', fill: chartColors.accent }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </ChartFrame>
+
+            <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5 shadow-sm dark:bg-[var(--color-bg-surface-dark)]">
+              <h3 className="text-base font-black text-[var(--color-text-strong)]">Ferramentas de Marketing</h3>
+              <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">{t('business.TudoFicaAgrupado')}</p>
+              <div className="mt-4 grid gap-2">
+                {[
+                  { label: 'Conteúdos', description: `${business.posts.length} publicações`, icon: FileText, onClick: () => { setMarketingSection('content'); setActiveTab('marketing'); } },
+                  { label: 'Promoções', description: `${business.promotions.length} ofertas`, icon: Tag, onClick: () => { setContentFilter('promotions'); setMarketingSection('content'); setActiveTab('marketing'); } },
+                  { label: 'Calendário', description: `${scheduledItems.length} agendamentos`, icon: Calendar, onClick: () => { setMarketingSection('calendar'); setActiveTab('marketing_calendar'); } },
+                  { label: 'Estatísticas', description: 'Análise detalhada', icon: BarChart3, onClick: () => setActiveTab('analytics') },
+                ].map(({ label, description, icon: ToolIcon, onClick }) => (
+                  <button key={label} type="button" onClick={onClick} className="flex items-center gap-3 rounded-2xl border border-[var(--color-border-subtle)] p-3 text-left transition hover:-translate-y-0.5 hover:border-[var(--color-green-300)] hover:bg-[var(--color-green-50)]">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-bg-subtle)] text-[var(--color-green-700)]"><ToolIcon className="h-4 w-4" /></span>
+                    <span className="min-w-0 flex-1"><span className="block text-xs font-black text-[var(--color-text-strong)]">{label}</span><span className="block text-[10px] text-[var(--color-text-muted)]">{description}</span></span>
+                    <ArrowUpRight className="h-4 w-4 text-[var(--color-text-muted)]" />
+                  </button>
+                ))}
+              </div>
+            </Card>
+          </div>}
+
+          {marketingSection !== 'overview' && (
+            <Card className="border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5 shadow-sm dark:bg-[var(--color-bg-surface-dark)]">
+              {(() => {
+                const sectionContent = {
+                  campaigns: {
+                    eyebrow: 'Planeamento e divulgação',
+                    title: 'Campanhas',
+                    description: 'Planeie, agende e acompanhe campanhas para promover publicações, eventos e ofertas.',
+                  },
+                  content: {
+                    eyebrow: 'Produção e distribuição',
+                    title: 'Conteúdos',
+                    description: 'Organize publicações e promoções e mantenha o perfil ativo junto dos seus clientes.',
+                  },
+                  audience: {
+                    eyebrow: 'Pessoas e relacionamento',
+                    title: 'Público-alvo',
+                    description: 'Defina segmentos e conheça quem encontra a empresa e interage com os seus conteúdos.',
+                  },
+                  calendar: {
+                    eyebrow: 'Planeamento editorial',
+                    title: 'Calendário de conteúdo e campanhas',
+                    description: 'Organize publicações, promoções e campanhas para manter uma presença consistente.',
+                  },
+                  library: {
+                    eyebrow: 'Materiais de campanha',
+                    title: 'Biblioteca',
+                    description: 'Reutilize imagens, vídeos e materiais já usados nas publicações da empresa.',
+                  },
+                  budget: {
+                    eyebrow: 'Investimento e retorno',
+                    title: 'Orçamento',
+                    description: 'Acompanhe o investimento planeado, o valor gasto e o saldo disponível para divulgação.',
+                  },
+                  reports: {
+                    eyebrow: 'Decisões baseadas em dados',
+                    title: 'Relatórios',
+                    description: 'Analise o desempenho das campanhas, conteúdos, contactos e vendas num só lugar.',
+                  },
+                }[marketingSection];
+
+                return (
+                  <div>
+                    <div className="flex flex-col justify-between gap-3 border-b border-[var(--color-border-subtle)] pb-5 sm:flex-row sm:items-start">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--color-green-700)]">{sectionContent.eyebrow}</p>
+                        <h3 className="mt-1 text-2xl font-black tabular-nums text-[var(--color-text-strong)]">{sectionContent.title}</h3>
+                        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--color-text-muted)]">{sectionContent.description}</p>
+                      </div>
+                      <Badge variant="info" className="w-fit px-3 py-1.5">Marketing</Badge>
+                    </div>
+                    {marketingSection === 'campaigns' && (
+                      <div className="mt-5 space-y-5">
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                          <StatCard
+                            icon={Megaphone}
+                            tone="primary"
+                            label="Campanhas"
+                            value={marketingCampaigns.length}
+                            hint="Total criadas"
+                          />
+                          <StatCard
+                            icon={Play}
+                            tone="success"
+                            label="Ativas"
+                            value={marketingCampaigns.filter((campaign) => campaign.status === 'active').length}
+                            hint="Em circulação"
+                          />
+                          <StatCard
+                            icon={Clock}
+                            tone="info"
+                            label="Agendadas"
+                            value={marketingCampaigns.filter((campaign) => campaign.status === 'scheduled').length}
+                            hint="Por iniciar"
+                          />
+                          <StatCard
+                            icon={DollarSign}
+                            tone="warning"
+                            label="Orçamento"
+                            value={`${marketingCampaigns.reduce((total, campaign) => total + (campaign.budgetXOF || 0), 0).toLocaleString('pt-PT')} XOF`}
+                            hint="Planeado"
+                          />
+                        </div>
+
+                        <div className="grid gap-5 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+                          <form
+                            className="self-start rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-4"
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              void createMarketingCampaign();
+                            }}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-green-700)]">Nova campanha</p>
+                                <h4 className="mt-1 text-base font-black text-[var(--color-text-strong)]">Configurar campanha</h4>
+                              </div>
+                              <Badge variant="neutral">Rascunho</Badge>
+                            </div>
+                            <p className="mt-1 text-[11px] leading-relaxed text-[var(--color-text-muted)]">{t('business.CriePrimeiroComo')}</p>
+
+                            <div className="mt-4 space-y-3">
+                              <label className="block">
+                                <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">Nome da campanha</span>
+                                <input
+                                  value={campaignName}
+                                  onChange={(event) => setCampaignName(event.target.value)}
+                                  placeholder="Ex.: Fim de semana no restaurante"
+                                  className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-neutral-0)] p-3 text-xs text-[var(--color-text-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]"
+                                  required
+                                />
+                              </label>
+
+                              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                                <label className="block">
+                                  <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">Objetivo</span>
+                                  <select
+                                    value={campaignObjective}
+                                    onChange={(event) => setCampaignObjective(event.target.value as MarketingCampaign['objective'])}
+                                    className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-neutral-0)] p-3 text-xs text-[var(--color-text-strong)]"
+                                  >
+                                    <option value="awareness">Notoriedade</option>
+                                    <option value="engagement">Envolvimento</option>
+                                    <option value="traffic">Tráfego</option>
+                                    <option value="conversions">Conversões</option>
+                                    <option value="sales">Vendas</option>
+                                  </select>
+                                </label>
+
+                                <label className="block">
+                                  <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">Orçamento máximo (XOF)</span>
+                                  <input
+                                    value={campaignBudget}
+                                    onChange={(event) => setCampaignBudget(event.target.value.replace(/[^\d]/g, ''))}
+                                    inputMode="numeric"
+                                    placeholder="0"
+                                    className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-neutral-0)] p-3 text-xs text-[var(--color-text-strong)]"
+                                  />
+                                </label>
+                              </div>
+
+                              <label className="block">
+                                <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">Público-alvo</span>
+                                <select
+                                  value={campaignAudienceId}
+                                  onChange={(event) => setCampaignAudienceId(event.target.value)}
+                                  className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-neutral-0)] p-3 text-xs text-[var(--color-text-strong)]"
+                                >
+                                  <option value="">Todos os seguidores</option>
+                                  {marketingSegments.map((segment) => <option key={segment.id} value={segment.id}>{segment.name}</option>)}
+                                </select>
+                              </label>
+
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <label className="block">
+                                  <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">Início</span>
+                                  <input
+                                    type="datetime-local"
+                                    value={campaignStartsAt}
+                                    onChange={(event) => setCampaignStartsAt(event.target.value)}
+                                    aria-label={t('business.InicioCampanha')}
+                                    className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-2.5 text-[10px]"
+                                  />
+                                </label>
+                                <label className="block">
+                                  <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">Fim</span>
+                                  <input
+                                    type="datetime-local"
+                                    value={campaignEndsAt}
+                                    onChange={(event) => setCampaignEndsAt(event.target.value)}
+                                    aria-label="Fim da campanha"
+                                    className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-2.5 text-[10px]"
+                                  />
+                                </label>
+                              </div>
+                              <p className="text-[10px] text-[var(--color-text-muted)]">As datas usam o fuso Africa/Bissau.</p>
+                            </div>
+
+                            <fieldset className="mt-4">
+                              <legend className="text-[10px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">Canais</legend>
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {(['guigui', 'social', 'sms', 'email', 'banner'] as const).map((channel) => {
+                                  const channelSelected = campaignChannels.includes(channel);
+                                  return (
+                                    <button
+                                      key={channel}
+                                      type="button"
+                                      aria-pressed={channelSelected}
+                                      onClick={() => setCampaignChannels((previous) => previous.includes(channel) ? previous.filter((item) => item !== channel) : [...previous, channel])}
+                                      className={`rounded-full px-2.5 py-1.5 text-[10px] font-black transition ${channelSelected ? 'bg-[var(--color-green-700)] text-white' : 'bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)] hover:text-[var(--color-text-strong)]'}`}
+                                    >
+                                      {MARKETING_CHANNEL_LABELS[channel]}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </fieldset>
+
+                            <fieldset className="mt-4">
+                              <legend className="text-[10px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">{t('business.ConteudosAssociados')}</legend>
+                              <div className="mt-2 max-h-36 space-y-1 overflow-auto rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-2.5">
+                                {business.posts.length + business.promotions.length === 0 ? (
+                                  <p className="text-[10px] text-[var(--color-text-muted)]">Ainda não há publicações ou promoções para associar.</p>
+                                ) : (
+                                  [...business.posts.slice(0, 8).map((post) => ({ id: post.id, title: post.title, type: 'Publicação' })), ...business.promotions.slice(0, 8).map((promotion) => ({ id: promotion.id, title: promotion.title, type: 'Promoção' }))].map((content) => (
+                                    <label key={content.id} className="flex items-center gap-2 text-[10px] text-[var(--color-text-muted)]">
+                                      <input
+                                        type="checkbox"
+                                        checked={campaignContentIds.includes(content.id)}
+                                        onChange={() => setCampaignContentIds((previous) => previous.includes(content.id) ? previous.filter((id) => id !== content.id) : [...previous, content.id])}
+                                        className="shrink-0"
+                                      />
+                                      <span className="min-w-0 flex-1 truncate">{content.title}</span>
+                                      <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide">{content.type}</span>
+                                    </label>
+                                  ))
+                                )}
+                              </div>
+                            </fieldset>
+
+                            <Button type="submit" size="sm" className="mt-4 w-full" disabled={!campaignName.trim()}>
+                              Guardar rascunho
+                            </Button>
+                          </form>
+
+                          <div className="min-w-0">
+                            <div className="border-b border-[var(--color-border-subtle)] pb-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-green-700)]">Planeamento</p>
+                                  <h4 className="mt-1 text-base font-black text-[var(--color-text-strong)]">As suas campanhas</h4>
+                                </div>
+                                <Badge variant="info">
+                                  {marketingCampaigns.filter((campaign) => campaignFilter === 'all' || campaign.status === campaignFilter).length} de {marketingCampaigns.length}
+                                </Badge>
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-1.5">
+                                {MARKETING_CAMPAIGN_FILTERS.map((filter) => (
+                                  <button
+                                    key={filter.id}
+                                    type="button"
+                                    aria-pressed={campaignFilter === filter.id}
+                                    onClick={() => setCampaignFilter(filter.id)}
+                                    className={`rounded-full px-2.5 py-1.5 text-[10px] font-black transition ${campaignFilter === filter.id ? 'bg-[var(--color-bg-surface-dark)] text-white' : 'bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] hover:text-[var(--color-text-strong)]'}`}
+                                  >
+                                    {filter.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="mt-3 space-y-2">
+                              {marketingCampaigns.filter((campaign) => campaignFilter === 'all' || campaign.status === campaignFilter).length === 0 ? (
+                                <EmptyState
+                                  icon={<Megaphone className="h-6 w-6" />}
+                                  title={marketingCampaigns.length === 0 ? 'Sem campanhas' : 'Nenhuma campanha neste estado'}
+                                  description={marketingCampaigns.length === 0 ? 'Preencha o formulário ao lado para criar a primeira campanha.' : 'Escolha outro filtro para ver as restantes campanhas.'}
+                                />
+                              ) : (
+                                marketingCampaigns
+                                  .filter((campaign) => campaignFilter === 'all' || campaign.status === campaignFilter)
+                                  .map((campaign) => (
+                                    <div key={campaign.id} className="rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 shadow-[var(--shadow-xs)]">
+                                      <div className="flex flex-wrap items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <h4 className="text-sm font-black text-[var(--color-text-strong)]">{campaign.name}</h4>
+                                            <Badge variant={MARKETING_STATUS_VARIANTS[campaign.status]}>{MARKETING_STATUS_LABELS[campaign.status]}</Badge>
+                                          </div>
+                                          <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">
+                                            {campaign.channels.map((channel) => MARKETING_CHANNEL_LABELS[channel]).join(' · ')}
+                                          </p>
+                                        </div>
+                                        {campaign.budgetXOF ? (
+                                          <div className="rounded-xl bg-[var(--color-bg-subtle)] px-2.5 py-1.5 text-right">
+                                            <p className="text-[9px] font-black uppercase tracking-wide text-[var(--color-text-muted)]">Orçamento</p>
+                                            <p className="text-xs font-black tabular-nums text-[var(--color-text-strong)]">{campaign.budgetXOF.toLocaleString('pt-PT')} XOF</p>
+                                          </div>
+                                        ) : null}
+                                      </div>
+
+                                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-semibold text-[var(--color-text-muted)]">
+                                        <span>{MARKETING_OBJECTIVE_LABELS[campaign.objective]}</span>
+                                        <span>{campaign.contentIds.length} conteúdos</span>
+                                        <span>
+                                          {campaign.startsAt ? new Date(campaign.startsAt).toLocaleDateString('pt-PT') : 'Sem início'}
+                                          {' — '}
+                                          {campaign.endsAt ? new Date(campaign.endsAt).toLocaleDateString('pt-PT') : 'Sem fim'}
+                                        </span>
+                                      </div>
+
+                                      <div className="mt-3 flex flex-wrap gap-2">
+                                        {campaign.status === 'draft' && <Button type="button" size="sm" variant="primary" onClick={() => updateCampaignStatus(campaign, 'scheduled')}>Agendar</Button>}
+                                        {campaign.status === 'scheduled' && <Button type="button" size="sm" variant="primary" onClick={() => updateCampaignStatus(campaign, 'active')}>Ativar</Button>}
+                                        {campaign.status === 'active' && <Button type="button" size="sm" variant="ghost" onClick={() => updateCampaignStatus(campaign, 'paused')}>Pausar</Button>}
+                                        {campaign.status === 'paused' && <Button type="button" size="sm" variant="primary" onClick={() => updateCampaignStatus(campaign, 'active')}>Retomar</Button>}
+                                        {!['ended', 'archived'].includes(campaign.status) && <Button type="button" size="sm" variant="ghost" onClick={() => updateCampaignStatus(campaign, 'ended')}>Encerrar</Button>}
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => setMarketingCampaigns((previous) => [{ ...campaign, id: `campaign-${Date.now()}`, name: `${campaign.name} (cópia)`, status: 'draft', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, ...previous])}
+                                        >
+                                          Duplicar
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {marketingSection === 'content' && (
+                      <div className="mt-6 border-t border-[var(--color-border-subtle)] pt-5">
+                        <div className="flex flex-wrap items-end justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-green-700)]">Inventário editorial</p>
+                            <h4 className="mt-1 text-base font-black text-[var(--color-text-strong)]">Publicações e promoções</h4>
+                            <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">Filtre o conteúdo que pode ser associado a campanhas.</p>
+                          </div>
+                          <Badge variant="info">{marketingContentItems.length} itens</Badge>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {(['all', 'posts', 'promotions', 'scheduled'] as const).map((filter) => (
+                            <button
+                              key={filter}
+                              type="button"
+                              aria-pressed={contentFilter === filter}
+                              onClick={() => setContentFilter(filter)}
+                              className={`rounded-full px-3 py-1.5 text-[10px] font-black transition ${contentFilter === filter ? 'bg-[var(--color-bg-surface-dark)] text-white' : 'bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] hover:text-[var(--color-text-strong)]'}`}
+                            >
+                              {filter === 'all' ? t('business.Todos') : filter === 'posts' ? t('posts') : filter === 'promotions' ? t('promotions') : t('business.Agendados')}
+                            </button>
+                          ))}
+                        </div>
+                        {marketingContentItems.length === 0 ? (
+                          <div className="mt-3">
+                            <EmptyState icon={<FileText className="h-6 w-6" />} title="Sem conteúdos neste filtro" description="Crie uma publicação ou promoção, ou escolha outro filtro." />
+                          </div>
+                        ) : (
+                          <div className="mt-3 grid gap-2 md:grid-cols-2">
+                            {marketingContentItems.map((item) => (
+                              <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-3">
+                                <span className="min-w-0">
+                                  <strong className="block truncate text-xs text-[var(--color-text-strong)]">{item.title}</strong>
+                                  <small className="text-[10px] text-[var(--color-text-muted)]">{item.typeLabel}</small>
+                                </span>
+                                <Badge variant={['published', 'active'].includes(item.status) ? 'success' : ['scheduled', 'publishing'].includes(item.status) ? 'info' : 'neutral'}>{item.status}</Badge>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {marketingSection === 'audience' && (
+                      <div className="mt-6 border-t border-[var(--color-border-subtle)] pt-5">
+                        <div className="flex items-center justify-between gap-3"><div><h4 className="text-sm font-black text-[var(--color-text-strong)]">Segmentos por regras</h4><p className="mt-1 text-[11px] text-[var(--color-text-muted)]">{t('business.EstimativasAparecemQuando')}</p></div><Button type="button" size="sm" onClick={createAudienceSegment}>Criar segmento</Button></div>
+                        <div className="mt-3 grid gap-2 md:grid-cols-2">{marketingSegments.length === 0 ? <div className="md:col-span-2"><EmptyState icon={<Users className="h-6 w-6" />} title="Sem segmentos" description="Crie um segmento para organizar o público das campanhas." /></div> : marketingSegments.map((segment) => <div key={segment.id} className="rounded-2xl border border-[var(--color-border-subtle)] p-4"><h4 className="text-xs font-black text-[var(--color-text-strong)]">{segment.name}</h4><p className="mt-1 text-[10px] text-[var(--color-text-muted)]">{segment.location} · {segment.interests.join(', ')}</p><p className="mt-3 text-sm font-black text-[var(--color-green-700)]">{segment.estimatedReach === undefined ? 'Estimativa indisponível' : `${segment.estimatedReach.toLocaleString('pt-PT')} pessoas estimadas`}</p></div>)}</div>
+                      </div>
+                    )}
+                    {marketingSection === 'library' && (
+                      <div className="mt-6 border-t border-[var(--color-border-subtle)] pt-5">
+                        <div className="flex flex-wrap items-end justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-green-700)]">Materiais reutilizáveis</p>
+                            <h4 className="mt-1 text-base font-black text-[var(--color-text-strong)]">Biblioteca de campanha</h4>
+                            <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">Imagens, vídeos e logótipos disponíveis para novas campanhas.</p>
+                          </div>
+                          <Badge variant="info">{marketingAssets.length} materiais</Badge>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {(['all', 'image', 'video', 'banner', 'logo'] as const).map((filter) => (
+                            <button
+                              key={filter}
+                              type="button"
+                              aria-pressed={assetFilter === filter}
+                              onClick={() => setAssetFilter(filter)}
+                              className={`rounded-full px-3 py-1.5 text-[10px] font-black transition ${assetFilter === filter ? 'bg-[var(--color-bg-surface-dark)] text-white' : 'bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] hover:text-[var(--color-text-strong)]'}`}
+                            >
+                              {filter === 'all' ? 'Todos' : MARKETING_ASSET_LABELS[filter]}
+                            </button>
+                          ))}
+                        </div>
+                        {marketingAssets.filter((asset) => assetFilter === 'all' || asset.type === assetFilter).length === 0 ? (
+                          <div className="mt-3">
+                            <EmptyState icon={<Layers className="h-6 w-6" />} title="Sem materiais neste filtro" description="Adicione imagens ou vídeos às publicações para os reutilizar aqui." />
+                          </div>
+                        ) : (
+                          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            {marketingAssets.filter((asset) => assetFilter === 'all' || asset.type === assetFilter).map((asset) => (
+                              <div key={asset.id} className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)]">
+                                {asset.type === 'video' ? <video src={asset.url} className="h-28 w-full object-cover" muted /> : <img src={asset.url} alt={asset.name} className="h-28 w-full object-cover" />}
+                                <div className="p-3">
+                                  <p className="truncate text-xs font-black text-[var(--color-text-strong)]">{asset.name}</p>
+                                  <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">{MARKETING_ASSET_LABELS[asset.type]} · {asset.usedBy.length} utilização(ões)</p>
+                                  <button type="button" disabled={asset.usedBy.length > 0} className="mt-2 text-[10px] font-black text-[var(--color-rose-600)] disabled:cursor-not-allowed disabled:text-[var(--color-text-muted)]">Arquivar</button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {marketingSection === 'budget' && (
+                      <div className="mt-6 grid gap-3 border-t border-[var(--color-border-subtle)] pt-5 sm:grid-cols-2 xl:grid-cols-4">
+                        <StatCard
+                          icon={DollarSign}
+                          tone="primary"
+                          label="Total planeado"
+                          value={`${marketingCampaigns.reduce((total, campaign) => total + (campaign.budgetXOF || 0), 0).toLocaleString('pt-PT')} XOF`}
+                          hint="Orçamento das campanhas"
+                        />
+                        <StatCard
+                          icon={TrendingUp}
+                          tone="warning"
+                          label="Gasto registado"
+                          value={`${marketingCampaigns.reduce((total, campaign) => total + (campaign.spentXOF || 0), 0).toLocaleString('pt-PT')} XOF`}
+                          hint="Investimento realizado"
+                        />
+                        <StatCard
+                          icon={CheckCircle2}
+                          tone="success"
+                          label="Disponível"
+                          value={`${marketingCampaigns.reduce((total, campaign) => total + Math.max(0, (campaign.budgetXOF || 0) - (campaign.spentXOF || 0)), 0).toLocaleString('pt-PT')} XOF`}
+                          hint="Saldo por utilizar"
+                        />
+                        <StatCard
+                          icon={Megaphone}
+                          tone="info"
+                          label="Campanhas"
+                          value={marketingCampaigns.length}
+                          hint="Com orçamento associado"
+                        />
+                      </div>
+                    )}
+                    {marketingSection === 'reports' && (
+                      <div className="mt-6 grid gap-4 border-t border-[var(--color-border-subtle)] pt-5 md:grid-cols-2">
+                        <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-4">
+                          <h4 className="text-sm font-black text-[var(--color-text-strong)]">{t('business.IndicadoresDisponiveis')}</h4>
+                          <div className="mt-3 space-y-2 text-xs text-[var(--color-text-muted)]">
+                            <div className="flex justify-between gap-3"><span>{t('business.Visualizacoes3')}</span><strong className="text-[var(--color-text-strong)]">{business.metrics.views.toLocaleString('pt-PT')}</strong></div>
+                            <div className="flex justify-between gap-3"><span>Contactos</span><strong className="text-[var(--color-text-strong)]">{(business.metrics.whatsappClicks + business.metrics.phoneClicks).toLocaleString('pt-PT')}</strong></div>
+                            <div className="flex justify-between gap-3"><span>Pedidos</span><strong className="text-[var(--color-text-strong)]">{myBusinessOrders.length.toLocaleString('pt-PT')}</strong></div>
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] p-4">
+                          <h4 className="text-sm font-black text-[var(--color-text-strong)]">{t('business.ExportacaoAnalise')}</h4>
+                          <p className="mt-2 text-xs leading-relaxed text-[var(--color-text-muted)]">{t('business.IndicadoresSaoDerivados')}</p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Button type="button" size="sm" variant="primary" onClick={() => setActiveTab('analytics')}>{t('business.AbrirEstatisticas')}</Button>
+                            <Button type="button" size="sm" variant="ghost" onClick={() => setActiveTab('reports')}>Exportar dados</Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {marketingSection === 'calendar' && (
+                      <div className="mt-6 border-t border-[var(--color-border-subtle)] pt-5">
+                        <div className="flex flex-wrap items-end justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-green-700)]">Próximas publicações</p>
+                            <h4 className="mt-1 text-base font-black text-[var(--color-text-strong)]">Agendamentos</h4>
+                            <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">{t('business.FusoHorarioPadrao')}</p>
+                          </div>
+                          <Badge variant="info">{scheduledItems.length} agendados</Badge>
+                        </div>
+                        <div className="mt-3 space-y-2">
+                          {scheduledItems.length === 0 && (
+                            <EmptyState
+                              icon={<Calendar className="h-6 w-6" />}
+                              title="Sem agendamentos"
+                              description={t('business.AindaNaoExistem3')}
+                              actions={<Button type="button" size="sm" variant="primary" onClick={() => setActiveTab('posts')}>Criar publicação</Button>}
+                            />
+                          )}
+                          {scheduledItems.map((item) => (
+                            <div key={item.id} className="flex flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div>
+                                <p className="text-xs font-black text-[var(--color-text-strong)]">{item.label || (item.itemType === 'promotion' ? t('business.Promocao') : item.itemType === 'post' ? t('business.Publicacao') : item.itemType)}</p>
+                                <p className="text-[11px] text-[var(--color-text-muted)]">{new Date(item.scheduledAt).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })} · {item.timezone}</p>
+                                <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-[var(--color-green-700)]">{item.status === 'scheduled' ? 'Agendado' : item.status === 'published' ? 'Publicado/Ativo' : item.status === 'expired' ? 'Expirado' : item.status === 'failed' ? `Falha: ${item.errorMessage || 'ver detalhes'}` : item.status === 'cancelled' ? 'Cancelado' : 'A publicar'}</p>
+                              </div>
+                              {item.status === 'scheduled' && <div className="flex flex-wrap gap-2">
+                                <Button type="button" size="sm" variant="ghost" onClick={() => void updateSchedule(item, 'reschedule')}>Reagendar</Button>
+                                <Button type="button" size="sm" variant="ghost" onClick={() => void updateSchedule(item, 'publish')}>Publicar agora</Button>
+                                <Button type="button" size="sm" variant="ghost" onClick={() => void updateSchedule(item, 'cancel')}>Cancelar</Button>
+                              </div>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* Notifications Tab */}
+      {activeTab === 'notifications' && (
+        <ClientNotificationsHub
+          business={business}
+          currentLang={currentLang}
+          notifications={notifications}
+          onMarkAsRead={onMarkNotificationAsRead}
+          onMarkAllAsRead={onMarkAllNotificationsAsRead}
+          onClearAll={onClearNotifications}
+          onNavigateTab={onNavigateNotificationTab}
+          onOpenNotification={onOpenNotification}
+        />
+      )}
+
+      {/* Settings Tab */}
+      {activeTab === 'communications' && (
+        <CommunicationHub currentLang={currentLang} mode="business" currentUser={currentUser} businesses={businesses} conversations={conversations} messages={conversationMessages} supportRequests={supportRequests} onCreateConversation={onCreateConversation} onSendMessage={onSendMessage} onCreateSupport={onCreateSupport} onReplySupport={onReplySupport} onMarkConversationRead={onMarkConversationRead} initialChannel="messages" channelOnly focusConversationId={focusConversationId} />
+      )}
+
+      {activeTab === 'support' && (
+        <CommunicationHub currentLang={currentLang} mode="business" currentUser={currentUser} businesses={businesses} conversations={conversations} messages={conversationMessages} supportRequests={supportRequests} onCreateConversation={onCreateConversation} onSendMessage={onSendMessage} onCreateSupport={onCreateSupport} onReplySupport={onReplySupport} onMarkConversationRead={onMarkConversationRead} initialChannel="support" channelOnly focusSupportId={focusSupportId} />
+      )}
+
+      {activeTab === 'security' && (
+        <ClientSecurityHub business={business} currentUser={currentUser} currentLang={currentLang} />
+      )}
+
+      {activeTab === 'reports' && (
+        <ClientReportsHub
+          business={business}
+          currentUser={currentUser}
+          currentLang={currentLang}
+          purchaseOrders={purchaseOrders}
+          events={events}
+          posts={business.posts}
+          marketingCampaigns={marketingCampaigns}
+          teamAudit={teamAudit}
+          exportContent={(
+            <ClientExportHub
+              business={business}
+              currentLang={currentLang}
+              purchaseOrders={purchaseOrders}
+              events={events}
+              teamMembers={teamMembers}
+              teamAudit={teamAudit}
+              conversations={conversations}
+              conversationMessages={conversationMessages}
+              supportRequests={supportRequests}
+              marketingCampaigns={marketingCampaigns}
+              marketingSegments={marketingSegments}
+              marketingAssets={marketingAssets}
+              scheduledItems={scheduledItems}
+              notifications={notifications}
+              currentUser={currentUser}
+              followerCount={followerCount}
+              audienceReach={audienceReach}
+            />
+          )}
+        />
+      )}
+
+      {activeTab === 'settings' && (
+        <ClientSettingsHub
+          business={business}
+          currentLang={currentLang}
+          accountEmail={currentUser.email}
+          notificationPreferences={notificationPreferences}
+          onNotificationPreferencesChange={onNotificationPreferencesChange}
+          currentThemeMode={currentThemeMode}
+          onThemeModeChange={onThemeModeChange}
+          onLanguageChange={onLanguageChange}
+          onSaveBusiness={async (updatedBusiness) => {
+            if (!denyPermission('profile')) throw new Error('Não tem permissão para editar os dados da empresa.');
+            if (!onSaveBusinessProfile) throw new Error('A gravação do perfil da empresa não está disponível.');
+            await onSaveBusinessProfile(updatedBusiness);
+          }}
+        />
+      )}
+
+      {selectedBusinessPost && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--color-bg-surface-dark)]/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="business-post-detail-title"
+          onClick={() => setSelectedBusinessPost(null)}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] shadow-[var(--shadow-lg)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-[var(--color-border-subtle)] p-5">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--color-green-600)]">{t('business.PublicacaoCriadaPela')}</p>
+                <h2 id="business-post-detail-title" className="mt-1 text-xl font-black text-[var(--color-text-strong)]">
+                  {selectedBusinessPost.title || 'Publicação sem título'}
+                </h2>
+                <p className="mt-1 text-[11px] font-semibold text-[var(--color-text-muted)]">
+                  {new Date(selectedBusinessPost.createdAt).toLocaleString('pt-PT')}
+                </p>
+              </div>
+              <IconButton label="Fechar publicação" variant="secondary" size="sm" onClick={() => setSelectedBusinessPost(null)}>
+                <X className="h-4 w-4" />
+              </IconButton>
+            </div>
+            <div className="space-y-5 p-5">
+              {selectedBusinessPost.imageUrl && (
+                <img src={selectedBusinessPost.imageUrl} alt={selectedBusinessPost.title || t('business.ImagemPublicacao')} className="max-h-[420px] w-full rounded-2xl object-cover" />
+              )}
+              {selectedBusinessPost.videoUrl && (
+                <video src={selectedBusinessPost.videoUrl} controls className="max-h-[420px] w-full rounded-2xl bg-[var(--color-bg-surface-dark)]" />
+              )}
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-text-strong)]">{selectedBusinessPost.content}</p>
+              <div className="flex flex-wrap gap-2 text-[11px] font-bold text-[var(--color-text-muted)]">
+                <span className="rounded-full bg-[var(--color-bg-subtle)] px-3 py-1">Gostos: {selectedPostEngagement?.likes ?? 0} · Comentários: {selectedPostEngagement?.comments.length ?? 0} · Partilhas: {selectedPostEngagement?.shares ?? 0}</span>
+                <span className="rounded-full bg-[var(--color-green-50)] px-3 py-1 text-[var(--color-emerald-700)]">Estado: {selectedBusinessPost.status}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Buy Extra Post Modal (4.3) */}
+      {showBuyPostModal && activeTab === 'my_business' && (
+        <div className="fixed inset-0 bg-[var(--color-bg-surface-dark)]/60 z-50 flex items-center justify-center p-4 overscroll-contain">
+          <div className="bg-[var(--color-neutral-0)] rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 overscroll-contain">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-extrabold text-[var(--color-text-strong)] text-base flex items-center gap-2">
+                <PlusCircle className="w-5 h-5 text-[var(--color-green-600)]" />
+                <span>Comprar Post Extra (Avulso)</span>
+              </h3>
+              <IconButton label="Fechar compra de post extra" variant="ghost"
+                onClick={() => setShowBuyPostModal(false)}
+                className="guigui-close-button"
+                title="Fechar"
+              >
+                <X className="w-4 h-4" aria-hidden="true" />
+              </IconButton>
+            </div>
+
+            <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">{t('business.EscolhaPacoteCreditos')}</p>
+
+            <div className="bg-[var(--color-green-50)] p-4 rounded-2xl border-[var(--color-green-200)] space-y-3 font-mono">
+              <div className="flex items-center justify-between gap-3">
+                <div><div className="text-[10px] text-[var(--color-blue-800)] uppercase font-bold">{t('business.PostsExtraPublicaveis')}</div><div className="text-xs text-[var(--color-green-600)]">{t('business.ComAprovacaoVia')}</div></div>
+                <select value={extraPostQuantity} onChange={(e) => setExtraPostQuantity(Number(e.target.value) || 1)} className="rounded-xl border-[var(--color-green-200)] bg-[var(--color-bg-surface)] px-2 py-2 text-xs font-black text-[var(--color-green-900)]" aria-label="Pacote de posts extra">
+                  {(postExtraProduct?.priceRules || [{ id: 'post-extra-default', quantity: 1, label: '+1 post', price: pricingConfig.extraPostPriceXOF }]).map((rule) => <option key={rule.id} value={rule.quantity}>{rule.label}</option>)}
+                </select>
+              </div>
+              <div className="text-right text-base font-black text-[var(--color-green-700)]">{postExtraPrice.toLocaleString('pt-PT')} XOF</div>
+            </div>
+
+            <form onSubmit={handleBuyExtraPost} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-[var(--color-text-strong)] font-semibold mb-1">{t('business.SelecioneCarteiraTelemovel')}</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    variant={selectedPaymentProvider === 'orange' ? 'accent' : 'secondary'}
+                    size="sm"
+                    type="button"
+                    onClick={() => setSelectedPaymentProvider('orange')}
+                    className={`p-3 rounded-xl border text-center font-bold transition flex items-center justify-center gap-2 ${
+                      selectedPaymentProvider === 'orange'
+                        ? 'border-[var(--color-gold-500)] bg-[var(--color-gold-50)] text-[var(--color-gold-900)] ring-2 ring-[var(--color-gold-500)]'
+                        : 'border-[var(--color-border-subtle)] text-[var(--color-text-muted)]'
+                    }`}
+                  >
+                    <span>Orange Money</span>
+                  </Button>
+                  <Button
+                    variant={selectedPaymentProvider === 'telecel' ? 'primary' : 'secondary'}
+                    size="sm"
+                    type="button"
+                    onClick={() => setSelectedPaymentProvider('telecel')}
+                    className={`p-3 rounded-xl border text-center font-bold transition flex items-center justify-center gap-2 ${
+                      selectedPaymentProvider === 'telecel'
+                        ? 'border-[var(--color-green-600)] bg-[var(--color-green-50)] text-[var(--color-green-900)] ring-2 ring-[var(--color-green-600)]'
+                        : 'border-[var(--color-border-subtle)] text-[var(--color-text-muted)]'
+                    }`}
+                  >
+                    <span>Telecel Cash</span>
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[var(--color-text-strong)] font-semibold mb-1">{t('business.NumeroTelemovel245')}</label>
+                <input
+                  type="text"
+                  required
+                  value={mobileMoneyPhone}
+                  onChange={(e) => setMobileMoneyPhone(e.target.value)}
+                  className="w-full bg-[var(--color-bg-subtle)] border-[var(--color-border-subtle)] rounded-xl p-3 font-mono text-[var(--color-text-strong)]"
+                />
+              </div>
+
+              <Button
+                variant="primary"
+                size="lg"
+                type="submit"
+                disabled={isProcessingPayment}
+                className="w-full py-3.5 bg-[var(--color-green-600)] hover:bg-[var(--color-green-700)] text-white font-extrabold rounded-xl transition shadow-sm flex items-center justify-center gap-2 min-h-[44px]"
+              >
+                <span>{isProcessingPayment ? 'A processar simulação...' : `Simular pagamento de ${postExtraPrice.toLocaleString('pt-PT')} XOF`}</span>
+              </Button>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Buy Extra Promotion Modal */}
+      {showBuyPromoModal && (
+        <div className="fixed inset-0 bg-[var(--color-bg-surface-dark)]/60 z-50 flex items-center justify-center p-4 overscroll-contain">
+          <div className="bg-[var(--color-neutral-0)] rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 overscroll-contain">
+            <div className="flex items-center justify-between border-b pb-3"><h3 className="font-extrabold text-[var(--color-text-strong)] text-base flex items-center gap-2"><Tag className="w-5 h-5 text-[var(--color-gold-600)]" /><span>{t('business.ComprarPromocaoExtra')}</span></h3><button type="button" onClick={() => setShowBuyPromoModal(false)} className="guigui-close-button" aria-label={t('business.FecharCompraPromocao')} title="Fechar"><X className="w-4 h-4" /></button></div>
+            <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">{t('business.EscolhaPacotePromocoes')}</p>
+            <div className="bg-[var(--color-gold-50)] p-4 rounded-2xl border-[var(--color-gold-200)] space-y-3 font-mono"><div className="flex items-center justify-between gap-3"><div><div className="text-[10px] text-[var(--color-gold-800)] uppercase font-bold">Destaques promocionais</div><div className="text-xs text-[var(--color-gold-700)]">{t('business.PrecoQuantidadeDefinidos')}</div></div><select value={extraPromotionQuantity} onChange={(e) => setExtraPromotionQuantity(Number(e.target.value) || 1)} className="rounded-xl border-[var(--color-gold-200)] bg-[var(--color-bg-surface)] px-2 py-2 text-xs font-black text-[var(--color-gold-900)]" aria-label={t('business.PacotePromocoesExtra')}>{(promotionExtraProduct?.priceRules || [{ id: 'promotion-extra-default', quantity: 1, label: '+1 promoção', price: pricingConfig.extraPromotionPriceXOF }]).map((rule) => <option key={rule.id} value={rule.quantity}>{rule.label}</option>)}</select></div><div className="text-right text-base font-black text-[var(--color-gold-700)]">{promotionExtraPrice.toLocaleString('pt-PT')} XOF</div></div>
+            <form onSubmit={handleBuyExtraPromo} className="space-y-4 text-xs"><div><label className="block text-[var(--color-text-strong)] font-semibold mb-1">{t('business.SeleccioneCarteiraTelemovel')}</label><div className="grid grid-cols-2 gap-3"><button type="button" onClick={() => setSelectedPaymentProvider('orange')} className={`p-3 rounded-xl border text-center font-bold transition ${selectedPaymentProvider === 'orange' ? 'border-[var(--color-gold-500)] bg-[var(--color-gold-50)] text-[var(--color-gold-900)] ring-2 ring-[var(--color-gold-500)]' : 'border-[var(--color-border-subtle)] text-[var(--color-text-muted)]'}`}>Orange Money</button><button type="button" onClick={() => setSelectedPaymentProvider('telecel')} className={`p-3 rounded-xl border text-center font-bold transition ${selectedPaymentProvider === 'telecel' ? 'border-[var(--color-green-600)] bg-[var(--color-green-50)] text-[var(--color-green-900)] ring-2 ring-[var(--color-green-600)]' : 'border-[var(--color-border-subtle)] text-[var(--color-text-muted)]'}`}>Telecel Cash</button></div></div><div><label className="block text-[var(--color-text-strong)] font-semibold mb-1">{t('business.NumeroTelemovel2452')}</label><input type="text" required value={mobileMoneyPhone} onChange={(e) => setMobileMoneyPhone(e.target.value)} className="w-full bg-[var(--color-bg-subtle)] border-[var(--color-border-subtle)] rounded-xl p-3 font-mono text-[var(--color-text-strong)]" /></div><button type="submit" disabled={isProcessingPayment} className="w-full py-3.5 bg-[var(--color-gold-600)] hover:bg-[var(--color-gold-700)] text-white font-extrabold rounded-xl transition shadow-sm min-h-[44px]">{isProcessingPayment ? 'A processar simulação...' : `Simular pagamento de ${promotionExtraPrice.toLocaleString('pt-PT')} XOF`}</button></form>
+          </div>
+        </div>
+      )}
+
+      {/* Upgrade Plan Modal */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 bg-[var(--color-bg-surface-dark)]/70 z-50 flex items-center justify-center p-4 overscroll-contain">
+          <div className="bg-[var(--color-bg-surface)] rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 overscroll-contain">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-extrabold text-[var(--color-text-strong)] text-base flex items-center gap-2">
+                <Zap className="w-5 h-5 text-[var(--color-gold-500)]" />
+                <span>{t('business.EscolherLibertarEscalao')}</span>
+              </h3>
+              <button type="button"
+                onClick={() => setShowUpgradeModal(false)}
+                className="guigui-close-button"
+                aria-label="Fechar escolha de plano"
+                title="Fechar"
+              >
+                <X className="w-4 h-4" aria-hidden="true" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">{t('business.EscolhaNovoEscalao')}<strong>{business.name}</strong>{t('business.ConcluirPagamentoCom')}</p>
+
+            {/* Select Tier Grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {availableSubscriptionPlans.map((plan) => (
+                <button
+                  key={plan.id}
+                  type="button"
+                  onClick={() => { setTargetUpgradePlanId(plan.id); if (plan.legacyTier) setTargetUpgradeTier(plan.legacyTier); }}
+                  className={`p-3.5 rounded-2xl border text-left transition relative ${
+                    targetUpgradePlanId === plan.id
+                      ? 'bg-[var(--color-green-50)] border-[var(--color-green-600)] ring-2 ring-[var(--color-green-600)] font-extrabold shadow-sm'
+                      : 'bg-[var(--color-neutral-0)] border-[var(--color-border-subtle)] hover:border-[var(--color-border-strong)]'
+                  }`}
+                >
+                  <div className="font-black text-[var(--color-text-strong)] text-xs">{plan.name}</div>
+                  <div className="text-[10px] text-[var(--color-green-700)] font-bold mt-1">{limitLabel(plan.postsPerMonth)} posts · {limitLabel(plan.promotionsPerMonth)} promoções</div>
+                  <div className="text-[10px] text-[var(--color-text-muted)] mt-0.5">{plan.price > 0 ? `${plan.price.toLocaleString('pt-PT')} ${plan.currency}${t('business.Mes')}` : t('business.PrecoNegociado')}</div>
+                  {targetUpgradePlanId === plan.id && (
+                    <CheckCircle className="w-4 h-4 text-[var(--color-green-600)] absolute top-3 right-3" />
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <form onSubmit={handleExecuteAutomatedPlanUpgrade} className="space-y-4 text-xs pt-2">
+              <div>
+                <label className="block text-[var(--color-text-strong)] font-bold mb-1">{t('business.NumeroTelemovelOrange')}</label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-[var(--color-text-muted)] absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    required
+                    value={upgradePaymentPhone}
+                    onChange={(e) => setUpgradePaymentPhone(e.target.value)}
+                    placeholder="+245 955 00 11 22"
+                    className="w-full pl-9 pr-3 py-2.5 bg-[var(--color-bg-subtle)] border-[var(--color-border-subtle)] rounded-xl font-mono text-[var(--color-text-strong)] text-xs font-bold focus:bg-[var(--color-bg-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-green-600)]"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-[var(--color-green-50)] p-3 rounded-xl border-[var(--color-green-200)] text-[11px] text-[var(--color-emerald-900)] leading-relaxed">
+                ⚡ <strong>{t('business.AtivacaoInstantanea')}</strong>{t('business.AssimQueIntroduzir')}<strong>{getPlanById(normaliseSubscriptionPlans(subscriptionPlans), targetUpgradePlanId, targetUpgradeTier).name.toUpperCase()}</strong>{t('business.SeraAutomaticamenteLiberado')}</div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowUpgradeModal(false)}
+                  className="px-4 py-2.5 bg-[var(--color-bg-subtle)] hover:bg-[var(--color-bg-subtle-dark)] text-[var(--color-text-strong)] font-bold rounded-xl transition"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isUpgrading}
+                  className="px-6 py-2.5 bg-[var(--color-green-600)] hover:bg-[var(--color-emerald-700)] text-white font-black rounded-xl transition shadow-md flex items-center gap-2"
+                >
+                  {isUpgrading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>{t('business.LibertarEscalao')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-4 h-4 text-[var(--color-gold-300)]" />
+                      <span>Pagar & Libertar {getPlanById(normaliseSubscriptionPlans(subscriptionPlans), targetUpgradePlanId, targetUpgradeTier).name}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* QR Code Modal for Purchase Order */}
+      {selectedOrderForQr && (
+        <div className="fixed inset-0 z-50 bg-[var(--color-bg-surface-dark)]/70 flex items-center justify-center p-4 overscroll-contain">
+          <div className="bg-[var(--color-bg-surface)] rounded-2xl max-w-md w-full p-6 text-[var(--color-text-strong)] relative shadow-2xl space-y-4 overscroll-contain">
+            <IconButton label="Fechar QR Code" variant="secondary"
+              onClick={() => setSelectedOrderForQr(null)}
+              className="absolute top-4 right-4 bg-[var(--color-bg-subtle)] hover:bg-[var(--color-bg-subtle-dark)] text-[var(--color-text-muted)] p-2 rounded-full transition z-10"
+              title="Fechar QR Code"
+            >
+              <X className="w-5 h-5" />
+            </IconButton>
+  
+            <QRCodeDisplay
+              code={selectedOrderForQr.orderCode}
+              qrToken={selectedOrderForQr.qrToken}
+              title={selectedOrderForQr.itemTitle}
+              subtitle={selectedOrderForQr.businessName}
+              buyerName={selectedOrderForQr.customerName}
+              buyerPhone={selectedOrderForQr.customerPhone}
+              amountXOF={selectedOrderForQr.totalPriceXOF}
+              status={selectedOrderForQr.status}
+              currentLang={currentLang}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+    </main>
+      </div>
+    </div>
+  );
+};
+
+
+
+
+
+
+
+
+
+

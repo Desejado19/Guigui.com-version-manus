@@ -1,0 +1,1678 @@
+{
+  "sites": [
+    {
+      "line": 1771,
+      "index": 1,
+      "pt": "Gerencie suas campanhas, conteúdos e promoções",
+      "key": "business.GerencieSuasCampanhas",
+      "en": "Manage your campaigns, content and promotions",
+      "fr": "Gérez vos campagnes, contenus et promotions",
+      "es": "Gestione sus campañas, contenidos y promociones"
+    },
+    {
+      "line": 1778,
+      "index": 1,
+      "pt": "Secções de marketing",
+      "key": "business.SeccoesMarketing",
+      "en": "Marketing sections",
+      "fr": "Sections marketing",
+      "es": "Secciones de marketing"
+    },
+    {
+      "line": 1878,
+      "index": 1,
+      "pt": "Alcance dos anúncios",
+      "key": "business.AlcanceDosAnuncios",
+      "en": "Ad reach",
+      "fr": "Portée des annonces",
+      "es": "Alcance de los anuncios"
+    },
+    {
+      "line": 1882,
+      "index": 1,
+      "pt": "Visualizações dos conteúdos publicados",
+      "key": "business.VisualizacoesDosConteudos",
+      "en": "Views of published content",
+      "fr": "Vues des contenus publiés",
+      "es": "Visualizaciones de los contenidos publicados"
+    },
+    {
+      "line": 1887,
+      "index": 1,
+      "pt": "Visualizações",
+      "key": "business.Visualizacoes",
+      "en": "Views",
+      "fr": "Vues",
+      "es": "Visualizaciones"
+    },
+    {
+      "line": 1893,
+      "index": 1,
+      "pt": "+14% este mês",
+      "key": "business.EsteMes",
+      "en": "+14% this month",
+      "fr": "+14 % ce mois-ci",
+      "es": "+14 % este mes"
+    },
+    {
+      "line": 1940,
+      "index": 1,
+      "pt": "Interação com o perfil",
+      "key": "business.InteracaoComPerfil",
+      "en": "Profile engagement",
+      "fr": "Interaction avec le profil",
+      "es": "Interacción con el perfil"
+    },
+    {
+      "line": 2017,
+      "index": 1,
+      "pt": "Produção de conteúdo",
+      "key": "business.ProducaoConteudo",
+      "en": "Content production",
+      "fr": "Production de contenu",
+      "es": "Producción de contenido"
+    },
+    {
+      "line": 2019,
+      "index": 1,
+      "pt": "Nova publicação",
+      "key": "business.NovaPublicacao",
+      "en": "New post",
+      "fr": "Nouvelle publication",
+      "es": "Nueva publicación"
+    },
+    {
+      "line": 2022,
+      "index": 1,
+      "pt": "Crie uma atualização clara para os seus clientes. A IA verifica o conteúdo antes do envio.",
+      "key": "business.CrieUmaAtualizacao",
+      "en": "Create a clear update for your customers. The AI checks the content before sending.",
+      "fr": "Créez une mise à jour claire pour vos clients. L'IA vérifie le contenu avant l'envoi.",
+      "es": "Cree una actualización clara para sus clientes. La IA verifica el contenido antes del envío."
+    },
+    {
+      "line": 2039,
+      "index": 1,
+      "pt": "Foto Única",
+      "key": "business.FotoUnica",
+      "en": "Single Photo",
+      "fr": "Photo Unique",
+      "es": "Foto Única"
+    },
+    {
+      "line": 2051,
+      "index": 1,
+      "pt": "Vídeo",
+      "key": "video",
+      "en": "",
+      "fr": "",
+      "es": ""
+    },
+    {
+      "line": 2070,
+      "index": 1,
+      "pt": "Publicação",
+      "key": "business.Publicacao",
+      "en": "Post",
+      "fr": "Publication",
+      "es": "Publicación"
+    },
+    {
+      "line": 2073,
+      "index": 1,
+      "pt": "Agendar publicação",
+      "key": "business.AgendarPublicacao",
+      "en": "Schedule post",
+      "fr": "Programmer la publication",
+      "es": "Programar publicación"
+    },
+    {
+      "line": 2084,
+      "index": 1,
+      "pt": "Defina o título e a informação principal da publicação.",
+      "key": "business.DefinaTituloInformacao",
+      "en": "Set the title and the main information of the post.",
+      "fr": "Définissez le titre et les informations principales de la publication.",
+      "es": "Defina el título y la información principal de la publicación."
+    },
+    {
+      "line": 2086,
+      "index": 1,
+      "pt": "Título",
+      "key": "title",
+      "en": "",
+      "fr": "",
+      "es": ""
+    },
+    {
+      "line": 2097,
+      "index": 1,
+      "pt": "Conteúdo",
+      "key": "businessNavContent",
+      "en": "",
+      "fr": "",
+      "es": ""
+    },
+    {
+      "line": 2112,
+      "index": 1,
+      "pt": "Imagem da publicação",
+      "key": "business.ImagemPublicacao",
+      "en": "Post image",
+      "fr": "Image de la publication",
+      "es": "Imagen de la publicación"
+    },
+    {
+      "line": 2128,
+      "index": 1,
+      "pt": "Pré-visualização",
+      "key": "business.PreVisualizacao",
+      "en": "Preview",
+      "fr": "Aperçu",
+      "es": "Vista previa"
+    },
+    {
+      "line": 2140,
+      "index": 1,
+      "pt": "Link do Vídeo Comercial (YouTube, Vimeo ou .MP4)",
+      "key": "business.LinkVideoComercial",
+      "en": "Commercial Video Link (YouTube, Vimeo or .MP4)",
+      "fr": "Lien de la vidéo commerciale (YouTube, Vimeo ou .MP4)",
+      "es": "Enlace del vídeo comercial (YouTube, Vimeo o .MP4)"
+    },
+    {
+      "line": 2159,
+      "index": 1,
+      "pt": "O reprodutor de vídeo de alta resolução será incorporado no post com o selo do seu plano.",
+      "key": "business.ReprodutorVideoAlta",
+      "en": "The high-resolution video player will be embedded in the post with your plan badge.",
+      "fr": "Le lecteur vidéo haute résolution sera intégré à la publication avec le badge de votre forfait.",
+      "es": "El reproductor de vídeo de alta resolución se integrará en la publicación con el sello de su plan."
+    },
+    {
+      "line": 2260,
+      "index": 1,
+      "pt": "Publicações activas",
+      "key": "business.PublicacoesActivas",
+      "en": "Active posts",
+      "fr": "Publications actives",
+      "es": "Publicaciones activas"
+    },
+    {
+      "line": 2285,
+      "index": 1,
+      "pt": "Abrir publicação",
+      "key": "business.AbrirPublicacao",
+      "en": "Open post",
+      "fr": "Ouvrir la publication",
+      "es": "Abrir publicación"
+    },
+    {
+      "line": 2301,
+      "index": 1,
+      "pt": "Criar Nova Promoção",
+      "key": "business.CriarNovaPromocao",
+      "en": "Create New Promotion",
+      "fr": "Créer une nouvelle promotion",
+      "es": "Crear nueva promoción"
+    },
+    {
+      "line": 2311,
+      "index": 1,
+      "pt": "Ativação",
+      "key": "business.Ativacao",
+      "en": "Activation",
+      "fr": "Activation",
+      "es": "Activación"
+    },
+    {
+      "line": 2314,
+      "index": 1,
+      "pt": "Agendar início",
+      "key": "business.AgendarInicio",
+      "en": "Schedule start",
+      "fr": "Programmer le début",
+      "es": "Programar inicio"
+    },
+    {
+      "line": 2317,
+      "index": 1,
+      "pt": "Início",
+      "key": "monetization.start",
+      "en": "",
+      "fr": "",
+      "es": ""
+    },
+    {
+      "line": 2324,
+      "index": 1,
+      "pt": "Título",
+      "key": "title",
+      "en": "",
+      "fr": "",
+      "es": ""
+    },
+    {
+      "line": 2330,
+      "index": 1,
+      "pt": "Ex: Almoço com 20% OFF",
+      "key": "business.AlmocoComOff",
+      "en": "Ex: Lunch with 20% OFF",
+      "fr": "Ex : Déjeuner avec 20 % de réduction",
+      "es": "Ej: Almuerzo con 20 % OFF"
+    },
+    {
+      "line": 2349,
+      "index": 1,
+      "pt": "Descrição",
+      "key": "description",
+      "en": "",
+      "fr": "",
+      "es": ""
+    },
+    {
+      "line": 2355,
+      "index": 1,
+      "pt": "Explique o que está incluído, as condições e como o cliente pode usufruir da oferta.",
+      "key": "business.ExpliqueQueEsta",
+      "en": "Explain what is included, the conditions and how the customer can use the offer.",
+      "fr": "Expliquez ce qui est inclus, les conditions et comment le client peut profiter de l'offre.",
+      "es": "Explique qué está incluido, las condiciones y cómo el cliente puede aprovechar la oferta."
+    },
+    {
+      "line": 2363,
+      "index": 1,
+      "pt": "Media da promoção",
+      "key": "business.MediaPromocao",
+      "en": "Promotion media",
+      "fr": "Média de la promotion",
+      "es": "Medios de la promoción"
+    },
+    {
+      "line": 2364,
+      "index": 1,
+      "pt": "Use uma imagem horizontal nítida para obter melhor resultado.",
+      "key": "business.UseUmaImagem",
+      "en": "Use a sharp horizontal image for the best result.",
+      "fr": "Utilisez une image horizontale nette pour un meilleur résultat.",
+      "es": "Use una imagen horizontal nítida para obtener un mejor resultado."
+    },
+    {
+      "line": 2368,
+      "index": 1,
+      "pt": "Vídeo",
+      "key": "video",
+      "en": "",
+      "fr": "",
+      "es": ""
+    },
+    {
+      "line": 2384,
+      "index": 1,
+      "pt": "Pré-visualização da promoção",
+      "key": "business.PreVisualizacaoPromocao",
+      "en": "Promotion preview",
+      "fr": "Aperçu de la promotion",
+      "es": "Vista previa de la promoción"
+    },
+    {
+      "line": 2389,
+      "index": 1,
+      "pt": "Dias de duração",
+      "key": "business.DiasDuracao",
+      "en": "Duration in days",
+      "fr": "Jours de durée",
+      "es": "Días de duración"
+    },
+    {
+      "line": 2405,
+      "index": 1,
+      "pt": "Publicar Promoção",
+      "key": "business.PublicarPromocao",
+      "en": "Publish Promotion",
+      "fr": "Publier la promotion",
+      "es": "Publicar promoción"
+    },
+    {
+      "line": 2419,
+      "index": 1,
+      "pt": "Secção 8 - Avaliações Qualitativas",
+      "key": "business.SeccaoAvaliacoesQualitativas",
+      "en": "Section 8 - Qualitative Reviews",
+      "fr": "Section 8 - Avis qualitatifs",
+      "es": "Sección 8 - Evaluaciones cualitativas"
+    },
+    {
+      "line": 2424,
+      "index": 1,
+      "pt": "Gestão de Avaliações & Respostas Públicas",
+      "key": "business.GestaoAvaliacoesRespostas",
+      "en": "Review Management & Public Replies",
+      "fr": "Gestion des avis et des réponses publiques",
+      "es": "Gestión de evaluaciones y respuestas públicas"
+    },
+    {
+      "line": 2427,
+      "index": 1,
+      "pt": "Responda publicamente aos seus clientes e acompanhe a classificação predominante qualitativa do seu negócio.",
+      "key": "reviews.dashboardHint",
+      "en": "",
+      "fr": "",
+      "es": ""
+    },
+    {
+      "line": 2441,
+      "index": 1,
+      "pt": "Rótulo Predominante",
+      "key": "business.RotuloPredominante",
+      "en": "Predominant Label",
+      "fr": "Libellé prédominant",
+      "es": "Etiqueta predominante"
+    },
+    {
+      "line": 2448,
+      "index": 1,
+      "pt": "avaliações confirmadas por SMS.",
+      "key": "business.AvaliacoesConfirmadasPor",
+      "en": "reviews confirmed by SMS.",
+      "fr": "avis confirmés par SMS.",
+      "es": "evaluaciones confirmadas por SMS."
+    },
+    {
+      "line": 2454,
+      "index": 1,
+      "pt": "Distribuição das Avaliações Qualitativas",
+      "key": "reviews.breakdown",
+      "en": "",
+      "fr": "",
+      "es": ""
+    },
+    {
+      "line": 2488,
+      "index": 1,
+      "pt": "Ainda não recebeu avaliações de clientes.",
+      "key": "business.AindaNaoRecebeu",
+      "en": "You have not received customer reviews yet.",
+      "fr": "Vous n'avez pas encore reçu d'avis de clients.",
+      "es": "Aún no ha recibido evaluaciones de clientes."
+    },
+    {
+      "line": 2525,
+      "index": 1,
+      "pt": "Denunciar avaliação abusiva à equipa Guigui",
+      "key": "business.DenunciarAvaliacaoAbusiva",
+      "en": "Report an abusive review to the Guigui team",
+      "fr": "Signaler un avis abusif à l'équipe Guigui",
+      "es": "Denunciar una evaluación abusiva al equipo Guigui"
+    },
+    {
+      "line": 2552,
+      "index": 1,
+      "pt": "A sua Resposta Pública:",
+      "key": "business.SuaRespostaPublica",
+      "en": "Your Public Reply:",
+      "fr": "Votre réponse publique :",
+      "es": "Su respuesta pública:"
+    },
+    {
+      "line": 2595,
+      "index": 1,
+      "pt": "Agradeça o feedback do cliente ou preste um esclarecimento educado...",
+      "key": "business.AgradecaFeedbackCliente",
+      "en": "Thank the customer for the feedback or provide a polite clarification...",
+      "fr": "Remerciez le client pour son retour ou apportez un éclaircissement courtois...",
+      "es": "Agradezca los comentarios del cliente o proporcione una aclaración educada..."
+    },
+    {
+      "line": 2642,
+      "index": 1,
+      "pt": "Convide colaboradores e controle o acesso às áreas da sua empresa.",
+      "key": "business.ConvideColaboradoresControle",
+      "en": "Invite team members and control access to your company areas.",
+      "fr": "Invitez des collaborateurs et contrôlez l'accès aux espaces de votre entreprise.",
+      "es": "Invite a colaboradores y controle el acceso a las áreas de su empresa."
+    },
+    {
+      "line": 2650,
+      "index": 1,
+      "pt": "Função",
+      "key": "business.Funcao",
+      "en": "Role",
+      "fr": "Rôle",
+      "es": "Función"
+    },
+    {
+      "line": 2667,
+      "index": 1,
+      "pt": "Ainda não existem colaboradores.",
+      "key": "business.AindaNaoExistem",
+      "en": "There are no team members yet.",
+      "fr": "Il n'y a pas encore de collaborateurs.",
+      "es": "Todavía no hay colaboradores."
+    },
+    {
+      "line": 2673,
+      "index": 1,
+      "pt": "Histórico da equipa",
+      "key": "business.HistoricoEquipa",
+      "en": "Team history",
+      "fr": "Historique de l'équipe",
+      "es": "Historial del equipo"
+    },
+    {
+      "line": 2684,
+      "index": 1,
+      "pt": "Gestão da Subscrição & Facturação XOF",
+      "key": "business.GestaoSubscricaoFacturacao",
+      "en": "Subscription & XOF Billing Management",
+      "fr": "Gestion de l'abonnement et de la facturation XOF",
+      "es": "Gestión de la suscripción y facturación XOF"
+    },
+    {
+      "line": 2718,
+      "index": 1,
+      "pt": "Escalão Atual",
+      "key": "business.EscalaoAtual",
+      "en": "Current Tier",
+      "fr": "Forfait actuel",
+      "es": "Nivel actual"
+    },
+    {
+      "line": 2729,
+      "index": 1,
+      "pt": "Próxima Renovação",
+      "key": "business.ProximaRenovacao",
+      "en": "Next Renewal",
+      "fr": "Prochain renouvellement",
+      "es": "Próxima renovación"
+    },
+    {
+      "line": 2739,
+      "index": 1,
+      "pt": "Método de Pagamento Ativo",
+      "key": "business.MetodoPagamentoAtivo",
+      "en": "Active Payment Method",
+      "fr": "Moyen de paiement actif",
+      "es": "Método de pago activo"
+    },
+    {
+      "line": 2752,
+      "index": 1,
+      "pt": "Alterar / Libertar Escalão",
+      "key": "business.AlterarLibertarEscalao",
+      "en": "Change / Release Tier",
+      "fr": "Modifier / Libérer le forfait",
+      "es": "Cambiar / Liberar nivel"
+    },
+    {
+      "line": 2761,
+      "index": 1,
+      "pt": "Comparativo de planos disponíveis",
+      "key": "business.ComparativoPlanosDisponiveis",
+      "en": "Comparison of available plans",
+      "fr": "Comparatif des forfaits disponibles",
+      "es": "Comparativa de planes disponibles"
+    },
+    {
+      "line": 2762,
+      "index": 1,
+      "pt": "Valores e benefícios sincronizados com o catálogo configurado pelo Super Admin.",
+      "key": "business.ValoresBeneficiosSincronizados",
+      "en": "Prices and benefits synchronised with the catalogue configured by the Super Admin.",
+      "fr": "Tarifs et avantages synchronisés avec le catalogue configuré par le Super Admin.",
+      "es": "Precios y beneficios sincronizados con el catálogo configurado por el Super Admin."
+    },
+    {
+      "line": 2780,
+      "index": 1,
+      "pt": "Publicidade e serviços adicionais",
+      "key": "business.PublicidadeServicosAdicionais",
+      "en": "Advertising and additional services",
+      "fr": "Publicité et services supplémentaires",
+      "es": "Publicidad y servicios adicionales"
+    },
+    {
+      "line": 2780,
+      "index": 2,
+      "pt": "Os produtos abaixo vêm do catálogo da Administração. Publicidade com preço directo segue o checkout móvel; serviços e campanhas marcados como orçamento ficam para negociação.",
+      "key": "business.ProdutosAbaixoVem",
+      "en": "The products below come from the Administration catalogue. Advertising with a direct price follows mobile checkout; services and campaigns marked as quote are left for negotiation.",
+      "fr": "Les produits ci-dessous proviennent du catalogue de l'Administration. La publicité à prix direct passe par le paiement mobile ; les services et campagnes marqués comme devis restent à négocier.",
+      "es": "Los productos siguientes provienen del catálogo de la Administración. La publicidad con precio directo sigue el pago móvil; los servicios y campañas marcados como presupuesto quedan para negociación."
+    },
+    {
+      "line": 2785,
+      "index": 1,
+      "pt": "Serviço de conteúdo",
+      "key": "business.ServicoConteudo",
+      "en": "Content service",
+      "fr": "Service de contenu",
+      "es": "Servicio de contenido"
+    },
+    {
+      "line": 2785,
+      "index": 2,
+      "pt": "Escolher serviço",
+      "key": "business.EscolherServico",
+      "en": "Choose service",
+      "fr": "Choisir le service",
+      "es": "Elegir servicio"
+    },
+    {
+      "line": 2785,
+      "index": 3,
+      "pt": "Solicitar orçamento",
+      "key": "business.SolicitarOrcamento",
+      "en": "Request a quote",
+      "fr": "Demander un devis",
+      "es": "Solicitar presupuesto"
+    },
+    {
+      "line": 2791,
+      "index": 1,
+      "pt": "Histórico de pagamentos e recibos",
+      "key": "business.HistoricoPagamentosRecibos",
+      "en": "Payment and receipt history",
+      "fr": "Historique des paiements et reçus",
+      "es": "Historial de pagos y recibos"
+    },
+    {
+      "line": 2792,
+      "index": 1,
+      "pt": "Consulte as transações da subscrição e das vendas de bilhetes.",
+      "key": "business.ConsulteTransacoesSubscricao",
+      "en": "Check your subscription and ticket sales transactions.",
+      "fr": "Consultez les transactions de l'abonnement et des ventes de billets.",
+      "es": "Consulte las transacciones de la suscripción y de las ventas de entradas."
+    },
+    {
+      "line": 2801,
+      "index": 1,
+      "pt": "Descrição",
+      "key": "description",
+      "en": "",
+      "fr": "",
+      "es": ""
+    },
+    {
+      "line": 2801,
+      "index": 2,
+      "pt": "Referência",
+      "key": "business.Referencia",
+      "en": "Reference",
+      "fr": "Référence",
+      "es": "Referencia"
+    },
+    {
+      "line": 2822,
+      "index": 1,
+      "pt": "Ainda não existem pagamentos registados.",
+      "key": "business.AindaNaoExistem2",
+      "en": "There are no payments recorded yet.",
+      "fr": "Aucun paiement n'est encore enregistré.",
+      "es": "Todavía no hay pagos registrados."
+    },
+    {
+      "line": 2850,
+      "index": 1,
+      "pt": "Configuração de Gestão Comercial (4.1 & 4.2)",
+      "key": "business.ConfiguracaoGestaoComercial",
+      "en": "Commercial Management Configuration (4.1 & 4.2)",
+      "fr": "Configuration de la gestion commerciale (4.1 & 4.2)",
+      "es": "Configuración de gestión comercial (4.1 & 4.2)"
+    },
+    {
+      "line": 2853,
+      "index": 1,
+      "pt": "Acesso Administrador / Gestão",
+      "key": "business.AcessoAdministradorGestao",
+      "en": "Administrator / Management Access",
+      "fr": "Accès administrateur / gestion",
+      "es": "Acceso administrador / gestión"
+    },
+    {
+      "line": 2871,
+      "index": 1,
+      "pt": "Restaurar Padrões",
+      "key": "business.RestaurarPadroes",
+      "en": "Restore Defaults",
+      "fr": "Restaurer les valeurs par défaut",
+      "es": "Restaurar valores por defecto"
+    },
+    {
+      "line": 2876,
+      "index": 1,
+      "pt": "Matriz de Preços por Categoria × Escalão & Tarifas de Bilhética",
+      "key": "business.MatrizPrecosPor",
+      "en": "Price Matrix by Category × Tier & Ticketing Fees",
+      "fr": "Matrice de prix par catégorie × forfait et tarifs de billetterie",
+      "es": "Matriz de precios por categoría × nivel y tarifas de entradas"
+    },
+    {
+      "line": 2880,
+      "index": 1,
+      "pt": "Todos os escalões (Básico, Profissional, Premium, Enterprise) incluem rigorosamente",
+      "key": "business.TodosEscaloesBasico",
+      "en": "All tiers (Basic, Professional, Premium, Enterprise) include exactly",
+      "fr": "Tous les forfaits (Basique, Professionnel, Premium, Enterprise) incluent rigoureusement",
+      "es": "Todos los niveles (Básico, Profesional, Premium, Enterprise) incluyen rigurosamente"
+    },
+    {
+      "line": 2880,
+      "index": 2,
+      "pt": "3 posts/mês",
+      "key": "business.PostsMes",
+      "en": "3 posts/month",
+      "fr": "3 publications/mois",
+      "es": "3 publicaciones/mes"
+    },
+    {
+      "line": 2880,
+      "index": 3,
+      "pt": ". Posts adicionais são sempre pagos à parte (compra avulsa em XOF).\r\n              A administração pode definir e ajustar em tempo real os preços de subscrição por grupo de atividade e as comissões de bilheteira.",
+      "key": "business.PostsAdicionaisSao",
+      "en": ". Additional posts are always paid separately (standalone purchase in XOF). The administration can set and adjust subscription prices by activity group and ticketing commissions in real time.",
+      "fr": ". Les publications supplémentaires sont toujours payées séparément (achat à l'unité en XOF). L'administration peut définir et ajuster en temps réel les prix d'abonnement par groupe d'activité et les commissions de billetterie.",
+      "es": ". Las publicaciones adicionales siempre se pagan aparte (compra suelta en XOF). La administración puede definir y ajustar en tiempo real los precios de suscripción por grupo de actividad y las comisiones de taquilla."
+    },
+    {
+      "line": 2890,
+      "index": 1,
+      "pt": "Matriz Configurável de Subscrição (Grupo de Categoria × Escalão)",
+      "key": "business.MatrizConfiguravelSubscricao",
+      "en": "Configurable Subscription Matrix (Category Group × Tier)",
+      "fr": "Matrice d'abonnement configurable (groupe de catégorie × forfait)",
+      "es": "Matriz configurable de suscripción (grupo de categoría × nivel)"
+    },
+    {
+      "line": 2893,
+      "index": 1,
+      "pt": "Clique numa célula de preço para alterar o valor em Francos CFA (XOF). Alterações não afetam contratos ativos até à renovação.",
+      "key": "business.CliqueNumaCelula",
+      "en": "Click a price cell to change the value in CFA francs (XOF). Changes do not affect active contracts until renewal.",
+      "fr": "Cliquez sur une cellule de prix pour modifier la valeur en francs CFA (XOF). Les changements n'affectent pas les contrats actifs avant le renouvellement.",
+      "es": "Haga clic en una celda de precio para cambiar el valor en francos CFA (XOF). Los cambios no afectan a los contratos activos hasta la renovación."
+    },
+    {
+      "line": 2915,
+      "index": 1,
+      "pt": "Básico",
+      "key": "tierBasic",
+      "en": "",
+      "fr": "",
+      "es": ""
+    },
+    {
+      "line": 2941,
+      "index": 1,
+      "pt": "Preço XOF/mês:",
+      "key": "business.PrecoXofMes",
+      "en": "Price XOF/month:",
+      "fr": "Prix XOF/mois :",
+      "es": "Precio XOF/mes:"
+    },
+    {
+      "line": 2979,
+      "index": 1,
+      "pt": "Clique para editar o valor deste escalão",
+      "key": "business.CliqueParaEditar",
+      "en": "Click to edit this tier's price",
+      "fr": "Cliquez pour modifier le prix de ce forfait",
+      "es": "Haga clic para editar el valor de este nivel"
+    },
+    {
+      "line": 2986,
+      "index": 1,
+      "pt": "/mês",
+      "key": "business.Mes",
+      "en": "/month",
+      "fr": "/mois",
+      "es": "/mes"
+    },
+    {
+      "line": 3007,
+      "index": 1,
+      "pt": "Configuração de Taxas da Bilheteira de Eventos",
+      "key": "business.ConfiguracaoTaxasBilheteira",
+      "en": "Event Ticketing Fee Configuration",
+      "fr": "Configuration des frais de billetterie d'événements",
+      "es": "Configuración de tasas de taquilla de eventos"
+    },
+    {
+      "line": 3014,
+      "index": 1,
+      "pt": "Comissão Percentual sobre Bilhetes (%)",
+      "key": "business.ComissaoPercentualSobre",
+      "en": "Percentage Commission on Tickets (%)",
+      "fr": "Commission en pourcentage sur les billets (%)",
+      "es": "Comisión porcentual sobre entradas (%)"
+    },
+    {
+      "line": 3032,
+      "index": 1,
+      "pt": "Taxa Fixa por Emissão SMS (XOF)",
+      "key": "business.TaxaFixaPor",
+      "en": "Fixed Fee per SMS Issuance (XOF)",
+      "fr": "Frais fixes par émission SMS (XOF)",
+      "es": "Tasa fija por emisión de SMS (XOF)"
+    },
+    {
+      "line": 3048,
+      "index": 1,
+      "pt": "Custo fixo por bilhete emitido para cobertura de gateway SMS e liquidação.",
+      "key": "business.CustoFixoPor",
+      "en": "Fixed cost per ticket issued to cover the SMS gateway and settlement.",
+      "fr": "Coût fixe par billet émis pour couvrir la passerelle SMS et le règlement.",
+      "es": "Coste fijo por entrada emitida para cubrir la pasarela de SMS y la liquidación."
+    },
+    {
+      "line": 3055,
+      "index": 1,
+      "pt": "Simulador Dinâmico de Exemplo (Bilhete 5.000 XOF)",
+      "key": "business.SimuladorDinamicoExemplo",
+      "en": "Dynamic Example Simulator (5,000 XOF ticket)",
+      "fr": "Simulateur dynamique d'exemple (billet de 5 000 XOF)",
+      "es": "Simulador dinámico de ejemplo (entrada de 5.000 XOF)"
+    },
+    {
+      "line": 3078,
+      "index": 1,
+      "pt": "Configuração de Receitas Adicionais & Descontos",
+      "key": "business.ConfiguracaoReceitasAdicionais",
+      "en": "Additional Revenue & Discount Configuration",
+      "fr": "Configuration des revenus supplémentaires et remises",
+      "es": "Configuración de ingresos adicionales y descuentos"
+    },
+    {
+      "line": 3084,
+      "index": 1,
+      "pt": "Preço de Post Extra Avulso (XOF)",
+      "key": "business.PrecoPostExtra",
+      "en": "Standalone Extra Post Price (XOF)",
+      "fr": "Prix d'une publication supplémentaire à l'unité (XOF)",
+      "es": "Precio de publicación extra suelta (XOF)"
+    },
+    {
+      "line": 3092,
+      "index": 1,
+      "pt": "Aplica-se após esgotar a cota transversal de 3 posts/mês.",
+      "key": "business.AplicaAposEsgotar",
+      "en": "Applies after the cross-cutting quota of 3 posts/month is used up.",
+      "fr": "S'applique après épuisement du quota transversal de 3 publications/mois.",
+      "es": "Se aplica tras agotar la cuota transversal de 3 publicaciones/mes."
+    },
+    {
+      "line": 3096,
+      "index": 1,
+      "pt": "Preço de Promoção Extra Avulsa (XOF)",
+      "key": "business.PrecoPromocaoExtra",
+      "en": "Standalone Extra Promotion Price (XOF)",
+      "fr": "Prix d'une promotion supplémentaire à l'unité (XOF)",
+      "es": "Precio de promoción extra suelta (XOF)"
+    },
+    {
+      "line": 3117,
+      "index": 1,
+      "pt": "Desconto percentual oferecido nas subscrições anuais.",
+      "key": "business.DescontoPercentualOferecido",
+      "en": "Percentage discount offered on annual subscriptions.",
+      "fr": "Remise en pourcentage offerte sur les abonnements annuels.",
+      "es": "Descuento porcentual ofrecido en las suscripciones anuales."
+    },
+    {
+      "line": 3127,
+      "index": 1,
+      "pt": "Histórico de Alterações de Preço para Auditoria (4.2.c)",
+      "key": "business.HistoricoAlteracoesPreco",
+      "en": "Price Change History for Audit (4.2.c)",
+      "fr": "Historique des modifications de prix pour audit (4.2.c)",
+      "es": "Historial de cambios de precio para auditoría (4.2.c)"
+    },
+    {
+      "line": 3141,
+      "index": 1,
+      "pt": "Escalão",
+      "key": "business.Escalao",
+      "en": "Tier",
+      "fr": "Forfait",
+      "es": "Nivel"
+    },
+    {
+      "line": 3142,
+      "index": 1,
+      "pt": "Preço Anterior",
+      "key": "business.PrecoAnterior",
+      "en": "Previous Price",
+      "fr": "Prix précédent",
+      "es": "Precio anterior"
+    },
+    {
+      "line": 3143,
+      "index": 1,
+      "pt": "Novo Preço",
+      "key": "business.NovoPreco",
+      "en": "New Price",
+      "fr": "Nouveau prix",
+      "es": "Nuevo precio"
+    },
+    {
+      "line": 3199,
+      "index": 1,
+      "pt": "Descarregar relatório de pedidos em formato CSV / Excel",
+      "key": "business.DescarregarRelatorioPedidos",
+      "en": "Download the orders report in CSV / Excel format",
+      "fr": "Télécharger le rapport des commandes au format CSV / Excel",
+      "es": "Descargar el informe de pedidos en formato CSV / Excel"
+    },
+    {
+      "line": 3246,
+      "index": 1,
+      "pt": "Transações Alto Valor",
+      "key": "business.TransacoesAltoValor",
+      "en": "High-Value Transactions",
+      "fr": "Transactions à forte valeur",
+      "es": "Transacciones de alto valor"
+    },
+    {
+      "line": 3265,
+      "index": 1,
+      "pt": "Levantamento concluído",
+      "key": "qrRedeemed",
+      "en": "",
+      "fr": "",
+      "es": ""
+    },
+    {
+      "line": 3278,
+      "index": 1,
+      "pt": "Aguardam validação na loja",
+      "key": "business.AguardamValidacaoLoja",
+      "en": "Awaiting in-store validation",
+      "fr": "En attente de validation en magasin",
+      "es": "Pendientes de validación en tienda"
+    },
+    {
+      "line": 3290,
+      "index": 1,
+      "pt": "Filtros de Pesquisa & Segmentação de Pedidos",
+      "key": "business.FiltrosPesquisaSegmentacao",
+      "en": "Search Filters & Order Segmentation",
+      "fr": "Filtres de recherche et segmentation des commandes",
+      "es": "Filtros de búsqueda y segmentación de pedidos"
+    },
+    {
+      "line": 3310,
+      "index": 1,
+      "pt": "Intervalo de Valores (Mínimo / Máximo em XOF) & Transações de Alto Valor:",
+      "key": "business.IntervaloValoresMinimo",
+      "en": "Value Range (Minimum / Maximum in XOF) & High-Value Transactions:",
+      "fr": "Plage de valeurs (minimum / maximum en XOF) et transactions à forte valeur :",
+      "es": "Intervalo de valores (mínimo / máximo en XOF) y transacciones de alto valor:"
+    },
+    {
+      "line": 3384,
+      "index": 1,
+      "pt": "Valor Mínimo (XOF)",
+      "key": "business.ValorMinimoXof",
+      "en": "Minimum Value (XOF)",
+      "fr": "Valeur minimale (XOF)",
+      "es": "Valor mínimo (XOF)"
+    },
+    {
+      "line": 3407,
+      "index": 1,
+      "pt": "Valor Máximo (XOF)",
+      "key": "business.ValorMaximoXof",
+      "en": "Maximum Value (XOF)",
+      "fr": "Valeur maximale (XOF)",
+      "es": "Valor máximo (XOF)"
+    },
+    {
+      "line": 3446,
+      "index": 1,
+      "pt": "Últimos 7 dias",
+      "key": "business.UltimosDias",
+      "en": "Last 7 days",
+      "fr": "7 derniers jours",
+      "es": "Últimos 7 días"
+    },
+    {
+      "line": 3447,
+      "index": 1,
+      "pt": "Últimos 30 dias",
+      "key": "business.UltimosDias2",
+      "en": "Last 30 days",
+      "fr": "30 derniers jours",
+      "es": "Últimos 30 días"
+    },
+    {
+      "line": 3464,
+      "index": 1,
+      "pt": "Até:",
+      "key": "business.Ate",
+      "en": "Until:",
+      "fr": "Jusqu'au :",
+      "es": "Hasta:"
+    },
+    {
+      "line": 3488,
+      "index": 1,
+      "pt": "Produtos Físicos (Loja)",
+      "key": "business.ProdutosFisicosLoja",
+      "en": "Physical Products (Store)",
+      "fr": "Produits physiques (boutique)",
+      "es": "Productos físicos (tienda)"
+    },
+    {
+      "line": 3489,
+      "index": 1,
+      "pt": "Promoções & Cupões",
+      "key": "business.PromocoesCupoes",
+      "en": "Promotions & Coupons",
+      "fr": "Promotions et coupons",
+      "es": "Promociones y cupones"
+    },
+    {
+      "line": 3491,
+      "index": 1,
+      "pt": "Serviços & Entregas",
+      "key": "business.ServicosEntregas",
+      "en": "Services & Deliveries",
+      "fr": "Services et livraisons",
+      "es": "Servicios y entregas"
+    },
+    {
+      "line": 3508,
+      "index": 1,
+      "pt": "Levantado / Concluído (Pago)",
+      "key": "business.LevantadoConcluidoPago",
+      "en": "Collected / Completed (Paid)",
+      "fr": "Retiré / Terminé (payé)",
+      "es": "Recogido / Completado (pagado)"
+    },
+    {
+      "line": 3517,
+      "index": 1,
+      "pt": "Método de Pagamento",
+      "key": "business.MetodoPagamento",
+      "en": "Payment Method",
+      "fr": "Moyen de paiement",
+      "es": "Método de pago"
+    },
+    {
+      "line": 3524,
+      "index": 1,
+      "pt": "Todos os Métodos",
+      "key": "business.TodosMetodos",
+      "en": "All Methods",
+      "fr": "Tous les moyens",
+      "es": "Todos los métodos"
+    },
+    {
+      "line": 3598,
+      "index": 1,
+      "pt": "Código / QR Token",
+      "key": "business.CodigoToken",
+      "en": "Code / QR Token",
+      "fr": "Code / jeton QR",
+      "es": "Código / token QR"
+    },
+    {
+      "line": 3604,
+      "index": 1,
+      "pt": "Ações",
+      "key": "business.Acoes",
+      "en": "Actions",
+      "fr": "Actions",
+      "es": "Acciones"
+    },
+    {
+      "line": 3625,
+      "index": 1,
+      "pt": "Copiar Código",
+      "key": "business.CopiarCodigo",
+      "en": "Copy Code",
+      "fr": "Copier le code",
+      "es": "Copiar código"
+    },
+    {
+      "line": 3727,
+      "index": 1,
+      "pt": "Grátis / Cupão",
+      "key": "business.GratisCupao",
+      "en": "Free / Coupon",
+      "fr": "Gratuit / coupon",
+      "es": "Gratis / cupón"
+    },
+    {
+      "line": 3837,
+      "index": 1,
+      "pt": "Levantamento Concluído",
+      "key": "business.LevantamentoConcluido",
+      "en": "Collection Completed",
+      "fr": "Retrait terminé",
+      "es": "Recogida completada"
+    },
+    {
+      "line": 3878,
+      "index": 1,
+      "pt": "Método de Pagamento:",
+      "key": "business.MetodoPagamento2",
+      "en": "Payment Method:",
+      "fr": "Moyen de paiement :",
+      "es": "Método de pago:"
+    },
+    {
+      "line": 3945,
+      "index": 1,
+      "pt": "Validação de Levantamentos & Códigos QR",
+      "key": "business.ValidacaoLevantamentosCodigos",
+      "en": "Collection & QR Code Validation",
+      "fr": "Validation des retraits et des codes QR",
+      "es": "Validación de recogidas y códigos QR"
+    },
+    {
+      "line": 3957,
+      "index": 1,
+      "pt": "Validar Código de Levantamento ou QR Token",
+      "key": "business.ValidarCodigoLevantamento",
+      "en": "Validate Collection Code or QR Token",
+      "fr": "Valider le code de retrait ou le jeton QR",
+      "es": "Validar código de recogida o token QR"
+    },
+    {
+      "line": 3967,
+      "index": 1,
+      "pt": "Introduza o código (ex: LEV-8942 ou GUI-QR-89421-BSS)",
+      "key": "business.IntroduzaCodigoLev",
+      "en": "Enter the code (e.g. LEV-8942 or GUI-QR-89421-BSS)",
+      "fr": "Saisissez le code (ex. : LEV-8942 ou GUI-QR-89421-BSS)",
+      "es": "Introduzca el código (ej.: LEV-8942 o GUI-QR-89421-BSS)"
+    },
+    {
+      "line": 4020,
+      "index": 1,
+      "pt": "Ainda não há compras ou bilhetes associados a esta empresa.",
+      "key": "business.AindaNaoCompras",
+      "en": "There are no purchases or tickets linked to this company yet.",
+      "fr": "Aucun achat ou billet n'est encore associé à cette entreprise.",
+      "es": "Todavía no hay compras ni entradas asociadas a esta empresa."
+    },
+    {
+      "line": 4028,
+      "index": 1,
+      "pt": "Código / Token",
+      "key": "business.CodigoToken2",
+      "en": "Code / Token",
+      "fr": "Code / jeton",
+      "es": "Código / token"
+    },
+    {
+      "line": 4033,
+      "index": 1,
+      "pt": "Ação",
+      "key": "business.Acao",
+      "en": "Action",
+      "fr": "Action",
+      "es": "Acción"
+    },
+    {
+      "line": 4237,
+      "index": 1,
+      "pt": "Relatórios e Estatísticas de Desempenho",
+      "key": "business.RelatoriosEstatisticasDesempenho",
+      "en": "Reports and Performance Statistics",
+      "fr": "Rapports et statistiques de performance",
+      "es": "Informes y estadísticas de rendimiento"
+    },
+    {
+      "line": 4239,
+      "index": 1,
+      "pt": "Acompanhe gráficos interativos de visualizações, cliques de contacto direto, performance de promoções e bilhética.",
+      "key": "business.AcompanheGraficosInterativos",
+      "en": "Track interactive charts of views, direct contact clicks, promotion performance and ticketing.",
+      "fr": "Suivez des graphiques interactifs des vues, des clics de contact direct, de la performance des promotions et de la billetterie.",
+      "es": "Siga gráficos interactivos de visualizaciones, clics de contacto directo, rendimiento de promociones y taquilla."
+    },
+    {
+      "line": 4257,
+      "index": 1,
+      "pt": "Diário (7 dias)",
+      "key": "business.DiarioDias",
+      "en": "Daily (7 days)",
+      "fr": "Quotidien (7 jours)",
+      "es": "Diario (7 días)"
+    },
+    {
+      "line": 4277,
+      "index": 1,
+      "pt": "Filtrar Secção:",
+      "key": "business.FiltrarSeccao",
+      "en": "Filter Section:",
+      "fr": "Filtrer la section :",
+      "es": "Filtrar sección:"
+    },
+    {
+      "line": 4288,
+      "index": 1,
+      "pt": "Visão Geral Completa",
+      "key": "business.VisaoGeralCompleta",
+      "en": "Full Overview",
+      "fr": "Vue d'ensemble complète",
+      "es": "Visión general completa"
+    },
+    {
+      "line": 4301,
+      "index": 1,
+      "pt": "Visualizações & Cliques",
+      "key": "business.VisualizacoesCliques",
+      "en": "Views & Clicks",
+      "fr": "Vues et clics",
+      "es": "Visualizaciones y clics"
+    },
+    {
+      "line": 4313,
+      "index": 1,
+      "pt": "Desempenho das Promoções",
+      "key": "business.DesempenhoDasPromocoes",
+      "en": "Promotion Performance",
+      "fr": "Performance des promotions",
+      "es": "Rendimiento de las promociones"
+    },
+    {
+      "line": 4325,
+      "index": 1,
+      "pt": "Vendas & Bilhética",
+      "key": "business.VendasBilhetica",
+      "en": "Sales & Ticketing",
+      "fr": "Ventes et billetterie",
+      "es": "Ventas y taquilla"
+    },
+    {
+      "line": 4334,
+      "index": 1,
+      "pt": "Visualizações do Perfil",
+      "key": "business.VisualizacoesPerfil",
+      "en": "Profile Views",
+      "fr": "Vues du profil",
+      "es": "Visualizaciones del perfil"
+    },
+    {
+      "line": 4360,
+      "index": 1,
+      "pt": "Resgates de Promoções",
+      "key": "business.ResgatesPromocoes",
+      "en": "Promotion Redemptions",
+      "fr": "Utilisations des promotions",
+      "es": "Canjes de promociones"
+    },
+    {
+      "line": 4373,
+      "index": 1,
+      "pt": "Volume de Bilhética",
+      "key": "business.VolumeBilhetica",
+      "en": "Ticketing Volume",
+      "fr": "Volume de billetterie",
+      "es": "Volumen de taquilla"
+    },
+    {
+      "line": 4392,
+      "index": 1,
+      "pt": "Evolução de Visualizações e Cliques de Contacto Direto",
+      "key": "business.EvolucaoVisualizacoesCliques",
+      "en": "Evolution of Views and Direct Contact Clicks",
+      "fr": "Évolution des vues et des clics de contact direct",
+      "es": "Evolución de visualizaciones y clics de contacto directo"
+    },
+    {
+      "line": 4491,
+      "index": 1,
+      "pt": "Chamadas Telefónicas",
+      "key": "business.ChamadasTelefonicas",
+      "en": "Phone Calls",
+      "fr": "Appels téléphoniques",
+      "es": "Llamadas telefónicas"
+    },
+    {
+      "line": 4531,
+      "index": 1,
+      "pt": "Desempenho Comparativo das Promoções & Destaques",
+      "key": "business.DesempenhoComparativoDas",
+      "en": "Comparative Performance of Promotions & Highlights",
+      "fr": "Performance comparative des promotions et mises en avant",
+      "es": "Rendimiento comparativo de las promociones y destacados"
+    },
+    {
+      "line": 4533,
+      "index": 1,
+      "pt": "Visualizações de cada oferta promocional vs quantidade de vouchers resgatados e cliques no WhatsApp.",
+      "key": "business.VisualizacoesCadaOferta",
+      "en": "Views for each promotional offer vs the number of redeemed vouchers and WhatsApp clicks.",
+      "fr": "Vues de chaque offre promotionnelle vs nombre de bons utilisés et clics WhatsApp.",
+      "es": "Visualizaciones de cada oferta promocional vs cantidad de cupones canjeados y clics en WhatsApp."
+    },
+    {
+      "line": 4581,
+      "index": 1,
+      "pt": "Título da Promoção",
+      "key": "business.TituloPromocao",
+      "en": "Promotion Title",
+      "fr": "Titre de la promotion",
+      "es": "Título de la promoción"
+    },
+    {
+      "line": 4582,
+      "index": 1,
+      "pt": "Tipo de Benefício",
+      "key": "business.TipoBeneficio",
+      "en": "Benefit Type",
+      "fr": "Type d'avantage",
+      "es": "Tipo de beneficio"
+    },
+    {
+      "line": 4583,
+      "index": 1,
+      "pt": "Visualizações",
+      "key": "business.Visualizacoes2",
+      "en": "Views",
+      "fr": "Vues",
+      "es": "Visualizaciones"
+    },
+    {
+      "line": 4704,
+      "index": 1,
+      "pt": "Distribuição das Vendas",
+      "key": "business.DistribuicaoDasVendas",
+      "en": "Sales Distribution",
+      "fr": "Répartition des ventes",
+      "es": "Distribución de las ventas"
+    },
+    {
+      "line": 4706,
+      "index": 1,
+      "pt": "Proporção por tipo de bilhete e oferta.",
+      "key": "business.ProporcaoPorTipo",
+      "en": "Proportion by ticket type and offer.",
+      "fr": "Proportion par type de billet et d'offre.",
+      "es": "Proporción por tipo de entrada y oferta."
+    },
+    {
+      "line": 4750,
+      "index": 1,
+      "pt": "Evolução da Receita Bruta Acumulada (XOF)",
+      "key": "business.EvolucaoReceitaBruta",
+      "en": "Cumulative Gross Revenue Evolution (XOF)",
+      "fr": "Évolution du revenu brut cumulé (XOF)",
+      "es": "Evolución de los ingresos brutos acumulados (XOF)"
+    },
+    {
+      "line": 4753,
+      "index": 1,
+      "pt": "Trajetória do volume financeiro total gerado no período selecionado.",
+      "key": "business.TrajetoriaVolumeFinanceiro",
+      "en": "Trajectory of the total financial volume generated in the selected period.",
+      "fr": "Trajectoire du volume financier total généré sur la période sélectionnée.",
+      "es": "Trayectoria del volumen financiero total generado en el período seleccionado."
+    },
+    {
+      "line": 4799,
+      "index": 1,
+      "pt": "Tabela Detalhada de Vendas por Período",
+      "key": "business.TabelaDetalhadaVendas",
+      "en": "Detailed Sales Table by Period",
+      "fr": "Tableau détaillé des ventes par période",
+      "es": "Tabla detallada de ventas por período"
+    },
+    {
+      "line": 4820,
+      "index": 1,
+      "pt": "Exportar Relatório CSV",
+      "key": "business.ExportarRelatorioCsv",
+      "en": "Export CSV Report",
+      "fr": "Exporter le rapport CSV",
+      "es": "Exportar informe CSV"
+    },
+    {
+      "line": 4828,
+      "index": 1,
+      "pt": "Período / Dia",
+      "key": "business.PeriodoDia",
+      "en": "Period / Day",
+      "fr": "Période / jour",
+      "es": "Período / día"
+    },
+    {
+      "line": 4935,
+      "index": 1,
+      "pt": "Tudo fica agrupado nesta área.",
+      "key": "business.TudoFicaAgrupado",
+      "en": "Everything is grouped in this area.",
+      "fr": "Tout est regroupé dans cet espace.",
+      "es": "Todo queda agrupado en esta área."
+    },
+    {
+      "line": 5007,
+      "index": 1,
+      "pt": "Crie primeiro como rascunho e associe conteúdos antes de agendar.",
+      "key": "business.CriePrimeiroComo",
+      "en": "Create it first as a draft and link content before scheduling.",
+      "fr": "Créez d'abord un brouillon et associez des contenus avant de programmer.",
+      "es": "Cree primero como borrador y asocie contenidos antes de programar."
+    },
+    {
+      "line": 5012,
+      "index": 1,
+      "pt": "Objetivo: tráfego",
+      "key": "business.ObjetivoTrafego",
+      "en": "Objective: traffic",
+      "fr": "Objectif : trafic",
+      "es": "Objetivo: tráfico"
+    },
+    {
+      "line": 5013,
+      "index": 1,
+      "pt": "Objetivo: conversões",
+      "key": "business.ObjetivoConversoes",
+      "en": "Objective: conversions",
+      "fr": "Objectif : conversions",
+      "es": "Objetivo: conversiones"
+    },
+    {
+      "line": 5016,
+      "index": 1,
+      "pt": "Orçamento máximo (XOF)",
+      "key": "business.OrcamentoMaximoXof",
+      "en": "Maximum budget (XOF)",
+      "fr": "Budget maximum (XOF)",
+      "es": "Presupuesto máximo (XOF)"
+    },
+    {
+      "line": 5018,
+      "index": 1,
+      "pt": "Público-alvo (opcional)",
+      "key": "business.PublicoAlvoOpcional",
+      "en": "Target audience (optional)",
+      "fr": "Public cible (facultatif)",
+      "es": "Público objetivo (opcional)"
+    },
+    {
+      "line": 5022,
+      "index": 1,
+      "pt": "Início da campanha",
+      "key": "business.InicioCampanha",
+      "en": "Campaign start",
+      "fr": "Début de la campagne",
+      "es": "Inicio de la campaña"
+    },
+    {
+      "line": 5027,
+      "index": 1,
+      "pt": "Conteúdos associados",
+      "key": "business.ConteudosAssociados",
+      "en": "Linked content",
+      "fr": "Contenus associés",
+      "es": "Contenidos asociados"
+    },
+    {
+      "line": 5070,
+      "index": 1,
+      "pt": "Estimativas só aparecem quando existem dados disponíveis.",
+      "key": "business.EstimativasAparecemQuando",
+      "en": "Estimates only appear when data is available.",
+      "fr": "Les estimations n'apparaissent que lorsque des données sont disponibles.",
+      "es": "Las estimaciones solo aparecen cuando hay datos disponibles."
+    },
+    {
+      "line": 5093,
+      "index": 1,
+      "pt": "Indicadores disponíveis",
+      "key": "business.IndicadoresDisponiveis",
+      "en": "Available indicators",
+      "fr": "Indicateurs disponibles",
+      "es": "Indicadores disponibles"
+    },
+    {
+      "line": 5095,
+      "index": 1,
+      "pt": "Visualizações",
+      "key": "business.Visualizacoes3",
+      "en": "Views",
+      "fr": "Vues",
+      "es": "Visualizaciones"
+    },
+    {
+      "line": 5101,
+      "index": 1,
+      "pt": "Exportação e análise",
+      "key": "business.ExportacaoAnalise",
+      "en": "Export and analysis",
+      "fr": "Exportation et analyse",
+      "es": "Exportación y análisis"
+    },
+    {
+      "line": 5102,
+      "index": 1,
+      "pt": "Os indicadores são derivados dos dados reais disponíveis. Métricas sem dados não são estimadas.",
+      "key": "business.IndicadoresSaoDerivados",
+      "en": "Indicators are derived from the available real data. Metrics without data are not estimated.",
+      "fr": "Les indicateurs sont dérivés des données réelles disponibles. Les métriques sans données ne sont pas estimées.",
+      "es": "Los indicadores se derivan de los datos reales disponibles. Las métricas sin datos no se estiman."
+    },
+    {
+      "line": 5104,
+      "index": 1,
+      "pt": "Abrir estatísticas",
+      "key": "business.AbrirEstatisticas",
+      "en": "Open statistics",
+      "fr": "Ouvrir les statistiques",
+      "es": "Abrir estadísticas"
+    },
+    {
+      "line": 5115,
+      "index": 1,
+      "pt": "Fuso horário padrão: Africa/Bissau. O servidor executa estes itens mesmo com o navegador fechado.",
+      "key": "business.FusoHorarioPadrao",
+      "en": "Default time zone: Africa/Bissau. The server runs these items even with the browser closed.",
+      "fr": "Fuseau horaire par défaut : Africa/Bissau. Le serveur exécute ces éléments même navigateur fermé.",
+      "es": "Zona horaria por defecto: Africa/Bissau. El servidor ejecuta estos elementos incluso con el navegador cerrado."
+    },
+    {
+      "line": 5120,
+      "index": 1,
+      "pt": "Ainda não existem conteúdos agendados.",
+      "key": "business.AindaNaoExistem3",
+      "en": "There is no scheduled content yet.",
+      "fr": "Il n'y a pas encore de contenus programmés.",
+      "es": "Todavía no hay contenidos programados."
+    },
+    {
+      "line": 5198,
+      "index": 1,
+      "pt": "Publicação criada pela empresa",
+      "key": "business.PublicacaoCriadaPela",
+      "en": "Post created by the business",
+      "fr": "Publication créée par l'entreprise",
+      "es": "Publicación creada por la empresa"
+    },
+    {
+      "line": 5245,
+      "index": 1,
+      "pt": "Escolha um pacote de créditos de publicação. A quota incluída e os posts comprados são mantidos separadamente e o preço é definido pela Administração.",
+      "key": "business.EscolhaPacoteCreditos",
+      "en": "Choose a post credits package. The included quota and purchased posts are kept separately and the price is set by the Administration.",
+      "fr": "Choisissez un pack de crédits de publication. Le quota inclus et les publications achetées sont conservés séparément et le prix est défini par l'Administration.",
+      "es": "Elija un paquete de créditos de publicación. La cuota incluida y las publicaciones compradas se mantienen por separado y el precio lo define la Administración."
+    },
+    {
+      "line": 5251,
+      "index": 1,
+      "pt": "Posts extra publicáveis",
+      "key": "business.PostsExtraPublicaveis",
+      "en": "Publishable extra posts",
+      "fr": "Publications supplémentaires disponibles",
+      "es": "Publicaciones extra publicables"
+    },
+    {
+      "line": 5251,
+      "index": 2,
+      "pt": "Com aprovação via IA e revisão humana quando necessário",
+      "key": "business.ComAprovacaoVia",
+      "en": "With AI approval and human review when needed",
+      "fr": "Avec approbation par IA et révision humaine si nécessaire",
+      "es": "Con aprobación por IA y revisión humana cuando sea necesario"
+    },
+    {
+      "line": 5261,
+      "index": 1,
+      "pt": "Selecione a Carteira Telemóvel",
+      "key": "business.SelecioneCarteiraTelemovel",
+      "en": "Select the Mobile Wallet",
+      "fr": "Sélectionnez le portefeuille mobile",
+      "es": "Seleccione la cartera móvil"
+    },
+    {
+      "line": 5293,
+      "index": 1,
+      "pt": "Número de Telemóvel (+245)",
+      "key": "business.NumeroTelemovel245",
+      "en": "Mobile Number (+245)",
+      "fr": "Numéro de téléphone mobile (+245)",
+      "es": "Número de teléfono móvil (+245)"
+    },
+    {
+      "line": 5320,
+      "index": 1,
+      "pt": "Comprar Promoção Extra",
+      "key": "business.ComprarPromocaoExtra",
+      "en": "Buy Extra Promotion",
+      "fr": "Acheter une promotion supplémentaire",
+      "es": "Comprar promoción extra"
+    },
+    {
+      "line": 5320,
+      "index": 2,
+      "pt": "Fechar compra de promoção extra",
+      "key": "business.FecharCompraPromocao",
+      "en": "Close extra promotion purchase",
+      "fr": "Fermer l'achat de promotion supplémentaire",
+      "es": "Cerrar compra de promoción extra"
+    },
+    {
+      "line": 5321,
+      "index": 1,
+      "pt": "Escolha um pacote de promoções extra. A promoção só é activada após confirmação do pagamento e continua sujeita às regras de publicação.",
+      "key": "business.EscolhaPacotePromocoes",
+      "en": "Choose an extra promotions package. The promotion is only activated after payment confirmation and remains subject to publishing rules.",
+      "fr": "Choisissez un pack de promotions supplémentaires. La promotion n'est activée qu'après confirmation du paiement et reste soumise aux règles de publication.",
+      "es": "Elija un paquete de promociones extra. La promoción solo se activa tras la confirmación del pago y sigue sujeta a las reglas de publicación."
+    },
+    {
+      "line": 5322,
+      "index": 1,
+      "pt": "Preço e quantidade definidos no catálogo",
+      "key": "business.PrecoQuantidadeDefinidos",
+      "en": "Price and quantity defined in the catalogue",
+      "fr": "Prix et quantité définis dans le catalogue",
+      "es": "Precio y cantidad definidos en el catálogo"
+    },
+    {
+      "line": 5322,
+      "index": 2,
+      "pt": "Pacote de promoções extra",
+      "key": "business.PacotePromocoesExtra",
+      "en": "Extra promotions package",
+      "fr": "Pack de promotions supplémentaires",
+      "es": "Paquete de promociones extra"
+    },
+    {
+      "line": 5323,
+      "index": 1,
+      "pt": "Seleccione a Carteira Telemóvel",
+      "key": "business.SeleccioneCarteiraTelemovel",
+      "en": "Select the Mobile Wallet",
+      "fr": "Sélectionnez le portefeuille mobile",
+      "es": "Seleccione la cartera móvil"
+    },
+    {
+      "line": 5323,
+      "index": 2,
+      "pt": "Número de Telemóvel (+245)",
+      "key": "business.NumeroTelemovel2452",
+      "en": "Mobile Number (+245)",
+      "fr": "Numéro de téléphone mobile (+245)",
+      "es": "Número de teléfono móvil (+245)"
+    },
+    {
+      "line": 5335,
+      "index": 1,
+      "pt": "Escolher / Libertar Escalão de Subscrição",
+      "key": "business.EscolherLibertarEscalao",
+      "en": "Choose / Release Subscription Tier",
+      "fr": "Choisir / libérer le forfait d'abonnement",
+      "es": "Elegir / liberar nivel de suscripción"
+    },
+    {
+      "line": 5347,
+      "index": 1,
+      "pt": "Escolha o novo escalão para a empresa",
+      "key": "business.EscolhaNovoEscalao",
+      "en": "Choose the new tier for the company",
+      "fr": "Choisissez le nouveau forfait de l'entreprise",
+      "es": "Elija el nuevo nivel para la empresa"
+    },
+    {
+      "line": 5348,
+      "index": 1,
+      "pt": ". Ao concluir o pagamento com Orange Money ou MTN, o plano será liberado e ativado imediatamente.",
+      "key": "business.ConcluirPagamentoCom",
+      "en": ". Once payment with Orange Money or MTN is completed, the plan is released and activated immediately.",
+      "fr": ". Une fois le paiement avec Orange Money ou MTN terminé, le forfait est libéré et activé immédiatement.",
+      "es": ". Al completar el pago con Orange Money o MTN, el plan se libera y se activa inmediatamente."
+    },
+    {
+      "line": 5376,
+      "index": 1,
+      "pt": "Número de Telemóvel Orange Money / MTN MoMo",
+      "key": "business.NumeroTelemovelOrange",
+      "en": "Mobile Number Orange Money / MTN MoMo",
+      "fr": "Numéro de téléphone mobile Orange Money / MTN MoMo",
+      "es": "Número de teléfono móvil Orange Money / MTN MoMo"
+    },
+    {
+      "line": 5393,
+      "index": 1,
+      "pt": "Ativação Instantânea:",
+      "key": "business.AtivacaoInstantanea",
+      "en": "Instant Activation:",
+      "fr": "Activation instantanée :",
+      "es": "Activación instantánea:"
+    },
+    {
+      "line": 5393,
+      "index": 2,
+      "pt": "Assim que introduzir o seu PIN USSD no telemóvel, o escalão",
+      "key": "business.AssimQueIntroduzir",
+      "en": "As soon as you enter your USSD PIN on your phone, the tier",
+      "fr": "Dès que vous saisissez votre code PIN USSD sur votre téléphone, le forfait",
+      "es": "En cuanto introduzca su PIN USSD en el teléfono, el nivel"
+    },
+    {
+      "line": 5393,
+      "index": 3,
+      "pt": "será automaticamente liberado para a sua empresa.",
+      "key": "business.SeraAutomaticamenteLiberado",
+      "en": "will be automatically released for your company.",
+      "fr": "sera automatiquement libéré pour votre entreprise.",
+      "es": "se liberará automáticamente para su empresa."
+    },
+    {
+      "line": 5413,
+      "index": 1,
+      "pt": "A Libertar Escalão...",
+      "key": "business.LibertarEscalao",
+      "en": "Releasing Tier...",
+      "fr": "Libération du forfait...",
+      "es": "Liberando nivel..."
+    }
+  ]
+}

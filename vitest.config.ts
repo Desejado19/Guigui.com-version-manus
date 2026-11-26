@@ -1,0 +1,16 @@
+import { defineConfig } from 'vitest/config';
+import path from 'path';
+
+export default defineConfig({
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, '.'),
+    },
+  },
+  test: {
+    include: ['tests/unit/**/*.test.ts', 'tests/unit/**/*.test.tsx'],
+    environment: 'node',
+    globals: true,
+    reporters: ['default'],
+  },
+});

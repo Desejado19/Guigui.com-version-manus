@@ -1,0 +1,48 @@
+name: CI
+
+# Antes só corria em main/master: o trabalho em branches ficava sem rede de
+# segurança e o repo chegou a estar sem compilar num clone limpo.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+# Um push novo no mesmo ref cancela a execução anterior.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: check + build + testes essenciais
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      # `npm ci` usa o package-lock.json versionado; falha se estiver fora de sincronia.
+      - run: npm ci
+      # Tipos de toda a app, servidor e scripts (`lint` é o mesmo comando, por isso não repete).
+      - run: npm run check
+      # Inclui vite build + dist/server.mjs + preflight + verificação de dist.
+      - run: npm run build
+      # Testes unitários/componentes (vitest).
+      - run: npm run test:unit
+      # Auditorias puras de dinheiro: pagamentos e validação de bilhetes.
+      # `npm run test:tickets` inclui também `audit-ticket-flow.ts`, que precisa
+      # de um servidor a correr e de TEST_SESSION_COOKIE — fica para uso local.
+      - run: npm run test:payments
+      - run: npx tsx scripts/audit-ticket-validation.ts
+      - run: npm audit --omit=dev --audit-level=moderate
+
+  # Os testes E2E (Playwright) precisam de PostgreSQL com dados semeados
+  # (`npm run db:seed-demo`) e ainda não têm esse serviço configurado aqui.
+  # Enquanto não houver base de dados no CI, ficam fora do caminho obrigatório
+  # para o pipeline não falhar por falta de infraestrutura.

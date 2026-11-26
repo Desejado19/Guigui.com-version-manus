@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-labelledby="title desc">
+  <title id="title">Guigui.com</title>
+  <desc id="desc">Ícone verde e dourado da plataforma Guigui.com</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="0.62" stop-color="#065f46"/>
+      <stop offset="1" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="48" fill="url(#bg)"/>
+  <circle cx="96" cy="96" r="62" fill="none" stroke="#fbbf24" stroke-width="18"/>
+  <path d="M102 96h38v34c-12 15-27 22-47 22-33 0-56-23-56-56s23-56 56-56c23 0 41 10 52 28l-19 13c-7-10-18-16-33-16-20 0-34 12-34 31s14 31 35 31c10 0 18-2 24-8v-6h-16z" fill="#fff"/>
+  <circle cx="143" cy="54" r="9" fill="#fbbf24"/>
+</svg>
