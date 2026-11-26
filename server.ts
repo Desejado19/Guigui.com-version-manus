@@ -135,6 +135,7 @@ import {
   updateTicketFees,
 } from './server/commercialAdminService';
 import { createCategoryRouter } from './server/categoryRoutes';
+import { createQualityAuditRouter } from './server/qualityAuditRoutes';
 import { createStoryRouter } from './server/storyRoutes';
 import { readFile } from 'node:fs/promises';
 import { injectInstitutionalMeta, injectPolicyMeta, registerInstitutionalRoutes } from './server/institutional/routes';
@@ -1538,6 +1539,9 @@ app.get('/api/sync/bootstrap', async (req, res) => {
 
 app.use('/api/categories', createCategoryRouter());
 app.use('/api', createStoryRouter({ sessionContext, requireSession, requireRole, logger: console }));
+// Auditoria de qualidade: o painel admin consome estes endpoints e antes não
+// tinha router montado, pelo que caía no fallback do SPA (HTML com 200).
+app.use('/api/admin/quality-audit', createQualityAuditRouter(requireRole('admin')));
 
 app.get('/api/businesses', async (req, res) => {
   const pagingResult = parseCollectionPaging(req.query as Record<string, unknown>);
@@ -8119,6 +8123,18 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')
   maxAge: '7d',
   fallthrough: true,
 }));
+
+// Guard de API: qualquer /api/* que não tenha sido tratado acima responde 404
+// JSON. Sem isto o catch-all do SPA devolvia index.html com 200 e os clientes
+// falhavam ao fazer JSON.parse (erros silenciosos nos painéis).
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    error: 'Endpoint de API não encontrado.',
+    code: 'API_ROUTE_NOT_FOUND',
+    method: req.method,
+    path: (req.originalUrl || req.url).split('?')[0],
+  });
+});
 
 async function startServer() {
   // Vite middleware in dev mode
