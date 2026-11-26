@@ -59,3 +59,6 @@ preview-concepts.html
 
 # Capturas temporárias de validação visual
 tmp-*.png
+
+# Evidência de auditoria gerada localmente (capturas, snapshots, relatórios) — não versionar
+audit-evidence/
